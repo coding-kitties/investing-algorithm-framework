@@ -68,7 +68,6 @@ class TestBacktestSave(TestCase):
             trades=[],
             positions=[],
             portfolio_snapshots=self._create_snapshots(),
-            trading_symbol="EUR",
             number_of_runs=1000,
             initial_unallocated=1000,
             created_at=datetime.now(tz=timezone.utc)
@@ -100,29 +99,18 @@ class TestBacktestSave(TestCase):
         """Test saving a Backtest with a BacktestRun that has
         pre-computed BacktestMetrics."""
         date_range = self._create_date_range()
+        window = BacktestWindow(train_range=date_range)
         run = BacktestRun(
-            backtest_window=BacktestWindow(
-                train_range=BacktestDateRange(
-                    start_date=date_range.start_date,
-                    end_date=date_range.end_date,
-                    name=date_range.name,
-                )
-            ),
+            backtest_window=window,
             created_at=datetime.now(tz=timezone.utc),
             orders=[],
             trades=[],
             positions=[],
             portfolio_snapshots=self._create_snapshots(),
-            trading_symbol="EUR",
             number_of_runs=1000,
             initial_unallocated=1000,
             backtest_metrics=BacktestMetrics(
-                backtest_start_date=datetime(
-                    2023, 8, 7, 7, 59, tzinfo=None
-                ),
-                backtest_end_date=datetime(
-                    2023, 12, 2, 0, 0, tzinfo=None
-                ),
+                backtest_window=window,
                 equity_curve=[],
                 total_net_gain=0.2,
                 cagr=0.1,
@@ -169,26 +157,18 @@ class TestBacktestSave(TestCase):
         date_range = BacktestDateRange(
             start_date=start, end_date=end, name=name
         )
+        window = BacktestWindow(train_range=date_range)
         return BacktestRun(
-            backtest_window=BacktestWindow(
-                train_range=BacktestDateRange(
-                    start_date=date_range.start_date,
-                    end_date=date_range.end_date,
-                    name=date_range.name,
-                )
-            ),
+            backtest_window=window,
             created_at=datetime.now(tz=timezone.utc),
             orders=[],
             trades=[],
             positions=[],
             portfolio_snapshots=self._create_snapshots(),
-            trading_symbol="EUR",
             number_of_runs=1000,
             initial_unallocated=1000,
             backtest_metrics=BacktestMetrics(
-                backtest_start_date=start.replace(tzinfo=None),
-
-                backtest_end_date=end.replace(tzinfo=None),
+                backtest_window=window,
                 total_net_gain=total_net_gain,
                 total_net_gain_percentage=total_net_gain / 1000.0,
                 number_of_trades=trades_closed,
@@ -353,14 +333,15 @@ class TestBacktestDirectoryLayoutV9(TestCase):
     def _mk_run(self, gain: float, name: str = "win") -> BacktestRun:
         start = datetime(2023, 1, 1, tzinfo=timezone.utc)
         end = datetime(2023, 12, 31, tzinfo=timezone.utc)
+        window = BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=start,
+                end_date=end,
+                name=name,
+            )
+        )
         return BacktestRun(
-            backtest_window=BacktestWindow(
-                train_range=BacktestDateRange(
-                    start_date=start,
-                    end_date=end,
-                    name=name,
-                )
-            ),
+            backtest_window=window,
             created_at=datetime.now(tz=timezone.utc),
             orders=[],
             trades=[],
@@ -373,13 +354,10 @@ class TestBacktestDirectoryLayoutV9(TestCase):
                     unallocated=1000,
                 ),
             ],
-            trading_symbol="EUR",
             number_of_runs=1,
             initial_unallocated=1000,
             backtest_metrics=BacktestMetrics(
-                backtest_start_date=start.replace(tzinfo=None),
-
-                backtest_end_date=end.replace(tzinfo=None),
+                backtest_window=window,
                 total_net_gain=gain,
                 total_net_gain_percentage=gain / 1000.0,
                 number_of_trades=1,

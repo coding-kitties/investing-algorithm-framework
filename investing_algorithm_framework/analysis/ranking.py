@@ -4,7 +4,8 @@ from typing import List
 from statistics import mean
 
 from investing_algorithm_framework.domain import BacktestEvaluationFocus, \
-    BacktestDateRange, Backtest, BacktestMetrics, OperationalException
+    BacktestDateRange, Backtest, BacktestMetrics, OperationalException, \
+    BacktestWindow
 
 
 def _filter_accepts_backtest(filter_fn) -> bool:
@@ -270,8 +271,10 @@ def combine_backtest_metrics(
 
     # Aggregate
     return BacktestMetrics(
-        backtest_start_date=start_date,
-        backtest_end_date=end_date,
+        backtest_window=BacktestWindow(train_range=BacktestDateRange(
+            start_date=start_date,
+            end_date=end_date,
+        )),
         equity_curve=[],  # leave empty to avoid misleading curves
         total_growth=safe_mean([m.total_growth for m in backtest_metrics]),
         total_growth_percentage=safe_mean(

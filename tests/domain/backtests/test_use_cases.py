@@ -61,10 +61,15 @@ def _run(
     universe_key: str | None = None,
     sharpe: float = 1.0,
 ) -> BacktestRun:
+    window = BacktestWindow(
+        train_range=BacktestDateRange(
+            start_date=start,
+            end_date=end,
+            name=name,
+        )
+    )
     metrics = BacktestMetrics(
-        backtest_start_date=start,
-
-        backtest_end_date=end,
+        backtest_window=window,
         sharpe_ratio=sharpe,
     )
     metadata: dict = {}
@@ -72,14 +77,7 @@ def _run(
         metadata["universe_key"] = universe_key
     return BacktestRun(
         backtest_metrics=metrics,
-        backtest_window=BacktestWindow(
-            train_range=BacktestDateRange(
-                start_date=start,
-                end_date=end,
-                name=name,
-            )
-        ),
-        trading_symbol="EUR",
+        backtest_window=window,
         initial_unallocated=1000.0,
         portfolio_snapshots=[],
         orders=[],
@@ -157,7 +155,7 @@ class TestUseCase1InSample(_BundleRoundTripBase):
         loaded = self.round_trip(self._build(), "uc1b")
         study = loaded.get_study("in_sample")
         self.assertIsInstance(study, Study)
-        self.assertEqual([u.key for u in study.universes], ["majors"])
+        self.assertEqual(study.universe.key, "majors")
         self.assertEqual(len(study.engine_results["vector"].runs), 3)
 
 

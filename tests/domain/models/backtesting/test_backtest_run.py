@@ -8,6 +8,13 @@ from investing_algorithm_framework.domain import BacktestMetrics, Trade, \
     Position
 
 
+def _backtest_window(start_date, end_date):
+    return BacktestWindow(train_range=BacktestDateRange(
+        start_date=start_date,
+        end_date=end_date,
+    ))
+
+
 class TestBacktestMetrics(TestCase):
 
     def setUp(self):
@@ -20,8 +27,7 @@ class TestBacktestMetrics(TestCase):
 
     def test_save(self):
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            backtest_end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
+            backtest_window=_backtest_window(datetime(2020, 1, 1, tzinfo=timezone.utc), datetime(2020, 12, 31, tzinfo=timezone.utc)),
             equity_curve = [
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -125,7 +131,6 @@ class TestBacktestMetrics(TestCase):
                     end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
                 )
             ),
-            trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -187,7 +192,6 @@ class TestBacktestMetrics(TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -201,8 +205,7 @@ class TestBacktestMetrics(TestCase):
 
     def test_open(self):
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            backtest_end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
+            backtest_window=_backtest_window(datetime(2020, 1, 1, tzinfo=timezone.utc), datetime(2020, 12, 31, tzinfo=timezone.utc)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -314,7 +317,6 @@ class TestBacktestMetrics(TestCase):
                     end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
                 )
             ),
-            trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -376,7 +378,6 @@ class TestBacktestMetrics(TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,

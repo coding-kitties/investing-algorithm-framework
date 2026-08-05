@@ -49,29 +49,26 @@ def _snapshots():
 
 def _make_run(start, end, *, gain, trades, symbols=None, market=None,
               metadata=None):
+    window = BacktestWindow(
+        train_range=BacktestDateRange(
+            start_date=start,
+            end_date=end,
+            name=f"{start:%Y%m%d}-{end:%Y%m%d}",
+        )
+    )
     return BacktestRun(
-        backtest_window=BacktestWindow(
-            train_range=BacktestDateRange(
-                start_date=start,
-                end_date=end,
-                name=f"{start:%Y%m%d}-{end:%Y%m%d}",
-            )
-        ),
+        backtest_window=window,
         created_at=datetime.now(tz=timezone.utc),
         orders=[],
         trades=[],
         positions=[],
         portfolio_snapshots=_snapshots(),
-        trading_symbol="EUR",
-        symbols=list(symbols or []),
         data_sources=[{"market": market}] if market else [],
         number_of_runs=10,
         initial_unallocated=1000,
         metadata=dict(metadata or {}),
         backtest_metrics=BacktestMetrics(
-            backtest_start_date=start.replace(tzinfo=None),
-
-            backtest_end_date=end.replace(tzinfo=None),
+            backtest_window=window,
             total_net_gain=gain,
             total_net_gain_percentage=gain / 1000.0,
             number_of_trades=trades,
@@ -97,6 +94,14 @@ def _make_backtest(algorithm_id, universe_key, *, gain, symbols, market):
         algorithm_id=algorithm_id,
         event_runs=[run],
         risk_free_rate=0.02,
+        universes=[
+            Universe(
+                key=universe_key or "default",
+                symbols=list(symbols),
+                trading_symbol="EUR",
+                market=market,
+            )
+        ],
     )
 
 

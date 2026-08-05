@@ -32,12 +32,17 @@ def _make_backtest(algorithm_id="test_algo", n_runs=1, with_metrics=True):
                 unallocated=200,
             ),
         ]
+        window = BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=start,
+                end_date=end,
+                name=f"window_{j}",
+            )
+        )
         metrics = None
         if with_metrics:
             metrics = BacktestMetrics(
-                backtest_start_date=start,
-
-                backtest_end_date=end,
+                backtest_window=window,
                 equity_curve=[
                     (1000, start),
                     (1200, end),
@@ -73,18 +78,11 @@ def _make_backtest(algorithm_id="test_algo", n_runs=1, with_metrics=True):
             )
         runs.append(
             BacktestRun(
-                backtest_window=BacktestWindow(
-                    train_range=BacktestDateRange(
-                        start_date=start,
-                        end_date=end,
-                        name=f"window_{j}",
-                    )
-                ),
+                backtest_window=window,
                 orders=[],
                 trades=[],
                 positions=[],
                 portfolio_snapshots=snapshots,
-                trading_symbol="EUR",
                 initial_unallocated=1000,
                 created_at=datetime.now(tz=timezone.utc),
                 backtest_metrics=metrics,

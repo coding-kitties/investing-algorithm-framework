@@ -41,10 +41,15 @@ def _make_run(
     universe_key: str | None = None,
     sharpe: float = 1.0,
 ) -> BacktestRun:
+    window = BacktestWindow(
+        train_range=BacktestDateRange(
+            start_date=start,
+            end_date=end,
+            name=name,
+        )
+    )
     metrics = BacktestMetrics(
-        backtest_start_date=start,
-
-        backtest_end_date=end,
+        backtest_window=window,
         sharpe_ratio=sharpe,
     )
     metadata: dict = {}
@@ -52,14 +57,7 @@ def _make_run(
         metadata["universe_key"] = universe_key
     return BacktestRun(
         backtest_metrics=metrics,
-        backtest_window=BacktestWindow(
-            train_range=BacktestDateRange(
-                start_date=start,
-                end_date=end,
-                name=name,
-            )
-        ),
-        trading_symbol="EUR",
+        backtest_window=window,
         initial_unallocated=1000.0,
         portfolio_snapshots=[],
         orders=[],

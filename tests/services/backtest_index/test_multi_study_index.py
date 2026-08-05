@@ -45,12 +45,10 @@ def _make_run(*, gain: float = 10.0, trades: int = 2) -> BacktestRun:
             )
         ),
         initial_unallocated=10_000.0,
-        trading_symbol="USDT",
         number_of_runs=1,
         number_of_days=30,
         number_of_orders=trades,
         number_of_trades=trades,
-        symbols=["BTC/USDT"],
     )
 
 

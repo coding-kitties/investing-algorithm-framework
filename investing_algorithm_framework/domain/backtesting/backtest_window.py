@@ -57,12 +57,12 @@ class BacktestWindow:
         if warmup_days < 0:
             raise ValueError("warmup_days must be >= 0")
 
-        train_duration = (train_range.end_date - train_range.start_date).days
+        train_duration = train_range.end_date - train_range.start_date
 
-        if not (warmup_days < train_duration):
+        if timedelta(days=warmup_days) >= train_duration:
             raise ValueError(
                 f"warmup_days ({warmup_days}) must be less than the total "
-                f"training duration ({train_duration} days)"
+                f"training duration ({train_duration})"
             )
 
         if gap_days is not None and gap_days < 0:

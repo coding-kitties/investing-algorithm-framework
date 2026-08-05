@@ -45,28 +45,25 @@ def _snapshots():
 def _make_run(start, end, *, gain, trades, days=120, sharpe=1.5):
     """Build a minimal ``BacktestRun`` carrying explicit
     ``BacktestMetrics`` so we can assert against the aggregator."""
+    window = BacktestWindow(
+        train_range=BacktestDateRange(
+            start_date=start,
+            end_date=end,
+            name=f"{start:%Y%m%d}-{end:%Y%m%d}",
+        )
+    )
     return BacktestRun(
-        backtest_window=BacktestWindow(
-            train_range=BacktestDateRange(
-                start_date=start,
-                end_date=end,
-                name=f"{start:%Y%m%d}-{end:%Y%m%d}",
-            )
-        ),
+        backtest_window=window,
         created_at=datetime.now(tz=timezone.utc),
         orders=[],
         trades=[],
         positions=[],
         portfolio_snapshots=_snapshots(),
-        trading_symbol="EUR",
-        symbols=["BTC"],
         data_sources=[],
         number_of_runs=1,
         initial_unallocated=1000,
         backtest_metrics=BacktestMetrics(
-            backtest_start_date=start.replace(tzinfo=None),
-
-            backtest_end_date=end.replace(tzinfo=None),
+            backtest_window=window,
             total_net_gain=gain,
             total_net_gain_percentage=gain / 1000.0,
             total_growth=gain,

@@ -43,29 +43,26 @@ def _snapshots():
 def _make_run(symbols, metadata=None):
     start = datetime(2023, 1, 1, tzinfo=timezone.utc)
     end = datetime(2023, 5, 1, tzinfo=timezone.utc)
+    window = BacktestWindow(
+        train_range=BacktestDateRange(
+            start_date=start,
+            end_date=end,
+            name="2023Q1",
+        )
+    )
     return BacktestRun(
-        backtest_window=BacktestWindow(
-            train_range=BacktestDateRange(
-                start_date=start,
-                end_date=end,
-                name="2023Q1",
-            )
-        ),
+        backtest_window=window,
         created_at=datetime.now(tz=timezone.utc),
         orders=[],
         trades=[],
         positions=[],
         portfolio_snapshots=_snapshots(),
-        trading_symbol="EUR",
-        symbols=list(symbols),
         data_sources=[],
         number_of_runs=1,
         initial_unallocated=1000,
         metadata=dict(metadata or {}),
         backtest_metrics=BacktestMetrics(
-            backtest_start_date=start.replace(tzinfo=None),
-
-            backtest_end_date=end.replace(tzinfo=None),
+            backtest_window=window,
             total_net_gain=100,
             total_net_gain_percentage=0.1,
             number_of_trades=2,

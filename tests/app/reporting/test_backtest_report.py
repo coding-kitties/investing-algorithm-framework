@@ -70,7 +70,6 @@ class Test(TestCase):
             trades=[],
             positions=[],
             portfolio_snapshots=snapshots,
-            trading_symbol="EUR",
             number_of_runs=1000,
             initial_unallocated=1000,
             created_at=datetime.now(tz=timezone.utc)
@@ -140,12 +139,15 @@ class Test(TestCase):
             trades=[],
             positions=[],
             portfolio_snapshots=snapshots,
-            trading_symbol="EUR",
             number_of_runs=1000,
             initial_unallocated=1000,
             backtest_metrics=BacktestMetrics(
-                backtest_start_date=datetime(2023, 8, 7, 7, 0, tzinfo=None),
-                backtest_end_date=datetime(2023, 8, 8, 7, 0, tzinfo=None),
+                backtest_window=BacktestWindow(
+                    train_range=BacktestDateRange(
+                        start_date=datetime(2023, 8, 7, 7, 0),
+                        end_date=datetime(2023, 8, 8, 7, 0),
+                    )
+                ),
                 equity_curve=[],
                 total_net_gain=0.2,
                 cagr=0.1,

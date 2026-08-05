@@ -11,6 +11,13 @@ from investing_algorithm_framework.domain import Backtest, Order, Position, \
     BacktestWindow
 
 
+def _backtest_window(start_date, end_date):
+    return BacktestWindow(train_range=BacktestDateRange(
+        start_date=start_date,
+        end_date=end_date,
+    ))
+
+
 class TestBacktestSaveOpen(unittest.TestCase):
 
     def setUp(self):
@@ -52,8 +59,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
 
         # Test models
         self.backtest_metrics_run_one = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -165,7 +171,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                     end_date=datetime(2020, 12, 31),
                 )
             ),
-            trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -227,7 +232,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -291,8 +295,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
     def test_save_and_open(self):
         # Mock save and open methods
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -404,7 +407,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                     end_date=datetime(2020, 12, 31),
                 )
             ),
-            trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -466,7 +468,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -571,9 +572,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
 
         first_backtest_run = loaded_backtest.get_all_backtest_runs()[0]
         self.assertEqual(
-            first_backtest_run.trading_symbol, "EUR"
-        )
-        self.assertEqual(
             first_backtest_run.backtest_start_date,
             datetime(2020, 1, 1, tzinfo=timezone.utc)
         )
@@ -622,7 +620,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
             backtest_window=BacktestWindow(
                 train_range=backtest_date_range_one,
             ),
-            trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[],
@@ -630,7 +627,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
             orders=[],
             positions=[],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -643,7 +639,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
             backtest_window=BacktestWindow(
                 train_range=backtest_date_range_two,
             ),
-            trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[],
@@ -651,7 +646,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
             orders=[],
             positions=[],
             created_at=datetime(2021, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -696,8 +690,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
     def test_backtest_hash(self):
         # Mock save and open methods
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -809,7 +802,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                     end_date=datetime(2020, 12, 31),
                 )
             ),
-            trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -871,7 +863,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -941,8 +932,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
 
         # Mock save and open methods
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -1054,7 +1044,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                     end_date=datetime(2020, 12, 31),
                 )
             ),
-            trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -1116,7 +1105,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -1186,8 +1174,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
 
         # Mock save and open methods
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -1299,7 +1286,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                     end_date=datetime(2023, 12, 31),
                 )
             ),
-            trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -1361,7 +1347,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,

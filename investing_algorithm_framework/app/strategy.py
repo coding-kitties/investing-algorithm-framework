@@ -829,7 +829,7 @@ class TradingStrategy:
         if self.strategy_id is not None:
             return self.strategy_id
 
-        return self.worker_id
+        return getattr(self, "worker_id", None) or self.__class__.__name__
 
     def has_open_orders(
         self, target_symbol=None, identifier=None, market=None

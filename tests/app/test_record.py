@@ -112,7 +112,6 @@ class TestBacktestRunRecordedValues(TestCase):
                     end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
                 )
             ),
-            trading_symbol="USD",
             recorded_values={
                 "rsi": [(dt, 70.5)],
                 "sma": [(dt, 100.0)],
@@ -134,7 +133,6 @@ class TestBacktestRunRecordedValues(TestCase):
                     end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
                 )
             ),
-            trading_symbol="USD",
             initial_unallocated=1000.0,
             created_at=dt,
             recorded_values={
@@ -166,7 +164,6 @@ class TestBacktestRunRecordedValues(TestCase):
                     end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
                 )
             ),
-            trading_symbol="USD",
         )
         self.assertEqual(run.recorded_values, {})
         d = run.to_dict()

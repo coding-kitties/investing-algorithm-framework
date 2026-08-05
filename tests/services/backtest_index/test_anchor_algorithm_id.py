@@ -49,12 +49,10 @@ def _make_run(*, trades: int = 2) -> BacktestRun:
             )
         ),
         initial_unallocated=10_000.0,
-        trading_symbol="USDT",
         number_of_runs=1,
         number_of_days=30,
         number_of_orders=trades,
         number_of_trades=trades,
-        symbols=["BTC/USDT"],
     )
 
 
@@ -72,11 +70,16 @@ def _make_backtest(
     algorithm_id: str,
     anchor: str | None,
     sharpe: float,
+    study_name: str | None = None,
 ) -> Backtest:
     return Backtest(
         algorithm_id=algorithm_id,
         anchor_algorithm_id=anchor,
-        study_name="param_robustness" if anchor else "in_sample",
+        study_name=(
+            study_name
+            if study_name is not None
+            else "param_robustness" if anchor else "in_sample"
+        ),
         vector_runs=[_make_run()],
         vector_summary=_make_summary(sharpe),
     )
@@ -260,6 +263,7 @@ class TestCombineBacktestsAnchor(TestCase):
             algorithm_id="child-1",
             anchor=None,
             sharpe=1.0,
+            study_name="param_robustness",
         )
         b = _make_backtest(
             algorithm_id="child-1",

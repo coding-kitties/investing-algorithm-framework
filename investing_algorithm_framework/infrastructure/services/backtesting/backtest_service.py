@@ -874,11 +874,25 @@ class BacktestService:
         # Portfolio configuration from study
         initial_capital = study.initial_capital
         if study.universe is not None:
+            matching_configuration = next((
+                configuration
+                for configuration
+                in self._portfolio_configuration_service.get_all()
+                if configuration.market == study.universe.market
+                and configuration.trading_symbol
+                == study.universe.trading_symbol
+            ), None)
             portfolio_configuration = PortfolioConfiguration(
                 identifier="backtest_portfolio",
                 market=study.universe.market or "BACKTEST",
                 trading_symbol=study.universe.trading_symbol or "USDT",
                 initial_balance=initial_capital or 1000.0,
+                fee_percentage=getattr(
+                    matching_configuration, "fee_percentage", 0.0
+                ),
+                slippage_percentage=getattr(
+                    matching_configuration, "slippage_percentage", 0.0
+                ),
             )
         else:
             _pcs = self._portfolio_configuration_service.get_all()

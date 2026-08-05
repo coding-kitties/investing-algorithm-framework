@@ -40,12 +40,13 @@ def _make_metrics(
     net_gain=500.0, net_gain_pct=5.0,
 ):
     return BacktestMetrics(
-        backtest_start_date=start,
-
-        backtest_end_date=end,
-
-        backtest_date_range_name=name,
-        trading_symbol="EUR",
+        backtest_window=BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=start,
+                end_date=end,
+                name=name,
+            )
+        ),
         initial_unallocated=10000.0,
         final_value=10000.0 + net_gain,
         total_net_gain=net_gain,
@@ -78,7 +79,6 @@ def _make_run(start, end, name, **kw):
                 name=name,
             )
         ),
-        trading_symbol="EUR",
         initial_unallocated=10000.0,
         backtest_metrics=m,
         number_of_trades=kw.get("trades", 20),

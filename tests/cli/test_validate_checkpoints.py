@@ -38,20 +38,19 @@ class TestValidateCheckpoints(TestCase):
             end_date1 = datetime(
                 2024, 6, 30, tzinfo=timezone.utc
             )
+            window1 = BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=start_date1,
+                    end_date=end_date1,
+                )
+            )
 
             metrics1 = BacktestMetrics(
-                backtest_start_date=start_date1,
-                backtest_end_date=end_date1
+                backtest_window=window1,
             )
 
             run1 = BacktestRun(
-                backtest_window=BacktestWindow(
-                    train_range=BacktestDateRange(
-                        start_date=start_date1,
-                        end_date=end_date1,
-                    )
-                ),
-                trading_symbol="EUR",
+                backtest_window=window1,
                 backtest_metrics=metrics1,
                 created_at=datetime.now(timezone.utc)
             )
@@ -65,21 +64,20 @@ class TestValidateCheckpoints(TestCase):
 
             start_date2 = datetime(2024, 7, 1, tzinfo=timezone.utc)
             end_date2 = datetime(2024, 12, 31, tzinfo=timezone.utc)
+            window2 = BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=start_date2,
+                    end_date=end_date2,
+                )
+            )
 
             metrics2 = BacktestMetrics(
-                backtest_start_date=start_date2,
-                backtest_end_date=end_date2
+                backtest_window=window2,
             )
 
             run2 = BacktestRun(
-                backtest_window=BacktestWindow(
-                    train_range=BacktestDateRange(
-                        start_date=start_date2,
-                        end_date=end_date2,
-                    )
-                ),
+                backtest_window=window2,
                 backtest_metrics=metrics2,
-                trading_symbol="EUR",
                 created_at=datetime.now(timezone.utc)
             )
 
@@ -93,21 +91,20 @@ class TestValidateCheckpoints(TestCase):
 
             start_date3 = datetime(2024, 7, 1, tzinfo=timezone.utc)
             end_date3 = datetime(2024, 12, 31, tzinfo=timezone.utc)
+            window3 = BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=start_date3,
+                    end_date=end_date3,
+                )
+            )
 
             metrics3 = BacktestMetrics(
-                backtest_start_date=start_date3,
-                backtest_end_date=end_date3,
+                backtest_window=window3,
             )
 
             run3 = BacktestRun(
-                backtest_window=BacktestWindow(
-                    train_range=BacktestDateRange(
-                        start_date=start_date3,
-                        end_date=end_date3,
-                    )
-                ),
+                backtest_window=window3,
                 backtest_metrics=metrics3,
-                trading_symbol="EUR",
                 created_at=datetime.now(timezone.utc)
             )
 
