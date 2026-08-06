@@ -145,6 +145,7 @@ from investing_algorithm_framework import (
     TakeProfitRule,
     CooldownRule,
     TradingCost,
+    SignalSide,
 )
 
 
@@ -189,19 +190,17 @@ class MyStrategy(TradingStrategy):
         TradingCost(symbol="ETH", fee_percentage=0.1),
     ]
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
+        """Event-mode entry point — live, paper trading, event backtests."""
         ...
+        # yield Signal(symbol="BTC", side=SignalSide.OPEN_LONG, source="my_rule")
+        # yield Signal(symbol="BTC", side=SignalSide.CLOSE_LONG, source="my_rule")
+        # Optional — short selling is opt-in: also yield OPEN_SHORT / CLOSE_SHORT.
 
-    def generate_sell_signals(self, data):
+    def generate_signal_series(self, data):
+        """Vector-mode entry point — only needed for vector backtests."""
         ...
-
-    # Optional — opt in to short selling (vector + event engines, #433/#434).
-    # Override BOTH to enable; otherwise the engine stays long-only.
-    def generate_short_signals(self, data):
-        ...
-
-    def generate_cover_signals(self, data):
-        ...
+        # yield SignalSeries(symbol="BTC", side=SignalSide.OPEN_LONG, series=entry_series)
 ```
 
 → [Strategy docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/strategies)
@@ -526,6 +525,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 from investing_algorithm_framework import (
     TradingStrategy, DataSource, TimeUnit, Schedule, DataType,
     PositionSize, ScalingRule, StopLossRule, CooldownRule,
+    SignalSide, signals_from_column, signal_series_from_column,
 )
 
 
@@ -590,57 +590,54 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         CooldownRule(trigger="any", blocks="any", bars=2),
     ]
 
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals = {}
+    def _add_signal_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = ema(df, period=12, source_column="Close",
+                 result_column="ema_short")
+        df = ema(df, period=26, source_column="Close",
+                 result_column="ema_long")
+        df = crossover(df, first_column="ema_short",
+                        second_column="ema_long",
+                        result_column="ema_crossover")
+        df = crossunder(df, first_column="ema_short",
+                         second_column="ema_long",
+                         result_column="ema_crossunder")
+        df = rsi(df, period=14, source_column="Close", result_column="rsi")
 
+        df["entry"] = (
+            (df["rsi"] < 30)
+            & (df["ema_crossover"].rolling(window=10).max() > 0)
+        ).fillna(False)
+        df["exit"] = (
+            (df["rsi"] >= 70)
+            & (df["ema_crossunder"].rolling(window=10).max() > 0)
+        ).fillna(False)
+        return df
+
+    def generate_signals(self, context, data: Dict[str, Any]):
+        """Event-mode entry point — live, paper trading, event backtests."""
         for symbol in self.symbols:
-            df = data[f"{symbol}_ohlcv"]
-            ema_short = ema(df, period=12, source_column="Close",
-                           result_column="ema_short")
-            ema_long = ema(ema_short, period=26, source_column="Close",
-                          result_column="ema_long")
-            ema_cross = crossover(ema_long,
-                                  first_column="ema_short",
-                                  second_column="ema_long",
-                                  result_column="ema_crossover")
-            rsi_data = rsi(df, period=14, source_column="Close",
-                          result_column="rsi")
-
-            rsi_oversold = rsi_data["rsi"] < 30
-            recent_crossover = (
-                ema_cross["ema_crossover"].rolling(window=10).max() > 0
+            df = self._add_signal_columns(data[f"{symbol}_ohlcv"])
+            yield from signals_from_column(
+                df, "entry", side=SignalSide.OPEN_LONG, symbol=symbol,
+                source="rsi_ema_crossover",
             )
-            signals[symbol] = (rsi_oversold & recent_crossover).fillna(False)
+            yield from signals_from_column(
+                df, "exit", side=SignalSide.CLOSE_LONG, symbol=symbol,
+                source="rsi_ema_crossover",
+            )
 
-        return signals
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals = {}
-
+    def generate_signal_series(self, data: Dict[str, Any]):
+        """Vector-mode entry point — only needed for vector backtests."""
         for symbol in self.symbols:
-            df = data[f"{symbol}_ohlcv"]
-            ema_short = ema(df, period=12, source_column="Close",
-                           result_column="ema_short")
-            ema_long = ema(ema_short, period=26, source_column="Close",
-                          result_column="ema_long")
-            ema_cross = crossunder(ema_long,
-                                   first_column="ema_short",
-                                   second_column="ema_long",
-                                   result_column="ema_crossunder")
-            rsi_data = rsi(df, period=14, source_column="Close",
-                          result_column="rsi")
-
-            rsi_overbought = rsi_data["rsi"] >= 70
-            recent_crossunder = (
-                ema_cross["ema_crossunder"].rolling(window=10).max() > 0
+            df = self._add_signal_columns(data[f"{symbol}_ohlcv"])
+            yield signal_series_from_column(
+                df, "entry", side=SignalSide.OPEN_LONG, symbol=symbol,
+                source="rsi_ema_crossover",
             )
-            signals[symbol] = (rsi_overbought & recent_crossunder).fillna(False)
-
-        return signals
+            yield signal_series_from_column(
+                df, "exit", side=SignalSide.CLOSE_LONG, symbol=symbol,
+                source="rsi_ema_crossover",
+            )
 ```
 
 Create as many strategy variants as you want — different parameters, different indicators, different symbols — then backtest them all and compare in a single report.
