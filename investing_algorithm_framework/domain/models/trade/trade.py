@@ -353,7 +353,9 @@ class Trade(BaseModel):
             "closed_at": closed_at,
             "updated_at": updated_at,
             "net_gain": self.net_gain if self.net_gain is not None else 0,
-            "total_fees": self.total_fees if self.total_fees is not None else 0,
+            "total_fees": (
+                self.total_fees if self.total_fees is not None else 0
+            ),
             "cost": self.cost if self.cost is not None else 0,
             "stop_losses": [
                 stop_loss.to_dict(datetime_format=datetime_format)

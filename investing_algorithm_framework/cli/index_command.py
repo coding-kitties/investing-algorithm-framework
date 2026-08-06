@@ -48,7 +48,8 @@ def _iter_bundle_paths(
     excluded = set(exclude_dirs) if exclude_dirs else set()
     results = []
     for path in directory.rglob(f"*{BUNDLE_EXT}"):
-        if excluded and any(part in excluded for part in path.relative_to(directory).parts[:-1]):
+        relative_parts = path.relative_to(directory).parts[:-1]
+        if excluded and any(part in excluded for part in relative_parts):
             continue
         results.append(path)
     return sorted(results)
@@ -90,7 +91,9 @@ def build_index(
         raise NotADirectoryError(f"Not a directory: {src}")
 
     out = Path(output).resolve() if output else src / DEFAULT_INDEX_NAME
-    paths: List[Path] = list(_iter_bundle_paths(src, exclude_dirs=exclude_dirs))
+    paths: List[Path] = list(
+        _iter_bundle_paths(src, exclude_dirs=exclude_dirs)
+    )
 
     pbar = None
     if show_progress:

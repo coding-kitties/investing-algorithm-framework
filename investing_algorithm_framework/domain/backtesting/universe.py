@@ -49,7 +49,7 @@ class Universe:
             self.key = self.generate_key()
 
     def generate_key(self) -> str:
-        """Generate a stable key based on symbols, trading symbol, and market."""
+        """Generate a key from symbols, trading symbol, and market."""
         symbols_str = ",".join(sorted(self.symbols))
         return f"{symbols_str}|{self.trading_symbol}|{self.market}"
 

@@ -142,10 +142,9 @@ class EventLoopService:
                 symbol_set.add(trade.symbol)
 
         for symbol in symbol_set:
-            data[symbol] = self._data_provider_service\
-                .get_ohlcv_data(
-                    symbol=symbol, date=date
-                )
+            data[symbol] = self._data_provider_service.get_ohlcv_data(
+                symbol=symbol, date=date
+            )
         return data
 
     def _get_strategies(
@@ -722,22 +721,24 @@ class EventLoopService:
             for data_source in data_sources:
                 # For backtesting, we use the start date and end date
                 # from the data source to fetch the data
-                data_object[data_source.get_identifier()] = \
+                data_object[data_source.get_identifier()] = (
                     self._data_provider_service.get_backtest_data(
                         data_source=data_source,
                         backtest_index_date=current_datetime,
                         start_date=data_source.start_date,
                         end_date=data_source.end_date,
                     )
+                )
         else:
             for data_source in data_sources:
-                data_object[data_source.get_identifier()] = \
+                data_object[data_source.get_identifier()] = (
                     self._data_provider_service.get_data(
                         data_source=data_source,
                         date=current_datetime,
                         start_date=data_source.start_date,
                         end_date=data_source.end_date,
                     )
+                )
 
         # Step 3: Check pending orders, stop losses, take profits
         self._trade_order_evaluator.evaluate(

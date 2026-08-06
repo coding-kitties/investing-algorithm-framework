@@ -16,7 +16,8 @@ import pandas as pd
 import polars as pl
 
 from investing_algorithm_framework.domain import BacktestRun, \
-    OperationalException, BacktestDateRange, BacktestWindow, Backtest, combine_backtests, \
+    OperationalException, BacktestDateRange, BacktestWindow, Backtest, \
+    combine_backtests, \
     generate_backtest_summary_metrics, DataSource, Study, EngineSlot, \
     PortfolioConfiguration, tqdm, SnapshotInterval, \
     save_backtests_to_directory, TimeFrame, resolve_backtest_path, \

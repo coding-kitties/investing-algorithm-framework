@@ -6,7 +6,8 @@ import logging
 import pandas as pd
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
-    BacktestRun, BacktestWindow, Portfolio, TimeFrame, PortfolioConfiguration, \
+    BacktestRun, BacktestWindow, Portfolio, TimeFrame, \
+    PortfolioConfiguration, \
     PortfolioSnapshot, OperationalException, Order, OrderType, OrderStatus, \
     OrderSide, Trade, TradeStatus, DataType, TradingCost, CooldownTracker, \
     SignalSide
@@ -118,17 +119,18 @@ class VectorBacktestService:
         # Build master index (union of all indices in signal dict)
         index = pd.Index([])
 
-        most_granular_ohlcv_data_source = \
+        most_granular_ohlcv_data_source = (
             self.get_most_granular_ohlcv_data_source(
                 strategy.data_sources
             )
+        )
 
         most_granular_ohlcv_data = self.data_provider_service.get_ohlcv_data(
-                symbol=most_granular_ohlcv_data_source.symbol,
-                start_date=backtest_date_range.start_date,
-                end_date=backtest_date_range.end_date,
-                pandas=True
-            )
+            symbol=most_granular_ohlcv_data_source.symbol,
+            start_date=backtest_date_range.start_date,
+            end_date=backtest_date_range.end_date,
+            pandas=True
+        )
 
         # Make sure to filter out the buy and sell signals that are before
         # the backtest start date

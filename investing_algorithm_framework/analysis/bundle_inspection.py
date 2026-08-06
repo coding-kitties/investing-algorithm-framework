@@ -1,5 +1,10 @@
 from pathlib import Path
-from typing import List, Union
+from typing import List, TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from investing_algorithm_framework.domain.backtesting.backtest import (
+        Backtest,
+    )
 
 
 def print_bundle_summary(
@@ -21,9 +26,9 @@ def print_bundle_summary(
 
     bundles = _resolve_bundles(source, Backtest)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {len(bundles)} bundle(s)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     for i, bt in enumerate(bundles):
         print(f"\n[{i}] algorithm_id={bt.algorithm_id!r}")
@@ -95,7 +100,9 @@ def _print_monte_carlo_tests(bt) -> None:
 def _resolve_bundles(source, backtest_cls):
     """Normalise *source* into a list of Backtest objects."""
     # Already a list of Backtest instances.
-    if isinstance(source, list) and source and isinstance(source[0], backtest_cls):
+    if (isinstance(source, list)
+            and source
+            and isinstance(source[0], backtest_cls)):
         return source
 
     # A list of file paths.

@@ -204,7 +204,8 @@ def generate_k_fold_backtest_windows(
 
     The total date range is divided into ``n_splits`` equal-sized test folds
     in strictly chronological order. For fold ``i``, the training window is
-    an *expanding* window covering ``[start_date, test_fold_i.start - gap_days)``,
+    an *expanding* window covering
+    ``[start_date, test_fold_i.start - gap_days)``,
     so every day in the range appears in exactly one test fold and there is
     no look-ahead bias.
 

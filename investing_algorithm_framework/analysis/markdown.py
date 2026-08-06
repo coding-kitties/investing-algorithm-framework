@@ -97,18 +97,18 @@ def create_markdown_table(data: List[Union[Dict[str, Any], Any]]):
 # ``format_spec`` is a Python format string applied to non-None values;
 # use ``""`` to fall back to ``str()`` (useful for ints).
 DEFAULT_METRIC_COLUMNS = [
-    ("total_net_gain_percentage", "Net Gain %",   "{:.2f}"),
-    ("cagr",                      "CAGR %",       "{:.2f}"),
-    ("sharpe_ratio",              "Sharpe",       "{:.2f}"),
-    ("sortino_ratio",             "Sortino",      "{:.2f}"),
-    ("calmar_ratio",              "Calmar",       "{:.2f}"),
-    ("profit_factor",             "Profit Factor", "{:.2f}"),
-    ("max_drawdown",              "Max DD %",     "{:.2f}"),
-    ("annual_volatility",         "Volatility %", "{:.2f}"),
-    ("win_rate",                  "Win Rate %",   "{:.2f}"),
-    ("number_of_trades",          "Trades",       ""),
-    ("stability_score", "Stability",     "{:.2f}"),
-    ("consistency_score", "Consistency",   "{:.2f}"),
+    ("total_net_gain_percentage", "Net Gain %", "{:.2f}"),
+    ("cagr", "CAGR %", "{:.2f}"),
+    ("sharpe_ratio", "Sharpe", "{:.2f}"),
+    ("sortino_ratio", "Sortino", "{:.2f}"),
+    ("calmar_ratio", "Calmar", "{:.2f}"),
+    ("profit_factor", "Profit Factor", "{:.2f}"),
+    ("max_drawdown", "Max DD %", "{:.2f}"),
+    ("annual_volatility", "Volatility %", "{:.2f}"),
+    ("win_rate", "Win Rate %", "{:.2f}"),
+    ("number_of_trades", "Trades", ""),
+    ("stability_score", "Stability", "{:.2f}"),
+    ("consistency_score", "Consistency", "{:.2f}"),
 ]
 
 
@@ -127,20 +127,24 @@ _PERCENT_RATIO_ATTRS = {
 
 
 DEFAULT_SUMMARY_METRIC_COLUMNS = [
-    ("total_net_gain_percentage", "Net Gain %",   "{:.2f}"),
-    ("cagr",                      "CAGR %",       "{:.2f}"),
-    ("sharpe_ratio",              "Sharpe",       "{:.2f}"),
-    ("sortino_ratio",             "Sortino",      "{:.2f}"),
-    ("calmar_ratio",              "Calmar",       "{:.2f}"),
-    ("profit_factor",             "Profit Factor", "{:.2f}"),
-    ("max_drawdown",              "Max DD %",     "{:.2f}"),
-    ("annual_volatility",         "Volatility %", "{:.2f}"),
-    ("win_rate",                  "Win Rate %",   "{:.2f}"),
-    ("number_of_trades",          "Trades",       ""),
-    ("stability_score",           "Stability",     "{:.2f}"),
-    ("consistency_score",         "Consistency",   "{:.2f}"),
-    ("number_of_windows",              "Windows",      ""),
-    ("average_window_duration (days)",             "Avg Window Duration (days)", "{:.2f}"),
+    ("total_net_gain_percentage", "Net Gain %", "{:.2f}"),
+    ("cagr", "CAGR %", "{:.2f}"),
+    ("sharpe_ratio", "Sharpe", "{:.2f}"),
+    ("sortino_ratio", "Sortino", "{:.2f}"),
+    ("calmar_ratio", "Calmar", "{:.2f}"),
+    ("profit_factor", "Profit Factor", "{:.2f}"),
+    ("max_drawdown", "Max DD %", "{:.2f}"),
+    ("annual_volatility", "Volatility %", "{:.2f}"),
+    ("win_rate", "Win Rate %", "{:.2f}"),
+    ("number_of_trades", "Trades", ""),
+    ("stability_score", "Stability", "{:.2f}"),
+    ("consistency_score", "Consistency", "{:.2f}"),
+    ("number_of_windows", "Windows", ""),
+    (
+        "average_window_duration (days)",
+        "Avg Window Duration (days)",
+        "{:.2f}",
+    ),
 ]
 
 # Default trade-focused metrics shown by
@@ -148,30 +152,34 @@ DEFAULT_SUMMARY_METRIC_COLUMNS = [
 # ``BacktestMetrics`` (per-run) and ``BacktestSummaryMetrics``
 # (per-engine aggregate), so this list works for either ``level``.
 DEFAULT_TRADE_METRIC_COLUMNS = [
-    ("number_of_trades",                 "Trades",        ""),
-    ("number_of_trades_closed",          "Closed",        ""),
-    ("win_rate",                         "Win Rate",      "{:.2f}"),
-    ("profit_factor",                    "Profit Factor", "{:.2f}"),
-    ("average_trade_gain_percentage",    "Avg Win %",     "{:.2f}"),
-    ("average_trade_loss_percentage",    "Avg Loss %",    "{:.2f}"),
-    ("average_trade_return_percentage",  "Avg Return %",  "{:.2f}"),
-    ("average_trade_duration",           "Avg Duration",  "{:.2f}"),
-    ("trades_per_week",                  "Trades/Week",   "{:.2f}"),
+    ("number_of_trades", "Trades", ""),
+    ("number_of_trades_closed", "Closed", ""),
+    ("win_rate", "Win Rate", "{:.2f}"),
+    ("profit_factor", "Profit Factor", "{:.2f}"),
+    ("average_trade_gain_percentage", "Avg Win %", "{:.2f}"),
+    ("average_trade_loss_percentage", "Avg Loss %", "{:.2f}"),
+    ("average_trade_return_percentage", "Avg Return %", "{:.2f}"),
+    ("average_trade_duration", "Avg Duration", "{:.2f}"),
+    ("trades_per_week", "Trades/Week", "{:.2f}"),
 ]
 
 DEFAULT_METRIC_COLUMNS = [
-    ("total_net_gain_percentage", "Net Gain %",   "{:.2f}"),
-    ("cagr",                      "CAGR %",       "{:.2f}"),
-    ("sharpe_ratio",              "Sharpe",       "{:.2f}"),
-    ("sortino_ratio",             "Sortino",      "{:.2f}"),
-    ("calmar_ratio",              "Calmar",       "{:.2f}"),
-    ("profit_factor",             "Profit Factor", "{:.2f}"),
-    ("max_drawdown",              "Max DD %",     "{:.2f}"),
-    ("annual_volatility",         "Volatility %", "{:.2f}"),
-    ("win_rate",                  "Win Rate %",   "{:.2f}"),
-    ("number_of_trades",          "Trades",       ""),
-    ("number_of_windows",              "Windows",      ""),
-    ("average_window_duration (days)",             "Avg Window Duration (days)", "{:.2f}"),
+    ("total_net_gain_percentage", "Net Gain %", "{:.2f}"),
+    ("cagr", "CAGR %", "{:.2f}"),
+    ("sharpe_ratio", "Sharpe", "{:.2f}"),
+    ("sortino_ratio", "Sortino", "{:.2f}"),
+    ("calmar_ratio", "Calmar", "{:.2f}"),
+    ("profit_factor", "Profit Factor", "{:.2f}"),
+    ("max_drawdown", "Max DD %", "{:.2f}"),
+    ("annual_volatility", "Volatility %", "{:.2f}"),
+    ("win_rate", "Win Rate %", "{:.2f}"),
+    ("number_of_trades", "Trades", ""),
+    ("number_of_windows", "Windows", ""),
+    (
+        "average_window_duration (days)",
+        "Avg Window Duration (days)",
+        "{:.2f}",
+    ),
 ]
 
 
@@ -468,7 +476,8 @@ def create_cross_study_metrics_table(
         backtests: List of ``Backtest`` objects, each expected to
             carry every study in ``studies`` on the same bundle (the
             standard multi-study-per-envelope layout produced by
-            ``app.run_backtest(..., study=..., backtest_storage_directory=...)``
+            ``app.run_backtest(..., study=...,``
+            ``backtest_storage_directory=...)``
             when the study names match across runs).
         studies: Study names (or ``Study`` objects — ``.name`` is
             used) to compare, in column order, e.g.
@@ -699,7 +708,9 @@ def show_study(study) -> str:
     # Config table
     config_rows = []
     if study.initial_capital is not None:
-        config_rows.append(("Initial Capital", f"{study.initial_capital:,.2f}"))
+        config_rows.append(
+            ("Initial Capital", f"{study.initial_capital:,.2f}")
+        )
     if study.risk_free_rate is not None:
         config_rows.append(("Risk-Free Rate", f"{study.risk_free_rate:.4f}"))
     if study.sample_type is not None:
@@ -923,12 +934,20 @@ def show_trade_insights(
                 )),
                 ("Short Win Rate", format_decimal_percent(m.short_win_rate)),
                 ("Winning Trades", (
-                    f"{m.number_of_positive_trades:,} "
-                    f"({format_percentage_points(m.percentage_positive_trades)})"
+                    "{:,} ({})".format(
+                        m.number_of_positive_trades,
+                        format_percentage_points(
+                            m.percentage_positive_trades
+                        ),
+                    )
                 )),
                 ("Losing Trades", (
-                    f"{m.number_of_negative_trades:,} "
-                    f"({format_percentage_points(m.percentage_negative_trades)})"
+                    "{:,} ({})".format(
+                        m.number_of_negative_trades,
+                        format_percentage_points(
+                            m.percentage_negative_trades
+                        ),
+                    )
                 )),
                 ("Win Rate", format_decimal_percent(m.win_rate)),
                 ("Average Winner", format_decimal_percent(
@@ -938,7 +957,8 @@ def show_trade_insights(
                     m.average_trade_loss_percentage, signed=True
                 )),
                 ("Average Duration", (
-                    f"{format_number(m.average_trade_duration, decimals=1)} hours"
+                    f"{format_number(m.average_trade_duration, decimals=1)} "
+                    "hours"
                 )),
                 ("Trades per Week", format_number(m.trades_per_week)),
             ])

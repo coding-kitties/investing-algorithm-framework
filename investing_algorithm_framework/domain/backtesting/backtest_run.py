@@ -25,7 +25,7 @@ from investing_algorithm_framework.domain.models.trade.trade_status import (
 from investing_algorithm_framework.domain.models.trade.trade_stop_loss import (
     TradeStopLoss,
 )
-from investing_algorithm_framework.domain.models.trade.trade_take_profit import (
+from ..models.trade.trade_take_profit import (
     TradeTakeProfit,
 )
 
@@ -38,7 +38,7 @@ logger = getLogger(__name__)
 
 
 def _ensure_utc_iso(value: Any) -> Any:
-    """Return an ISO-8601 UTC string for a datetime, or the value unchanged."""
+    """Convert a datetime to ISO-8601 UTC; leave other values unchanged."""
     if not hasattr(value, "isoformat"):
         return value
     if value.tzinfo is None:
@@ -218,7 +218,10 @@ class BacktestRun:
 
     @property
     def backtest_start_date(self) -> datetime:
-        """Start of the active range (``test_range`` if set, else ``train_range``)."""
+        """Start of the active range.
+
+        Uses ``test_range`` when set, otherwise ``train_range``.
+        """
         return self._active_range.start_date
 
     @property
@@ -228,7 +231,7 @@ class BacktestRun:
 
     @property
     def backtest_date_range_name(self) -> Optional[str]:
-        """Name of the active range; the join key back to the study's windows."""
+        """Name of the active range; joins back to the study's windows."""
         return self._active_range.name
 
     @property
@@ -276,7 +279,9 @@ class BacktestRun:
             "data_sources": list(self.data_sources),
             "signals": _serialise_signals(self.signals),
             "signal_events": _serialise_signal_events(self.signal_events),
-            "recorded_values": _serialise_recorded_values(self.recorded_values),
+            "recorded_values": _serialise_recorded_values(
+                self.recorded_values
+            ),
             "metadata": dict(self.metadata),
         }
 
@@ -365,7 +370,7 @@ class BacktestRun:
 
     @staticmethod
     def open(directory_path: Union[str, Path]) -> "BacktestRun":
-        """Load a :class:`BacktestRun` from a ``metrics.json`` + ``run.json`` pair."""
+        """Load a run from a ``metrics.json`` and ``run.json`` pair."""
         directory_path = str(directory_path)
         if not os.path.exists(directory_path):
             raise OperationalException(
@@ -396,7 +401,7 @@ class BacktestRun:
         )
 
     def save(self, directory_path: Union[str, Path]) -> None:
-        """Persist this run to ``metrics.json`` + ``run.json`` under *directory_path*."""
+        """Persist ``metrics.json`` and ``run.json`` under the directory."""
         directory_path = str(directory_path)
         os.makedirs(directory_path, exist_ok=True)
 

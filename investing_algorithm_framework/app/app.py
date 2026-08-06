@@ -980,10 +980,9 @@ class App:
         if inspect.isclass(task):
             task = task()
 
-        assert isinstance(task, Task), \
-            OperationalException(
-                "Task object is not an instance of a Task"
-            )
+        assert isinstance(task, Task), OperationalException(
+            "Task object is not an instance of a Task"
+        )
 
         self._tasks.append(task)
 
@@ -1157,8 +1156,7 @@ class App:
 
         return True, missing_data_info
 
-
-    def get_backtest_data(
+    def get_backtest_data(  # noqa: F811
         self,
         strategy: TradingStrategy,
         backtest_date_range: BacktestDateRange,
@@ -1259,7 +1257,7 @@ class App:
 
         return data
 
-    def run_vector_backtests(
+    def run_vector_backtests(  # noqa: F811
         self,
         strategies: List[TradingStrategy],
         backtest_date_range: BacktestDateRange = None,
@@ -1528,7 +1526,7 @@ class App:
             iterative_summary_update=iterative_summary_update,
         )
 
-    def run_vector_backtest(
+    def run_vector_backtest(  # noqa: F811
         self,
         strategy: TradingStrategy = None,
         backtest_date_range: BacktestDateRange = None,
@@ -1687,7 +1685,7 @@ class App:
 
         return backtest
 
-    def run_backtests(
+    def run_backtests(  # noqa: F811
         self,
         backtest_date_ranges: List[BacktestDateRange],
         initial_amount=None,
@@ -1864,7 +1862,7 @@ class App:
 
         return backtests
 
-    def get_backtest_data(
+    def get_backtest_data(  # noqa: F811
         self,
         strategy: TradingStrategy,
         backtest_date_range: BacktestDateRange,
@@ -1965,7 +1963,7 @@ class App:
 
         return data
 
-    def run_vector_backtests(
+    def run_vector_backtests(  # noqa: F811
         self,
         strategies: List[TradingStrategy],
         backtest_date_range: BacktestDateRange = None,
@@ -2239,7 +2237,7 @@ class App:
             iterative_summary_update=iterative_summary_update,
         )
 
-    def run_vector_backtest(
+    def run_vector_backtest(  # noqa: F811
         self,
         strategy: TradingStrategy = None,
         backtest_date_range: BacktestDateRange = None,
@@ -2398,7 +2396,7 @@ class App:
 
         return backtest
 
-    def run_backtests(
+    def run_backtests(  # noqa: F811
         self,
         backtest_date_ranges: List[BacktestDateRange],
         initial_amount=None,
@@ -2575,7 +2573,7 @@ class App:
 
         return backtests
 
-    def get_backtest_data(
+    def get_backtest_data(  # noqa: F811
         self,
         strategy: TradingStrategy,
         backtest_date_range: BacktestDateRange,
@@ -2676,7 +2674,6 @@ class App:
 
         return data
 
-
     def run_backtest(
         self,
         strategy: Optional[TradingStrategy] = None,
@@ -2775,7 +2772,8 @@ class App:
                         _market = pc.market
                     if _trading_symbol is None:
                         _trading_symbol = pc.trading_symbol
-                    if _initial_amount is None and hasattr(pc, "initial_balance"):
+                    if (_initial_amount is None
+                            and hasattr(pc, "initial_balance")):
                         _initial_amount = pc.initial_balance
                     break
 
@@ -2880,10 +2878,10 @@ class App:
             )
 
         # Engine selection priority:
-        #   1. Explicit study.engine value (VECTOR or EVENT) → always respected.
+        #   1. Explicit study.engine value (VECTOR or EVENT) is respected.
         #   2. Auto-detect when study.engine is None:
-        #      vectorized ONLY if every strategy overrides generate_signal_series
-        #      AND none of them override generate_signals.
+        #      vectorized only if every strategy overrides
+        #      generate_signal_series and none override generate_signals.
         _base_gss = TradingStrategy.generate_signal_series
         _base_gs = TradingStrategy.generate_signals
         if engine == BacktestEngine.VECTOR:
@@ -2892,7 +2890,10 @@ class App:
             use_vector = False
         else:
             use_vector = (
-                all(type(s).generate_signal_series is not _base_gss for s in strats)
+                all(
+                    type(s).generate_signal_series is not _base_gss
+                    for s in strats
+                )
                 and all(type(s).generate_signals is _base_gs for s in strats)
             )
 
@@ -2941,7 +2942,9 @@ class App:
                         study.initial_capital
                     )
 
-            backtest_service: BacktestService = self.container.backtest_service()
+            backtest_service: BacktestService = (
+                self.container.backtest_service()
+            )
             backtests = backtest_service.run_vector_backtests(
                 strategies=strats,
                 study=study,
@@ -2987,7 +2990,7 @@ class App:
                 )
             data_provider_service.add_data_provider(CCXTOHLCVDataProvider())
 
-            # Inject universe symbols/market into strategies that don't set them
+            # Inject universe fields into strategies that do not set them.
             if universe is not None:
                 _u_map = _build_strategy_universe_map(strats, universe)
                 for _s in strats:
@@ -3035,8 +3038,10 @@ class App:
                 blotter=self._blotter,
             )
 
-            # TODO: Given that this is already defined in the
-            # study instance we can just give the study instance to the backtest service and let it handle the rest. This will avoid having to pass all these parameters around. The backtest service can then form the Backtest instances with the study instance and the backtest windows. This will also allow us to add more fields to the study instance in the future without having to change the signature of this method.
+            # TODO: Pass the study directly to the backtest service. It can
+            # form Backtest instances from the study and its windows, avoiding
+            # this parameter list and future signature changes for Study
+            # fields.
             _apply_study_fields(
                 backtests,
                 study_name,
@@ -3161,12 +3166,13 @@ class App:
                     end_date=backtest_date_range.end_date
                 )
                 original_data_combinations.append((data_source, data))
-                original_datasets_ordered_by_symbol[data_source.symbol] = \
+                original_datasets_ordered_by_symbol[data_source.symbol] = (
                     data_provider_service.get_data(
                         data_source=data_source,
                         start_date=data_provider._start_date_data_source,
                         end_date=backtest_date_range.end_date
                     )
+                )
 
         for _ in tqdm(
             range(number_of_permutations),

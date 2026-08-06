@@ -559,8 +559,8 @@ def _backtest_to_index_rows(
     want the legacy flat dict shape (Parquet / SQL columns). Returns
     one row per populated engine — vector first, then event. The
     typed :class:`BacktestIndexRow` is the authoritative contract —
-    see ``docs/architecture/backtest/tiered-backtest-storage.md`` §3.1 and the v9.0
-    dual-engine design doc §6.
+    see ``docs/architecture/backtest/tiered-backtest-storage.md`` §3.1
+    and the v9.0 dual-engine design doc §6.
     """
     return [
         row.to_flat_dict()

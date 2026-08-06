@@ -34,7 +34,8 @@ class _BacktestWindowChartGrid:
 
         return HTML(
             '<div style="display:grid;gap:16px;'
-            'grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr));'
+            'grid-template-columns:repeat('
+            'auto-fit,minmax(min(100%,480px),1fr));'
             f'width:{width_css}">{"".join(charts)}</div>'
         )
 
@@ -353,7 +354,6 @@ def plot_backtest_windows(
     # Safest fix: convert to explicit int64 milliseconds and pass as a plain
     # numpy array.  numpy arrays have no .to_numpy() so _to_time_array skips
     # the datetime branch and treats the values as raw milliseconds directly.
-    import numpy as np
     idx = price_df.index
     if getattr(idx, "tz", None) is not None:
         idx = idx.tz_convert("UTC").tz_localize(None)
@@ -410,7 +410,7 @@ def plot_backtest_windows(
 
         for kind_label, date_range, color in (
             ("train", train, train_color),
-            ("test",  test,  test_color),
+            ("test", test, test_color),
         ):
             if date_range is None:
                 continue

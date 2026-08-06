@@ -166,9 +166,15 @@ class Study:
     aggregates across runs. Tier 1 is one-row-per-run by design.
     These have two options when tiered storage ships:
 
-    1. Derive on demand — SELECT from the Tier 1 backtest_runs table and re-compute generate_backtest_summary_metrics over the filtered set. This is actually what get_metrics() already does in-memory.
-    2. Separate table — a study_summaries table with one row per (study_name, engine), storing the pre-computed aggregate. Mirrors today's summary field.
-    backtest_windows on the study is also redundant in tiered storage — each run row already carries start_date/end_date/date_range_name, so the window catalogue can be reconstructed with SELECT DISTINCT. It stays in the Study for the .obtf export path and for in-memory filtering without a SQL query.
+     1. Derive on demand from the Tier 1 ``backtest_runs`` table and
+         recompute summary metrics over the filtered set. This is what
+         ``get_metrics()`` already does in memory.
+     2. Store a ``study_summaries`` row per ``(study_name, engine)``
+         containing the precomputed aggregate, mirroring today's summary.
+
+     ``backtest_windows`` is also redundant in tiered storage because each
+     run carries its date range. The catalogue can be reconstructed with
+     ``SELECT DISTINCT``; it remains for OBTF export and in-memory filtering.
 
     Attributes:
         name: Stable identifier for this study within its parent
@@ -196,8 +202,9 @@ class Study:
               train/test splits.
             * ``"stress"`` — stress-test / parameter perturbation.
             * ``"monte_carlo"`` — Monte-Carlo scenario runs.
-                        * ``"exploratory"`` — one-off experiment or visualization
-                            that is not formal validation evidence.
+                        * ``"exploratory"`` — one-off experiment or
+                            visualization that is not formal validation
+                            evidence.
 
             Consumers MUST treat unknown values as opaque strings.
             ``None`` means the runner did not tag the study (e.g.
@@ -222,7 +229,7 @@ class Study:
     name: str = "default"
     description: Optional[str] = None
     backtest_windows: List[BacktestWindow] = field(default_factory=list)
-    universe: Optional[Universe] = None # Probably is required
+    universe: Optional[Universe] = None  # Probably is required
     # Client facing only, will not be persisted in the bundle.
     # Use engine_results for persisted data.
     engines: List[BacktestEngine] = field(default_factory=list)
@@ -455,7 +462,10 @@ class Study:
             "description": self.description,
             "initial_capital": self.initial_capital,
             "risk_free_rate": self.risk_free_rate,
-            "universe": self.universe.to_dict() if self.universe is not None else None,
+            "universe": (
+                self.universe.to_dict()
+                if self.universe is not None else None
+            ),
             "backtest_windows": [
                 bw.to_dict() for bw in (self.backtest_windows or [])
             ],
@@ -511,8 +521,8 @@ class Study:
         universe_raw = data.get("universe")
 
         if universe_raw is None:
-            # Back-compat: older serialisations stored a list under "universes";
-            # take the first entry.
+            # Older serialisations stored a list under "universes";
+            # take its first entry.
             universes_list = data.get("universes") or []
             universe_raw = universes_list[0] if universes_list else None
 
@@ -674,8 +684,10 @@ class Study:
                 f"    {engine_name!r}: EngineSlot(",
                 f"      state={state!r},",
                 f"      runs={len(slot.runs)},",
-                f"      summary={'present' if slot.summary is not None else None!r},",
-                f"      summaries_by_universe={list(summaries_by_universe)!r},",
+                "      summary="
+                f"{'present' if slot.summary is not None else None!r},",
+                "      summaries_by_universe="
+                f"{list(summaries_by_universe)!r},",
                 f"      monte_carlo_tests={len(slot.monte_carlo_tests)},",
                 "    ),",
             ])

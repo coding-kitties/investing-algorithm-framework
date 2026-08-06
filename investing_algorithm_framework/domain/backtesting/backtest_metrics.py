@@ -281,7 +281,10 @@ class BacktestMetrics:
 
     @property
     def backtest_start_date(self) -> datetime:
-        """Start of the active range (``test_range`` if set, else ``train_range``)."""
+        """Start of the active range.
+
+        Uses ``test_range`` when set, otherwise ``train_range``.
+        """
         return self._active_range.start_date
 
     @property
@@ -291,7 +294,7 @@ class BacktestMetrics:
 
     @property
     def backtest_date_range_name(self) -> Optional[str]:
-        """Name of the active range; the join key back to the study's windows."""
+        """Name of the active range; joins back to the study's windows."""
         return self._active_range.name
 
     @property

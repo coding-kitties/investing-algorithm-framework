@@ -74,7 +74,8 @@ def combine_backtests(backtests):
 
     Runs and per-engine summaries are combined per engine
     (vector with vector, event with event), matching the v9.0
-    dual-engine model (see ``docs/architecture/backtest/v9.0-dual-engine-design.md``).
+    dual-engine model (see the v9.0 dual-engine architecture
+    documentation).
 
     Args:
         backtests (List[Backtest]): List of Backtest instances to combine.
@@ -129,8 +130,12 @@ def combine_backtests(backtests):
                     f"(got {anchor_algorithm_id!r} and {bt_anchor!r})."
                 )
 
-        vector_runs += list(backtest.get_runs(ENGINE_VECTOR, study=_combine_study_name))
-        event_runs += list(backtest.get_runs(ENGINE_EVENT, study=_combine_study_name))
+        vector_runs += list(backtest.get_runs(
+            ENGINE_VECTOR, study=_combine_study_name
+        ))
+        event_runs += list(backtest.get_runs(
+            ENGINE_EVENT, study=_combine_study_name
+        ))
 
     def _summary(runs):
         per_run_metrics = [

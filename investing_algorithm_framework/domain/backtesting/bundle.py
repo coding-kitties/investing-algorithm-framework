@@ -567,7 +567,9 @@ def _build_v4_envelope(backtest: Backtest) -> dict:
         # from "absent" without ambiguity. Empty list / dict / None
         # payloads stay cheap on the wire.
         "study_name": (_ds.name if (_ds := backtest.get_study()) else None),
-        "study_description": (_ds.description if (_ds := backtest.get_study()) else None),
+        "study_description": (
+            _ds.description if (_ds := backtest.get_study()) else None
+        ),
         "universes": [
             u.to_dict() for u in (backtest.universes or [])
         ],
@@ -1107,7 +1109,9 @@ def remove_study_from_bundle(
 
     blob = path.read_bytes()
     if not blob.startswith(_MAGIC):
-        raise ValueError(f"Not a valid .obtf bundle (missing IAFB magic): {path}")
+        raise ValueError(
+            f"Not a valid .obtf bundle (missing IAFB magic): {path}"
+        )
 
     version, doc = _decode_payload(blob)
 

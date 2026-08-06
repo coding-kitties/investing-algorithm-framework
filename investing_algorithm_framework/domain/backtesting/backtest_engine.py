@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class BacktestEngine(Enum):
     VECTOR = "vector"
     EVENT_DRIVEN = "event_driven"
@@ -10,13 +11,15 @@ class BacktestEngine(Enum):
         Convert a string to a BacktestEngine enum member.
 
         Args:
-            engine_str (str): The string representation of the backtest engine.
+            engine_str (str): The string representation of the backtest
+                engine.
 
         Returns:
             BacktestEngine: The corresponding BacktestEngine enum member.
 
         Raises:
-            ValueError: If the provided string does not match any BacktestEngine.
+            ValueError: If the provided string does not match any
+                BacktestEngine.
         """
         try:
             return BacktestEngine(engine_str)
@@ -38,7 +41,8 @@ class BacktestEngine(Enum):
             BacktestEngine: The corresponding BacktestEngine enum member.
 
         Raises:
-            ValueError: If the provided value does not match any BacktestEngine.
+            ValueError: If the provided value does not match any
+                BacktestEngine.
         """
         if isinstance(value, BacktestEngine):
             return value
