@@ -64,10 +64,10 @@ report = BacktestReport.open(directory_path="./my_backtests")
 report.show()
 ```
 
-The `open()` method recursively finds all valid backtest directories (containing `algorithm_id.json` and a `runs/` folder) **and** any `.iafbt` bundle files, and loads them into a single report.
+The `open()` method recursively finds all valid backtest directories (containing `algorithm_id.json` and a `runs/` folder) **and** any `.obtf` bundle files, and loads them into a single report.
 
-:::tip Optimized `.iafbt` bundle format
-Backtests are saved by default in the framework's custom **`.iafbt` bundle format** — a single binary file per backtest combining zstd compression and MessagePack encoding. It is purpose-built for backtest reports: ~21× smaller and ~27× fewer files than the legacy directory format, and `BacktestReport.open()` loads it ~3× faster. The legacy directory format is still fully supported for backwards compatibility, and you can mix both in the same folder.
+:::tip Optimized `.obtf` bundle format
+Backtests are saved by default in the framework's custom **`.obtf` bundle format** — a single binary file per backtest combining zstd compression and MessagePack encoding. It is purpose-built for backtest reports: ~21× smaller and ~27× fewer files than the legacy directory format, and `BacktestReport.open()` loads it ~3× faster. The legacy directory format is still fully supported for backwards compatibility, and you can mix both in the same folder.
 
 For very large batches, opt into parallel loading:
 
@@ -255,7 +255,7 @@ Stream-recalculates every backtest bundle on disk inside worker processes. The f
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `src_dir` | `str \| Path` | Directory containing `.iafbt` bundles (and/or legacy backtest directories) |
+| `src_dir` | `str \| Path` | Directory containing `.obtf` bundles (and/or legacy backtest directories) |
 | `dst_dir` | `str \| Path`, optional | Output directory. If `None`, bundles are rewritten in place inside `src_dir` |
 | `risk_free_rate` | `float`, optional | Override risk-free rate. If `None`, uses each backtest's stored rate |
 | `metrics` | `List[str]`, optional | Specific metrics to compute. If `None`, computes all default metrics |

@@ -3,7 +3,15 @@ from datetime import datetime, date
 import tempfile
 from pathlib import Path
 
-from investing_algorithm_framework.domain import BacktestMetrics, Trade
+from investing_algorithm_framework.domain import BacktestMetrics, Trade, \
+    BacktestWindow, BacktestDateRange
+
+
+def _backtest_window(start_date, end_date):
+    return BacktestWindow(train_range=BacktestDateRange(
+        start_date=start_date,
+        end_date=end_date,
+    ))
 
 
 class TestBacktestMetrics(TestCase):
@@ -18,8 +26,7 @@ class TestBacktestMetrics(TestCase):
 
     def test_save(self):
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve = [
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -121,8 +128,7 @@ class TestBacktestMetrics(TestCase):
 
     def test_open(self):
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),

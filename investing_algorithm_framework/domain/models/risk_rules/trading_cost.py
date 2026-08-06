@@ -72,6 +72,47 @@ class TradingCost:
         """Return the fee for a given trade value."""
         return trade_value * self.fee_percentage / 100 + self.fee_fixed
 
+    def to_dict(self):
+        """Return a JSON-friendly dict snapshot of this cost model.
+
+        Used by :class:`ExecutionConfig` to persist the per-symbol
+        cost configuration into a backtest bundle. Any attached
+        :class:`SlippageModel` is nested via its own ``to_dict()``.
+        """
+        return {
+            "symbol": self.symbol,
+            "fee_percentage": self.fee_percentage,
+            "slippage_percentage": self.slippage_percentage,
+            "fee_fixed": self.fee_fixed,
+            "slippage_model": (
+                self.slippage_model.to_dict()
+                if self.slippage_model is not None else None
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """Reconstruct a :class:`TradingCost` from :meth:`to_dict`
+        output. Returns ``None`` for ``None`` input."""
+        if data is None:
+            return None
+        # Local import to avoid a circular import with the domain
+        # blotter module.
+        from investing_algorithm_framework.domain.blotter \
+            import SlippageModel
+
+        sm_raw = data.get("slippage_model")
+        slippage_model = (
+            SlippageModel.from_dict(sm_raw) if sm_raw is not None else None
+        )
+        return cls(
+            symbol=data.get("symbol"),
+            fee_percentage=data.get("fee_percentage", 0.0) or 0.0,
+            slippage_percentage=data.get("slippage_percentage", 0.0) or 0.0,
+            fee_fixed=data.get("fee_fixed", 0.0) or 0.0,
+            slippage_model=slippage_model,
+        )
+
     @staticmethod
     def resolve(symbol, trading_costs, portfolio_configuration=None):
         """

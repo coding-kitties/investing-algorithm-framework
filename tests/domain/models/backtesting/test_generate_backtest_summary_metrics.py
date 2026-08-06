@@ -362,32 +362,40 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         self.assertEqual(result.number_of_trades_closed, 20)
 
     # ==========================================================
-    # Percentage Returns (Compounded)
+    # Percentage Returns (Money-Weighted, Overlap-Safe)
     # ==========================================================
 
-    def test_percentage_returns_compounded(self):
-        """Test that percentage returns are compounded, not summed."""
-        # Period 1: 10%, Period 2: 10% (decimals: 0.10)
-        # Compounded: (1.1 * 1.1) - 1 = 0.21 (21%), NOT 0.20
+    def test_percentage_returns_money_weighted(self):
+        """Aggregate net-gain % is sum(PnL) / sum(initial capital).
+
+        Each per-run backtest restarts at ``initial_unallocated`` and
+        is independent, so chained compounding is fictional.
+        Rolling windows further overlap, which would double-count
+        calendar periods. The aggregate uses the same definition as
+        the per-run metric (PnL / capital) but at bundle scale.
+        """
+        # Each run: net gain 100 on initial 1000 = 10%.
+        # Bundle: 200 / 2000 = 10% (NOT 21% from chained compounding).
         metrics1 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
         metrics2 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
         self.assertAlmostEqual(
-            result.total_net_gain_percentage, 0.21, places=4
+            result.total_net_gain_percentage, 0.10, places=4
         )
 
-    def test_growth_percentage_compounded(self):
-        """Test that growth percentage is compounded."""
+    def test_growth_percentage_money_weighted(self):
+        """Growth % uses the same money-weighted definition."""
         metrics1 = create_mock_backtest_metrics(total_growth_percentage=0.20)
         metrics2 = create_mock_backtest_metrics(total_growth_percentage=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
-        # (1.2 * 1.1) - 1 = 0.32
+        # mock helper sets total_growth=100 and initial_unallocated=1000
+        # for each run, so aggregate growth % = 200 / 2000 = 0.10.
         self.assertAlmostEqual(
-            result.total_growth_percentage, 0.32, places=4
+            result.total_growth_percentage, 0.10, places=4
         )
 
     # ==========================================================
@@ -601,10 +609,11 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         self.assertEqual(result.number_of_trades, 30)
         self.assertEqual(result.number_of_trades_closed, 26)
 
-        # Verify compounded percentage
-        # (1.10 * 1.05) - 1 = 0.155
+        # Verify money-weighted percentage:
+        # sum(net_gain) / sum(initial_unallocated)
+        # = (1000 + 500) / (1000 + 1000) = 0.75
         self.assertAlmostEqual(
-            result.total_net_gain_percentage, 0.155, places=4
+            result.total_net_gain_percentage, 0.75, places=4
         )
 
         # Verify weighted Sharpe (equal time weights)
@@ -644,23 +653,31 @@ class TestGenerateBacktestSummaryMetricsCalculationValidity(unittest.TestCase):
     Tests to verify that the aggregation calculations make financial sense.
     """
 
-    def test_compounding_makes_sense_for_returns(self):
+    def test_money_weighted_aggregation_is_overlap_safe(self):
         """
-        Verify that compounding is mathematically correct for returns.
+        Verify the bundle-level percentage uses the money-weighted
+        formula (PnL / capital) rather than chained compounding.
 
-        Example: Start with $1000
-        - Period 1: +10% -> $1100
-        - Period 2: +10% -> $1210
-        Total return: ($1210 - $1000) / $1000 = 0.21 (21%), NOT 0.20
+        Per-run backtests in this framework each restart at the
+        configured initial balance and are independent, so chaining
+        ``(1+r1) * (1+r2)`` would invent compounding that never
+        actually happened. With overlapping rolling windows this also
+        double-counts calendar periods and inflates the result by
+        orders of magnitude. Money-weighted aggregation avoids both.
+
+        Example: two independent $1000 runs, each making +$100.
+          - Aggregate PnL: $200 over $2000 deployed = 10%.
+          - (Chained compounding would have given 21%, which would
+            only be correct if profits had been reinvested into a
+            single continuous run.)
         """
         metrics1 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
         metrics2 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
-        # Compound return should be 0.21 (21%)
         self.assertAlmostEqual(
-            result.total_net_gain_percentage, 0.21, places=4
+            result.total_net_gain_percentage, 0.10, places=4
         )
 
     def test_weighted_average_makes_sense_for_ratios(self):

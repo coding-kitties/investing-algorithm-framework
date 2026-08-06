@@ -1,476 +1,426 @@
 import json
 import os
-from pathlib import Path
+from dataclasses import dataclass, field, fields as dc_fields
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
 from logging import getLogger
-from typing import Union, List, Optional, Dict, Any
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
-from investing_algorithm_framework.domain.exceptions \
-    import OperationalException
-from investing_algorithm_framework.domain.models.order import Order, \
-    OrderSide, OrderStatus
+from investing_algorithm_framework.domain.exceptions import (
+    OperationalException,
+)
+from investing_algorithm_framework.domain.models.order import (
+    Order,
+    OrderSide,
+    OrderStatus,
+)
+from investing_algorithm_framework.domain.models.portfolio import (
+    PortfolioSnapshot,
+)
 from investing_algorithm_framework.domain.models.position import Position
 from investing_algorithm_framework.domain.models.trade import Trade
-from investing_algorithm_framework.domain.models.portfolio import \
-    PortfolioSnapshot
-from investing_algorithm_framework.domain.models.trade.trade_status import \
-    TradeStatus
-from investing_algorithm_framework.domain.models.trade.trade_stop_loss import \
-    TradeStopLoss
-from investing_algorithm_framework.domain.models.trade.trade_take_profit \
-    import TradeTakeProfit
+from investing_algorithm_framework.domain.models.trade.trade_status import (
+    TradeStatus,
+)
+from investing_algorithm_framework.domain.models.trade.trade_stop_loss import (
+    TradeStopLoss,
+)
+from ..models.trade.trade_take_profit import (
+    TradeTakeProfit,
+)
 
-
+from .backtest_date_range import BacktestDateRange
 from .backtest_metrics import BacktestMetrics
+from .backtest_window import BacktestWindow
 
 
 logger = getLogger(__name__)
 
 
+def _ensure_utc_iso(value: Any) -> Any:
+    """Convert a datetime to ISO-8601 UTC; leave other values unchanged."""
+    if not hasattr(value, "isoformat"):
+        return value
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat()
+
+
+def _parse_datetime(value: Any) -> Optional[datetime]:
+    """Parse a datetime from an ISO-8601 string, returning UTC-aware output."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if not isinstance(value, str):
+        return value
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _serialise_signals(
+    signals: Dict[str, Dict[str, Any]],
+) -> Dict[str, Dict[str, List[Any]]]:
+    """Flatten pandas Series signal payloads into ISO date lists."""
+    out: Dict[str, Dict[str, List[Any]]] = {}
+    for symbol, sig_data in signals.items():
+        out[symbol] = {}
+        for sig_type, series in sig_data.items():
+            if hasattr(series, "iloc"):
+                out[symbol][sig_type] = [
+                    _ensure_utc_iso(ts)
+                    for ts, val in zip(series.index, series)
+                    if val
+                ]
+            else:
+                out[symbol][sig_type] = series
+    return out
+
+
+def _serialise_signal_events(
+    events: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for evt in events:
+        entry = dict(evt)
+        if "date" in entry:
+            entry["date"] = _ensure_utc_iso(entry["date"])
+        out.append(entry)
+    return out
+
+
+def _serialise_recorded_values(
+    recorded: Dict[str, List],
+) -> Dict[str, List[Dict[str, Any]]]:
+    return {
+        key: [
+            {"datetime": _ensure_utc_iso(dt), "value": val}
+            for dt, val in entries
+        ]
+        for key, entries in recorded.items()
+    }
+
+
+def _deserialise_signal_events(
+    events: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for evt in events:
+        entry = dict(evt)
+        raw = entry.get("date")
+        if isinstance(raw, str):
+            entry["date"] = _parse_datetime(raw)
+        out.append(entry)
+    return out
+
+
+def _deserialise_recorded_values(
+    raw: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, List]:
+    out: Dict[str, List] = {}
+    for key, entries in raw.items():
+        parsed = []
+        for entry in entries:
+            dt = entry.get("datetime")
+            if isinstance(dt, str):
+                dt = _parse_datetime(dt)
+            parsed.append((dt, entry.get("value")))
+        out[key] = parsed
+    return out
+
+
+def _rehydrate_backtest_window(raw: Any) -> BacktestWindow:
+    """Reconstruct a :class:`BacktestWindow` from a ``to_dict`` payload."""
+    if isinstance(raw, BacktestWindow):
+        return raw
+    if not isinstance(raw, dict):
+        raise OperationalException(
+            "BacktestRun data must include a 'backtest_window' key."
+        )
+
+    tr = raw.get("train_range") or {}
+    train_range = BacktestDateRange(
+        start_date=_parse_datetime(tr.get("start")),
+        end_date=_parse_datetime(tr.get("end")),
+        name=tr.get("name"),
+    )
+    te = raw.get("test_range")
+    test_range = (
+        BacktestDateRange(
+            start_date=_parse_datetime(te.get("start")),
+            end_date=_parse_datetime(te.get("end")),
+            name=te.get("name"),
+        )
+        if te is not None
+        else None
+    )
+    return BacktestWindow(
+        train_range=train_range,
+        test_range=test_range,
+        warmup_days=raw.get("warmup_days", 0),
+        fold_index=raw.get("fold_index"),
+        name=raw.get("name"),
+    )
+
+
 @dataclass
 class BacktestRun:
-    """
-    Represents a backtest of an algorithm. It contains the backtest metrics,
-    backtest results, and paths to strategy and data files.
+    """One execution of an algorithm over a single :class:`BacktestWindow`.
 
-    Attributes:
-        backtest_metrics (Optional[List[BacktestMetrics]]): A list of
-            backtest metrics objects, each representing the performance
-            metrics of a single backtest run.
-        backtest_start_date (datetime): The start date of the backtest.
-        backtest_end_date (datetime): The end date of the backtest.
-        backtest_date_range_name (str): The name of the date range used for
-            the backtest.
-        trading_symbol (str): The trading symbol used in the backtest.
-        initial_unallocated (float): The initial unallocated amount in the
-            backtest.
-        number_of_runs (int): The number of runs in the backtest.
-        portfolio_snapshots (List[PortfolioSnapshot]): A list of portfolio
-            snapshots taken during the backtest.
-        trades (List[Trade]): A list of trades executed during the backtest.
-        orders (List[Order]): A list of orders placed during the backtest.
-        positions (List[Position]): A list of positions held during the
-            backtest.
-        created_at (datetime): The date and time when the backtest was created.
-        symbols (List[str]): A list of trading symbols involved in
-            the backtest.
-        number_of_days (int): The total number of days the backtest ran.
-        number_of_trades (int): The total number of trades executed during
-            the backtest.
-        number_of_trades_closed (int): The total number of trades that were
-            closed during the backtest.
-        number_of_trades_open (int): The total number of trades that are
-            still open at the end of the backtest.
-        number_of_orders (int): The total number of orders placed during
-            the backtest.
-        number_of_positions (int): The total number of positions held
-            during the backtest.
-        signals (Dict[str, Dict[str, Any]]): Raw buy/sell signals
-            produced by the strategy, keyed by symbol. At runtime each
-            entry contains ``{"buy": pd.Series[bool],
-            "sell": pd.Series[bool]}``.  When serialized via
-            ``to_dict()`` / ``save()``, each Series is stored as a
-            list of ISO-8601 date strings where the signal is True.
-            On ``open()`` the lists are restored as-is (not as
-            pd.Series) so you can reconstruct them if needed.
-        signal_events (List[Dict]): Chronological log of every fired
-            signal and its disposition. Each entry is a dict with keys:
-            ``date`` (datetime), ``symbol`` (str), ``signal`` ("buy" or
-            "sell"), ``executed`` (bool), and ``reason`` (str).
-            Possible reasons:
-            - ``"executed"`` — signal produced a trade action.
-            - ``"already_in_position"`` — buy signal ignored because
-              a position was already open for this symbol.
-            - ``"no_position_to_close"`` — sell signal ignored because
-              no position was open for this symbol.
-            - ``"sell_priority_on_conflict"`` — buy signal suppressed
-              because a sell signal also fired on the same bar.
-            - ``"insufficient_capital"`` — buy signal ignored because
-              there was not enough capital to open a position.
+    Mirrors the on-disk shape documented in
+    ``docs/architecture/backtest/open_backtest_format.md`` §Run structure.
+    The window's *active range* (``test_range`` when present, else
+    ``train_range``) drives the derived date fields and
+    :pyattr:`window_role`; the full parent window stays accessible on
+    :pyattr:`backtest_window` for consumers that need the training
+    portion of a walk-forward run.
     """
-    backtest_start_date: datetime
-    backtest_end_date: datetime
-    trading_symbol: str
+
+    backtest_window: BacktestWindow
     initial_unallocated: float = 0.0
-    number_of_runs: int = 0
+    created_at: Optional[datetime] = None
+    number_of_runs: int = 1
+    number_of_days: int = 0
+    number_of_hours: int = 0
+    backtest_metrics: Optional[BacktestMetrics] = None
     portfolio_snapshots: List[PortfolioSnapshot] = field(default_factory=list)
     trades: List[Trade] = field(default_factory=list)
     orders: List[Order] = field(default_factory=list)
     positions: List[Position] = field(default_factory=list)
-    created_at: datetime = None,
-    symbols: List[str] = field(default_factory=list)
-    number_of_days: int = 0
     number_of_trades: int = 0
     number_of_trades_closed: int = 0
     number_of_trades_open: int = 0
     number_of_orders: int = 0
     number_of_positions: int = 0
-    backtest_metrics: BacktestMetrics = None
-    backtest_date_range_name: str = None
     data_sources: List[Dict] = field(default_factory=list)
-    metadata: Dict[str, str] = field(default_factory=dict)
     signals: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     signal_events: List[Dict[str, Any]] = field(default_factory=list)
     recorded_values: Dict[str, List] = field(default_factory=dict)
+    metadata: Dict[str, str] = field(default_factory=dict)
+
+    # ------------------------------------------------------------------
+    # Derived active-range fields
+    # ------------------------------------------------------------------
+
+    @property
+    def _active_range(self) -> BacktestDateRange:
+        window = self.backtest_window
+        return (
+            window.test_range
+            if window.test_range is not None
+            else window.train_range
+        )
+
+    @property
+    def backtest_start_date(self) -> datetime:
+        """Start of the active range.
+
+        Uses ``test_range`` when set, otherwise ``train_range``.
+        """
+        return self._active_range.start_date
+
+    @property
+    def backtest_end_date(self) -> datetime:
+        """End of the active range."""
+        return self._active_range.end_date
+
+    @property
+    def backtest_date_range_name(self) -> Optional[str]:
+        """Name of the active range; joins back to the study's windows."""
+        return self._active_range.name
+
+    @property
+    def window_role(self) -> str:
+        """``"test"`` for OOS runs, ``"train"`` for in-sample-only fits."""
+        return (
+            "test"
+            if self.backtest_window.test_range is not None
+            else "train"
+        )
+
+    # ------------------------------------------------------------------
+    # Serialisation
+    # ------------------------------------------------------------------
 
     def to_dict(self) -> dict:
-        """
-        Convert the Backtest instance to a dictionary with all
-        date/datetime fields as ISO strings (always UTC).
-        """
-        def ensure_iso(value):
-            if hasattr(value, "isoformat"):
-                if value.tzinfo is None:
-                    value = value.replace(tzinfo=timezone.utc)
-                return value.isoformat()
-            return value
-
-        backtest_metrics = self.backtest_metrics.to_dict() \
-            if self.backtest_metrics else None
+        """Return a JSON-friendly dict matching OBTF §Run structure."""
         return {
-            "backtest_metrics": backtest_metrics,
-            "backtest_start_date": ensure_iso(self.backtest_start_date),
+            "backtest_window": self.backtest_window.to_dict(),
+            "backtest_start_date": _ensure_utc_iso(self.backtest_start_date),
+            "backtest_end_date": _ensure_utc_iso(self.backtest_end_date),
             "backtest_date_range_name": self.backtest_date_range_name,
-            "backtest_end_date": ensure_iso(self.backtest_end_date),
-            "trading_symbol": self.trading_symbol,
+            "window_role": self.window_role,
             "initial_unallocated": self.initial_unallocated,
+            "created_at": _ensure_utc_iso(self.created_at),
             "number_of_runs": self.number_of_runs,
+            "number_of_days": self.number_of_days,
+            "number_of_hours": self.number_of_hours,
+            "backtest_metrics": (
+                self.backtest_metrics.to_dict()
+                if self.backtest_metrics is not None
+                else None
+            ),
             "portfolio_snapshots": [
                 ps.to_dict() for ps in self.portfolio_snapshots
             ],
-            "trades": [trade.to_dict() for trade in self.trades],
-            "orders": [order.to_dict() for order in self.orders],
-            "positions": [position.to_dict() for position in self.positions],
-            "created_at": ensure_iso(self.created_at),
-            "symbols": self.symbols,
-            "number_of_days": self.number_of_days,
+            "trades": [t.to_dict() for t in self.trades],
+            "orders": [o.to_dict() for o in self.orders],
+            "positions": [p.to_dict() for p in self.positions],
             "number_of_trades": self.number_of_trades,
             "number_of_trades_closed": self.number_of_trades_closed,
             "number_of_trades_open": self.number_of_trades_open,
             "number_of_orders": self.number_of_orders,
             "number_of_positions": self.number_of_positions,
-            "metadata": self.metadata,
-            "signals": {
-                symbol: {
-                    sig_type: [
-                        ensure_iso(ts)
-                        for ts, val in zip(series.index, series)
-                        if val
-                    ] if hasattr(series, 'iloc') else series
-                    for sig_type, series in sig_data.items()
-                }
-                for symbol, sig_data in self.signals.items()
-            },
-            "signal_events": [
-                {
-                    **evt,
-                    "date": ensure_iso(evt["date"])
-                } for evt in self.signal_events
-            ],
-            "recorded_values": {
-                key: [
-                    {
-                        "datetime": ensure_iso(entry[0]),
-                        "value": entry[1]
-                    }
-                    for entry in entries
-                ]
-                for key, entries in self.recorded_values.items()
-            },
+            "data_sources": list(self.data_sources),
+            "signals": _serialise_signals(self.signals),
+            "signal_events": _serialise_signal_events(self.signal_events),
+            "recorded_values": _serialise_recorded_values(
+                self.recorded_values
+            ),
+            "metadata": dict(self.metadata),
         }
 
     @classmethod
     def from_dict(
         cls,
         data: dict,
-        backtest_metrics: 'BacktestMetrics' = None,
-    ) -> 'BacktestRun':
+        backtest_metrics: Optional[BacktestMetrics] = None,
+    ) -> "BacktestRun":
+        """Reconstruct a :class:`BacktestRun` from a :meth:`to_dict` payload.
+
+        ``backtest_metrics`` may be supplied explicitly (used by the
+        directory loader where metrics live in a sibling file); when
+        omitted, the nested ``backtest_metrics`` key on ``data`` is used.
         """
-        Reconstruct a ``BacktestRun`` from a plain dict produced by
-        :py:meth:`to_dict`.
-
-        Used by :py:meth:`open` (the directory-based loader) and by the
-        binary bundle loader (issue #487). The ``backtest_metrics``
-        parameter lets callers inject a metrics instance loaded from a
-        sibling file; if not supplied, the ``backtest_metrics`` key on
-        ``data`` is used.
-
-        Args:
-            data: Dict with the same shape as ``to_dict()``.
-            backtest_metrics: Pre-constructed ``BacktestMetrics`` (used by
-                the directory loader where metrics live in a separate
-                file). If None, parses from ``data['backtest_metrics']``.
-
-        Returns:
-            BacktestRun: The reconstructed run.
-        """
-        # Work on a shallow copy so the caller's dict is untouched.
         data = dict(data)
 
-        # Resolve metrics: prefer an explicitly injected instance, else
-        # fall back to the inline dict (binary bundle case).
-        metrics_dict = data.pop("backtest_metrics", None)
-        if backtest_metrics is None and metrics_dict is not None:
-            backtest_metrics = BacktestMetrics.from_dict(metrics_dict)
+        if backtest_metrics is None:
+            metrics_dict = data.pop("backtest_metrics", None)
+            if metrics_dict is not None:
+                backtest_metrics = BacktestMetrics.from_dict(metrics_dict)
+        else:
+            data.pop("backtest_metrics", None)
 
-        # Validate and set defaults for required fields
-        required_fields = {
-            "backtest_start_date": "2020-01-01 00:00:00",
-            "backtest_end_date": "2020-01-02 00:00:00",
-            "created_at": "2020-01-01 00:00:00",
-            "trading_symbol": "USD",
-            "initial_unallocated": 1000.0,
-            "number_of_runs": 1
+        window_data = data.pop("backtest_window", None)
+        if window_data is None and data.get("backtest_start_date") is not None:
+            start_date = _parse_datetime(data.get("backtest_start_date"))
+            end_date = _parse_datetime(data.get("backtest_end_date")) \
+                or start_date
+            window = BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=start_date,
+                    end_date=end_date,
+                    name=data.get("backtest_date_range_name"),
+                )
+            )
+        else:
+            window = _rehydrate_backtest_window(window_data)
+
+        # Derived fields are recomputed from the window; drop any echoes.
+        for key in (
+            "backtest_start_date",
+            "backtest_end_date",
+            "backtest_date_range_name",
+            "window_role",
+        ):
+            data.pop(key, None)
+
+        data["orders"] = [
+            Order.from_dict(o) for o in (data.get("orders") or [])
+        ]
+        data["positions"] = [
+            Position.from_dict(p) for p in (data.get("positions") or [])
+        ]
+        data["trades"] = [
+            Trade.from_dict(t) for t in (data.get("trades") or [])
+        ]
+        data["portfolio_snapshots"] = [
+            PortfolioSnapshot.from_dict(ps)
+            for ps in (data.get("portfolio_snapshots") or [])
+        ]
+        data["signals"] = data.get("signals") or {}
+        data["signal_events"] = _deserialise_signal_events(
+            data.get("signal_events") or []
+        )
+        data["recorded_values"] = _deserialise_recorded_values(
+            data.get("recorded_values") or {}
+        )
+        data["created_at"] = _parse_datetime(data.get("created_at"))
+
+        valid = {f.name for f in dc_fields(cls)} - {
+            "backtest_window",
+            "backtest_metrics",
         }
-        for field_name, default_value in required_fields.items():
-            if field_name not in data or data[field_name] is None:
-                logger.warning(
-                    f"Missing required field '{field_name}' in "
-                    f"backtest data, using default: {default_value}"
-                )
-                data[field_name] = default_value
-
-        # Parse datetime fields. Accept both ISO 8601 (new format) and the
-        # legacy "%Y-%m-%d %H:%M:%S" form for backwards compatibility.
-        def _parse_dt(value):
-            if isinstance(value, datetime):
-                dt = value
-            elif isinstance(value, str):
-                try:
-                    dt = datetime.fromisoformat(value)
-                except ValueError:
-                    dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
-            else:
-                return value
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            else:
-                dt = dt.astimezone(timezone.utc)
-            return dt
-
-        data["backtest_start_date"] = _parse_dt(data["backtest_start_date"])
-        data["backtest_end_date"] = _parse_dt(data["backtest_end_date"])
-        data["created_at"] = _parse_dt(data["created_at"])
-
-        # Parse orders with error handling
-        orders = []
-        for order_data in data.get("orders", []) or []:
-            try:
-                orders.append(Order.from_dict(order_data))
-            except Exception as e:
-                logger.error(f"Failed to parse order data: {e}")
-                continue
-        data["orders"] = orders
-
-        # Parse positions
-        positions = []
-        for position_data in data.get("positions", []) or []:
-            try:
-                positions.append(Position.from_dict(position_data))
-            except Exception as e:
-                logger.error(f"Failed to parse position data: {e}")
-                continue
-        data["positions"] = positions
-
-        # Parse trades
-        trades = []
-        for trade_data in data.get("trades", []) or []:
-            try:
-                trades.append(Trade.from_dict(trade_data))
-            except Exception as e:
-                logger.error(f"Failed to parse trade data: {e}")
-                continue
-        data["trades"] = trades
-
-        # Parse portfolio snapshots
-        portfolio_snapshots = []
-        for ps_data in data.get("portfolio_snapshots", []) or []:
-            try:
-                portfolio_snapshots.append(
-                    PortfolioSnapshot.from_dict(ps_data)
-                )
-            except Exception as e:
-                logger.error(f"Failed to parse portfolio snapshot data: {e}")
-                continue
-        data["portfolio_snapshots"] = portfolio_snapshots
-
-        # Signals stored as lists of ISO date strings
-        signals = data.pop("signals", {}) or {}
-
-        # Parse signal_events dates back to datetime
-        raw_events = data.pop("signal_events", []) or []
-        signal_events = []
-        for evt in raw_events:
-            parsed = dict(evt)
-            if isinstance(parsed.get("date"), str):
-                try:
-                    parsed["date"] = datetime.fromisoformat(parsed["date"])
-                except (ValueError, TypeError):
-                    pass
-            signal_events.append(parsed)
-
-        # Parse recorded_values
-        raw_recorded = data.pop("recorded_values", {}) or {}
-        recorded_values = {}
-        for key, entries in raw_recorded.items():
-            parsed_entries = []
-            for entry in entries:
-                dt = entry.get("datetime")
-                if isinstance(dt, str):
-                    try:
-                        dt = datetime.fromisoformat(dt)
-                    except (ValueError, TypeError):
-                        pass
-                parsed_entries.append((dt, entry.get("value")))
-            recorded_values[key] = parsed_entries
-
-        # Drop fields not present on the dataclass (forward-compat).
-        # The dataclass has ``backtest_metrics`` but we set it explicitly
-        # below to allow injection.
-        from dataclasses import fields as _fields
-        valid = {f.name for f in _fields(cls)} - {"backtest_metrics"}
         filtered = {k: v for k, v in data.items() if k in valid}
 
         return cls(
+            backtest_window=window,
             backtest_metrics=backtest_metrics,
-            signals=signals,
-            signal_events=signal_events,
-            recorded_values=recorded_values,
             **filtered,
         )
 
+    # ------------------------------------------------------------------
+    # Disk IO
+    # ------------------------------------------------------------------
+
     @staticmethod
-    def open(directory_path: Union[str, Path]) -> 'BacktestRun':
-        """
-        Open a backtest report from a directory and return a Backtest instance.
-
-        Args:
-            directory_path (str): The path to the directory containing the
-                backtest report files.
-
-        Returns:
-            Backtest: An instance of Backtest with the loaded metrics
-                and results.
-
-        Raises:
-            OperationalException: If the directory does not exist or if
-            there is an error loading the files.
-        """
+    def open(directory_path: Union[str, Path]) -> "BacktestRun":
+        """Load a run from a ``metrics.json`` and ``run.json`` pair."""
+        directory_path = str(directory_path)
         if not os.path.exists(directory_path):
             raise OperationalException(
                 f"The directory {directory_path} does not exist."
             )
 
-        # Load combined backtest metrics
-        backtest_metrics = None
         metrics_file = os.path.join(directory_path, "metrics.json")
-        if os.path.isfile(metrics_file):
-            backtest_metrics = BacktestMetrics.open(metrics_file)
+        backtest_metrics = (
+            BacktestMetrics.open(metrics_file)
+            if os.path.isfile(metrics_file)
+            else None
+        )
 
-        # Load run.json
         run_file = os.path.join(directory_path, "run.json")
         if not os.path.isfile(run_file):
             raise OperationalException(
                 f"The run file {run_file} does not exist."
             )
-
-        with open(run_file, 'r') as f:
+        with open(run_file, "r") as f:
             content = f.read().strip()
         if not content:
             raise OperationalException(
                 f"The run file {run_file} is empty."
             )
 
-        data = json.loads(content)
-        return BacktestRun.from_dict(data, backtest_metrics=backtest_metrics)
-
-    def create_directory_name(self) -> str:
-        """
-        Create a directory name for the backtest run based on its attributes.
-
-        Returns:
-            str: A string representing the directory name.
-        """
-        start_str = self.backtest_start_date.strftime("%Y%m%d")
-        end_str = self.backtest_end_date.strftime("%Y%m%d")
-        dir_name = f"backtest_{self.trading_symbol}_{start_str}_{end_str}"
-        return dir_name
+        return BacktestRun.from_dict(
+            json.loads(content), backtest_metrics=backtest_metrics
+        )
 
     def save(self, directory_path: Union[str, Path]) -> None:
-        """
-        Save the backtest run to a directory.
+        """Persist ``metrics.json`` and ``run.json`` under the directory."""
+        directory_path = str(directory_path)
+        os.makedirs(directory_path, exist_ok=True)
 
-        Args:
-            directory_path (str): The directory where the metrics
-            file will be saved.
-
-        Raises:
-            OperationalException: If the directory does not exist or if
-            there is an error saving the files.
-
-        Returns:
-            None: This method does not return anything, it saves the
-            metrics to a file.
-        """
-
-        metrics_path = os.path.join(directory_path, "metrics.json")
-        run_path = os.path.join(directory_path, "run.json")
-
-        if not os.path.exists(directory_path):
-            os.makedirs(directory_path)
-
-        # Call the save method of BacktestMetrics
-        if self.backtest_metrics:
-            self.backtest_metrics.save(metrics_path)
-
-        # Save the run data
-        with open(run_path, 'w') as f:
-            # string format datetime objects
-            data = self.to_dict()
-
-            # Remove backtest_metrics to avoid redundancy
-            data.pop("backtest_metrics", None)
-
-            # Ensure datetime objects are in UTC before formatting
-            backtest_start_date = self.backtest_start_date
-
-            if backtest_start_date.tzinfo is None:
-                # Naive datetime - treat as UTC
-                backtest_start_date = backtest_start_date.replace(
-                    tzinfo=timezone.utc
-                )
-            else:
-                # Timezone-aware - convert to UTC
-                backtest_start_date = backtest_start_date.astimezone(
-                    timezone.utc
-                )
-
-            backtest_end_date = self.backtest_end_date
-            if backtest_end_date.tzinfo is None:
-                backtest_end_date = backtest_end_date.replace(
-                    tzinfo=timezone.utc
-                )
-            else:
-                backtest_end_date = backtest_end_date.astimezone(timezone.utc)
-
-            created_at = self.created_at
-
-            if created_at.tzinfo is None:
-                created_at = created_at.replace(tzinfo=timezone.utc)
-            else:
-                created_at = created_at.astimezone(timezone.utc)
-
-            data["backtest_start_date"] = backtest_start_date.strftime(
-                "%Y-%m-%d %H:%M:%S"
+        if self.backtest_metrics is not None:
+            self.backtest_metrics.save(
+                os.path.join(directory_path, "metrics.json")
             )
-            data["backtest_end_date"] = backtest_end_date.strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-            data["created_at"] = created_at.strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-            json.dump(data, f, default=str)
+
+        payload = self.to_dict()
+        payload.pop("backtest_metrics", None)
+
+        with open(os.path.join(directory_path, "run.json"), "w") as f:
+            json.dump(payload, f, default=str)
+
+    def create_directory_name(self) -> str:
+        """Return a filesystem-safe directory name for this run."""
+        start = self.backtest_start_date.strftime("%Y%m%d")
+        end = self.backtest_end_date.strftime("%Y%m%d")
+        return f"backtest_{start}_{end}"
 
     def get_trade(self, trade_id: str) -> Optional[Trade]:
         """
@@ -816,13 +766,11 @@ class BacktestRun:
 
         return selection
 
-    def __repr__(self):
-        """
-        Return a string representation of the Backtest instance.
-
-        Returns:
-            str: A string representation of the Backtest instance.
-        """
-        return json.dumps(
-            self.to_dict(), indent=4, sort_keys=True, default=str
+    def __repr__(self) -> str:
+        return (
+            f"BacktestRun(range={self.backtest_date_range_name!r}, "
+            f"role={self.window_role!r}, "
+            f"start={self.backtest_start_date.isoformat()}, "
+            f"end={self.backtest_end_date.isoformat()}, "
+            f"trades={len(self.trades)}, orders={len(self.orders)})"
         )

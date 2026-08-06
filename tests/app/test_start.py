@@ -6,15 +6,14 @@ from typing import Dict, Any
 import pandas as pd
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, Algorithm, \
-    MarketCredential
+    MarketCredential, Schedule
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 from tests.resources import OrderExecutorTest, PortfolioProviderTest
 
 
 class StrategyOne(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.SECOND)
     number_of_runs = 0
 
     def __init__(
@@ -53,8 +52,7 @@ class StrategyOne(TradingStrategy):
 
 
 class StrategyTwo(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.SECOND)
     number_of_runs = 0
 
     def __init__(

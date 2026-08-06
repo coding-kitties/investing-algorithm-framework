@@ -236,4 +236,4 @@ declarative surface (`Pipeline`, `Factor`, `Filter`, `top` / `bottom` /
 - [Pipelines](pipelines.md) — concept page.
 - [Pipelines: Vector backtest](pipelines-vector-backtest.md) — Phase 2 roadmap.
 - [Pipelines: Live trading](pipelines-live.md) — Phase 3 roadmap.
-- Design doc: [`docs/design/pipeline-api.md`](https://github.com/coding-kitties/investing-algorithm-framework/blob/dev/docs/design/pipeline-api.md).
+- Design doc: [`docs/architecture/strategy/pipeline-api.md`](https://github.com/coding-kitties/investing-algorithm-framework/blob/dev/docs/architecture/strategy/pipeline-api.md).

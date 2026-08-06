@@ -7,16 +7,14 @@ import pandas as pd
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
-    BacktestDateRange
+    BacktestDateRange, Schedule
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 
 
 class TestStrategy(TradingStrategy):
     strategy_id = "test_strategy"
-    time_unit = TimeUnit.MINUTE
-    interval = 1
-
+    schedule = Schedule.every(1, TimeUnit.MINUTE)
     def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
         str, pd.Series]:
         pass

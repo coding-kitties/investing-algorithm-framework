@@ -1,12 +1,12 @@
 """``LocalTieredStore`` — Tier-1 SQLite + Tier-2 Parquet + Tier-3
-content-addressed OHLCV chunks + canonical ``.iafbt`` bundles on a
+content-addressed OHLCV chunks + canonical ``.obtf`` bundles on a
 local filesystem (epic #540 phases 3b + 3c).
 
 Layout under *root*::
 
     <root>/
         index.sqlite               # Tier-1, kept in sync on every write
-        bundles/<handle>.iafbt     # canonical bytes (source of truth)
+        bundles/<handle>.obtf     # canonical bytes (source of truth)
         parquet/
             portfolio_snapshots/run_id=<handle>/part-0.parquet
             trades/run_id=<handle>/part-0.parquet
@@ -114,7 +114,7 @@ class LocalTieredStore(BacktestStore):
     (WAL handles it) but per-handle write atomicity is the caller's
     responsibility.
 
-    Phase 3b deliberately keeps the .iafbt bundle as the canonical
+    Phase 3b deliberately keeps the .obtf bundle as the canonical
     representation. Reads always go through the bundle so the
     Backtest round-trip is bit-for-bit identical to today's
     behaviour. Tier-2 sidecars are *auxiliary* — used only for
@@ -138,7 +138,7 @@ class LocalTieredStore(BacktestStore):
     # ------------------------------------------------------------------
     @staticmethod
     def _normalize_handle(handle: StoreHandle) -> str:
-        """Strip the .iafbt suffix; handles are stored bare in Tier-1."""
+        """Strip the .obtf suffix; handles are stored bare in Tier-1."""
         if handle.endswith(BUNDLE_EXT):
             return handle[: -len(BUNDLE_EXT)]
         return handle
@@ -201,16 +201,18 @@ class LocalTieredStore(BacktestStore):
         else:
             backtest.save_bundle(bundle_path)
 
-        # 2. Tier-1 — SQLite row.
+        # 2. Tier-1 — SQLite row(s). v9.0: one row per populated
+        # engine slot (vector / event).
         stat = bundle_path.stat()
-        row = backtest.index_row(bundle_path=bare)
+        rows = backtest.index_rows(bundle_path=bare)
         index = self._open_index()
         try:
-            index.upsert(
-                row,
-                bundle_mtime_ns=stat.st_mtime_ns,
-                bundle_size=stat.st_size,
-            )
+            for row in rows:
+                index.upsert(
+                    row,
+                    bundle_mtime_ns=stat.st_mtime_ns,
+                    bundle_size=stat.st_size,
+                )
         finally:
             index.close()
 
@@ -434,11 +436,12 @@ class LocalTieredStore(BacktestStore):
                         "rebuild_index: skipping %s: %s", handle, exc,
                     )
                     continue
-                index.upsert(
-                    bt.index_row(bundle_path=handle),
-                    bundle_mtime_ns=stat.st_mtime_ns,
-                    bundle_size=stat.st_size,
-                )
+                for row in bt.index_rows(bundle_path=handle):
+                    index.upsert(
+                        row,
+                        bundle_mtime_ns=stat.st_mtime_ns,
+                        bundle_size=stat.st_size,
+                    )
                 n += 1
         finally:
             index.close()
@@ -478,7 +481,7 @@ class LocalTieredStore(BacktestStore):
         Hashes are emitted with possible duplicates (one per
         ``(handle, key)`` reference); de-duplicate in the caller if
         needed. Useful as the input for the dedup-upload negotiate
-        step in ``docs/design/ohlcv-dedup-protocol.md``.
+        step in ``docs/architecture/backtest/ohlcv-dedup-protocol.md``.
         """
         for handle in self.iter_handles():
             for rel in self._read_ohlcv_manifest(handle).values():

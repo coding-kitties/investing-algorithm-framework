@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework.domain import BacktestRun, \
-    BacktestDateRange, PortfolioSnapshot, Backtest, BacktestMetrics
+    BacktestDateRange, BacktestWindow, PortfolioSnapshot, Backtest, BacktestMetrics
 
 
 class TestBacktestSave(TestCase):
@@ -57,27 +57,30 @@ class TestBacktestSave(TestCase):
         pre-computed metrics (metrics are computed during save)."""
         date_range = self._create_date_range()
         run = BacktestRun(
-            backtest_start_date=date_range.start_date,
-            backtest_end_date=date_range.end_date,
-            backtest_date_range_name=date_range.name,
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=date_range.start_date,
+                    end_date=date_range.end_date,
+                    name=date_range.name,
+                )
+            ),
             orders=[],
             trades=[],
             positions=[],
             portfolio_snapshots=self._create_snapshots(),
-            trading_symbol="EUR",
             number_of_runs=1000,
             initial_unallocated=1000,
             created_at=datetime.now(tz=timezone.utc)
         )
         backtest = Backtest(
             algorithm_id="alg-025",
-            backtest_runs=[run],
+            vector_runs=[run],
         )
         backtest.save(self.output_path)
 
         # Check directory structure
         self.assertTrue(os.path.exists(self.output_path))
-        runs_dir = os.path.join(self.output_path, "runs")
+        runs_dir = os.path.join(self.output_path, "vector_runs")
         self.assertTrue(os.path.exists(runs_dir))
 
         backtest_run_dir = os.path.join(
@@ -96,25 +99,18 @@ class TestBacktestSave(TestCase):
         """Test saving a Backtest with a BacktestRun that has
         pre-computed BacktestMetrics."""
         date_range = self._create_date_range()
+        window = BacktestWindow(train_range=date_range)
         run = BacktestRun(
-            backtest_start_date=date_range.start_date,
-            backtest_end_date=date_range.end_date,
-            backtest_date_range_name=date_range.name,
+            backtest_window=window,
             created_at=datetime.now(tz=timezone.utc),
             orders=[],
             trades=[],
             positions=[],
             portfolio_snapshots=self._create_snapshots(),
-            trading_symbol="EUR",
             number_of_runs=1000,
             initial_unallocated=1000,
             backtest_metrics=BacktestMetrics(
-                backtest_start_date=datetime(
-                    2023, 8, 7, 7, 59, tzinfo=None
-                ),
-                backtest_end_date=datetime(
-                    2023, 12, 2, 0, 0, tzinfo=None
-                ),
+                backtest_window=window,
                 equity_curve=[],
                 total_net_gain=0.2,
                 cagr=0.1,
@@ -134,14 +130,14 @@ class TestBacktestSave(TestCase):
         )
         backtest = Backtest(
             algorithm_id="alg-025",
-            backtest_runs=[run],
+            vector_runs=[run],
             risk_free_rate=0.0
         )
         backtest.save(self.output_path)
 
         # Check directory structure
         self.assertTrue(os.path.exists(self.output_path))
-        runs_dir = os.path.join(self.output_path, "runs")
+        runs_dir = os.path.join(self.output_path, "vector_runs")
         self.assertTrue(os.path.exists(runs_dir))
 
         backtest_run_dir = os.path.join(
@@ -161,21 +157,18 @@ class TestBacktestSave(TestCase):
         date_range = BacktestDateRange(
             start_date=start, end_date=end, name=name
         )
+        window = BacktestWindow(train_range=date_range)
         return BacktestRun(
-            backtest_start_date=date_range.start_date,
-            backtest_end_date=date_range.end_date,
-            backtest_date_range_name=date_range.name,
+            backtest_window=window,
             created_at=datetime.now(tz=timezone.utc),
             orders=[],
             trades=[],
             positions=[],
             portfolio_snapshots=self._create_snapshots(),
-            trading_symbol="EUR",
             number_of_runs=1000,
             initial_unallocated=1000,
             backtest_metrics=BacktestMetrics(
-                backtest_start_date=start.replace(tzinfo=None),
-                backtest_end_date=end.replace(tzinfo=None),
+                backtest_window=window,
                 total_net_gain=total_net_gain,
                 total_net_gain_percentage=total_net_gain / 1000.0,
                 number_of_trades=trades_closed,
@@ -241,13 +234,13 @@ class TestBacktestSave(TestCase):
 
         backtest = Backtest(
             algorithm_id="alg-511",
-            backtest_runs=runs,
+            vector_runs=runs,
             backtest_summary=stale_summary,
             risk_free_rate=0.0,
         )
         backtest.save(self.output_path)
 
-        summary_path = os.path.join(self.output_path, "summary.json")
+        summary_path = os.path.join(self.output_path, "vector_summary.json")
         self.assertTrue(os.path.exists(summary_path))
 
         with open(summary_path, "r") as f:
@@ -294,17 +287,165 @@ class TestBacktestSave(TestCase):
             gross_loss=-100.0,
         )
 
-        bt_a = Backtest(algorithm_id="alg-511", backtest_runs=[run_a])
-        bt_b = Backtest(algorithm_id="alg-511", backtest_runs=[run_b])
+        bt_a = Backtest(algorithm_id="alg-511", vector_runs=[run_a])
+        bt_b = Backtest(algorithm_id="alg-511", vector_runs=[run_b])
 
         merged = bt_a.merge(bt_b)
 
-        self.assertEqual(len(merged.backtest_runs), 2)
-        self.assertIsNotNone(merged.backtest_summary)
-        self.assertEqual(merged.backtest_summary.number_of_windows, 2)
+        self.assertEqual(len(merged.get_all_backtest_runs()), 2)
+        self.assertIsNotNone(merged.vector_summary)
+        self.assertEqual(merged.vector_summary.number_of_windows, 2)
         self.assertAlmostEqual(
-            merged.backtest_summary.total_net_gain, 150.0, places=4
+            merged.vector_summary.total_net_gain, 150.0, places=4
         )
         self.assertEqual(
-            merged.backtest_summary.number_of_trades_closed, 30
+            merged.vector_summary.number_of_trades_closed, 30
         )
+
+
+class TestBacktestDirectoryLayoutV9(TestCase):
+    """Stage 4 regression coverage for design doc \u00a74 \u2014 the legacy
+    directory save/open layout.
+
+    Verifies:
+    * Per-engine subdirs (``vector_runs/`` / ``event_runs/``) and
+      per-engine summary files (``vector_summary.json`` /
+      ``event_summary.json``).
+    * Empty engine slots are omitted entirely.
+    * Reader still accepts the pre-v9.0 ``runs/`` + ``summary.json``
+      shape and routes it into the vector slot.
+    * Round-trip preserves both engines.
+    """
+
+    def setUp(self):
+        self.resource_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "resources",
+        )
+        self.output_path = os.path.join(
+            self.resource_dir, "backtest_dir_v9"
+        )
+
+    def tearDown(self):
+        if os.path.exists(self.output_path):
+            shutil.rmtree(self.output_path)
+
+    def _mk_run(self, gain: float, name: str = "win") -> BacktestRun:
+        start = datetime(2023, 1, 1, tzinfo=timezone.utc)
+        end = datetime(2023, 12, 31, tzinfo=timezone.utc)
+        window = BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=start,
+                end_date=end,
+                name=name,
+            )
+        )
+        return BacktestRun(
+            backtest_window=window,
+            created_at=datetime.now(tz=timezone.utc),
+            orders=[],
+            trades=[],
+            positions=[],
+            portfolio_snapshots=[
+                PortfolioSnapshot(
+                    created_at="2023-01-01 00:00:00",
+                    total_value=1000,
+                    trading_symbol="EUR",
+                    unallocated=1000,
+                ),
+            ],
+            number_of_runs=1,
+            initial_unallocated=1000,
+            backtest_metrics=BacktestMetrics(
+                backtest_window=window,
+                total_net_gain=gain,
+                total_net_gain_percentage=gain / 1000.0,
+                number_of_trades=1,
+                number_of_trades_closed=1,
+                total_number_of_days=365,
+            ),
+        )
+
+    def test_vector_only_save_omits_event_slot_on_disk(self):
+        bt = Backtest(
+            algorithm_id="alg-vec",
+            vector_runs=[self._mk_run(100.0)],
+        )
+        bt.save(self.output_path)
+
+        self.assertTrue(
+            os.path.isdir(
+                os.path.join(self.output_path, "vector_runs")
+            )
+        )
+        self.assertTrue(
+            os.path.isfile(
+                os.path.join(self.output_path, "vector_summary.json")
+            )
+        )
+        # Event slot must be entirely absent.
+        self.assertFalse(
+            os.path.exists(
+                os.path.join(self.output_path, "event_runs")
+            )
+        )
+        self.assertFalse(
+            os.path.exists(
+                os.path.join(self.output_path, "event_summary.json")
+            )
+        )
+
+    def test_dual_engine_round_trip_via_directory(self):
+        bt = Backtest(
+            algorithm_id="alg-dual",
+            vector_runs=[self._mk_run(100.0, name="vec")],
+            event_runs=[self._mk_run(200.0, name="evt")],
+        )
+        bt.save(self.output_path)
+
+        # Both per-engine layouts present on disk.
+        for engine in ("vector", "event"):
+            self.assertTrue(
+                os.path.isdir(
+                    os.path.join(self.output_path, f"{engine}_runs")
+                )
+            )
+            self.assertTrue(
+                os.path.isfile(
+                    os.path.join(
+                        self.output_path, f"{engine}_summary.json"
+                    )
+                )
+            )
+
+        loaded = Backtest.open(self.output_path)
+        self.assertEqual(sorted(loaded.engines()), ["event", "vector"])
+        self.assertEqual(len(loaded.vector_runs), 1)
+        self.assertEqual(len(loaded.event_runs), 1)
+        self.assertIsNotNone(loaded.vector_summary)
+        self.assertIsNotNone(loaded.event_summary)
+
+    def test_reader_routes_legacy_runs_into_vector_slot(self):
+        """Pre-v9.0 layout (``runs/`` + ``summary.json``) must still
+        load and route into the vector slot (design doc \u00a74)."""
+        bt = Backtest(
+            algorithm_id="alg-legacy",
+            vector_runs=[self._mk_run(123.0)],
+        )
+        bt.save(self.output_path)
+
+        # Rename the v9.0 layout to the pre-v9.0 layout on disk.
+        os.rename(
+            os.path.join(self.output_path, "vector_runs"),
+            os.path.join(self.output_path, "runs"),
+        )
+        os.rename(
+            os.path.join(self.output_path, "vector_summary.json"),
+            os.path.join(self.output_path, "summary.json"),
+        )
+
+        loaded = Backtest.open(self.output_path)
+        self.assertEqual(loaded.engines(), ["vector"])
+        self.assertEqual(len(loaded.vector_runs), 1)
+        self.assertEqual(loaded.event_runs, [])
+        self.assertIsNotNone(loaded.vector_summary)

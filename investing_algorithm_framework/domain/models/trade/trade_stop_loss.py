@@ -68,6 +68,7 @@ class TradeStopLoss(BaseModel):
         sell_amount: float = None,
         high_water_mark: float = None,
         high_water_mark_date: str = None,
+        is_short: bool = False,
         created_at: datetime = None,
         updated_at: datetime = None
     ):
@@ -80,17 +81,24 @@ class TradeStopLoss(BaseModel):
         self.high_water_mark = high_water_mark
         self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
+        self.is_short = is_short
         self.created_at = created_at
         self.updated_at = updated_at
 
+        # #434 phase 3 — for short trades the stop loss triggers on
+        # price *rise*, so the trigger price sits ABOVE the
+        # most-favorable (lowest) price seen so far. ``high_water_mark``
+        # is reused as the "extreme favorable price" regardless of
+        # direction: maximum for longs, minimum for shorts.
+        direction = 1 if self.is_short else -1
         if high_water_mark is None:
             self.high_water_mark = open_price
             self.stop_loss_price = self.open_price * \
-                (1 - (self.percentage / 100))
+                (1 + direction * (self.percentage / 100))
             self.high_water_mark_date = created_at
         else:
             self.stop_loss_price = high_water_mark * \
-                (1 - (self.percentage / 100))
+                (1 + direction * (self.percentage / 100))
 
         if sell_amount is not None:
             self.sell_amount = sell_amount
@@ -121,6 +129,23 @@ class TradeStopLoss(BaseModel):
         """
 
         if not self.active or self.sold_amount == self.sell_amount:
+            return
+
+        if self.is_short:
+            # SHORT: favorable direction is DOWN. Track the lowest
+            # price; trigger price sits ABOVE the low water mark.
+            if not self.trailing:
+                if current_price < self.high_water_mark:
+                    self.high_water_mark = current_price
+                return
+            # trailing short SL
+            if current_price >= self.stop_loss_price:
+                return
+            if current_price < self.high_water_mark:
+                self.high_water_mark = current_price
+                self.high_water_mark_date = date
+                self.stop_loss_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
             return
 
         if not self.trailing:
@@ -154,6 +179,18 @@ class TradeStopLoss(BaseModel):
             return False
 
         if not self.active or self.sold_amount == self.sell_amount:
+            return False
+
+        if self.is_short:
+            # SHORT: trigger when price rises above the stop level.
+            if not self.trailing:
+                return current_price >= self.stop_loss_price
+            if current_price >= self.stop_loss_price:
+                return True
+            if current_price < self.high_water_mark:
+                self.high_water_mark = current_price
+                self.stop_loss_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
             return False
 
         if not self.trailing:
@@ -268,6 +305,7 @@ class TradeStopLoss(BaseModel):
             "sell_amount": self.sell_amount,
             "sold_amount": self.sold_amount,
             "active": self.active,
+            "is_short": getattr(self, "is_short", False),
             "sell_prices": self.sell_prices,
             "created_at": ensure_iso(self.created_at),
             "updated_at": ensure_iso(self.updated_at)
@@ -312,6 +350,7 @@ class TradeStopLoss(BaseModel):
             high_water_mark_date=high_water_mark_date,
             triggered=data.get("triggered", False),
             triggered_at=triggered_at,
+            is_short=data.get("is_short", False),
             created_at=created_at,
             updated_at=updated_at
         )

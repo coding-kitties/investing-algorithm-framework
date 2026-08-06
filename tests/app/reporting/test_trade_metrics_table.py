@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from investing_algorithm_framework.domain import BacktestMetrics
+from investing_algorithm_framework.domain import BacktestMetrics, \
+    BacktestWindow, BacktestDateRange
 from investing_algorithm_framework.app.reporting.tables.trade_metrics_table \
     import create_html_trade_metrics_table
 
@@ -17,13 +18,10 @@ class TestCreateHtmlTradeMetricsTable(TestCase):
     def _make_metrics(self, **overrides):
         """Create a BacktestMetrics with sensible defaults."""
         defaults = dict(
-            backtest_start_date=datetime(
-                2023, 1, 1, tzinfo=timezone.utc
-            ),
-            backtest_end_date=datetime(
-                2023, 12, 31, tzinfo=timezone.utc
-            ),
-            trading_symbol="EUR",
+            backtest_window=BacktestWindow(train_range=BacktestDateRange(
+                start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+                end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
+            )),
             trades_per_year=12.0,
             trade_per_day=0.033,
             exposure_ratio=0.5,

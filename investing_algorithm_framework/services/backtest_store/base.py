@@ -4,7 +4,7 @@ A :class:`BacktestStore` decouples *where* a backtest is persisted
 from the rest of the framework. Three concrete implementations are
 planned:
 
-* :class:`LocalDirStore` (this PR) — directory of ``.iafbt`` bundles.
+* :class:`LocalDirStore` (this PR) — directory of ``.obtf`` bundles.
   Adapter over today's :meth:`Backtest.save_bundle` /
   :meth:`Backtest.open` so existing layouts keep working unchanged.
 * ``LocalTieredStore`` (Phase 3b/3c) — SQLite Tier-1 + per-project

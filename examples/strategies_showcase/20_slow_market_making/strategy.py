@@ -11,6 +11,7 @@ from investing_algorithm_framework import (
     OrderType,
     TimeUnit,
     TradingStrategy,
+    Schedule,
 )
 
 SYMBOL = "BTC/EUR"
@@ -21,8 +22,7 @@ INVENTORY_CAP_EUR = 250.0
 
 class SlowMarketMakingStrategy(TradingStrategy):
     algorithm_id = "slow-market-making"
-    time_unit = TimeUnit.HOUR
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.HOUR)
     market = "BITVAVO"
     trading_symbol = "EUR"
     symbols = [SYMBOL.split("/")[0]]

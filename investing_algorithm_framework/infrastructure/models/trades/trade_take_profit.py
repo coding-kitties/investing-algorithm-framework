@@ -53,5 +53,6 @@ class SQLTradeTakeProfit(
     active = Column(Boolean)
     triggered = Column(Boolean, default=False)
     triggered_at = Column(DateTime, default=None)
+    is_short = Column(Boolean, default=False)
     created_at = Column(DateTime)
     updated_at = Column(DateTime, default=None)

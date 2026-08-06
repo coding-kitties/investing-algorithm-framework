@@ -75,6 +75,7 @@ class TradeTakeProfit(BaseModel):
         sell_amount: float = None,
         high_water_mark: float = None,
         high_water_mark_date: str = None,
+        is_short: bool = False,
         created_at: datetime = None,
         updated_at: datetime = None
     ):
@@ -87,12 +88,16 @@ class TradeTakeProfit(BaseModel):
         self.high_water_mark = high_water_mark
         self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
+        self.is_short = is_short
         self.created_at = created_at
         self.updated_at = updated_at
 
+        # #434 phase 3 — for short trades the take profit triggers on
+        # price *drop*, so the trigger price sits BELOW entry.
+        direction = -1 if self.is_short else 1
         if high_water_mark is None and not self.trailing:
             self.take_profit_price = self.open_price * \
-                (1 + (self.percentage / 100))
+                (1 + direction * (self.percentage / 100))
         else:
             self.take_profit_price = None
 
@@ -119,6 +124,10 @@ class TradeTakeProfit(BaseModel):
             current_price: float - the last reported price of the trade
             date: the date of the price update
         """
+
+        if self.is_short:
+            self._update_short(current_price, date)
+            return
 
         if not self.trailing:
             # Fixed take profit: track high watermark
@@ -160,6 +169,9 @@ class TradeTakeProfit(BaseModel):
 
         if current_price is None:
             return False
+
+        if self.is_short:
+            return self._has_triggered_short(current_price)
 
         if not self.trailing:
             # Fixed take profit: trigger when price reaches take_profit_price
@@ -205,6 +217,62 @@ class TradeTakeProfit(BaseModel):
                         self.take_profit_price = new_take_profit_price
 
                 return False
+
+    # ------------------------------------------------------------------
+    # #434 phase 3 \u2014 SHORT take-profit logic. The favorable
+    # direction is DOWN, so we track the LOW water mark in
+    # ``high_water_mark`` (reused as \"extreme favorable price\") and
+    # the trigger price sits ABOVE that mark for trailing rebounds.
+    # ------------------------------------------------------------------
+
+    def _update_short(self, current_price: float, date) -> None:
+        if not self.trailing:
+            if current_price <= self.take_profit_price:
+                if (self.high_water_mark is None
+                        or current_price < self.high_water_mark):
+                    self.high_water_mark = current_price
+                    self.high_water_mark_date = date
+            return
+
+        if self.high_water_mark is None:
+            initial_threshold = self.open_price * (1 - (self.percentage / 100))
+            if current_price <= initial_threshold:
+                self.high_water_mark = current_price
+                self.high_water_mark_date = date
+                self.take_profit_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
+        else:
+            if current_price < self.high_water_mark:
+                self.high_water_mark = current_price
+                self.high_water_mark_date = date
+                new_take_profit_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
+                if new_take_profit_price < self.take_profit_price:
+                    self.take_profit_price = new_take_profit_price
+
+    def _has_triggered_short(self, current_price: float) -> bool:
+        if not self.trailing:
+            return current_price <= self.take_profit_price
+
+        if self.high_water_mark is None:
+            initial_threshold = self.open_price * (1 - (self.percentage / 100))
+            if current_price <= initial_threshold:
+                self.high_water_mark = current_price
+                self.take_profit_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
+            return False
+
+        # Trailing short TP: trigger when price rebounds upward
+        # above the take_profit_price.
+        if current_price > self.take_profit_price:
+            return True
+        if current_price < self.high_water_mark:
+            self.high_water_mark = current_price
+            new_take_profit_price = self.high_water_mark * \
+                (1 + (self.percentage / 100))
+            if new_take_profit_price < self.take_profit_price:
+                self.take_profit_price = new_take_profit_price
+        return False
 
     def get_sell_amount(self) -> float:
         """
@@ -300,6 +368,7 @@ class TradeTakeProfit(BaseModel):
             "sell_amount": self.sell_amount,
             "sold_amount": self.sold_amount,
             "active": self.active,
+            "is_short": getattr(self, "is_short", False),
             "triggered": self.triggered,
             "triggered_at": ensure_iso(self.triggered_at),
             "high_water_mark_date": self.high_water_mark_date,
@@ -346,6 +415,7 @@ class TradeTakeProfit(BaseModel):
             sell_amount=data.get("sell_amount"),
             high_water_mark=data.get("high_water_mark"),
             high_water_mark_date=high_water_mark_date,
+            is_short=data.get("is_short", False),
             created_at=created_at,
             updated_at=updated_at
         )

@@ -137,10 +137,19 @@ class TestSQLOrderMetadataDBPersistence(TestBase):
         self.assertEqual(retrieved.metadata["stop_loss_id"], 42)
 
     def test_no_metadata_returns_empty_dict(self):
-        """Order created without metadata returns {} when read back."""
+        """Order created without metadata has no user-supplied keys.
+
+        v9.0 (#431) — the framework injects ``_reservation_price`` on
+        every BUY order to track slippage; filter underscore-prefixed
+        framework keys before comparing.
+        """
         order = self._create_order()
         retrieved = self.repository.get(order.id)
-        self.assertEqual(retrieved.metadata, {})
+        user_metadata = {
+            k: v for k, v in retrieved.metadata.items()
+            if not k.startswith("_")
+        }
+        self.assertEqual(user_metadata, {})
 
     def test_update_metadata(self):
         """Metadata can be updated via the update method."""

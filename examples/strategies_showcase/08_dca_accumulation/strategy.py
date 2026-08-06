@@ -12,30 +12,32 @@ Two pieces working together:
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 from investing_algorithm_framework import (
     Context,
     DataSource,
     DataType,
-    OrderSide,
-    OrderType,
+    PositionSize,
+    Signal,
+    SignalSide,
     TimeUnit,
     TradingStrategy,
+    Schedule,
 )
 
 SYMBOL = "BTC/EUR"
+BASE = SYMBOL.split("/")[0]
 MARKET = "BITVAVO"
 DCA_AMOUNT_EUR = 25.0
 
 
 class DCAStrategy(TradingStrategy):
     algorithm_id = "dca-weekly"
-    time_unit = TimeUnit.DAY
-    interval = 7
+    schedule = Schedule.every(7, TimeUnit.DAY)
     market = MARKET
     trading_symbol = "EUR"
-    symbols = [SYMBOL.split("/")[0]]
+    symbols = [BASE]
 
     data_sources = [
         DataSource(
@@ -45,20 +47,18 @@ class DCAStrategy(TradingStrategy):
         )
     ]
 
-    def run_strategy(self, context: Context, data: Dict[str, Any]) -> None:
+    position_sizes = [
+        PositionSize(symbol=BASE, fixed_amount=DCA_AMOUNT_EUR),
+    ]
+
+    def generate_signals(
+        self, context: Context, data: Dict[str, Any]
+    ) -> Iterable[Signal]:
         df = data[f"{SYMBOL}-ohlcv"]
         if len(df) == 0:
             return
-        price = float(df["Close"].iloc[-1])
-        if price <= 0:
+        if float(df["Close"].iloc[-1]) <= 0:
             return
-        cash = context.get_unallocated()
-        if cash < DCA_AMOUNT_EUR:
+        if context.get_unallocated() < DCA_AMOUNT_EUR:
             return
-        context.create_order(
-            target_symbol=self.symbols[0],
-            order_side=OrderSide.BUY,
-            order_type=OrderType.LIMIT,
-            price=price,
-            amount=(DCA_AMOUNT_EUR * 0.995) / price,
-        )
+        yield Signal(symbol=BASE, side=SignalSide.SCALE_IN, source="dca")

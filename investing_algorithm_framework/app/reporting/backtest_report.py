@@ -14,6 +14,9 @@ from jinja2 import Environment, FileSystemLoader
 from investing_algorithm_framework.domain import (
     Backtest, OperationalException, tqdm, BUNDLE_EXT
 )
+from investing_algorithm_framework.domain.backtesting.backtest import (
+    ENGINE_VECTOR,
+)
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -219,7 +222,7 @@ class BacktestReport:
     def _is_backtest(backtest_path):
         if not os.path.exists(backtest_path):
             return False
-        # Bundle file (.iafbt)
+        # Bundle file (.obtf)
         if os.path.isfile(backtest_path) and \
                 backtest_path.endswith(BUNDLE_EXT):
             return True
@@ -349,6 +352,44 @@ backtest_utils import (
         return report
 
     # ------------------------------------------------------------------
+    # Engine-view expansion (design doc §7 / Stage 6)
+    # ------------------------------------------------------------------
+
+    def _engine_views(self):
+        """Expand ``self.backtests`` to one entry per populated engine.
+
+        Each entry is a dict ``{'backtest', 'engine', 'dual'}`` where
+        ``dual`` is True when the source backtest carries runs for
+        both engines. Builders treat each entry as an independent
+        "strategy" so vector and event results render as separate
+        pages in the dashboard — satisfying the v9.0 requirement that
+        the report distinguishes the two engines.
+
+        Backtests that report no populated engines fall back to a
+        single vector view for backward compatibility with empty /
+        legacy fixtures.
+        """
+        views = []
+        for bt_idx, bt in enumerate(self.backtests):
+            engines = list(bt.engines()) or [ENGINE_VECTOR]
+            dual = len(engines) > 1
+            for engine in engines:
+                views.append({
+                    "backtest": bt,
+                    "backtest_index": bt_idx,
+                    "engine": engine,
+                    "dual": dual,
+                })
+        return views
+
+    @staticmethod
+    def _engine_label(view) -> str:
+        """Suffix appended to algorithm_id when both engines coexist."""
+        if not view["dual"]:
+            return ""
+        return f" ({view['engine']})"
+
+    # ------------------------------------------------------------------
     # Full HTML assembly
     # ------------------------------------------------------------------
 
@@ -361,7 +402,12 @@ backtest_utils import (
         logo_dark_b64 = _read_logo_base64('finterion-dark.png')
         logo_light_b64 = _read_logo_base64('finterion-light.png')
 
-        is_single = len(self.backtests) == 1
+        # ``is_single`` drives the dashboard's single- vs comparison-
+        # view layout. A backtest exposing both engines now counts as
+        # a comparison (vector vs event) even when it is the only
+        # backtest loaded.
+        engine_views = self._engine_views()
+        is_single = len(engine_views) == 1
         strategies = self._build_strategies_data()
         run_data = self._build_run_data()
         windows_meta = self._build_windows_meta()
@@ -447,14 +493,18 @@ backtest_utils import (
     def _build_strategies_data(self):
         strategies = []
 
-        for i, bt in enumerate(self.backtests):
+        for i, view in enumerate(self._engine_views()):
+            bt = view["backtest"]
+            engine = view["engine"]
             color = STRATEGY_COLORS[i % len(STRATEGY_COLORS)]
-            runs = bt.get_all_backtest_runs()
+            runs = bt.get_runs(engine)
 
-            # Summary metrics
+            # Summary metrics: each engine view binds to its own
+            # per-engine summary (design doc section 7 / Stage 6).
             summary_dict = {}
-            if bt.backtest_summary is not None:
-                summary_dict = bt.backtest_summary.to_dict()
+            primary_summary = bt.get_summary(engine)
+            if primary_summary is not None:
+                summary_dict = primary_summary.to_dict()
 
             # Representative equity curve (first run, as % growth)
             rep_eq = []
@@ -487,11 +537,16 @@ backtest_utils import (
             algo_name = bt.algorithm_id or f"strategy_{i}"
             if len(algo_name) > 8:
                 algo_name = algo_name[:8]
+            algo_name += self._engine_label(view)
 
-            # Prefer persisted bt.tag, fall back to directory tag
+            # Prefer persisted bt.tag, fall back to directory tag.
+            # Source tags are indexed by the original backtest index
+            # so both engine views of a dual-engine bundle share the
+            # same source tag.
             tag = getattr(bt, 'tag', None) or ''
-            if not tag and i < len(self._source_tags):
-                tag = self._source_tags[i]
+            bt_idx = view["backtest_index"]
+            if not tag and bt_idx < len(self._source_tags):
+                tag = self._source_tags[bt_idx]
 
             strategies.append({
                 'id': f'strat-{i}',
@@ -511,8 +566,9 @@ backtest_utils import (
     def _build_run_data(self):
         run_data = {}
 
-        for i, bt in enumerate(self.backtests):
-            runs = bt.get_all_backtest_runs()
+        for i, view in enumerate(self._engine_views()):
+            bt = view["backtest"]
+            runs = bt.get_runs(view["engine"])
 
             for j, run in enumerate(runs):
                 rid = f"run-{i}-{j}"
@@ -855,8 +911,9 @@ backtest_utils import (
 
     def _build_windows_meta(self):
         windows = {}
-        for bt in self.backtests:
-            for run in bt.get_all_backtest_runs():
+        for view in self._engine_views():
+            bt = view["backtest"]
+            for run in bt.get_runs(view["engine"]):
                 name = run.backtest_date_range_name or ''
                 if name not in windows:
                     ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
@@ -877,8 +934,9 @@ backtest_utils import (
 
     def _build_run_labels(self):
         labels, seen = [], set()
-        for bt in self.backtests:
-            for run in bt.get_all_backtest_runs():
+        for view in self._engine_views():
+            bt = view["backtest"]
+            for run in bt.get_runs(view["engine"]):
                 name = run.backtest_date_range_name or ''
                 if name not in seen:
                     ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
@@ -953,8 +1011,9 @@ backtest_utils import (
 
         # Collect all window date ranges
         windows = {}
-        for bt in self.backtests:
-            for run in bt.get_all_backtest_runs():
+        for view in self._engine_views():
+            bt = view["backtest"]
+            for run in bt.get_runs(view["engine"]):
                 name = run.backtest_date_range_name or ''
                 if name not in windows:
                     windows[name] = {

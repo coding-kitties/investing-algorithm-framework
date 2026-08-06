@@ -7,7 +7,7 @@ from unittest import TestCase
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
     MarketCredential, DataSource, INDEX_DATETIME, DataType, \
-    CSVOHLCVDataProvider, BacktestDateRange
+    CSVOHLCVDataProvider, BacktestDateRange, Schedule
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 from tests.resources import random_string, \
@@ -15,8 +15,7 @@ from tests.resources import random_string, \
 
 
 class StrategyOne(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     data_sources = [
         DataSource(
             symbol="BTC/EUR",

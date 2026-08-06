@@ -168,5 +168,6 @@ examples/**/resources/
 .data_cache/
 
 # Investing Algorithm Framework backtest bundles
+*.obtf
 *.iafbt
 iaf-storage-demo/

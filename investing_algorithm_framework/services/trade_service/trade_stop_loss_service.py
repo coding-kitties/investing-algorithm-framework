@@ -29,7 +29,7 @@ class TradeStopLossService(RepositoryService):
         update_data = {
             "triggered": True,
             "triggered_at": trigger_date,
-            "updated_at":  trigger_date
+            "updated_at": trigger_date
         }
 
         for id in stop_loss_ids:

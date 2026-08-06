@@ -70,7 +70,7 @@ class TestRecalculateBacktests(TestCase):
         # Clear existing metrics
         for run in bt.get_all_backtest_runs():
             run.backtest_metrics = None
-        bt.backtest_summary = None
+        bt.vector_summary = None
 
         result = recalculate_backtests([bt], risk_free_rate=0.024)
         self.assertEqual(len(result), 1)
@@ -84,9 +84,9 @@ class TestRecalculateBacktests(TestCase):
             self.assertIsNotNone(run.backtest_metrics.max_drawdown)
 
         # Summary should be regenerated
-        self.assertIsNotNone(recalculated.backtest_summary)
-        self.assertIsNotNone(recalculated.backtest_summary.cagr)
-        self.assertIsNotNone(recalculated.backtest_summary.sharpe_ratio)
+        self.assertIsNotNone(recalculated.vector_summary)
+        self.assertIsNotNone(recalculated.vector_summary.cagr)
+        self.assertIsNotNone(recalculated.vector_summary.sharpe_ratio)
 
     def test_recalculate_multiple_backtests(self):
         bt1 = self._load_backtest('backtest_one')
@@ -96,7 +96,7 @@ class TestRecalculateBacktests(TestCase):
         for bt in [bt1, bt2]:
             for run in bt.get_all_backtest_runs():
                 run.backtest_metrics = None
-            bt.backtest_summary = None
+            bt.vector_summary = None
 
         result = recalculate_backtests([bt1, bt2], risk_free_rate=0.024)
         self.assertEqual(len(result), 2)
@@ -104,7 +104,7 @@ class TestRecalculateBacktests(TestCase):
         for bt in result:
             for run in bt.get_all_backtest_runs():
                 self.assertIsNotNone(run.backtest_metrics)
-            self.assertIsNotNone(bt.backtest_summary)
+            self.assertIsNotNone(bt.vector_summary)
 
     def test_recalculate_uses_backtest_risk_free_rate(self):
         bt = self._load_backtest('backtest_one')
@@ -135,7 +135,7 @@ class TestRecalculateBacktests(TestCase):
 
         runs = bt.get_all_backtest_runs()
         if len(runs) > 0:
-            summary = bt.backtest_summary
+            summary = bt.vector_summary
             self.assertIsNotNone(summary)
 
             # Total trades should equal sum of per-run trades
@@ -207,13 +207,13 @@ class TestRecalculateBacktests(TestCase):
             # First pass
             recalculate_backtests([bt], risk_free_rate=rfr)
             first_summary = {
-                attr: getattr(bt.backtest_summary, attr, None)
+                attr: getattr(bt.vector_summary, attr, None)
                 for attr, _ in _SUMMARY_METRICS
             }
 
             # Second pass
             recalculate_backtests([bt], risk_free_rate=rfr)
-            recalc_summary = bt.backtest_summary
+            recalc_summary = bt.vector_summary
 
             self.assertIsNotNone(recalc_summary)
 
@@ -252,7 +252,7 @@ class TestRecalculateBacktests(TestCase):
             recalculate_backtests([bt], risk_free_rate=rfr)
 
             runs = bt.get_all_backtest_runs()
-            summary = bt.backtest_summary
+            summary = bt.vector_summary
 
             # Regenerate summary independently from per-run metrics
             from investing_algorithm_framework.domain.backtesting \

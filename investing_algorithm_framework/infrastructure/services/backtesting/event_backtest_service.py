@@ -1,10 +1,10 @@
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from collections import defaultdict
 from typing import Dict, List
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
-    BacktestRun, TimeUnit, generate_backtest_summary_metrics, Backtest
+    BacktestRun, BacktestWindow, generate_backtest_summary_metrics, Backtest
 from investing_algorithm_framework.domain.models.trade.trade_status import \
     TradeStatus
 from investing_algorithm_framework.services import DataProviderService, \
@@ -141,34 +141,33 @@ class EventBacktestService:
             Dict mapping datetime to strategy_ids and task_ids to run.
         """
         schedule = defaultdict(
-            lambda: {"strategy_ids": set(), "task_ids": set(tasks)}
+            lambda: {
+                "strategy_ids": set(),
+                "task_ids": set(tasks),
+                "scheduled_function_calls": [],
+            }
         )
 
         for strategy in strategies:
-            strategy_id = strategy.strategy_profile.strategy_id
-            interval = strategy.strategy_profile.interval
-            time_unit = strategy.strategy_profile.time_unit
+            sid = strategy.strategy_profile.strategy_id
+            strat_schedule = strategy.strategy_profile.schedule
+            for t in strat_schedule.iter_run_times(start_date, end_date):
+                schedule[t]["strategy_ids"].add(sid)
 
-            if time_unit == TimeUnit.SECOND:
-                step = timedelta(seconds=interval)
-            elif time_unit == TimeUnit.MINUTE:
-                step = timedelta(minutes=interval)
-            elif time_unit == TimeUnit.HOUR:
-                step = timedelta(hours=interval)
-            elif time_unit == TimeUnit.DAY:
-                step = timedelta(days=interval)
-            else:
-                raise ValueError(f"Unsupported time unit: {time_unit}")
-
-            t = start_date
-            while t <= end_date:
-                schedule[t]["strategy_ids"].add(strategy_id)
-                t += step
+            for sf in strategy.strategy_profile.scheduled_functions or []:
+                for t in sf.schedule.iter_run_times(start_date, end_date):
+                    _ = schedule[t]
+                    schedule[t]["scheduled_function_calls"].append(
+                        (sid, sf.func)
+                    )
 
         return {
             ts: {
                 "strategy_ids": sorted(data["strategy_ids"]),
-                "task_ids": sorted(data["task_ids"])
+                "task_ids": sorted(data["task_ids"]),
+                "scheduled_function_calls": list(
+                    data["scheduled_function_calls"]
+                ),
             }
             for ts, data in schedule.items()
         }
@@ -202,21 +201,18 @@ class EventBacktestService:
 
         # Create the backtest run
         run = BacktestRun(
-            backtest_start_date=backtest_date_range.start_date,
-            backtest_end_date=backtest_date_range.end_date,
-            backtest_date_range_name=backtest_date_range.name,
+            backtest_window=BacktestWindow(train_range=backtest_date_range),
             initial_unallocated=initial_unallocated,
-            trading_symbol=portfolio.trading_symbol,
             created_at=datetime.now(tz=timezone.utc),
             portfolio_snapshots=self._portfolio_snapshot_service.get_all(
                 {"portfolio_id": portfolio.id}
             ),
             number_of_runs=number_of_runs,
             trades=self._trade_service.get_all(
-                {"portfolio": portfolio.id}
+                {"portfolio_id": portfolio.id}
             ),
             orders=self._order_service.get_all(
-                {"portfolio": portfolio.id}
+                {"portfolio_id": portfolio.id}
             ),
             positions=self._position_repository.get_all(
                 {"portfolio": portfolio.id}
@@ -305,10 +301,9 @@ class EventBacktestService:
 
         return Backtest(
             algorithm_id=algorithm_id,
-            backtest_runs=[run],
-            backtest_summary=generate_backtest_summary_metrics(
+            event_runs=[run],
+            event_summary=generate_backtest_summary_metrics(
                 [run.backtest_metrics]
             ),
             risk_free_rate=risk_free_rate,
-            engine_type="event",
         )

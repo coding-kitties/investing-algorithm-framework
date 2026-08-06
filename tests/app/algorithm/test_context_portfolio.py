@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from investing_algorithm_framework import TradingStrategy, TimeUnit, \
+from investing_algorithm_framework import TradingStrategy, TimeUnit, Schedule, \
     CSVOHLCVDataProvider
 from tests.resources import BitvavoTestBase, BinanceTestBase
 from tests.resources.strategies_for_testing import StrategyOne
@@ -27,9 +27,7 @@ from tests.resources.strategies_for_testing import StrategyOne
 class GetAllocatedStrategy(TradingStrategy):
     """Strategy that creates a BUY order on run (for allocation tests)."""
     id = "strategy_one"
-    time_unit = TimeUnit.SECOND
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.SECOND)
     def run_strategy(self, context, data=None):
         context.create_limit_order(
             target_symbol="BTC",

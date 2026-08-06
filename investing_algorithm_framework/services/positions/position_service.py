@@ -42,9 +42,15 @@ class PositionService(RepositoryService):
 
     def update_positions_with_created_buy_order(self, order):
         """
-        Function to update positions with created order.
-        If the order is filled then also the amount of the position
-        is updated.
+        Reserve trading-symbol balance for a freshly-created buy order.
+
+        v9.0 (#431) \u2014 this method now only handles the reservation
+        side: it subtracts the reserved size from the trading-symbol
+        position. The target-position bump (and any cost accounting)
+        for already-filled portions is handled by
+        :meth:`update_positions_with_buy_order_filled` via the
+        standard fill-handling path in
+        :meth:`OrderService._sync_with_buy_order_filled`.
 
         Args:
             order (Order): The order that has been created.
@@ -55,7 +61,6 @@ class PositionService(RepositoryService):
         position = self.get(order.position_id)
         portfolio = self.portfolio_repository.get(position.portfolio_id)
         size = order.get_size()
-        filled = order.get_filled()
 
         logger.info(
             f"Syncing trading symbol {portfolio.get_trading_symbol()} "
@@ -74,19 +79,6 @@ class PositionService(RepositoryService):
                 "amount": trading_symbol_position.get_amount() - size
             }
         )
-
-        if filled > 0:
-            logger.info(
-                f"Syncing position {position.get_symbol()} with created buy "
-                f"order {order.get_id()} with filled size {order.get_filled()}"
-            )
-            self.update(
-                position.id,
-                {
-                    "amount": position.get_amount() + order.get_filled(),
-                    "cost": position.get_cost() + size,
-                }
-            )
 
     def update_positions_with_buy_order_filled(self, order, filled_amount):
         """
@@ -206,5 +198,138 @@ class PositionService(RepositoryService):
             {
                 "amount":
                     trading_symbol_position.get_amount() + filled_size
+            }
+        )
+
+    # ------------------------------------------------------------------
+    # #434 phase 2 — SHORT / COVER position sync.
+    #
+    # Position model: short positions carry a NEGATIVE ``amount`` on
+    # the target-symbol position. A SHORT fill drives the position
+    # further negative; a COVER fill moves it back toward zero.
+    # ------------------------------------------------------------------
+
+    def update_positions_with_created_short_order(self, order):
+        """Reserve trading-symbol collateral for a freshly-created
+        short order. Cash-side semantics are identical to a BUY
+        reservation (``amount * reservation_price`` is removed from
+        the trading-symbol position) — the target position is not
+        touched at creation time; it only moves negative on the
+        first fill.
+        """
+        position = self.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        size = order.get_size()
+
+        logger.info(
+            f"Syncing trading symbol {portfolio.get_trading_symbol()} "
+            f"position with created short order {order.get_id()} "
+            f"with collateral {size}"
+        )
+        trading_symbol_position = self.find(
+            {
+                "portfolio": portfolio.id,
+                "symbol": portfolio.trading_symbol
+            }
+        )
+        self.update(
+            trading_symbol_position.id,
+            {
+                "amount": trading_symbol_position.get_amount() - size
+            }
+        )
+
+    def update_positions_with_short_order_filled(
+        self, order, filled_amount
+    ):
+        """Update the target position when a SHORT order fills:
+        decrement (i.e. drive further negative) by ``filled_amount``.
+
+        Cost accounting on the target position uses the proceeds
+        (``filled_amount * fill_price``) as a positive cost — the
+        position's ``cost`` field on short positions represents the
+        gross proceeds captured at entry (so net_gain math stays
+        symmetric with the long path).
+        """
+        if filled_amount is None or filled_amount <= 0:
+            return
+
+        fill_price = order.get_price()
+        if fill_price is None:
+            fill_price = 0
+        filled_size = filled_amount * fill_price
+
+        logger.info(
+            f"Syncing position with filled short order {order.get_id()} "
+            f"filled amount {filled_amount}"
+        )
+        position = self.get(order.position_id)
+        self.update(
+            position.id,
+            {
+                "amount": position.get_amount() - filled_amount,
+                "cost": position.get_cost() + filled_size,
+            }
+        )
+
+    def update_positions_with_created_cover_order(self, order):
+        """Reserve trading-symbol cash for a freshly-created cover
+        order. COVER spends cash to buy the short back, so the
+        reservation mirrors a BUY (``amount * reservation_price``
+        locked on the trading-symbol position).
+        """
+        position = self.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        size = order.get_size()
+
+        logger.info(
+            f"Syncing trading symbol {portfolio.get_trading_symbol()} "
+            f"position with created cover order {order.get_id()} "
+            f"with reserved cash {size}"
+        )
+        trading_symbol_position = self.find(
+            {
+                "portfolio": portfolio.id,
+                "symbol": portfolio.trading_symbol
+            }
+        )
+        self.update(
+            trading_symbol_position.id,
+            {
+                "amount": trading_symbol_position.get_amount() - size
+            }
+        )
+
+    def update_positions_with_cover_order_filled(
+        self, order, filled_amount
+    ):
+        """Update the target position when a COVER order fills:
+        increment (toward zero) by ``filled_amount``. Reduces the
+        position's ``cost`` proportionally so net_gain stays
+        consistent for partial covers.
+        """
+        if filled_amount is None or filled_amount <= 0:
+            return
+
+        position = self.get(order.position_id)
+        position_amount = position.get_amount() or 0
+
+        # Scale the cost reduction by the fraction of the open short
+        # being closed in this fill.
+        if position_amount < 0:
+            fraction = filled_amount / abs(position_amount)
+        else:
+            fraction = 0
+        cost_reduction = (position.get_cost() or 0) * fraction
+
+        logger.info(
+            f"Syncing position with filled cover order {order.get_id()} "
+            f"filled amount {filled_amount}"
+        )
+        self.update(
+            position.id,
+            {
+                "amount": position.get_amount() + filled_amount,
+                "cost": (position.get_cost() or 0) - cost_reduction,
             }
         )

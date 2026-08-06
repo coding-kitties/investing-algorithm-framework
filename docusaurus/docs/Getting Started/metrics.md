@@ -22,7 +22,7 @@ summary adds **multi-window** measures (`consistency_score`,
 
 Prefer the getters over direct attribute access — they handle missing
 runs / metrics safely and work the same way whether the backtest was
-just produced or loaded from an `.iafbt` bundle.
+just produced or loaded from an `.obtf` bundle.
 
 ```python
 from investing_algorithm_framework import BacktestDateRange
@@ -50,7 +50,7 @@ metrics = backtest.get_backtest_metrics(date_range)
 run = backtest.get_backtest_run(date_range)
 ```
 
-All metrics are persisted inside the `.iafbt` bundle, so reports
+All metrics are persisted inside the `.obtf` bundle, so reports
 loaded from disk have identical values without recomputation.
 
 ## Conventions

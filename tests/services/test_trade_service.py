@@ -1,8 +1,12 @@
 from unittest.mock import patch
-from datetime import datetime
+from datetime import datetime, timezone
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential, OrderStatus, TradeStatus, OrderSide
 from tests.resources import TestBase
+
+
+def _now():
+    return datetime.now(tz=timezone.utc)
 
 
 class TestTradeService(TestBase):
@@ -24,7 +28,9 @@ class TestTradeService(TestBase):
         "EUR": 1000
     }
 
-    def test_create_trade_from_buy_order_with_created_status(self):
+    def test_create_trade_at_fill_with_zero_fill_returns_none(self):
+        # v9.0 (#431) — trades are no longer created eagerly for unfilled
+        # buy orders. create_trade_at_fill returns None for fill_amount <= 0.
         order_repository = self.app.container.order_repository()
         buy_order = order_repository.create(
             {
@@ -39,19 +45,14 @@ class TestTradeService(TestBase):
             }
         )
         trade_service = self.app.container.trade_service()
-        trade = trade_service.create_trade_from_buy_order(buy_order)
-        self.assertEqual("ADA", trade.target_symbol)
-        self.assertEqual("EUR", trade.trading_symbol)
-        self.assertEqual(2004, trade.amount)
-        self.assertEqual(0, trade.available_amount)
-        self.assertEqual(0, trade.filled_amount)
-        self.assertEqual(2004, trade.remaining)
-        self.assertEqual(0.24262, trade.open_price)
-        self.assertIsNotNone(trade.opened_at)
-        self.assertIsNone(trade.closed_at)
-        self.assertEqual(TradeStatus.CREATED.value, trade.status)
+        trade = trade_service.create_trade_at_fill(
+            buy_order, 0, 0.24262, _now()
+        )
+        self.assertIsNone(trade)
 
-    def test_create_trade_from_buy_order_with_open_status(self):
+    def test_create_trade_at_fill_with_partial_fill(self):
+        # v9.0 (#431) — each fill event produces one trade with
+        # amount == fill_amount, remaining always 0.
         order_repository = self.app.container.order_repository()
         buy_order = order_repository.create(
             {
@@ -66,13 +67,15 @@ class TestTradeService(TestBase):
             }
         )
         trade_service = self.app.container.trade_service()
-        trade = trade_service.create_trade_from_buy_order(buy_order)
+        trade = trade_service.create_trade_at_fill(
+            buy_order, 1000, 0.24262, _now()
+        )
         self.assertEqual("ADA", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
-        self.assertEqual(2004, trade.amount)
+        self.assertEqual(1000, trade.amount)
         self.assertEqual(1000, trade.filled_amount)
         self.assertEqual(1000, trade.available_amount)
-        self.assertEqual(1004, trade.remaining)
+        self.assertEqual(0, trade.remaining)
         self.assertEqual(0.24262, trade.open_price)
         self.assertIsNotNone(trade.opened_at)
         self.assertIsNone(trade.closed_at)
@@ -92,19 +95,21 @@ class TestTradeService(TestBase):
             }
         )
         trade_service = self.app.container.trade_service()
-        trade = trade_service.create_trade_from_buy_order(buy_order)
+        trade = trade_service.create_trade_at_fill(
+            buy_order, 5, 6, _now()
+        )
         self.assertEqual("DOT", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
-        self.assertEqual(10, trade.amount)
+        self.assertEqual(5, trade.amount)
         self.assertEqual(5, trade.available_amount)
         self.assertEqual(5, trade.filled_amount)
-        self.assertEqual(5, trade.remaining)
+        self.assertEqual(0, trade.remaining)
         self.assertEqual(6, trade.open_price)
         self.assertIsNotNone(trade.opened_at)
         self.assertIsNone(trade.closed_at)
         self.assertEqual(TradeStatus.OPEN.value, trade.status)
 
-    def test_create_trade_from_buy_order_with_closed_status(self):
+    def test_create_trade_at_fill_with_full_fill(self):
         order_repository = self.app.container.order_repository()
         buy_order = order_repository.create(
             {
@@ -119,7 +124,9 @@ class TestTradeService(TestBase):
             }
         )
         trade_service = self.app.container.trade_service()
-        trade = trade_service.create_trade_from_buy_order(buy_order)
+        trade = trade_service.create_trade_at_fill(
+            buy_order, 2004, 0.24262, _now()
+        )
         self.assertEqual("ADA", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
         self.assertEqual(2004, trade.amount)
@@ -129,10 +136,9 @@ class TestTradeService(TestBase):
         self.assertEqual(0.24262, trade.open_price)
         self.assertIsNotNone(trade.opened_at)
         self.assertIsNone(trade.closed_at)
-        self.assertEqual(0, trade.remaining)
         self.assertEqual(TradeStatus.OPEN.value, trade.status)
 
-    def test_create_trade_from_buy_order_with_rejected_status(self):
+    def test_create_trade_at_fill_with_rejected_order_returns_none(self):
         order_repository = self.app.container.order_repository()
         buy_order = order_repository.create(
             {
@@ -147,10 +153,12 @@ class TestTradeService(TestBase):
             }
         )
         trade_service = self.app.container.trade_service()
-        trade = trade_service.create_trade_from_buy_order(buy_order)
+        trade = trade_service.create_trade_at_fill(
+            buy_order, 100, 0.24262, _now()
+        )
         self.assertIsNone(trade)
 
-    def test_create_trade_from_buy_order_with_canceled_buy_order(self):
+    def test_create_trade_at_fill_with_canceled_order_returns_none(self):
         order_repository = self.app.container.order_repository()
         buy_order = order_repository.create(
             {
@@ -165,10 +173,12 @@ class TestTradeService(TestBase):
             }
         )
         trade_service = self.app.container.trade_service()
-        trade = trade_service.create_trade_from_buy_order(buy_order)
+        trade = trade_service.create_trade_at_fill(
+            buy_order, 100, 0.24262, _now()
+        )
         self.assertIsNone(trade)
 
-    def test_create_trade_from_buy_order_with_expired_buy_order(self):
+    def test_create_trade_at_fill_with_expired_order_returns_none(self):
         order_repository = self.app.container.order_repository()
         buy_order = order_repository.create(
             {
@@ -183,45 +193,32 @@ class TestTradeService(TestBase):
             }
         )
         trade_service = self.app.container.trade_service()
-        trade = trade_service.create_trade_from_buy_order(buy_order)
+        trade = trade_service.create_trade_at_fill(
+            buy_order, 100, 0.24262, _now()
+        )
         self.assertIsNone(trade)
 
     def test_update_trade_with_filled_buy_order(self):
+        # v9.0 (#431) - trades are created at fill time. A single fill
+        # for the full order amount produces one trade with
+        # amount == filled_amount and remaining 0.
         order_repository = self.app.container.order_repository()
         buy_order = order_repository.create(
             {
                 "target_symbol": "ADA",
                 "trading_symbol": "EUR",
                 "amount": 2004,
-                "filled": 0,
+                "filled": 2004,
                 "order_side": "BUY",
                 "price": 0.24262,
                 "order_type": "LIMIT",
-                "status": "CREATED",
-            }
-        )
-        order_id = buy_order.id
-        trade_service = self.app.container.trade_service()
-        trade = trade_service.create_trade_from_buy_order(buy_order)
-        self.assertEqual("ADA", trade.target_symbol)
-        self.assertEqual("EUR", trade.trading_symbol)
-        self.assertEqual(2004, trade.amount)
-        self.assertEqual(2004, trade.remaining)
-        self.assertEqual(0, trade.filled_amount)
-        self.assertEqual(0, trade.available_amount)
-        self.assertEqual(0.24262, trade.open_price)
-        self.assertEqual(TradeStatus.CREATED.value, trade.status)
-        self.assertIsNotNone(trade.opened_at)
-        self.assertIsNone(trade.closed_at)
-        buy_order = order_repository.get(order_id)
-        buy_order = order_repository.update(
-            buy_order.id,
-            {
                 "status": OrderStatus.CLOSED.value,
-                "filled": 2004,
             }
         )
-        trade = trade_service.update_trade_with_buy_order(2004, buy_order)
+        trade_service = self.app.container.trade_service()
+        trade = trade_service.create_trade_at_fill(
+            buy_order, 2004, 0.24262, _now()
+        )
         self.assertEqual("ADA", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
         self.assertEqual(2004, trade.amount)
@@ -233,6 +230,8 @@ class TestTradeService(TestBase):
         self.assertEqual(TradeStatus.OPEN.value, trade.status)
 
     def test_update_trade_with_existing_buy_order(self):
+        # v9.0 (#431) \u2014 multiple partial fills now produce one trade
+        # per fill event (instead of growing a single trade).
         order_repository = self.app.container.order_repository()
         buy_order = order_repository.create(
             {
@@ -243,21 +242,18 @@ class TestTradeService(TestBase):
                 "order_side": "BUY",
                 "price": 0.24262,
                 "order_type": "LIMIT",
-                "status": "CREATED",
+                "status": OrderStatus.OPEN.value,
             }
         )
         order_id = buy_order.id
         trade_service = self.app.container.trade_service()
-        trade = trade_service.create_trade_from_buy_order(buy_order)
-        self.assertEqual("ADA", trade.target_symbol)
-        self.assertEqual("EUR", trade.trading_symbol)
-        self.assertEqual(2004, trade.amount)
-        self.assertEqual(1000, trade.filled_amount)
-        self.assertEqual(1000, trade.available_amount)
-        self.assertEqual(1004, trade.remaining)
-        self.assertEqual(0.24262, trade.open_price)
-        self.assertIsNotNone(trade.opened_at)
-        self.assertIsNone(trade.closed_at)
+        first_trade = trade_service.create_trade_at_fill(
+            buy_order, 1000, 0.24262, _now()
+        )
+        self.assertEqual(1000, first_trade.amount)
+        self.assertEqual(1000, first_trade.filled_amount)
+        self.assertEqual(0, first_trade.remaining)
+
         buy_order = order_repository.get(order_id)
         buy_order = order_repository.update(
             buy_order.id,
@@ -266,18 +262,24 @@ class TestTradeService(TestBase):
                 "filled": 2004,
             }
         )
-        trade = trade_service.update_trade_with_buy_order(1004, buy_order)
-        self.assertEqual("ADA", trade.target_symbol)
-        self.assertEqual("EUR", trade.trading_symbol)
-        self.assertEqual(2004, trade.amount)
-        self.assertEqual(2004, trade.filled_amount)
-        self.assertEqual(2004, trade.available_amount)
-        self.assertEqual(0, trade.remaining)
-        self.assertEqual(0.24262, trade.open_price)
-        self.assertIsNone(trade.closed_at)
-        self.assertEqual(0, trade.remaining)
+        second_trade = trade_service.create_trade_at_fill(
+            buy_order, 1004, 0.24262, _now()
+        )
+        self.assertEqual(1004, second_trade.amount)
+        self.assertEqual(1004, second_trade.filled_amount)
+        self.assertEqual(0, second_trade.remaining)
+
+        # The order now has two trades linked to it (one per fill).
+        trades = trade_service.get_all({"order_id": order_id})
+        self.assertEqual(2, len(trades))
+        self.assertEqual(
+            2004, sum(t.amount for t in trades)
+        )
 
     def test_update_trade_with_existing_buy_order_and_partialy_closed(self):
+        # v9.0 (#431) \u2014 each partial fill of a buy order produces a
+        # separate trade. After two fills we expect two trades whose
+        # amounts sum to the total filled quantity.
         order_service = self.app.container.order_service()
         buy_order = order_service.create(
             {
@@ -303,19 +305,20 @@ class TestTradeService(TestBase):
 
         order_id = buy_order.id
         trade_service = self.app.container.trade_service()
-        trade = trade_service.find(
-            {"order_id": order_id}
-        )
-        self.assertEqual("ADA", trade.target_symbol)
-        self.assertEqual("EUR", trade.trading_symbol)
-        self.assertEqual(2004, trade.amount)
-        self.assertEqual(1000, trade.filled_amount)
-        self.assertEqual(1000, trade.available_amount)
-        self.assertEqual(1004, trade.remaining)
-        self.assertEqual(0.24262, trade.open_price)
-        self.assertIsNotNone(trade.opened_at)
-        self.assertIsNone(trade.closed_at)
-        self.assertEqual(TradeStatus.OPEN.value, trade.status)
+        trades = trade_service.get_all({"order_id": order_id})
+        self.assertEqual(1, len(trades))
+        first_trade = trades[0]
+        self.assertEqual("ADA", first_trade.target_symbol)
+        self.assertEqual("EUR", first_trade.trading_symbol)
+        self.assertEqual(1000, first_trade.amount)
+        self.assertEqual(1000, first_trade.filled_amount)
+        self.assertEqual(1000, first_trade.available_amount)
+        self.assertEqual(0, first_trade.remaining)
+        self.assertEqual(0.24262, first_trade.open_price)
+        self.assertIsNotNone(first_trade.opened_at)
+        self.assertIsNone(first_trade.closed_at)
+        self.assertEqual(TradeStatus.OPEN.value, first_trade.status)
+
         buy_order = order_service.get(order_id)
         buy_order = order_service.update(
             buy_order.id,
@@ -325,17 +328,13 @@ class TestTradeService(TestBase):
                 "remaining": 504,
             }
         )
-        trade = trade_service.find(
-            {"order_id": order_id}
+        trades = trade_service.get_all({"order_id": order_id})
+        self.assertEqual(2, len(trades))
+        self.assertEqual(1500, sum(t.amount for t in trades))
+        self.assertTrue(all(t.remaining == 0 for t in trades))
+        self.assertTrue(
+            all(t.open_price == 0.24262 for t in trades)
         )
-        self.assertEqual("ADA", trade.target_symbol)
-        self.assertEqual("EUR", trade.trading_symbol)
-        self.assertEqual(2004, trade.amount)
-        self.assertEqual(1500, trade.filled_amount)
-        self.assertEqual(1500, trade.available_amount)
-        self.assertEqual(504, trade.remaining)
-        self.assertEqual(0.24262, trade.open_price)
-        self.assertIsNone(trade.closed_at)
 
     def test_close_trades(self):
         portfolio = self.app.context.get_portfolio()
@@ -591,15 +590,8 @@ class TestTradeService(TestBase):
             "portfolio_id": portfolio.id
         })
 
-        # There should be two trades for the two buy orders
-        trade_service = self.app.container.trade_service()
-        self.assertEqual(2, len(trade_service.get_all()))
-        self.assertEqual(1, len(trade_service.get_all({"order_id": order_one_id})))
-        self.assertEqual(1, len(trade_service.get_all({"order_id": order_two_id})))
-
-        # Update the buy order to closed
-        order_service = self.app.container.order_service()
-
+        # v9.0 (#431) - trades are created at fill time. Fill both buy
+        # orders first so the trade assertions below hold.
         for order in orders:
             order_service.update(
                 order.id,
@@ -609,6 +601,15 @@ class TestTradeService(TestBase):
                     "remaining": 0
                 }
             )
+
+        # There should be two trades for the two buy orders
+        trade_service = self.app.container.trade_service()
+        self.assertEqual(2, len(trade_service.get_all()))
+        self.assertEqual(1, len(trade_service.get_all({"order_id": order_one_id})))
+        self.assertEqual(1, len(trade_service.get_all({"order_id": order_two_id})))
+
+        # Update the buy order to closed
+        order_service = self.app.container.order_service()
 
         self.assertEqual(2, len(trade_service.get_all()))
         self.assertEqual(1, len(trade_service.get_all(
@@ -719,10 +720,12 @@ class TestTradeService(TestBase):
             }
         )
 
+        # v9.0 (#431) - each fill produces one trade. The partial fill
+        # above creates exactly one trade for 1000 units, remaining 0.
         trade_service = self.app.container.trade_service()
         trade = trade_service.find({"order_id": order_id})
-        self.assertEqual(2000, trade.amount)
-        self.assertEqual(1000, trade.remaining)
+        self.assertEqual(1000, trade.amount)
+        self.assertEqual(0, trade.remaining)
         self.assertEqual(1000, trade.filled_amount)
         self.assertEqual(1000, trade.available_amount)
         self.assertEqual(TradeStatus.OPEN.value, trade.status)
@@ -752,11 +755,11 @@ class TestTradeService(TestBase):
             }
         )
         trade = trade_service.find({"order_id": order_id})
-        self.assertEqual(2000, trade.amount)
-        self.assertEqual(1000, trade.remaining)
+        self.assertEqual(1000, trade.amount)
+        self.assertEqual(0, trade.remaining)
         self.assertEqual(0, trade.available_amount)
         self.assertEqual(1000, trade.filled_amount)
-        self.assertEqual(TradeStatus.OPEN.value, trade.status)
+        self.assertEqual(TradeStatus.CLOSED.value, trade.status)
         self.assertEqual(0.2, trade.open_price)
         self.assertAlmostEqual(1000 * 0.3 - 1000 * 0.2, trade.net_gain)
         self.assertEqual(2, len(trade.orders))
@@ -1291,29 +1294,19 @@ class TestTradeService(TestBase):
             }
         )
 
-        trade_two = self.app.container.trade_service().find(
-            {"order_id": buy_order_two.id}
-        )
-        trade_two_id = trade_two.id
-        trade_service.add_stop_loss(
-            trade_two,
-            10,
-            True,
+        # v9.0 (#431) — no trade exists yet for the unfilled buy. Queue
+        # the stop-loss rule on the order so it would be materialised
+        # if a fill ever arrives.
+        self.app.context.add_stop_loss(
+            order=buy_order_two,
+            percentage=10,
+            trailing=True,
             sell_percentage=25,
         )
-        trade_two = trade_service.get(trade_two_id)
-        self.assertEqual(1, len(trade_two.stop_losses))
         trade_service.update(
             trade_one_id,
             {
                 "last_reported_price": 17,
-                "last_reported_price_datetime": datetime.now(),
-            }
-        )
-        trade_service.update(
-            trade_two_id,
-            {
-                "last_reported_price": 7,
                 "last_reported_price_datetime": datetime.now(),
             }
         )
@@ -1720,8 +1713,12 @@ class TestTradeService(TestBase):
                 self.assertEqual(7, order_data["price"])
                 self.assertEqual(5, order_data["amount"])
             else:
+                # v9.0 (#431) - the ada trade was created at fill time
+                # with amount == 10 (partial fill). SL1 (50%) + SL2
+                # (25%) both trigger and combine into one sell order
+                # for 7.5 units.
                 self.assertEqual(17, order_data["price"])
-                self.assertEqual(10, order_data["amount"])
+                self.assertEqual(7.5, order_data["amount"])
 
         for order_data in sell_order_data:
             order_service.create(order_data)
@@ -1746,8 +1743,8 @@ class TestTradeService(TestBase):
         )
 
         self.assertEqual(2, len(ada_trade.orders))
-        self.assertEqual(0, ada_trade.available_amount)
-        self.assertEqual(20, ada_trade.amount)
+        self.assertEqual(2.5, ada_trade.available_amount)
+        self.assertEqual(10, ada_trade.amount)
         self.assertEqual("OPEN", ada_trade.status)
 
         self.assertEqual(2, len(dot_trade.orders))
@@ -1991,20 +1988,20 @@ class TestTradeService(TestBase):
                 "target_symbol": "ADA",
                 "trading_symbol": "EUR",
                 "amount": 20,
-                "filled": 10,
-                "remaining": 10,
+                "filled": 20,
+                "remaining": 0,
                 "order_side": "BUY",
                 "price": 20,
                 "order_type": "LIMIT",
                 "portfolio_id": 1,
-                "status": "OPEN",
+                "status": "CLOSED",
             }
         )
         order_service.update(
             buy_order_one.id,
             {
-                "filled": 10,
-                "remaining": 10,
+                "filled": 20,
+                "remaining": 0,
             }
         )
 
@@ -2012,8 +2009,10 @@ class TestTradeService(TestBase):
         trade_one = self.app.container.trade_service().find(
             {"order_id": buy_order_one.id}
         )
-        self.assertEqual(10, trade_one.remaining)
+        # v9.0 (#431) - the trade is created at fill time with
+        # amount == fill_amount.
         self.assertEqual(20, trade_one.amount)
+        self.assertEqual(0, trade_one.remaining)
         self.assertEqual("OPEN", trade_one.status)
 
         trade_one_id = trade_one.id
@@ -2115,7 +2114,9 @@ class TestTradeService(TestBase):
         trade_one = self.app.container.trade_service().find(
             {"order_id": buy_order_one.id}
         )
-        self.assertEqual(0, trade_one.available_amount)
+        # v9.0 (#431) - buy fully filled at 20; TP1 sells 50% = 10,
+        # so 10 remains available.
+        self.assertEqual(10, trade_one.available_amount)
         self.assertEqual(20, trade_one.amount)
         self.assertEqual("OPEN", trade_one.status)
 
@@ -2173,8 +2174,11 @@ class TestTradeService(TestBase):
         )
 
         sell_order_data = trade_service.get_triggered_take_profit_orders()
-        # Only one, because ada trade has nothing remaining
-        self.assertEqual(1, len(sell_order_data))
+        # v9.0 (#431) - ada was fully filled (20), TP1 sold 10, leaving
+        # 10 available. TP2 (trailing) triggers when price drops to
+        # 22.4, and dot TP3 triggers when price drops to 12.5. Two
+        # sell orders are produced.
+        self.assertEqual(2, len(sell_order_data))
 
         for order_data in sell_order_data:
             self.assertEqual("SELL", order_data["order_side"])
@@ -2691,14 +2695,16 @@ class TestTradeService(TestBase):
             self.assertEqual(1, order_data["portfolio_id"])
             self.assertEqual("LIMIT", order_data["order_type"])
             self.assertEqual(22, order_data["price"])
-            self.assertEqual(10, order_data["amount"])
+            # v9.0 (#431) - ada trade has amount 10 (partial fill),
+            # TP1 sells 50% of 10 = 5.
+            self.assertEqual(5, order_data["amount"])
             self.assertEqual("ADA", order_data["target_symbol"])
 
         order = order_service.create(sell_order_data[0])
         order_service.update(
             order.id,
             {
-                "filled": 10,
+                "filled": 5,
                 "remaining": 0,
                 "status": OrderStatus.CLOSED.value,
             }
@@ -2708,8 +2714,8 @@ class TestTradeService(TestBase):
         trade_one = trade_service.get(trade_one_id)
         trade_two = trade_service.get(trade_two_id)
 
-        self.assertEqual(0, trade_one.available_amount)
-        self.assertEqual(20, trade_one.amount)
+        self.assertEqual(5, trade_one.available_amount)
+        self.assertEqual(10, trade_one.amount)
         self.assertEqual("OPEN", trade_one.status)
 
         self.assertEqual(20, trade_two.available_amount)
@@ -2763,7 +2769,10 @@ class TestTradeService(TestBase):
         )
 
         sell_order_data = trade_service.get_triggered_take_profit_orders()
-        self.assertEqual(0, len(sell_order_data))
+        # v9.0 (#431) - trade still has 5 units available (10 - 5 sold
+        # by TP1). Trailing TP2 at 22.5 triggers when price drops to
+        # 22.4, producing one sell order.
+        self.assertEqual(1, len(sell_order_data))
 
     def test_deactivation_of_take_profits_when_stop_losses_are_triggered(self):
         """

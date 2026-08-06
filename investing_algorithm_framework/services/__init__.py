@@ -1,5 +1,6 @@
 from .trade_order_evaluator import BacktestTradeOrderEvaluator, \
     TradeOrderEvaluator, DefaultTradeOrderEvaluator
+from .trade_hooks import TradeHookDispatcher
 from .configuration_service import ConfigurationService
 from .market_credential_service import MarketCredentialService
 from .data_providers import DataProviderService
@@ -39,9 +40,11 @@ from .metrics import get_annual_volatility, get_mean_daily_return, \
     get_current_win_rate, get_current_average_trade_return, \
     get_current_average_trade_loss, get_current_average_trade_duration, \
     get_current_average_trade_gain, create_backtest_metrics_for_backtest, \
-    recalculate_backtests, recalculate_backtests_in_directory, \
+    recalculate_backtests, \
+    recalculate_backtests_in_directory, \
     get_cv_consistency, get_normalized_stability, \
-    get_consistency_score, get_stability_score
+    get_consistency_score, get_stability_score, \
+    get_omega_ratio, get_ulcer_index, get_trade_mae_mfe_statistics
 
 __all__ = [
     "get_mean_daily_return",
@@ -66,6 +69,7 @@ __all__ = [
     "BrokerBalanceTracker",
     "TradeOrderEvaluator",
     "DefaultTradeOrderEvaluator",
+    "TradeHookDispatcher",
     "get_risk_free_rate_us",
     "get_annual_volatility",
     "get_sortino_ratio",
@@ -137,6 +141,9 @@ __all__ = [
     "create_backtest_metrics_for_backtest",
     "recalculate_backtests",
     "recalculate_backtests_in_directory",
+    "get_omega_ratio",
+    "get_ulcer_index",
+    "get_trade_mae_mfe_statistics",
     "TradeStopLossService",
     "TradeTakeProfitService",
     "get_mean_yearly_return",

@@ -1,18 +1,20 @@
 """Cross-sectional momentum strategy using the Pipeline API."""
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 from investing_algorithm_framework import (
     AverageDollarVolume,
     Context,
     DataSource,
-    OrderSide,
-    OrderType,
     Pipeline,
+    PositionSize,
     Returns,
+    Signal,
+    SignalSide,
     TimeUnit,
     TradingStrategy,
+    Schedule,
 )
 
 SYMBOLS = ["BTC/EUR", "ETH/EUR", "SOL/EUR", "ADA/EUR", "XRP/EUR"]
@@ -30,8 +32,7 @@ class MomentumScreener(Pipeline):
 
 class CrossSectionalMomentumStrategy(TradingStrategy):
     algorithm_id = "cross-sectional-momentum"
-    time_unit = TimeUnit.DAY
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
     trading_symbol = TRADING_SYMBOL
     symbols = SYMBOLS
@@ -49,58 +50,40 @@ class CrossSectionalMomentumStrategy(TradingStrategy):
         for symbol in SYMBOLS
     ]
 
-    def run_strategy(self, context: Context, data: Dict[str, Any]) -> None:
+    position_sizes = [
+        PositionSize(
+            symbol=symbol.split("/")[0],
+            percentage_of_portfolio=(100.0 / TOP_N) - 0.5,
+        )
+        for symbol in SYMBOLS
+    ]
+
+    def generate_signals(
+        self, context: Context, data: Dict[str, Any]
+    ) -> Iterable[Signal]:
         screen = data["MomentumScreener"]
         if screen.is_empty():
             return
 
         targets_df = screen.sort("alpha", descending=True).head(TOP_N)
-        targets = {row["symbol"] for row in targets_df.iter_rows(named=True)}
+        target_bases = {
+            row["symbol"].split("/")[0]
+            for row in targets_df.iter_rows(named=True)
+        }
 
-        def last_close(symbol: str) -> float:
-            ohlcv = data[f"{symbol}-ohlcv"]
-            try:
-                return float(ohlcv["Close"][-1])
-            except (KeyError, TypeError):
-                return float(ohlcv["close"].iloc[-1])
-
-        def base(symbol: str) -> str:
-            return symbol.split("/")[0]
-
-        # Close non-targets
         for symbol in SYMBOLS:
-            if symbol in targets:
+            base = symbol.split("/")[0]
+            if base in target_bases:
                 continue
-            sym = base(symbol)
-            if not context.has_position(sym, market=self.market):
+            if not context.has_position(base, market=self.market):
                 continue
-            position = context.get_position(sym, market=self.market)
-            context.create_order(
-                target_symbol=sym,
-                order_side=OrderSide.SELL,
-                order_type=OrderType.LIMIT,
-                price=last_close(symbol),
-                amount=position.get_amount(),
+            yield Signal(
+                symbol=base, side=SignalSide.CLOSE_LONG, source="csm"
             )
 
-        # Open new targets equal-weight
-        unallocated = context.get_unallocated()
-        new_targets = [
-            s for s in targets
-            if not context.has_position(base(s), market=self.market)
-        ]
-        if not new_targets:
-            return
-        per_target = unallocated / len(new_targets)
-        for symbol in new_targets:
-            price = last_close(symbol)
-            if price <= 0:
+        for base in target_bases:
+            if context.has_position(base, market=self.market):
                 continue
-            amount = (per_target * 0.995) / price
-            context.create_order(
-                target_symbol=base(symbol),
-                order_side=OrderSide.BUY,
-                order_type=OrderType.LIMIT,
-                price=price,
-                amount=amount,
+            yield Signal(
+                symbol=base, side=SignalSide.OPEN_LONG, source="csm"
             )

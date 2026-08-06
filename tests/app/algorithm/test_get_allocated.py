@@ -3,16 +3,14 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from investing_algorithm_framework import TradingStrategy, TimeUnit, \
+from investing_algorithm_framework import TradingStrategy, TimeUnit, Schedule, \
     MarketCredential, PortfolioConfiguration
 from tests.resources import TestBase
 
 
 class StrategyOne(TradingStrategy):
     id = "strategy_one"
-    time_unit = TimeUnit.SECOND
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.SECOND)
     def run_strategy(
         self,
         context,

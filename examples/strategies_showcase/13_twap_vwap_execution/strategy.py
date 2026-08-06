@@ -11,6 +11,7 @@ from investing_algorithm_framework import (
     OrderType,
     TimeUnit,
     TradingStrategy,
+    Schedule,
 )
 
 SYMBOL = "BTC/EUR"
@@ -21,8 +22,7 @@ START_AFTER_BARS = 5  # let warmup pass first
 
 class TWAPExecutionStrategy(TradingStrategy):
     algorithm_id = "twap-bar-level"
-    time_unit = TimeUnit.DAY
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     market = "BITVAVO"
     trading_symbol = "EUR"
     symbols = [SYMBOL.split("/")[0]]

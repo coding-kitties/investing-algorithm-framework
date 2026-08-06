@@ -1,7 +1,14 @@
 import os
 from unittest import TestCase
 
-from investing_algorithm_framework import create_backtest_metrics, BacktestRun
+from investing_algorithm_framework import (
+    BacktestMetrics,
+    BacktestRun,
+    create_backtest_metrics,
+)
+from investing_algorithm_framework.services.metrics.trades import (
+    get_directional_trade_statistics,
+)
 
 class TestGenerateMetrics(TestCase):
     def setUp(self):
@@ -17,12 +24,69 @@ class TestGenerateMetrics(TestCase):
         )
 
     def test_generate_metrics(self):
-        # This is a placeholder for the actual test implementation
         backtest_run = BacktestRun.open(
             os.path.join(self.backtest_run_directory, 'backtest_run_one')
         )
         backtest_metrics = create_backtest_metrics(
             backtest_run, risk_free_rate=0.024
+        )
+        self.assertIs(
+            backtest_metrics.backtest_window,
+            backtest_run.backtest_window,
+        )
+        self.assertEqual(
+            backtest_metrics.backtest_start_date,
+            backtest_run.backtest_start_date,
+        )
+        self.assertEqual(
+            backtest_metrics.backtest_end_date,
+            backtest_run.backtest_end_date,
+        )
+        self.assertIsInstance(
+            backtest_metrics.number_of_positive_trades, int
+        )
+        self.assertIsInstance(
+            backtest_metrics.number_of_negative_trades, int
+        )
+        self.assertIsInstance(
+            backtest_metrics.percentage_positive_trades, float
+        )
+        self.assertIsInstance(
+            backtest_metrics.percentage_negative_trades, float
+        )
+        directional = get_directional_trade_statistics(backtest_run.trades)
+        self.assertEqual(
+            backtest_metrics.number_of_long_trades,
+            directional["number_of_long_trades"],
+        )
+        self.assertEqual(
+            backtest_metrics.long_win_rate,
+            directional["long_win_rate"],
+        )
+        self.assertEqual(
+            backtest_metrics.number_of_short_trades,
+            directional["number_of_short_trades"],
+        )
+        self.assertEqual(
+            backtest_metrics.short_win_rate,
+            directional["short_win_rate"],
+        )
+        restored = BacktestMetrics.from_dict(backtest_metrics.to_dict())
+        self.assertEqual(
+            restored.number_of_long_trades,
+            backtest_metrics.number_of_long_trades,
+        )
+        self.assertEqual(
+            restored.long_win_rate,
+            backtest_metrics.long_win_rate,
+        )
+        self.assertEqual(
+            restored.number_of_short_trades,
+            backtest_metrics.number_of_short_trades,
+        )
+        self.assertEqual(
+            restored.short_win_rate,
+            backtest_metrics.short_win_rate,
         )
 
     def test_total_loss_is_gross_loss_magnitude(self):

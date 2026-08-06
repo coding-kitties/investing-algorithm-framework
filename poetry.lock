@@ -1409,6 +1409,24 @@ files = [
 devel = ["colorama", "json-spec", "jsonschema", "pylint", "pytest", "pytest-benchmark", "pytest-cache", "validictory"]
 
 [[package]]
+name = "finterion-charts"
+version = "1.4.0"
+description = "Python binding for Finterion Charts — declarative ChartSpec builder, validator, and codec."
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "finterion_charts-1.4.0-py3-none-any.whl", hash = "sha256:173d8f47d7f4db7ef1395b5d57b73356ec5e3d9c5e2770c33557e75f31bc09cf"},
+    {file = "finterion_charts-1.4.0.tar.gz", hash = "sha256:552838710077160a794146893a20e50b3157c5195714493c0b0887a435601478"},
+]
+
+[package.extras]
+all = ["ipython (>=8.0)", "jsonschema (>=4.17)", "numpy (>=1.24)", "pandas (>=2.0)"]
+dev = ["jsonschema (>=4.17)", "numpy (>=1.24)", "pandas (>=2.0)", "pytest (>=7.4)"]
+jupyter = ["ipython (>=8.0)"]
+pandas = ["numpy (>=1.24)", "pandas (>=2.0)"]
+schema = ["jsonschema (>=4.17)"]
+
+[[package]]
 name = "flake8"
 version = "7.0.0"
 description = "the modular source code checker: pep8 pyflakes and co"
@@ -5567,4 +5585,4 @@ yahoo = ["yfinance"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "21f560d6bf6486249d3ad08a4f993269dd60e960e81d84703cccb5ddcb91ba21"
+content-hash = "7b5b0f888cbb3282740237f916f68d04918ac6af0f8b8b22a8dbfb8a99c015be"

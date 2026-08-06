@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from investing_algorithm_framework import Task, AppHook
+from investing_algorithm_framework import Task, AppHook, Schedule, TimeUnit
 from investing_algorithm_framework.app.algorithm import AlgorithmFactory, \
     Algorithm
 from tests.resources.strategies_for_testing.strategy_v1 import \
@@ -8,6 +8,7 @@ from tests.resources.strategies_for_testing.strategy_v1 import \
 
 
 class TestTask(Task):
+    schedule = Schedule.every(1, TimeUnit.MINUTE)
 
     def run(self, algorithm):
         pass
@@ -46,7 +47,13 @@ class Test(TestCase):
             strategy=CrossOverStrategyV1
         )
         self.assertIsInstance(algorithm, Algorithm)
-        self.assertEqual(algorithm.algorithm_id, "CrossOverStrategyV1")
+        # CrossOverStrategyV1 sets its own explicit ``algorithm_id``
+        # default ("crossover_strategy_v1"). The factory now reuses an
+        # already-assigned strategy algorithm_id instead of overwriting
+        # it with a class-name-derived one, so the Algorithm-level id
+        # matches the strategy-level id (needed for the vector/event
+        # engines to land in the same ``<algorithm_id>.iafbt`` bundle).
+        self.assertEqual(algorithm.algorithm_id, "crossover_strategy_v1")
         self.assertEqual(len(algorithm.strategies), 1)
         self.assertEqual(len(algorithm.tasks), 0)
         self.assertEqual(len(algorithm.on_strategy_run_hooks), 0)

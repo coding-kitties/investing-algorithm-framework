@@ -14,6 +14,7 @@ from investing_algorithm_framework import (
     OrderType,
     TimeUnit,
     TradingStrategy,
+    Schedule,
 )
 
 SYMBOLS = ["BTC/EUR", "ETH/EUR", "SOL/EUR", "ADA/EUR", "XRP/EUR"]
@@ -25,8 +26,7 @@ TARGET_DAILY_RETURN = 0.001  # ~25% annualised
 
 class MarkowitzStrategy(TradingStrategy):
     algorithm_id = "mean-variance-markowitz"
-    time_unit = TimeUnit.DAY
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
     trading_symbol = "EUR"
     symbols = [s.split("/")[0] for s in SYMBOLS]

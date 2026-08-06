@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential, OrderStatus, TradeStatus
+from investing_algorithm_framework.domain import OperationalException
 from tests.resources import TestBase
 
 
@@ -378,17 +379,9 @@ class TestOrderService(TestBase):
         self.assertEqual(0, position.amount)
         self.assertEqual(0, position.cost)
 
-        trade = trade_service.find(
-            {
-                "order_id": order.id,
-            }
-        )
-
-        self.assertEqual(1000, trade.amount)
-        self.assertEqual(1000, trade.remaining)
-        self.assertEqual(0, trade.filled_amount)
-        self.assertEqual(0, trade.available_amount)
-        self.assertEqual(1, trade.open_price)
+        # v9.0 (#431) — no trade is created until the order fills.
+        with self.assertRaises(OperationalException):
+            trade_service.find({"order_id": order.id})
 
         portfolio_provider_lookup = self.app.container.portfolio_provider_lookup()
         portfolio_provider_lookup.register_portfolio_provider_for_market(

@@ -1,9 +1,15 @@
-"""Backtest the mean-reversion strategy."""
+"""Backtest the Mean-reversion Bollinger Bands strategy."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from investing_algorithm_framework import BacktestDateRange, create_app
+from investing_algorithm_framework import (
+    BacktestDateRange,
+    BacktestWindow,
+    Study,
+    Universe,
+    create_app,
+)
 
 from strategy import MeanReversionStrategy
 
@@ -13,18 +19,30 @@ def main() -> None:
         hour=0, minute=0, second=0, microsecond=0
     ) - timedelta(days=1)
     start = end - timedelta(days=365)
-    date_range = BacktestDateRange(start_date=start, end_date=end)
+
+    study = Study(
+        name="mean-reversion",
+        universe=Universe(
+            market="BITVAVO",
+            trading_symbol="EUR",
+            initial_capital=1000,
+        ),
+        backtest_windows=[
+            BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=start,
+                    end_date=end,
+                )
+            )
+        ],
+    )
 
     app = create_app()
-    app.add_market(market="BITVAVO", trading_symbol="EUR",
-                   initial_balance=1000)
-
-    backtest = app.run_vector_backtest(
-        strategy=MeanReversionStrategy(),
-        backtest_date_range=date_range,
-        initial_amount=1000,
-    )
-    print(backtest)
+    app.add_strategy(MeanReversionStrategy)
+    backtests = app.run_backtest(strategy=MeanReversionStrategy, study=study)
+    backtest = backtests[0]
+    metrics = backtest.get_backtest_metrics(study_name=study.name)
+    print(metrics)
 
 
 if __name__ == "__main__":

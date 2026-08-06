@@ -1,25 +1,31 @@
 from investing_algorithm_framework.domain import \
-    TimeUnit
+    OperationalException, Schedule
 
 
 class Task:
-    time_unit: str = None
-    interval: int = None
+    schedule: Schedule = None
     worker_id: str = None
     decorated = None
 
     def __init__(
         self,
-        time_unit=None,
-        interval=None,
+        schedule: Schedule = None,
         worker_id=None,
         decorated=None
     ):
-        if time_unit is not None:
-            self.time_unit = TimeUnit.from_value(time_unit)
-
-        if interval is not None:
-            self.interval = interval
+        if schedule is not None:
+            self.schedule = schedule
+        else:
+            class_schedule = getattr(self.__class__, 'schedule', None)
+            if isinstance(class_schedule, Schedule):
+                self.schedule = class_schedule
+            else:
+                raise OperationalException(
+                    "Task requires a Schedule. Pass ``schedule=`` to the "
+                    "constructor or set ``schedule = Schedule.every(...)`` "
+                    "on the class. The legacy ``time_unit``/``interval`` "
+                    "API was removed in v9.0."
+                )
 
         if decorated is not None:
             self.decorated = decorated

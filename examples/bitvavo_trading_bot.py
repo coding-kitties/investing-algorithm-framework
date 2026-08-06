@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from typing import Dict, Any
 import logging.config
 
-from investing_algorithm_framework import TimeUnit, TradingStrategy, \
+from investing_algorithm_framework import TimeUnit, Schedule, TradingStrategy, \
     create_app, DEFAULT_LOGGING_CONFIG, Context, DataSource
 
 """
@@ -22,8 +22,7 @@ load_dotenv()
 # Define your bitvavo trading strategy and register the data sources
 class BitvavoTradingStrategy(TradingStrategy):
     algorithm_id = "bitvavo-trading-strategy"
-    time_unit = TimeUnit.SECOND
-    interval = 10
+    schedule = Schedule.every(10, TimeUnit.SECOND)
     data_sources = [
         DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", warmup_window=200, time_frame="2h", identifier="BTC/EUR-ohlcv"),
         DataSource(data_type="Ticker", market="bitvavo", symbol="BTC/EUR", identifier="BTC/EUR-ticker")

@@ -15,12 +15,13 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from investing_algorithm_framework.domain import BacktestRun, TimeUnit, \
-    OperationalException, BacktestDateRange, Backtest, combine_backtests, \
-    generate_backtest_summary_metrics, DataSource, \
+from investing_algorithm_framework.domain import BacktestRun, \
+    OperationalException, BacktestDateRange, BacktestWindow, Backtest, \
+    combine_backtests, \
+    generate_backtest_summary_metrics, DataSource, Study, EngineSlot, \
     PortfolioConfiguration, tqdm, SnapshotInterval, \
     save_backtests_to_directory, TimeFrame, resolve_backtest_path, \
-    BUNDLE_EXT
+    BUNDLE_EXT, Universe, build_strategy_universe_map, stamp_backtests
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService, fill_missing_timeseries_data, \
     get_missing_timeseries_data_entries
@@ -457,18 +458,23 @@ class BacktestService:
             strategy: The strategy to validate.
 
         Raises:
-            OperationalException: If the strategy does not have the required
-                buy/sell signal functions.
+            OperationalException: If the strategy does not override
+                ``generate_signal_series``.
         """
-        if not hasattr(strategy, 'generate_buy_signals'):
+        from investing_algorithm_framework.app.strategy import (
+            TradingStrategy,
+        )
+
+        # ``hasattr`` is always True because the base class defines a
+        # no-op default. Check the method has actually been overridden
+        # by the user subclass.
+        own_method = type(strategy).generate_signal_series
+        base_method = TradingStrategy.generate_signal_series
+        if own_method is base_method:
             raise OperationalException(
-                "Strategy must define a vectorized buy signal function "
-                "(buy_signal_vectorized)."
-            )
-        if not hasattr(strategy, 'generate_sell_signals'):
-            raise OperationalException(
-                "Strategy must define a vectorized sell signal function "
-                "(sell_signal_vectorized)."
+                "Strategy must define a vectorized signal generator "
+                "(generate_signal_series). See docs/migration-v8-to-v9.md "
+                "§10."
             )
 
     def generate_schedule(
@@ -479,37 +485,53 @@ class BacktestService:
         end_date
     ) -> Dict[datetime, Dict[str, List[str]]]:
         """
-        Generates a dict-based schedule: datetime => {strategy_ids, task_ids}
+        Generates a dict-based schedule keyed by ``datetime``.
+
+        Each entry contains:
+
+        * ``strategy_ids``  — strategies that fire at this tick.
+        * ``task_ids``      — tasks that fire at this tick.
+        * ``scheduled_function_calls`` — list of
+          ``(strategy_id, function_name)`` tuples for the
+          v9.0 ``ScheduledFunction`` API.
+
+        The return type is intentionally a plain mapping of
+        ``datetime`` → ``dict`` so downstream consumers (including the
+        polars-based OHLCV pipeline) keep their existing semantics. Use
+        ``Schedule.materialize_polars(start, end)`` on an individual
+        schedule if you need a vectorised polars-native fire-times series.
         """
         schedule = defaultdict(
-            lambda: {"strategy_ids": set(), "task_ids": set(tasks)}
+            lambda: {
+                "strategy_ids": set(),
+                "task_ids": set(tasks),
+                "scheduled_function_calls": [],
+            }
         )
 
         for strategy in strategies:
-            strategy_id = strategy.strategy_profile.strategy_id
-            interval = strategy.strategy_profile.interval
-            time_unit = strategy.strategy_profile.time_unit
+            sid = strategy.strategy_profile.strategy_id
+            strat_schedule = strategy.strategy_profile.schedule
+            for t in strat_schedule.iter_run_times(start_date, end_date):
+                schedule[t]["strategy_ids"].add(sid)
 
-            if time_unit == TimeUnit.SECOND:
-                step = timedelta(seconds=interval)
-            elif time_unit == TimeUnit.MINUTE:
-                step = timedelta(minutes=interval)
-            elif time_unit == TimeUnit.HOUR:
-                step = timedelta(hours=interval)
-            elif time_unit == TimeUnit.DAY:
-                step = timedelta(days=interval)
-            else:
-                raise ValueError(f"Unsupported time unit: {time_unit}")
-
-            t = start_date
-            while t <= end_date:
-                schedule[t]["strategy_ids"].add(strategy_id)
-                t += step
+            for sf in strategy.strategy_profile.scheduled_functions or []:
+                for t in sf.schedule.iter_run_times(start_date, end_date):
+                    # Touch the bucket so it exists in the output, but
+                    # do not add to strategy_ids — the function fires
+                    # independently of the parent strategy tick.
+                    _ = schedule[t]
+                    schedule[t]["scheduled_function_calls"].append(
+                        (sid, sf.func)
+                    )
 
         return {
             ts: {
                 "strategy_ids": sorted(data["strategy_ids"]),
-                "task_ids": sorted(data["task_ids"])
+                "task_ids": sorted(data["task_ids"]),
+                "scheduled_function_calls": list(
+                    data["scheduled_function_calls"]
+                ),
             }
             for ts, data in schedule.items()
         }
@@ -561,11 +583,8 @@ class BacktestService:
         portfolio = self._portfolio_service.get_all()[0]
 
         run = BacktestRun(
-            backtest_start_date=backtest_date_range.start_date,
-            backtest_end_date=backtest_date_range.end_date,
-            backtest_date_range_name=backtest_date_range.name,
+            backtest_window=BacktestWindow(train_range=backtest_date_range),
             initial_unallocated=self._get_initial_unallocated(),
-            trading_symbol=portfolio.trading_symbol,
             created_at=datetime.now(tz=timezone.utc),
             portfolio_snapshots=self._portfolio_snapshot_service.get_all(
                 {"portfolio_id": portfolio.id}
@@ -585,19 +604,22 @@ class BacktestService:
             run, risk_free_rate=risk_free_rate
         )
         run.backtest_metrics = backtest_metrics
-        return Backtest(
+        bt = Backtest(
             algorithm_id=algorithm.id,
-            backtest_runs=[run],
-            backtest_summary=generate_backtest_summary_metrics(
-                [backtest_metrics]
-            ),
             parameters=algorithm.get_parameters()
             if hasattr(algorithm, 'get_parameters') else {},
             tag=algorithm.metadata.get('tag') if hasattr(
                 algorithm, 'metadata') and algorithm.metadata
             else None,
-            engine_type="event",
         )
+        _event_study = Study(name="default")
+        _event_slot = _event_study.get_engine("event")
+        _event_slot.runs = [run]
+        _event_slot.summary = generate_backtest_summary_metrics(
+            [backtest_metrics]
+        )
+        bt._studies["default"] = _event_study
+        return bt
 
     def backtest_exists(
         self,
@@ -665,11 +687,19 @@ class BacktestService:
             backtest = Backtest.open(backtest_directory)
             run = backtest.get_backtest_run(backtest_date_range)
             metadata = backtest.get_metadata()
-            return Backtest(
-                backtest_runs=[run],
-                metadata=metadata,
-                engine_type=backtest.engine_type,
+            engine = (
+                "event"
+                if run in backtest.get_runs("event")
+                else "vector"
             )
+            result = Backtest(
+                algorithm_id=backtest.algorithm_id,
+                metadata=metadata,
+            )
+            _loaded_study = Study(name="default")
+            _loaded_study.get_engine(engine).runs = [run]
+            result._studies["default"] = _loaded_study
+            return result
         else:
             raise OperationalException("Backtest does not exist.")
 
@@ -731,11 +761,8 @@ class BacktestService:
     def run_vector_backtests(
         self,
         strategies: List,
-        portfolio_configuration: PortfolioConfiguration,
-        backtest_date_range: BacktestDateRange = None,
-        backtest_date_ranges: List[BacktestDateRange] = None,
+        study: Study = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
-        risk_free_rate: Optional[float] = None,
         skip_data_sources_initialization: bool = False,
         show_progress: bool = False,
         continue_on_error: bool = False,
@@ -774,14 +801,8 @@ class BacktestService:
 
         Args:
             strategies: List of strategies to backtest.
-            portfolio_configuration: Portfolio configuration with
-                initial balance, market, and trading symbol.
-            backtest_date_range: Single backtest date range to use
-                for all strategies.
-            backtest_date_ranges: List of backtest date ranges to use
-                for all strategies.
+            study: Study object containing backtest configuration.
             snapshot_interval: Interval for portfolio snapshots.
-            risk_free_rate: Risk-free rate for backtest metrics.
             skip_data_sources_initialization: Whether to skip data
                 source initialization.
             show_progress: Whether to show progress bars.
@@ -824,10 +845,9 @@ class BacktestService:
                 "be provided"
             )
 
-        if backtest_date_range is None and backtest_date_ranges is None:
+        if study is None:
             raise OperationalException(
-                "Either backtest_date_range or backtest_date_ranges "
-                "must be provided"
+                "A Study object must be provided"
             )
 
         # Collect all data sources
@@ -836,25 +856,104 @@ class BacktestService:
         for strategy in strategies:
             data_sources.extend(strategy.data_sources)
 
-        # Get risk-free rate if not provided
+        # --- Derive everything needed from the Study object -----------
+        risk_free_rate = study.risk_free_rate
         if risk_free_rate is None:
-
             if show_progress:
                 _print_progress(
-                    "Retrieving risk free rate for metrics calculation ...",
+                    "Retrieving risk free rate for metrics "
+                    "calculation ...",
                     show_progress
                 )
-
             risk_free_rate = self._get_risk_free_rate()
-
             if show_progress:
                 _print_progress(
                     f"Retrieved risk free rate of: {risk_free_rate}",
                     show_progress
                 )
 
+        # Portfolio configuration from study
+        initial_capital = study.initial_capital
+        if study.universe is not None:
+            matching_configuration = next((
+                configuration
+                for configuration
+                in self._portfolio_configuration_service.get_all()
+                if configuration.market == study.universe.market
+                and configuration.trading_symbol
+                == study.universe.trading_symbol
+            ), None)
+            portfolio_configuration = PortfolioConfiguration(
+                identifier="backtest_portfolio",
+                market=study.universe.market or "BACKTEST",
+                trading_symbol=study.universe.trading_symbol or "USDT",
+                initial_balance=initial_capital or 1000.0,
+                fee_percentage=getattr(
+                    matching_configuration, "fee_percentage", 0.0
+                ),
+                slippage_percentage=getattr(
+                    matching_configuration, "slippage_percentage", 0.0
+                ),
+            )
+        else:
+            _pcs = self._portfolio_configuration_service.get_all()
+            portfolio_configuration = _pcs[0] if _pcs else None
+            if portfolio_configuration is None:
+                raise OperationalException(
+                    "Study.universe must be set or a "
+                    "PortfolioConfiguration must exist."
+                )
+
+        # Date ranges from study windows, per study.window_part
+        # ("train" / "test" / "both", default "test").
+        backtest_date_ranges = study.resolve_backtest_date_ranges()
+        if not backtest_date_ranges:
+            raise OperationalException(
+                "Study must have at least one backtest_window "
+                "with a train_range or test_range set."
+            )
+
+        # Stamping fields derived from the study
+        stamp_required = bool(
+            (study.name and study.name != "default")
+            or study.description
+            or study.universe is not None
+            or study.backtest_windows
+            or study.initial_capital is not None
+        )
+        study_name = study.name
+        study_description = study.description
+        # Stamped on every checkpoint save (not just a final post-hoc
+        # pass over survivors) so a strategy eliminated mid-sweep by a
+        # progressive ``window_filter_function`` still has the full
+        # window list on disk — it never reaches the final survivor
+        # list that ``_apply_backtest_windows`` (app.py) restamps.
+        study_backtest_windows = list(study.backtest_windows or [])
+        # Same rationale as ``study_backtest_windows`` above — without
+        # this, a mid-sweep checkpoint save writes a study with
+        # ``initial_capital=None`` that a survivor list never corrects.
+        study_initial_capital = study.initial_capital
+        universe_map = build_strategy_universe_map(
+            strategies,
+            [study.universe] if study.universe else [],
+        )
+
+        # Inject universe symbols/market into strategies that don't set them
+        for s in strategies:
+            matched = universe_map.get(s.algorithm_id)
+            if matched is None:
+                continue
+            if not s.symbols and matched.symbols:
+                s.symbols = list(matched.symbols)
+            if not getattr(s, "market", None) and matched.market:
+                s.market = matched.market
+
+        anchor_algorithm_id = None
+        # ------------------------------------------------------------------
+
         # Load checkpoint cache only if checkpointing is enabled
         checkpoint_cache = {}
+
         if use_checkpoints and backtest_storage_directory is not None:
             checkpoint_cache = self._load_checkpoint_cache(
                 backtest_storage_directory
@@ -866,11 +965,6 @@ class BacktestService:
         session_cache = None
         if backtest_storage_directory is not None:
             session_cache = self._create_session_cache()
-
-        # Handle single date range case - convert to list
-        # for unified processing
-        if backtest_date_range is not None:
-            backtest_date_ranges = [backtest_date_range]
 
         # Handle multiple date ranges with batching
         active_strategies = strategies.copy()
@@ -1118,6 +1212,30 @@ class BacktestService:
                             try:
                                 batch_result = future.result()
                                 if batch_result:
+                                    # Phase 2b: stamp study fields and
+                                    # the matched Universe on each
+                                    # backtest BEFORE checkpoint write
+                                    # so on-disk envelopes carry the
+                                    # metadata even if the sweep is
+                                    # interrupted.
+                                    if stamp_required:
+                                        stamp_backtests(
+                                            batch_result,
+                                            study_name=study_name,
+                                            study_description=(
+                                                study_description
+                                            ),
+                                            universe_map=universe_map,
+                                            anchor_algorithm_id=(
+                                                anchor_algorithm_id
+                                            ),
+                                            backtest_windows=(
+                                                study_backtest_windows
+                                            ),
+                                            initial_capital=(
+                                                study_initial_capital
+                                            ),
+                                        )
                                     # Add all results from this batch
                                     all_backtests.extend(batch_result)
                                     batch_buffer.extend(batch_result)
@@ -1213,6 +1331,25 @@ class BacktestService:
                                 self._run_batch_backtest_worker(worker_args)
 
                             if batch_result:
+                                # Phase 2b: stamp study fields and the
+                                # matched Universe on each backtest
+                                # BEFORE checkpoint write.
+                                if stamp_required:
+                                    stamp_backtests(
+                                        batch_result,
+                                        study_name=study_name,
+                                        study_description=study_description,
+                                        universe_map=universe_map,
+                                        anchor_algorithm_id=(
+                                            anchor_algorithm_id
+                                        ),
+                                        backtest_windows=(
+                                            study_backtest_windows
+                                        ),
+                                        initial_capital=(
+                                            study_initial_capital
+                                        ),
+                                    )
                                 all_backtests.extend(batch_result)
                                 batch_buffer.extend(batch_result)
 
@@ -1293,15 +1430,15 @@ class BacktestService:
                     )
                     all_backtests.extend(checkpointed_backtests)
 
-            # Iteratively update backtest_summary after each window
-            # This enables window_filter_function to access up-to-date
-            # summary metrics during filtering
+            # Iteratively update each engine's summary after each
+            # window so ``window_filter_function`` sees up-to-date
+            # per-engine summary metrics. v9.0 regenerates the vector
+            # and event summaries independently from their respective
+            # run lists; the cross-engine "backtest_summary" rollup
+            # from v8 no longer exists.
             if iterative_summary_update:
                 for backtest in all_backtests:
-                    backtest.backtest_summary = \
-                        generate_backtest_summary_metrics(
-                            backtest.get_all_backtest_metrics()
-                        )
+                    backtest.regenerate_summaries()
 
             # Apply window filter function
             if window_filter_function is not None:
@@ -1471,16 +1608,14 @@ class BacktestService:
 
             all_backtests = combined_backtests
 
-        # Generate summary metrics
+        # Generate summary metrics (per engine, independently)
         for backtest in tqdm(
             all_backtests,
             colour="green",
             desc="Generating backtest summary metrics",
             disable=not show_progress
         ):
-            backtest.backtest_summary = generate_backtest_summary_metrics(
-                backtest.get_all_backtest_metrics()
-            )
+            backtest.regenerate_summaries()
 
         # Apply final filter function
         if final_filter_function is not None:
@@ -1698,31 +1833,65 @@ class BacktestService:
                 backtests_to_save.append(bt)
                 continue
 
-            # If the existing bundle already contains a run for one of
-            # the new date ranges (e.g. a forced rerun), drop the
-            # overlapping runs from the existing bundle before merging
-            # so we don't end up with duplicates.
+            # Study-aware merge semantics (applies to any number of
+            # studies already in the bundle):
+            #
+            # 1. Overwrite: if the on-disk study already has a run
+            #    for the same date range, replace it with the new run.
+            # 2. Keep: runs in the on-disk study whose date ranges are
+            #    *not* covered by the new batch are preserved as-is.
+            # 3. Append: runs in the new batch whose date ranges are
+            #    entirely new are appended.
+            # 4. After any change: recalculate engine summary metrics
+            #    for the affected study.
+            #
+            # Non-target studies (disjoint study slots) are always
+            # preserved by ``save_bundle(merge=True)`` via
+            # ``_merge_v5_envelopes`` Rule 1 — no explicit copy needed.
+            _bt_ds = bt.get_study()
+            new_study_name = _bt_ds.name if _bt_ds else "default"
+
+            existing_target = existing.get_study(new_study_name)
+            if existing_target is None:
+                # Brand-new study slot — just save bt as-is.
+                # _merge_v5_envelopes adds it alongside existing studies.
+                backtests_to_save.append(bt)
+                continue
+
+            # Study already exists on this bundle: apply rules 1-4.
             new_ranges = {
                 (run.backtest_start_date, run.backtest_end_date)
                 for run in bt.get_all_backtest_runs()
             }
-            kept_runs = [
-                run for run in existing.get_all_backtest_runs()
-                if (run.backtest_start_date, run.backtest_end_date)
-                not in new_ranges
-            ]
-            existing.backtest_runs = kept_runs
+            bt_target = bt.get_study(new_study_name)
+            for _eng in ("vector", "event"):
+                _ex_slot = existing_target.engine_results.get(_eng)
+                if _ex_slot is None:
+                    continue
+                # Surviving runs: on-disk runs whose date range is NOT
+                # in the new batch (rules 2 + 3 — keep non-overlapping).
+                surviving = [
+                    r for r in (_ex_slot.runs or [])
+                    if (r.backtest_start_date, r.backtest_end_date)
+                    not in new_ranges
+                ]
+                if not surviving:
+                    continue
+                # Prepend survivors so the combined list stays
+                # chronological (old windows before new windows).
+                if bt_target is not None:
+                    _bt_slot = bt_target.engine_results.get(_eng)
+                    if _bt_slot is not None:
+                        _bt_slot.runs = surviving + _bt_slot.runs
+                    else:
+                        bt_target.engine_results[_eng] = EngineSlot(
+                            runs=surviving
+                        )
 
-            if kept_runs:
-                merged = combine_backtests([existing, bt])
-                # Preserve the freshly produced backtest's metadata /
-                # parameters by letting the new backtest's values win
-                # on key conflicts (combine_backtests uses dict update
-                # in iteration order — ``bt`` is second so its values
-                # already win).
-                backtests_to_save.append(merged)
-            else:
-                backtests_to_save.append(bt)
+            # Rule 4: recalculate summary metrics for every engine
+            # in the target study now that runs have been merged.
+            bt.regenerate_summaries()
+            backtests_to_save.append(bt)
 
         # Save backtests to disk
         save_backtests_to_directory(
@@ -2162,20 +2331,23 @@ class BacktestService:
                 )
                 backtest = Backtest(
                     algorithm_id=strategy.algorithm_id,
-                    backtest_runs=[backtest_run],
-                    backtest_summary=generate_backtest_summary_metrics(
-                        [backtest_run.backtest_metrics]
-                    ),
                     metadata=strategy.metadata if hasattr(
                         strategy, 'metadata') else None,
-                    risk_free_rate=risk_free_rate,
                     parameters=strategy.get_parameters()
                     if hasattr(strategy, 'get_parameters') else {},
                     tag=strategy.metadata.get('tag') if hasattr(
                         strategy, 'metadata') and strategy.metadata
                     else None,
-                    engine_type="vector",
                 )
+                _worker_study = Study(name="default")
+                _worker_slot = _worker_study.get_engine("vector")
+                _worker_slot.runs = [backtest_run]
+                _worker_slot.summary = (
+                    generate_backtest_summary_metrics(
+                        [backtest_run.backtest_metrics]
+                    ) if backtest_run.backtest_metrics else None
+                )
+                backtest._studies["default"] = _worker_study
                 batch_results.append(backtest)
 
                 # Increment shared progress counter so the
@@ -2303,14 +2475,34 @@ class BacktestService:
                     initial_balance=initial_amount
                 )
 
+        # Build a Study from the resolved parameters so that
+        # run_vector_backtests receives a single Study object.
+        _all_date_ranges = []
+        if backtest_date_range is not None:
+            _all_date_ranges.append(backtest_date_range)
+        if backtest_date_ranges is not None:
+            _all_date_ranges.extend(backtest_date_ranges)
+
+        _rfr = risk_free_rate if risk_free_rate is not None \
+            else self._get_risk_free_rate()
+        run_study = Study(
+            name="default",
+            backtest_windows=[
+                BacktestWindow(train_range=dr) for dr in _all_date_ranges
+            ],
+            universe=Universe(
+                market=portfolio_configuration.market,
+                trading_symbol=portfolio_configuration.trading_symbol,
+            ),
+            initial_capital=portfolio_configuration.initial_balance,
+            risk_free_rate=_rfr,
+        )
+
         # Use the optimized run_vector_backtests method
         backtests = self.run_vector_backtests(
             strategies=[strategy],
-            portfolio_configuration=portfolio_configuration,
-            backtest_date_range=backtest_date_range,
-            backtest_date_ranges=backtest_date_ranges,
+            study=run_study,
             snapshot_interval=snapshot_interval,
-            risk_free_rate=risk_free_rate,
             skip_data_sources_initialization=skip_data_sources_initialization,
             show_progress=show_progress,
             continue_on_error=continue_on_error,
@@ -2348,13 +2540,12 @@ class BacktestService:
 
             return backtest
         else:
-            # Return empty backtest if no results
+            # Return empty backtest if no results. v9.0 represents
+            # "empty vector backtest" as an empty vector_runs list;
+            # event_runs stays empty too.
             return Backtest(
                 algorithm_id=strategy.algorithm_id,
-                backtest_runs=[],
-                risk_free_rate=risk_free_rate or 0.0,
                 metadata=metadata or {},
-                engine_type="vector",
             )
 
     def _get_risk_free_rate(self) -> float:
@@ -2370,6 +2561,42 @@ class BacktestService:
             "(2.7%%). Provide risk_free_rate to override."
         )
         return 0.027
+
+    def _reset_event_backtest_state(self):
+        """
+        Wipe all portfolio/order/trade/position state and recreate
+        fresh portfolios from their configurations.
+
+        This is called before every isolated (algorithm, window) event
+        backtest run so that each run starts from a clean, freshly
+        capitalized portfolio instead of accumulating orders/trades
+        from prior windows or other algorithms that share the same
+        underlying SQL database.
+
+        Also resets ``LAST_SNAPSHOT_DATETIME`` -- otherwise the event
+        loop's snapshot-cadence guard (see ``EventLoopService``) thinks
+        a snapshot was already taken from a previous algorithm's/
+        window's run and skips taking a fresh one for this run.
+        """
+        from investing_algorithm_framework.domain import \
+            BACKTESTING_INITIAL_AMOUNT, LAST_SNAPSHOT_DATETIME
+        from investing_algorithm_framework.infrastructure.database \
+            .sql_alchemy import Session, SQLBaseModel
+
+        with Session() as db:
+            for table in reversed(SQLBaseModel.metadata.sorted_tables):
+                db.execute(table.delete())
+            db.commit()
+
+        initial_amount = self._configuration_service.config.get(
+            BACKTESTING_INITIAL_AMOUNT, None
+        )
+        for pc in self._portfolio_configuration_service.get_all():
+            self._portfolio_service.create_portfolio_from_configuration(
+                pc, initial_amount=initial_amount
+            )
+
+        self._configuration_service.add_value(LAST_SNAPSHOT_DATETIME, None)
 
     def run_backtests(
         self,
@@ -2637,6 +2864,14 @@ class BacktestService:
                         )
 
                         try:
+                            # Reset portfolio/order/trade/position state
+                            # before every isolated (algorithm, window) run
+                            # so this run starts from a clean, freshly
+                            # capitalized portfolio instead of accumulating
+                            # trades from prior windows or other algorithms
+                            # sharing this run.
+                            self._reset_event_backtest_state()
+
                             # Create event backtest service
                             event_backtest_service = EventBacktestService(
                                 data_provider_service=(
@@ -2832,15 +3067,12 @@ class BacktestService:
                     )
                     all_backtests.extend(checkpointed_backtests)
 
-            # Iteratively update backtest_summary after each window
-            # This enables window_filter_function to access up-to-date
-            # summary metrics during filtering
+            # Iteratively update each engine's summary after each
+            # window so ``window_filter_function`` sees up-to-date
+            # per-engine summary metrics.
             if iterative_summary_update:
                 for backtest in all_backtests:
-                    backtest.backtest_summary = \
-                        generate_backtest_summary_metrics(
-                            backtest.get_all_backtest_metrics()
-                        )
+                    backtest.regenerate_summaries()
 
             # Apply window filter function
             if window_filter_function is not None:
@@ -2982,16 +3214,14 @@ class BacktestService:
                     combined_backtests.append(combined)
             all_backtests = combined_backtests
 
-        # Generate summary metrics
+        # Generate summary metrics (per engine, independently)
         for backtest in tqdm(
             all_backtests,
             colour="green",
             desc="Generating backtest summary metrics",
             disable=not show_progress
         ):
-            backtest.backtest_summary = generate_backtest_summary_metrics(
-                backtest.get_all_backtest_metrics()
-            )
+            backtest.regenerate_summaries()
 
         # Apply final filter function
         if final_filter_function is not None:
@@ -3111,7 +3341,8 @@ class BacktestService:
 
             return backtest, {}
         else:
-            # Return empty backtest if no results
+            # Return empty backtest if no results. v9.0 represents
+            # "empty event backtest" as an empty event_runs list.
             algorithm_id = (
                 algorithm.algorithm_id
                 if hasattr(algorithm, 'algorithm_id')
@@ -3119,10 +3350,7 @@ class BacktestService:
             )
             return Backtest(
                 algorithm_id=algorithm_id,
-                backtest_runs=[],
-                risk_free_rate=risk_free_rate or 0.0,
                 metadata=metadata or {},
-                engine_type="event",
             ), {}
 
     def create_ohlcv_permutation(

@@ -4,14 +4,12 @@ from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
-    BacktestDateRange
+    BacktestDateRange, Schedule
 
 
 class TestStrategy(TradingStrategy):
     strategy_id = "test_strategy"
-    time_unit = TimeUnit.MINUTE
-    interval = 1
-
+    schedule = Schedule.every(1, TimeUnit.MINUTE)
     def run_strategy(self, context, data):
         pass
 

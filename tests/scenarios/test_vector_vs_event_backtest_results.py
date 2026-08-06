@@ -10,12 +10,11 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, Schedule
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     position_sizes = [
         PositionSize(
@@ -27,8 +26,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
     def __init__(
         self,
         algorithm_id: str,
-        time_unit: TimeUnit,
-        interval: int,
+        schedule: Schedule,
         market: str,
         rsi_time_frame: str,
         rsi_period: int,
@@ -82,8 +80,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval
+            schedule=schedule,
         )
 
         self.buy_signal_dates = {}
@@ -258,8 +255,7 @@ class Test(TestCase):
         )
         strategy = RSIEMACrossoverStrategy(
             algorithm_id="RSIEMACrossover",
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             market="BITVAVO",
             rsi_time_frame="2h",
             rsi_period=14,
@@ -279,7 +275,7 @@ class Test(TestCase):
             trading_symbol="EUR",
             market="BITVAVO"
         )
-        run = vector_backtests.backtest_runs[0]
+        run = vector_backtests.get_all_backtest_runs()[0]
 
         vector_trade_count = len(run.get_trades())
         self.assertGreater(vector_trade_count, 0, "Should have at least 1 vector trade")
@@ -291,7 +287,7 @@ class Test(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             risk_free_rate=0.027
         )
-        run = event_backtest.backtest_runs[0]
+        run = event_backtest.get_all_backtest_runs()[0]
         event_trade_count = len(run.get_trades())
         self.assertEqual(vector_trade_count, event_trade_count,
                          f"Vector and event trade counts should match: "

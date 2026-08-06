@@ -33,6 +33,9 @@ from .returns import get_total_return, get_final_value, \
     get_total_growth
 from .sharpe_ratio import get_sharpe_ratio, get_rolling_sharpe_ratio
 from .sortino_ratio import get_sortino_ratio
+from .omega_ratio import get_omega_ratio
+from .ulcer import get_ulcer_index
+from .mae_mfe import get_trade_mae_mfe_statistics
 from .volatility import get_annual_volatility
 from .win_rate import get_win_rate, get_win_loss_ratio, get_current_win_rate, \
     get_current_win_loss_ratio
@@ -44,7 +47,8 @@ from .trades import get_average_trade_duration, get_average_trade_size, \
     get_current_average_trade_gain, get_current_average_trade_return, \
     get_current_average_trade_duration, get_current_average_trade_loss, \
     get_average_win_duration, get_average_loss_duration, \
-    get_max_consecutive_wins, get_max_consecutive_losses
+    get_max_consecutive_wins, get_max_consecutive_losses, \
+    get_directional_trade_statistics
 from .value_at_risk import get_value_at_risk, \
     get_conditional_value_at_risk
 
@@ -88,7 +92,13 @@ def create_backtest_metrics_for_backtest(
         )
         backtest_run.backtest_metrics = backtest_metrics
 
-    backtest.backtest_runs = backtest_runs
+    # ``backtest_runs`` above is the concatenated view returned by
+    # ``get_all_backtest_runs()``; the BacktestRun instances are the
+    # same objects already held in ``backtest.vector_runs`` /
+    # ``backtest.event_runs``, so mutating their ``backtest_metrics``
+    # in place is all that's needed. The v8 assignment
+    # ``backtest.backtest_runs = backtest_runs`` is no longer required
+    # — the engine slot lists are already up to date.
     return backtest
 
 
@@ -101,8 +111,10 @@ def _recalculate_one(args):
     the full snapshots/trades back through pickle.
     """
     backtest, risk_free_rate, metrics = args
+    _st = backtest._get_default_study()
+    _study_rfr = _st.risk_free_rate if _st is not None else None
     rfr = risk_free_rate if risk_free_rate is not None \
-        else (backtest.risk_free_rate or 0.0)
+        else (_study_rfr or 0.0)
 
     run_metrics = [
         create_backtest_metrics(run, rfr, metrics)
@@ -126,9 +138,32 @@ def _recalculate_one_path(args):
     Used by :func:`recalculate_backtests_in_directory`. The Backtest
     never crosses the process boundary so the parent stays flat,
     regardless of batch size.
+
+    *args* is a dict with the following keys:
+
+    * ``src_path`` / ``dst_path``: input / output bundle paths.
+    * ``risk_free_rate`` / ``metrics``: forwarded to
+      :func:`create_backtest_metrics`.
+    * ``include_ohlcv`` / ``ohlcv_store``: forwarded to
+      :func:`save_bundle`.
+    * ``study`` (optional): only recompute runs for this study slot.
+      Both the legacy/default-study slot and all other studies
+      are considered.
+    * ``engine`` (optional): one of ``"vector"`` / ``"event"``;
+      restricts recomputation to that engine.
+    * ``windows`` (optional): list of :class:`BacktestDateRange`
+      objects; only runs whose ``(backtest_start_date,
+      backtest_end_date)`` matches one of these are recomputed.
     """
-    src_path, dst_path, risk_free_rate, metrics, \
-        include_ohlcv, ohlcv_store = args
+    src_path = args["src_path"]
+    dst_path = args["dst_path"]
+    risk_free_rate = args.get("risk_free_rate")
+    metrics = args.get("metrics")
+    include_ohlcv = args.get("include_ohlcv", False)
+    ohlcv_store = args.get("ohlcv_store")
+    study_filter = args.get("study")
+    engine_filter = args.get("engine")
+    windows = args.get("windows")
 
     # Local imports keep the worker startup cost predictable and avoid
     # circular-import issues at module load time.
@@ -136,41 +171,64 @@ def _recalculate_one_path(args):
         is_bundle_file, open_bundle, save_bundle,
     )
     from investing_algorithm_framework.domain.backtesting.backtest \
-        import Backtest as _Backtest
+        import Backtest as _Backtest, ENGINES, ENGINE_VECTOR
     from investing_algorithm_framework.domain.backtesting.backtest_utils \
-        import _backtest_to_index_row
+        import _backtest_to_index_rows
 
     bt = open_bundle(src_path) if is_bundle_file(src_path) \
         else _Backtest.open(src_path)
+    _bt_st = bt._get_default_study()
+    _bt_rfr = _bt_st.risk_free_rate if _bt_st is not None else None
     rfr = risk_free_rate if risk_free_rate is not None \
-        else (bt.risk_free_rate or 0.0)
+        else (_bt_rfr or 0.0)
 
-    for run in bt.get_all_backtest_runs():
+    # Build the list of runs to recompute, honouring the optional
+    # study/engine/windows filters across all studies.
+    targets = []  # list of BacktestRun objects to recompute
+    for name, study in bt.studies.items():
+        if study_filter is not None and study_filter != name:
+            continue
+        for engine_name, slot in study.engines.items():
+            if engine_filter is not None and engine_filter != engine_name:
+                continue
+            targets.extend(slot.runs)
+
+    if windows:
+        wanted = {(w.start_date, w.end_date) for w in windows}
+        targets = [
+            r for r in targets
+            if (r.backtest_start_date, r.backtest_end_date) in wanted
+        ]
+
+    for run in targets:
         run.backtest_metrics = create_backtest_metrics(run, rfr, metrics)
 
-    all_metrics = [
-        run.backtest_metrics
-        for run in bt.get_all_backtest_runs()
-        if run.backtest_metrics is not None
-    ]
-    bt.backtest_summary = generate_backtest_summary_metrics(all_metrics)
+    # v9.0: each engine has its own summary; ``regenerate_summaries``
+    # rebuilds all study slots from the newly populated per-run
+    # metrics so the persisted bundle stays self-consistent.
+    bt.regenerate_summaries()
 
     out = str(save_bundle(
         bt, dst_path,
         include_ohlcv=include_ohlcv,
         ohlcv_store=ohlcv_store,
     ))
-    row = _backtest_to_index_row(bt, bundle_path=os.path.basename(out))
+    rows = _backtest_to_index_rows(bt, bundle_path=os.path.basename(out))
     del bt
     gc.collect()
-    return out, row
+    return out, rows
 
 
 def _apply_recalc_result(backtest, run_metrics, summary):
     runs = backtest.get_all_backtest_runs()
     for run, bm in zip(runs, run_metrics):
         run.backtest_metrics = bm
-    backtest.backtest_summary = summary
+    # ``summary`` (the cross-engine roll-up computed by the worker) is
+    # intentionally ignored. v9.0 stores summaries per engine; we
+    # regenerate them from the freshly assigned per-run metrics so
+    # vector and event summaries stay independent and self-consistent.
+    del summary
+    backtest.regenerate_summaries()
 
 
 def _make_pool(n_workers: int, max_tasks_per_child: Optional[int]):
@@ -283,18 +341,7 @@ def recalculate_backtests(
     workers: Optional[int] = None,
     max_tasks_per_child: Optional[int] = 16,
 ) -> List[Backtest]:
-    """
-    Recalculate all metrics for a set of in-memory backtests.
-
-    .. deprecated:: 8.7.2
-        Holding many backtests in the parent process is memory-unsafe:
-        each :class:`Backtest` carries portfolio snapshots, trades and
-        timeseries, so a list of a few thousand backtests can easily
-        consume tens of gigabytes before any work starts. Use
-        :func:`recalculate_backtests_in_directory` instead — it streams
-        backtests from disk inside worker processes and never
-        materialises a ``List[Backtest]`` in the parent. This function
-        will be removed in a future major release.
+    """Recalculate all metrics for a set of in-memory backtests.
 
     Args:
         backtests: The backtests to recalculate (mutated in place).
@@ -304,23 +351,11 @@ def recalculate_backtests(
         workers: Number of parallel worker processes. ``None`` or
             ``1`` runs serially in the calling process.
         max_tasks_per_child: Recycle each worker after this many tasks
-            to keep RSS flat. Applied natively on Python 3.11+ and
-            emulated by re-creating the pool on older versions. Set to
-            ``None`` to disable recycling.
+            to keep RSS flat. Set to ``None`` to disable recycling.
 
     Returns:
         The same backtest objects, mutated in place.
     """
-    warnings.warn(
-        "recalculate_backtests(List[Backtest]) is deprecated and will "
-        "be removed in a future major release: holding many backtests "
-        "in the parent process is memory-unsafe. Use "
-        "recalculate_backtests_in_directory(src_dir, ...) instead, "
-        "which streams from disk inside worker processes and keeps "
-        "parent memory flat.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
     if not backtests:
         return backtests
 
@@ -374,6 +409,9 @@ def recalculate_backtests_in_directory(
     include_ohlcv: bool = False,
     max_tasks_per_child: Optional[int] = 16,
     update_index: bool = True,
+    study: Optional[str] = None,
+    engine: Optional[str] = None,
+    windows: Optional[List[BacktestDateRange]] = None,
 ) -> int:
     """Stream-recalculate backtest metrics for every bundle on disk.
 
@@ -383,7 +421,7 @@ def recalculate_backtests_in_directory(
     constant regardless of how many backtests are processed.
 
     Args:
-        src_dir: Directory containing ``.iafbt`` bundles (and/or
+        src_dir: Directory containing ``.obtf`` bundles (and/or
             legacy backtest directories).
         dst_dir: Output directory. If ``None``, bundles are rewritten
             in place inside *src_dir*.
@@ -400,15 +438,34 @@ def recalculate_backtests_in_directory(
         update_index: Rewrite ``index.parquet`` in *dst_dir* (or
             *src_dir* when in-place) using the freshly computed
             summaries.
+        study: Optional study name. When provided, only runs belonging
+            to that study slot are recomputed; all other studies on
+            the bundle keep their existing per-run metrics. All
+            studies are honoured. Per-engine
+            summaries are still regenerated for *every* slot so
+            cross-study aggregates stay consistent with the latest
+            per-run metrics.
+        engine: Optional engine filter (``"vector"`` or ``"event"``);
+            restricts recomputation to that engine.
+        windows: Optional list of :class:`BacktestDateRange` objects;
+            only runs whose ``(start_date, end_date)`` matches one of
+            these are recomputed.
 
     Returns:
         Number of backtests recalculated.
     """
     from investing_algorithm_framework.domain.backtesting.bundle \
         import BUNDLE_EXT
+    from investing_algorithm_framework.domain.backtesting.backtest \
+        import ENGINES
     from investing_algorithm_framework.domain.backtesting.backtest_utils \
         import _resolve_workers
     from investing_algorithm_framework.domain.utils.custom_tqdm import tqdm
+
+    if engine is not None and engine not in ENGINES:
+        raise OperationalException(
+            f"Unknown engine {engine!r}, expected one of {list(ENGINES)}."
+        )
 
     src_dir = Path(src_dir)
     in_place = dst_dir is None
@@ -443,10 +500,17 @@ def recalculate_backtests_in_directory(
         if base.endswith(BUNDLE_EXT):
             base = base[: -len(BUNDLE_EXT)]
         dst = str(out_dir / f"{base}{BUNDLE_EXT}")
-        plan.append((
-            src, dst, risk_free_rate, metrics,
-            include_ohlcv, ohlcv_store,
-        ))
+        plan.append({
+            "src_path": src,
+            "dst_path": dst,
+            "risk_free_rate": risk_free_rate,
+            "metrics": metrics,
+            "include_ohlcv": include_ohlcv,
+            "ohlcv_store": ohlcv_store,
+            "study": study,
+            "engine": engine,
+            "windows": windows,
+        })
 
     n = len(plan)
     n_workers = min(_resolve_workers(workers), n)
@@ -460,13 +524,16 @@ def recalculate_backtests_in_directory(
     rows: List[dict] = []
 
     def _on_result(item, result):
-        out_path, row = result
-        if update_index and row is not None:
-            rows.append(row)
+        # ``_recalculate_one_path`` now returns ``(out_path, rows)``
+        # where ``rows`` is a list with one entry per populated engine
+        # (v9.0). Extend the index accumulator with all returned rows.
+        out_path, new_rows = result
+        if update_index and new_rows:
+            rows.extend(new_rows)
         pbar.update(1)
 
     def _on_error(item, exc):
-        logger.error(f"Failed to recalculate {item[0]}: {exc}")
+        logger.error(f"Failed to recalculate {item['src_path']}: {exc}")
         pbar.update(1)
 
     try:
@@ -502,7 +569,9 @@ def recalculate_backtests_in_directory(
 
 
 def create_backtest_metrics(
-    backtest_run: BacktestRun, risk_free_rate: float, metrics: List[str] = None
+    backtest_run: BacktestRun,
+    risk_free_rate: float,
+    metrics: List[str] = None,
 ) -> BacktestMetrics:
     """
     Create a BacktestMetrics instance and optionally save it to a file.
@@ -514,7 +583,6 @@ def create_backtest_metrics(
             metric calculations.
         metrics (List[str], optional): List of metric names to compute.
             If None, a default set of metrics will be computed.
-
     Returns:
         BacktestMetrics: The computed backtest metrics.
     """
@@ -538,8 +606,10 @@ def create_backtest_metrics(
             "rolling_sharpe_ratio",
             "sortino_ratio",
             "calmar_ratio",
+            "omega_ratio",
             "profit_factor",
             "annual_volatility",
+            "ulcer_index",
             "monthly_returns",
             "yearly_returns",
             "drawdown_series",
@@ -573,11 +643,28 @@ def create_backtest_metrics(
             "average_trade_gain_percentage",
             "average_trade_return",
             "average_trade_return_percentage",
+            "average_mae",
+            "average_mae_percentage",
+            "average_mfe",
+            "average_mfe_percentage",
+            "max_mae",
+            "max_mfe",
+            "mfe_mae_ratio",
             "median_trade_return",
             "number_of_trades",
             "number_of_trades_closed",
             "number_of_trades_opened",
             "number_of_trades_open_at_end",
+            "number_of_long_trades",
+            "number_of_long_trades_closed",
+            "number_of_winning_long_trades",
+            "number_of_losing_long_trades",
+            "long_win_rate",
+            "number_of_short_trades",
+            "number_of_short_trades_closed",
+            "number_of_winning_short_trades",
+            "number_of_losing_short_trades",
+            "short_win_rate",
             "win_rate",
             "current_win_rate",
             "win_loss_ratio",
@@ -605,12 +692,7 @@ def create_backtest_metrics(
         ]
 
     backtest_metrics = BacktestMetrics(
-        backtest_start_date=backtest_run.backtest_start_date,
-        backtest_end_date=backtest_run.backtest_end_date,
-        backtest_date_range_name=(
-            backtest_run.backtest_date_range_name or ""
-        ),
-        trading_symbol=backtest_run.trading_symbol or "",
+        backtest_window=backtest_run.backtest_window,
         initial_unallocated=backtest_run.initial_unallocated or 0.0,
     )
 
@@ -763,15 +845,25 @@ def create_backtest_metrics(
         except OperationalException as e:
             logger.warning(f"current_average_trade_loss failed: {e}")
 
-    safe_set("number_of_positive_trades", get_positive_trades, backtest_run.trades)
+    safe_set("number_of_positive_trades", get_positive_trades, backtest_run.trades, index=0)
     safe_set("percentage_positive_trades", get_positive_trades, backtest_run.trades, index=1)
-    safe_set("number_of_negative_trades", get_negative_trades, backtest_run.trades)
+    safe_set("number_of_negative_trades", get_negative_trades, backtest_run.trades, index=0)
     safe_set("percentage_negative_trades", get_negative_trades, backtest_run.trades, index=1)
     safe_set("median_trade_return", get_median_trade_return, backtest_run.trades, index=0)
     safe_set("median_trade_return_percentage", get_median_trade_return, backtest_run.trades, index=1)
     safe_set("number_of_trades", get_number_of_trades, backtest_run.trades)
     safe_set("number_of_trades_closed", get_number_of_closed_trades, backtest_run.trades)
     safe_set("number_of_trades_opened", get_number_of_open_trades, backtest_run.trades)
+    directional_statistics = get_directional_trade_statistics(
+        backtest_run.trades
+    )
+    for metric_name, value in directional_statistics.items():
+        if metric_name in metrics:
+            setattr(backtest_metrics, metric_name, value)
+    mae_mfe_statistics = get_trade_mae_mfe_statistics(backtest_run.trades)
+    for metric_name, value in mae_mfe_statistics.items():
+        if metric_name in metrics:
+            setattr(backtest_metrics, metric_name, value)
     safe_set("average_trade_duration", get_average_trade_duration, backtest_run.trades)
     safe_set("average_win_duration", get_average_win_duration, backtest_run.trades)
     safe_set("average_loss_duration", get_average_loss_duration, backtest_run.trades)
@@ -782,12 +874,14 @@ def create_backtest_metrics(
     safe_set("sharpe_ratio", get_sharpe_ratio, backtest_run.portfolio_snapshots, risk_free_rate)
     safe_set("rolling_sharpe_ratio", get_rolling_sharpe_ratio, backtest_run.portfolio_snapshots, risk_free_rate)
     safe_set("sortino_ratio", get_sortino_ratio, backtest_run.portfolio_snapshots, risk_free_rate)
+    safe_set("omega_ratio", get_omega_ratio, backtest_run.portfolio_snapshots)
     safe_set("profit_factor", get_profit_factor, backtest_run.trades)
     safe_set("calmar_ratio", get_calmar_ratio, backtest_run.portfolio_snapshots)
     safe_set("annual_volatility", get_annual_volatility, backtest_run.portfolio_snapshots)
     safe_set("monthly_returns", get_monthly_returns, backtest_run.portfolio_snapshots)
     safe_set("yearly_returns", get_yearly_returns, backtest_run.portfolio_snapshots)
     safe_set("drawdown_series", get_drawdown_series, backtest_run.portfolio_snapshots)
+    safe_set("ulcer_index", get_ulcer_index, backtest_run.portfolio_snapshots)
     safe_set("max_drawdown", get_max_drawdown, backtest_run.portfolio_snapshots)
     safe_set("max_drawdown_absolute", get_max_drawdown_absolute, backtest_run.portfolio_snapshots)
     safe_set("max_daily_drawdown", get_max_daily_drawdown, backtest_run.portfolio_snapshots)

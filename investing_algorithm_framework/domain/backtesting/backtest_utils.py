@@ -39,7 +39,7 @@ def resolve_backtest_path(
 ) -> Optional[str]:
     """Return the on-disk path for a stored backtest, or ``None``.
 
-    Prefers ``<storage>/<algorithm_id>.iafbt`` (issue #487 bundle
+    Prefers ``<storage>/<algorithm_id>.obtf`` (issue #487 bundle
     format) and falls back to the legacy directory at
     ``<storage>/<algorithm_id>``.
     """
@@ -117,7 +117,7 @@ def save_backtests_to_directory(
         show_progress (bool, optional): Whether to display a progress bar
             while saving backtests. Defaults to False.
         format: Persistence layout. ``"bundle"`` (default, issue #487)
-            writes one ``.iafbt`` file per backtest. ``"directory"``
+            writes one ``.obtf`` file per backtest. ``"directory"``
             keeps the legacy human-readable per-file JSON layout.
         workers: Process pool size for parallel saves. Only used in
             ``bundle`` mode. Defaults to ``min(8, os.cpu_count())``.
@@ -344,7 +344,7 @@ def load_backtests_from_directory(
     """
     Loads Backtest objects from the specified directory.
 
-    Auto-detects each entry: ``.iafbt`` bundle files (issue #487) and
+    Auto-detects each entry: ``.obtf`` bundle files (issue #487) and
     legacy backtest directories are both supported and may coexist in
     the same parent directory.
 
@@ -550,19 +550,27 @@ def iter_backtests_from_directory(
 # ---------------------------------------------------------------------------
 
 
-def _backtest_to_index_row(bt: Backtest, bundle_path: Optional[str] = None):
-    """Flatten a backtest's summary + identity into a single row.
+def _backtest_to_index_rows(
+    bt: Backtest, bundle_path: Optional[str] = None,
+):
+    """Flatten a backtest's per-engine summary + identity into rows.
 
-    Thin wrapper around :meth:`Backtest.index_row` for callers that
-    want the legacy flat dict shape (Parquet / SQL columns). The
-    typed :class:`BacktestIndexRow` is the authoritative contract \u2014
-    see ``docs/design/tiered-backtest-storage.md`` \u00a73.1.
+    Thin wrapper around :meth:`Backtest.index_rows` for callers that
+    want the legacy flat dict shape (Parquet / SQL columns). Returns
+    one row per populated engine — vector first, then event. The
+    typed :class:`BacktestIndexRow` is the authoritative contract —
+    see ``docs/architecture/backtest/tiered-backtest-storage.md`` §3.1
+    and the v9.0 dual-engine design doc §6.
     """
-    return bt.index_row(bundle_path=bundle_path).to_flat_dict()
+    return [
+        row.to_flat_dict()
+        for row in bt.index_rows(bundle_path=bundle_path)
+    ]
 
 
 def _write_index(directory_path: Union[str, Path], backtests: List[Backtest]):
-    """Write ``<directory_path>/index.parquet`` with one row per backtest.
+    """Write ``<directory_path>/index.parquet`` with one row per
+    (backtest, engine) pair.
 
     Uses pandas + pyarrow. Failures are non-fatal — the caller logs them.
     """
@@ -572,7 +580,7 @@ def _write_index(directory_path: Union[str, Path], backtests: List[Backtest]):
     for bt in backtests:
         base = getattr(bt, "algorithm_id", None) or "backtest"
         rel = f"{base}{BUNDLE_EXT}"
-        rows.append(_backtest_to_index_row(bt, bundle_path=rel))
+        rows.extend(_backtest_to_index_rows(bt, bundle_path=rel))
 
     df = pd.DataFrame(rows)
     target = Path(directory_path) / "index.parquet"
@@ -680,7 +688,7 @@ def _migrate_one(args):
         ohlcv_store=ohlcv_store,
     ))
     rel = os.path.basename(out)
-    row = _backtest_to_index_row(bt, bundle_path=rel)
+    rows = _backtest_to_index_rows(bt, bundle_path=rel)
     # Drop the heavy backtest before returning so the worker process's
     # RSS can be reclaimed before it picks up the next task.
     del bt
@@ -693,7 +701,7 @@ def _migrate_one(args):
                 os.remove(src)
             except OSError:
                 pass
-    return out, row
+    return out, rows
 
 
 def migrate_backtests(
@@ -708,7 +716,7 @@ def migrate_backtests(
     delete_source: bool = False,
 ) -> int:
     """Rewrite a directory of legacy backtest folders (or existing
-    ``.iafbt`` bundles) as ``.iafbt`` bundles in *dst_dir*.
+    ``.obtf`` bundles) as ``.obtf`` bundles in *dst_dir*.
 
     The migration is streamed: each backtest is loaded and re-saved
     inside a single worker process, so memory usage stays roughly
@@ -716,7 +724,7 @@ def migrate_backtests(
 
     Args:
         src_dir: Source directory containing legacy backtest folders
-            and/or ``.iafbt`` bundles. Walked recursively.
+            and/or ``.obtf`` bundles. Walked recursively.
         dst_dir: Destination directory. Created if it does not exist.
         workers: Number of parallel workers. ``None`` picks
             ``min(8, cpu_count)``. Pass ``1`` to force serial.
@@ -739,7 +747,7 @@ def migrate_backtests(
     dst_dir = Path(dst_dir)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
-    # Discover sources: any *.iafbt file or any directory shaped like
+    # Discover sources: any *.obtf file or any directory shaped like
     # a legacy backtest (algorithm_id.json + runs/).
     sources: List[str] = []
     for root, dirs, files in os.walk(src_dir):
@@ -748,10 +756,19 @@ def migrate_backtests(
                 sources.append(os.path.join(root, fname))
         for dname in list(dirs):
             d = os.path.join(root, dname)
-            if (
-                os.path.isfile(os.path.join(d, "algorithm_id.json"))
-                and os.path.isdir(os.path.join(d, "runs"))
-            ):
+            # A backtest directory is identified by algorithm_id.json
+            # plus at least one runs slot. v9.0 writes per-engine
+            # slots (``vector_runs/`` / ``event_runs/``); legacy v8
+            # layout used a single ``runs/`` directory.
+            has_id = os.path.isfile(
+                os.path.join(d, "algorithm_id.json")
+            )
+            has_runs = (
+                os.path.isdir(os.path.join(d, "runs"))
+                or os.path.isdir(os.path.join(d, "vector_runs"))
+                or os.path.isdir(os.path.join(d, "event_runs"))
+            )
+            if has_id and has_runs:
                 sources.append(d)
                 # Don't descend into a recognised backtest dir.
                 dirs.remove(dname)
@@ -814,9 +831,9 @@ def migrate_backtests(
                     for fut in done_set:
                         args = inflight.pop(fut)
                         try:
-                            _out, row = fut.result()
+                            _out, new_rows = fut.result()
                             if write_index:
-                                rows.append(row)
+                                rows.extend(new_rows)
                         except Exception as e:
                             logger.error(
                                 f"Failed to migrate {args[0]}: {e}"
@@ -831,9 +848,9 @@ def migrate_backtests(
         else:
             for args in plan:
                 try:
-                    _out, row = _migrate_one(args)
+                    _out, new_rows = _migrate_one(args)
                     if write_index:
-                        rows.append(row)
+                        rows.extend(new_rows)
                 except Exception as e:
                     logger.error(f"Failed to migrate {args[0]}: {e}")
                 finally:

@@ -4,7 +4,7 @@ This tutorial demonstrates main capabilities of the **Investing Algorithm Framew
 through a series of Jupyter notebooks. Each notebook focuses on a specific aspect of
 the framework, from data handling to advanced backtesting and analysis.
 
-> **Note**: This tutorial only showcases a subset of the framework's capabilities. Advanced features like cross-sectional pipelines can be explored in the [advanced tutorials](../advanced_tutorial/README.md).
+> **Note**: This tutorial only showcases a subset of the framework's capabilities. Advanced features like cross-sectional pipelines can be explored in the [advanced tutorials](../advanced_tutorials/cross-sectional-pipelines/README.md).
 >
 > **Note**: This tutorial uses the Bitvavo exchange with EUR as the trading symbol.
 > You can adapt the examples to other exchanges and symbols supported by the framework.
@@ -39,16 +39,16 @@ tutorial/
 ├── notebooks/                         # Tutorial notebooks (start here!)
 │   ├── 01_data_exploration.ipynb      # Data download and validation
 │   ├── 02_strategy_visualization.ipynb # Strategy logic visualization
-│   ├── 03_param_sweep.ipynb           # Parameter optimization
-│   ├── 04_backtest_optimized.ipynb    # Optimized strategy testing
-│   ├── 05_event_backtest.ipynb        # Event-based backtesting
+│   ├── 03_in_sample_param_sweep.ipynb           # In-sample parameter optimization
+│   ├── 04_out_sample_vector_backtest.ipynb    # Out-of-sample vector backtesting
+│   ├── 05_event_backtest.ipynb        # Out-of-sample event-based backtesting
 │   ├── 06_robustness_analysis.ipynb   # Robustness and validation
 │   └── 07_final_analysis.ipynb        # Final results and reporting
 ├── strategies/                        # Strategy implementations
-│   └── supertrend_ema_confirmation/      # Example strategy
+│   └── supertrend_ema_confirmation/   # Example strategy (v9 signal API)
 ├── data/                              # Downloaded market data
-├── backtests/                         # Backtest results storage
-└── resources/                         # Additional resources
+├── backtest_results/                  # Backtest results storage
+└── reports/                           # Generated reports / figures
 ```
 
 ## 🔧 Prerequisites
@@ -275,6 +275,23 @@ print(table)
 
 ## 🔑 Key Framework Features
 
+### Strategy API (v9)
+
+Strategies declare **what** to do; the framework handles **how much**
+and **how**. The example `SupertrendEmaConfirmationStrategy` implements
+both signal methods so it works in either backtest mode:
+
+| Method | Used by | Returns |
+|--------|---------|---------|
+| `generate_signals(context, data)` | event backtest / live | one or more `Signal(symbol, side, ...)` for the latest bar |
+| `generate_signal_series(data)` | vector backtest | one `SignalSeries` per `(symbol, side)` covering the whole window |
+
+Sizing lives on the class as a list of `PositionSize` rules
+(`percentage_of_portfolio=...` or `fixed_amount=...`). Risk attachments
+(`StopLossRule`, `TakeProfitRule`, `ScalingRule`, `CooldownRule`) attach
+to orders automatically. See `docs/architecture/strategy.md` for the
+full contract.
+
 ### Data Management
 | Function | Description |
 |----------|-------------|
@@ -324,10 +341,10 @@ After completing this tutorial:
 ### Additional Resources
 
 - **Documentation**: See `docusaurus/docs/` for full documentation
-- **Example Strategies**: See `examples/example_strategies/`
+- **Example Strategies**: See `examples/strategies_showcase/`
 - **Advanced Topics**:
-  - `docs/Advanced Concepts/vector-backtesting.md`
-  - `docs/Advanced Concepts/PARALLEL_PROCESSING_GUIDE.md`
+  - `docusaurus/docs/Advanced Concepts/vector-backtesting.md`
+  - `docusaurus/docs/Advanced Concepts/PARALLEL_PROCESSING_GUIDE.md`
 
 ## 📧 Support
 

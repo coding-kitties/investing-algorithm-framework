@@ -97,7 +97,8 @@ class TradeService(RepositoryService):
         position_repository,
         portfolio_repository,
         configuration_service,
-        trade_allocation_repository
+        trade_allocation_repository,
+        trade_hook_dispatcher=None
     ):
         super(TradeService, self).__init__(trade_repository)
         self.order_repository = order_repository
@@ -107,47 +108,292 @@ class TradeService(RepositoryService):
         self.trade_stop_loss_repository = trade_stop_loss_repository
         self.trade_take_profit_repository = trade_take_profit_repository
         self.trade_allocation_repository = trade_allocation_repository
+        self.trade_hook_dispatcher = trade_hook_dispatcher
 
-    def create_trade_from_buy_order(self, buy_order) -> Union[Trade, None]:
+    def _dispatch_trade_hook(self, hook_name, trade):
+        """Best-effort notify the owning strategy of a trade-lifecycle
+        event. No-op when no dispatcher is wired or no hook is active.
         """
-        Function to create a trade from a buy order. If the given buy
-        order has its status set to CANCELED, EXPIRED, or REJECTED,
-        the trade object will not be created. If the given buy
-        order has its status set to CLOSED or OPEN, the trade object
-        will be created. The amount will be set to the filled amount.
+        if self.trade_hook_dispatcher is not None and trade is not None:
+            self.trade_hook_dispatcher.dispatch(hook_name, trade)
+
+    def create_trade_at_fill(
+        self, buy_order, fill_amount, fill_price, opened_at
+    ) -> Union[Trade, None]:
+        """
+        Create a Trade row for a single fill event on a buy order.
+
+        v9.0 (#431) — trades are no longer created eagerly when a buy
+        order is placed. Instead, ``OrderService.update`` calls this
+        method for every positive ``filled_difference`` it observes,
+        producing one Trade per fill event. The position aggregates
+        these trades.
+
+        Any pending stop-loss / take-profit rules queued on the
+        ``buy_order.metadata`` (via :meth:`Order.add_pending_stop_loss`
+        / :meth:`Order.add_pending_take_profit`) are materialized onto
+        the new trade before it is returned.
 
         Args:
-            buy_order: Order object representing the buy order
+            buy_order: The BUY order being filled.
+            fill_amount: Amount filled in this fill event.
+            fill_price: Execution price for this fill event.
+            opened_at: Datetime when the fill occurred.
 
         Returns:
-            Union[Trade, None] Representing the created trade object or None
+            Trade: The newly created trade, or ``None`` if the fill
+            amount is non-positive or the order is in a terminal
+            non-fillable state.
         """
+        if buy_order.status in (
+            OrderStatus.CANCELED.value,
+            OrderStatus.EXPIRED.value,
+            OrderStatus.REJECTED.value,
+        ):
+            return None
 
-        if buy_order.status in \
-                [
-                    OrderStatus.CANCELED.value,
-                    OrderStatus.EXPIRED.value,
-                    OrderStatus.REJECTED.value
-                ]:
+        if fill_amount is None or fill_amount <= 0:
             return None
 
         data = {
             "buy_order": buy_order,
             "target_symbol": buy_order.target_symbol,
             "trading_symbol": buy_order.trading_symbol,
-            "amount": buy_order.get_amount(),
-            "available_amount": buy_order.get_filled(),
-            "filled_amount": buy_order.get_filled(),
-            "remaining": buy_order.get_remaining(),
-            "opened_at": buy_order.created_at,
-            "cost": buy_order.get_filled() * buy_order.price
+            "amount": fill_amount,
+            "available_amount": fill_amount,
+            "filled_amount": fill_amount,
+            "remaining": 0,
+            "opened_at": opened_at,
+            "cost": fill_amount * fill_price,
+            "status": TradeStatus.OPEN.value,
         }
+        strategy_id = (buy_order.metadata or {}).get("strategy_id")
+        if strategy_id is not None:
+            data["metadata"] = {"strategy_id": strategy_id}
 
-        if buy_order.get_filled() > 0:
-            data["status"] = TradeStatus.OPEN.value
-            data["cost"] = buy_order.filled * buy_order.price
+        trade = self.create(data)
 
-        return self.create(data)
+        # The SQL Trade constructor pulls ``open_price`` from
+        # ``buy_order.price``; force it to the fill price for this
+        # specific fill so partial fills at different prices remain
+        # accurate.
+        if trade.open_price != fill_price:
+            trade = self.update(trade.id, {"open_price": fill_price})
+
+        # Materialize any pending stop-loss / take-profit rules queued
+        # on the buy order onto this freshly created trade.
+        for spec in buy_order.pending_stop_losses:
+            self.add_stop_loss(
+                trade,
+                percentage=spec["percentage"],
+                trailing=spec.get("trailing", False),
+                sell_percentage=spec.get("sell_percentage", 100),
+                created_at=opened_at,
+            )
+
+        for spec in buy_order.pending_take_profits:
+            self.add_take_profit(
+                trade,
+                percentage=spec["percentage"],
+                trailing=spec.get("trailing", False),
+                sell_percentage=spec.get("sell_percentage", 100),
+                created_at=opened_at,
+            )
+
+        self._dispatch_trade_hook("on_trade_created", trade)
+        self._dispatch_trade_hook("on_trade_opened", trade)
+        return trade
+
+    # ------------------------------------------------------------------
+    # #434 phase 2 — SHORT / COVER trade lifecycle.
+    #
+    # Mirrors the v9.0 long-side flow:
+    #   - ``create_short_trade_at_fill`` is the SHORT analog of
+    #     ``create_trade_at_fill``; it opens a Trade with ``is_short``
+    #     set so per-bar reprice and net_gain math invert correctly.
+    #   - ``close_short_trade_with_filled_cover_order`` is the COVER
+    #     analog of ``update_trade_with_filled_sell_order`` but takes
+    #     the simpler direct-update path (no TradeAllocation rows in
+    #     phase 2; stop-loss / take-profit on shorts arrives in a
+    #     later phase).
+    # ------------------------------------------------------------------
+
+    def create_short_trade_at_fill(
+        self, short_order, fill_amount, fill_price, opened_at
+    ) -> Union[Trade, None]:
+        """Create a SHORT trade for a single fill event on a short
+        order. Mirrors :py:meth:`create_trade_at_fill` but flips the
+        direction and tags the trade with ``is_short=True``.
+        """
+        if short_order.status in (
+            OrderStatus.CANCELED.value,
+            OrderStatus.EXPIRED.value,
+            OrderStatus.REJECTED.value,
+        ):
+            return None
+
+        if fill_amount is None or fill_amount <= 0:
+            return None
+
+        # Cost for a short trade is the proceeds at entry (notional).
+        # This mirrors the vector engine (#433) so net_gain math stays
+        # symmetric across engines.
+        cost = fill_amount * fill_price
+        data = {
+            "buy_order": short_order,
+            "target_symbol": short_order.target_symbol,
+            "trading_symbol": short_order.trading_symbol,
+            "amount": fill_amount,
+            "available_amount": fill_amount,
+            "filled_amount": fill_amount,
+            "remaining": 0,
+            "opened_at": opened_at,
+            "cost": cost,
+            "status": TradeStatus.OPEN.value,
+            "is_short": True,
+        }
+        strategy_id = (short_order.metadata or {}).get("strategy_id")
+        if strategy_id is not None:
+            data["metadata"] = {"strategy_id": strategy_id}
+
+        trade = self.create(data)
+
+        # The SQL Trade constructor pulls ``open_price`` from
+        # ``short_order.price``; force it to the fill price for this
+        # specific fill so partial fills at different prices remain
+        # accurate.
+        if trade.open_price != fill_price:
+            trade = self.update(trade.id, {"open_price": fill_price})
+
+        # #434 phase 3 — materialize any pending stop-loss /
+        # take-profit rules queued on the short order onto this new
+        # short trade. ``add_stop_loss`` / ``add_take_profit`` copy
+        # ``trade.is_short`` into the created SL/TP so the trigger
+        # math inverts correctly.
+        for spec in getattr(short_order, "pending_stop_losses", []) or []:
+            self.add_stop_loss(
+                trade,
+                percentage=spec["percentage"],
+                trailing=spec.get("trailing", False),
+                sell_percentage=spec.get("sell_percentage", 100),
+                created_at=opened_at,
+            )
+
+        for spec in getattr(short_order, "pending_take_profits", []) or []:
+            self.add_take_profit(
+                trade,
+                percentage=spec["percentage"],
+                trailing=spec.get("trailing", False),
+                sell_percentage=spec.get("sell_percentage", 100),
+                created_at=opened_at,
+            )
+
+        self._dispatch_trade_hook("on_trade_created", trade)
+        self._dispatch_trade_hook("on_trade_opened", trade)
+        return trade
+
+    def close_short_trade_with_filled_cover_order(
+        self, filled_difference, cover_order
+    ):
+        """Close (or partially close) one or more open SHORT trades on
+        the target symbol with the filled portion of a COVER order.
+
+        Uses FIFO across open short trades for the symbol/portfolio.
+        Realizes ``net_gain = (open_price - fill_price) * portion`` per
+        trade — inverse of the long path — and closes the trade when
+        ``available_amount`` reaches zero. Skips ``TradeAllocation``
+        bookkeeping in phase 2 (stop-loss / take-profit on shorts is
+        a later phase).
+        """
+        if filled_difference is None or filled_difference <= 0:
+            return
+
+        position = self.position_repository.get(cover_order.position_id)
+        # #434 phase 3 — honour an explicit trade allocation stashed
+        # by the order service (e.g. from a SL/TP-triggered COVER).
+        # The hint is a list of ``{"trade_id": int, "amount": float}``
+        # dicts. When present, allocate to those trades first
+        # (preserving order); fall through to FIFO if it doesn't
+        # absorb the entire fill.
+        explicit_allocations = (cover_order.metadata or {}).get(
+            "_cover_trade_allocations"
+        )
+        # Find all open short trades for this position's symbol
+        # belonging to the same portfolio.
+        candidate_trades = self.get_all(
+            {
+                "target_symbol": cover_order.target_symbol,
+                "trading_symbol": cover_order.trading_symbol,
+                "portfolio_id": position.portfolio_id,
+                "status": TradeStatus.OPEN.value,
+            }
+        )
+        short_trades = [t for t in candidate_trades if t.is_short]
+        # FIFO: oldest opened first.
+        short_trades.sort(key=lambda t: t.opened_at)
+
+        if explicit_allocations:
+            # Stable reorder: requested trade_ids first (preserving the
+            # caller-supplied order), all others (FIFO) appended.
+            requested_ids = [
+                a["trade_id"] for a in explicit_allocations
+                if a.get("trade_id") is not None
+            ]
+            by_id = {t.id: t for t in short_trades}
+            head = [by_id[i] for i in requested_ids if i in by_id]
+            tail = [t for t in short_trades if t.id not in set(requested_ids)]
+            short_trades = head + tail
+
+        remaining = filled_difference
+        fill_price = cover_order.get_price()
+        closed_at = cover_order.updated_at or cover_order.created_at
+        # Re-fetch a local handle so attaching it to the trade's
+        # session in ``add_order_to_trade`` does not detach the
+        # caller's reference (which the order_service.update flow
+        # still needs to read ``status`` from).
+        cover_order_id = cover_order.get_id()
+
+        for trade in short_trades:
+            if remaining <= 0:
+                break
+
+            available = trade.available_amount or 0
+            if available <= 0:
+                continue
+
+            portion = min(available, remaining)
+            # Inverse of the long path: short gains when fill < open.
+            net_gain_contribution = (
+                trade.open_price - fill_price
+            ) * portion
+
+            new_available = available - portion
+            new_net_gain = (trade.net_gain or 0) + net_gain_contribution
+
+            updates = {
+                "available_amount": new_available,
+                "net_gain": new_net_gain,
+                "updated_at": closed_at,
+            }
+            if new_available <= 0:
+                updates["status"] = TradeStatus.CLOSED.value
+                updates["closed_at"] = closed_at
+
+            self.update(trade.id, updates)
+            if self.trade_hook_dispatcher is not None:
+                updated_trade = self.get(trade.id)
+                if updates.get("status") == TradeStatus.CLOSED.value:
+                    self._dispatch_trade_hook(
+                        "on_trade_closed", updated_trade
+                    )
+                else:
+                    self._dispatch_trade_hook(
+                        "on_trade_updated", updated_trade
+                    )
+            local_cover_order = self.order_repository.get(cover_order_id)
+            self.repository.add_order_to_trade(trade, local_cover_order)
+
+            remaining -= portion
 
     def _allocate_sell_to_trade(
         self, trade_id, sell_order, amount_to_close
@@ -171,6 +417,13 @@ class TradeService(RepositoryService):
         trade = self.get(trade_id)
         open_price = trade.open_price
         sell_price = sell_order.price
+        # v9.0 (#431) — STOP SELL orders carry no ``price`` until they
+        # trigger and fill. Fall back to ``stop_price`` for the initial
+        # allocation accounting so reservation succeeds; the eventual
+        # fill-time sync will overwrite trade state with the real
+        # execution price.
+        if sell_price is None or sell_price == 0:
+            sell_price = sell_order.stop_price or 0
         sell_order_id = sell_order.id
         sell_updated_at = sell_order.updated_at
         current_available = trade.available_amount
@@ -222,6 +475,12 @@ class TradeService(RepositoryService):
             update_data["closed_at"] = sell_updated_at
 
         self.update(trade_id, update_data)
+        if self.trade_hook_dispatcher is not None:
+            updated_trade = self.get(trade_id)
+            if update_data.get("status") == TradeStatus.CLOSED.value:
+                self._dispatch_trade_hook("on_trade_closed", updated_trade)
+            else:
+                self._dispatch_trade_hook("on_trade_updated", updated_trade)
         return allocation
 
     def _create_trade_allocations_fifo(self, sell_order):
@@ -351,18 +610,39 @@ class TradeService(RepositoryService):
             for stop_loss in stop_losses:
 
                 if stop_loss.active:
+                    prev_price = stop_loss.stop_loss_price
                     stop_loss.update_with_last_reported_price(
                         data["last_reported_price"], last_reported_price_date
                     )
                     to_be_saved_stop_losses.append(stop_loss)
 
+                    if (
+                        self.trade_hook_dispatcher is not None
+                        and stop_loss.stop_loss_price != prev_price
+                    ):
+                        hook_name = (
+                            "on_trade_trailing_stop_loss_updated"
+                            if stop_loss.trailing
+                            else "on_trade_stop_loss_updated"
+                        )
+                        self._dispatch_trade_hook(hook_name, trade)
+
             for take_profit in take_profits:
 
                 if take_profit.active:
+                    prev_price = take_profit.take_profit_price
                     take_profit.update_with_last_reported_price(
                         data["last_reported_price"], last_reported_price_date
                     )
                     to_be_saved_take_profits.append(take_profit)
+
+                    if (
+                        self.trade_hook_dispatcher is not None
+                        and take_profit.take_profit_price != prev_price
+                    ):
+                        self._dispatch_trade_hook(
+                            "on_trade_take_profit_updated", trade
+                        )
 
             self.trade_stop_loss_repository\
                 .save_objects(to_be_saved_stop_losses)
@@ -421,6 +701,12 @@ class TradeService(RepositoryService):
         """
         sell_order_id = sell_order.id
         sell_price = sell_order.price
+        # v9.0 (#431) — STOP SELL orders carry no ``price`` until they
+        # trigger and fill. Fall back to ``stop_price`` so portfolio
+        # revenue/cost accounting succeeds; the eventual fill-time
+        # sync will replace these estimates with real values.
+        if sell_price is None or sell_price == 0:
+            sell_price = sell_order.stop_price or 0
         sell_amount = sell_order.amount
 
         if (trades is None or len(trades) == 0) \
@@ -578,71 +864,6 @@ class TradeService(RepositoryService):
         self.portfolio_repository.save(portfolio)
         return trade
 
-    def update_trade_with_buy_order(
-        self, filled_difference, buy_order
-    ) -> Trade:
-        """
-        Function to update a trade from a buy order. This function
-        checks if a trade exists for the buy order. If the given buy
-        order has its status set to CANCLED, EXPIRED, or REJECTED, the
-        trade will object will be removed. If the given buy order has
-        its status set to CLOSED or OPEN, the amount and
-        remaining of the trade object will be updated.
-
-        Args:
-            filled_difference: float representing the difference between the
-                filled amount of the buy order and the filled amount
-                of the trade
-            buy_order: Order object representing the buy order
-
-        Returns:
-            Trade object
-        """
-        trade = self.find({"buy_order": buy_order.id})
-        filled = buy_order.get_filled()
-        amount = buy_order.get_amount()
-
-        if filled is None:
-            filled = trade.filled_amount + filled_difference
-
-        remaining = buy_order.get_remaining()
-
-        if remaining is None:
-            remaining = trade.remaining - filled_difference
-
-        if trade is None:
-            raise OperationalException(
-                "Trade does not exist for buy order."
-            )
-
-        status = buy_order.get_status()
-
-        if status in \
-                [
-                    OrderStatus.CANCELED.value,
-                    OrderStatus.EXPIRED.value,
-                    OrderStatus.REJECTED.value
-                ]:
-            return self.delete(trade.id)
-
-        trade = self.find({"order_id": buy_order.id})
-        updated_data = {
-            "available_amount": trade.available_amount + filled_difference,
-            "filled_amount": filled,
-            "remaining": remaining,
-            "cost": trade.cost + filled_difference * buy_order.price
-        }
-
-        if amount != trade.amount:
-            updated_data["amount"] = amount
-            updated_data["cost"] = amount * buy_order.price
-
-        if filled_difference > 0:
-            updated_data["status"] = TradeStatus.OPEN.value
-
-        trade = self.update(trade.id, updated_data)
-        return trade
-
     def update_trade_with_filled_sell_order(
         self, filled_difference, sell_order
     ) -> Trade:
@@ -785,14 +1006,22 @@ class TradeService(RepositoryService):
 
     def add_stop_loss(
         self,
-        trade,
-        percentage: float,
+        trade=None,
+        percentage: float = None,
         trailing: bool = False,
         sell_percentage: float = 100,
-        created_at: datetime = None
+        created_at: datetime = None,
+        order=None,
     ) -> TradeStopLoss:
         """
-        Function to add a stop loss to a trade.
+        Function to add a stop loss to a trade or a pending buy order.
+
+        v9.0 (#431) — when ``order`` is supplied, the stop-loss spec
+        is queued on the buy order via
+        :meth:`Order.add_pending_stop_loss` and is materialized onto
+        each trade created when the order fills. This is the only way
+        to attach risk rules to a BUY order that has not yet filled,
+        because trades are no longer created eagerly at BUY creation.
 
         Example of fixed stop loss:
             * You buy BTC at $40,000.
@@ -808,7 +1037,8 @@ class TradeService(RepositoryService):
             * BTC price drops to $39,900 → SL level reached, trade closes.
 
         Args:
-            trade: Trade object representing the trade
+            trade: Trade object representing the trade. Mutually
+                exclusive with ``order``.
             percentage: float representing the percentage of the open price
                 that the stop loss should be set at
             trailing (bool): representing whether the stop loss is a
@@ -817,10 +1047,49 @@ class TradeService(RepositoryService):
                 that should be sold if the stop loss is triggered.
             created_at: datetime representing the creation date of the
                 stop loss. If None, the current datetime will be used.
+            order: Order object representing a BUY order. When
+                supplied, the spec is queued on the order and applied
+                to each trade materialized at fill time.
 
         Returns:
             None
         """
+        if order is not None and trade is not None:
+            raise OperationalException(
+                "add_stop_loss accepts either ``trade`` or ``order``, "
+                "not both."
+            )
+
+        if order is not None:
+            prev_updated_at = order.updated_at
+            order.add_pending_stop_loss(
+                percentage=percentage,
+                trailing=trailing,
+                sell_percentage=sell_percentage,
+            )
+            # Keep persisted JSON column in sync with the in-memory
+            # metadata dict — SQLAlchemy doesn't detect in-place dict
+            # mutations on the metadata attribute.
+            if hasattr(order, "metadata_json"):
+                import json as _json
+                order.metadata_json = _json.dumps(order.metadata)
+            # Preserve updated_at so backtest fill checks (which
+            # filter OHLCV by Datetime >= updated_at) still match
+            # historical bars after a metadata-only save (#434).
+            order.updated_at = prev_updated_at
+            try:
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(order, "updated_at")
+            except Exception:
+                pass
+            self.order_repository.save(order)
+            return None
+
+        if trade is None:
+            raise OperationalException(
+                "add_stop_loss requires either ``trade`` or ``order``."
+            )
+
         trade = self.get(trade.id)
 
         # Check if the sell percentage + the existing stop losses is
@@ -843,18 +1112,26 @@ class TradeService(RepositoryService):
             "total_amount_trade": trade.amount,
             "sell_percentage": sell_percentage,
             "active": True,
+            "is_short": bool(getattr(trade, "is_short", False)),
             "created_at": created_at if created_at is not None
             else datetime.now(tz=timezone.utc)
         }
-        return self.trade_stop_loss_repository.create(creation_data)
+        created = self.trade_stop_loss_repository.create(creation_data)
+        self._dispatch_trade_hook("on_trade_stop_loss_created", trade)
+        if trailing:
+            self._dispatch_trade_hook(
+                "on_trade_trailing_stop_loss_created", trade
+            )
+        return created
 
     def add_take_profit(
         self,
-        trade,
-        percentage: float,
+        trade=None,
+        percentage: float = None,
         trailing: bool = False,
         sell_percentage: float = 100,
-        created_at: datetime = None
+        created_at: datetime = None,
+        order=None,
     ) -> TradeTakeProfit:
         """
         Function to add a take profit to a trade. This function will add a
@@ -890,6 +1167,36 @@ class TradeService(RepositoryService):
         Returns:
             None
         """
+        if order is not None and trade is not None:
+            raise OperationalException(
+                "add_take_profit accepts either ``trade`` or ``order``, "
+                "not both."
+            )
+
+        if order is not None:
+            prev_updated_at = order.updated_at
+            order.add_pending_take_profit(
+                percentage=percentage,
+                trailing=trailing,
+                sell_percentage=sell_percentage,
+            )
+            if hasattr(order, "metadata_json"):
+                import json as _json
+                order.metadata_json = _json.dumps(order.metadata)
+            order.updated_at = prev_updated_at
+            try:
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(order, "updated_at")
+            except Exception:
+                pass
+            self.order_repository.save(order)
+            return None
+
+        if trade is None:
+            raise OperationalException(
+                "add_take_profit requires either ``trade`` or ``order``."
+            )
+
         trade = self.get(trade.id)
 
         # Check if the sell percentage + the existing stop losses is
@@ -911,10 +1218,13 @@ class TradeService(RepositoryService):
             "total_amount_trade": trade.amount,
             "sell_percentage": sell_percentage,
             "active": True,
+            "is_short": bool(getattr(trade, "is_short", False)),
             "created_at": created_at if created_at is not None
             else datetime.now(tz=timezone.utc)
         }
-        return self.trade_take_profit_repository.create(creation_data)
+        created = self.trade_take_profit_repository.create(creation_data)
+        self._dispatch_trade_hook("on_trade_take_profit_created", trade)
+        return created
 
     def get_triggered_stop_loss_orders(self):
         """
@@ -995,6 +1305,10 @@ class TradeService(RepositoryService):
                 "order_id": trade.orders[0].id
             })
             portfolio_id = position.portfolio_id
+            # #434 phase 3 — short trades close with COVER, longs
+            # with SELL.
+            close_side = OrderSide.COVER.value if trade.is_short \
+                else OrderSide.SELL.value
             sell_orders_data.append(
                 {
                     "target_symbol": trade.target_symbol,
@@ -1002,7 +1316,7 @@ class TradeService(RepositoryService):
                     "amount": order_amount,
                     "price": trade.last_reported_price,
                     "order_type": OrderType.LIMIT.value,
-                    "order_side": OrderSide.SELL.value,
+                    "order_side": close_side,
                     "portfolio_id": portfolio_id,
                     "metadata": {"order_reason": "stop_loss"},
                     "stop_losses": stop_loss_metadata,
@@ -1102,6 +1416,8 @@ class TradeService(RepositoryService):
                 "order_id": trade.orders[0].id
             })
             portfolio_id = position.portfolio_id
+            close_side = OrderSide.COVER.value if trade.is_short \
+                else OrderSide.SELL.value
             sell_orders_data.append(
                 {
                     "target_symbol": trade.target_symbol,
@@ -1109,7 +1425,7 @@ class TradeService(RepositoryService):
                     "amount": order_amount,
                     "price": trade.last_reported_price,
                     "order_type": OrderType.LIMIT.value,
-                    "order_side": OrderSide.SELL.value,
+                    "order_side": close_side,
                     "portfolio_id": portfolio_id,
                     "metadata": {"order_reason": "take_profit"},
                     "take_profits": take_profit_metadata,

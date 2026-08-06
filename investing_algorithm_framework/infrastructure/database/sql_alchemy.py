@@ -80,7 +80,47 @@ class SQLBaseModel(DeclarativeBase):
 
 
 def create_all_tables():
-    SQLBaseModel.metadata.create_all(bind=Session().bind)
+    bind = Session().bind
+    SQLBaseModel.metadata.create_all(bind=bind)
+    _apply_forward_only_migrations(bind)
+
+
+def _apply_forward_only_migrations(bind):
+    """
+    Tiny idempotent migration helper.
+
+    The framework has no Alembic; new tables come from
+    ``metadata.create_all`` but new *columns* on existing tables do not.
+    Live customer SQLite files therefore need an in-place ALTER for any
+    column we add post-1.0.
+
+    Each entry below is run once per startup, wrapped in try/except so
+    a column that already exists or a non-SQLite backend that handles
+    the change differently does not break boot.
+
+    Forward-only, additive, never destructive.
+    """
+    statements = [
+        # #433 — short selling support. ``is_short`` defaults to 0 so
+        # every existing long trade keeps its semantics.
+        "ALTER TABLE trades ADD COLUMN is_short BOOLEAN "
+        "NOT NULL DEFAULT 0",
+        # #434 phase 3 — SL/TP inversion for short trades. The
+        # ``is_short`` flag on stop-loss / take-profit rows tells the
+        # trigger logic to flip the price math.
+        "ALTER TABLE trade_stop_losses ADD COLUMN is_short BOOLEAN "
+        "NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_take_profits ADD COLUMN is_short BOOLEAN "
+        "NOT NULL DEFAULT 0",
+    ]
+    for stmt in statements:
+        try:
+            with bind.begin() as conn:
+                conn.exec_driver_sql(stmt)
+        except Exception:
+            # Column already exists, table missing, or non-SQLite
+            # dialect with different syntax — all benign at boot.
+            pass
 
 
 def teardown_sqlalchemy():

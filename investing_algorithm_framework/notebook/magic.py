@@ -300,12 +300,11 @@ class BacktestMagics(Magics):
                 --trading-symbol EUR -o results
 
             from investing_algorithm_framework import (
-                TradingStrategy, DataSource, TimeUnit
+                TradingStrategy, DataSource, Schedule, TimeUnit
             )
 
             class MyStrategy(TradingStrategy):
-                time_unit = TimeUnit.DAY
-                interval = 1
+                schedule = Schedule.every(1, TimeUnit.DAY)
                 data_sources = [
                     DataSource(
                         identifier="btc",

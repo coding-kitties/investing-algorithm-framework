@@ -30,7 +30,8 @@ from .win_rate import get_win_rate, get_win_loss_ratio, get_current_win_rate, \
     get_current_win_loss_ratio
 from .calmar_ratio import get_calmar_ratio
 from .generate import create_backtest_metrics, \
-    create_backtest_metrics_for_backtest, recalculate_backtests, \
+    create_backtest_metrics_for_backtest, \
+    recalculate_backtests, \
     recalculate_backtests_in_directory
 from .risk_free_rate import get_risk_free_rate_us
 from .trades import get_negative_trades, get_positive_trades, \
@@ -45,6 +46,9 @@ from .mean_daily_return import get_mean_daily_return, get_mean_yearly_return
 from .standard_deviation import get_daily_returns_std
 from .consistency import get_cv_consistency, get_normalized_stability, \
     get_consistency_score, get_stability_score
+from .omega_ratio import get_omega_ratio
+from .ulcer import get_ulcer_index
+from .mae_mfe import get_trade_mae_mfe_statistics
 
 __all__ = [
     "get_mean_daily_return",
@@ -124,5 +128,10 @@ __all__ = [
     "get_cv_consistency",
     "get_normalized_stability",
     "get_consistency_score",
-    "get_stability_score"
+    "get_stability_score",
+    "recalculate_backtests",
+    "recalculate_backtests_in_directory",
+    "get_omega_ratio",
+    "get_ulcer_index",
+    "get_trade_mae_mfe_statistics",
 ]

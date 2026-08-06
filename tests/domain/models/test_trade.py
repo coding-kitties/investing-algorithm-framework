@@ -46,6 +46,118 @@ class Test(TestCase):
         self.assertEqual(trade.amount, 1)
         self.assertEqual(trade.open_price, 10000)
 
+    def test_high_and_low_water_mark_tracking(self):
+        order = Order(
+            external_id="123",
+            target_symbol="BTC",
+            trading_symbol="EUR",
+            order_side="BUY",
+            order_type="LIMIT",
+            price=10000,
+            amount=1,
+            filled=1,
+            remaining=0,
+            status="OPEN",
+            created_at=datetime(2017, 8, 17, 12, 42, 48),
+        )
+        trade = Trade(
+            id=1,
+            orders=[order],
+            target_symbol="BTC",
+            trading_symbol="EUR",
+            amount=1,
+            available_amount=0,
+            filled_amount=0,
+            remaining=1,
+            open_price=10000,
+            opened_at=datetime(2023, 11, 29),
+            closed_at=None,
+            status="OPEN",
+            cost=10000,
+        )
+
+        self.assertIsNone(trade.high_water_mark)
+        self.assertIsNone(trade.low_water_mark)
+
+        t1 = datetime(2023, 11, 29, 1)
+        trade.update({
+            "last_reported_price": 11000,
+            "last_reported_price_datetime": t1,
+        })
+        self.assertEqual(trade.high_water_mark, 11000)
+        self.assertEqual(trade.high_water_mark_datetime, t1)
+        self.assertEqual(trade.low_water_mark, 11000)
+        self.assertEqual(trade.low_water_mark_datetime, t1)
+
+        t2 = datetime(2023, 11, 29, 2)
+        trade.update({
+            "last_reported_price": 9000,
+            "last_reported_price_datetime": t2,
+        })
+        # High water mark unchanged, low water mark drops.
+        self.assertEqual(trade.high_water_mark, 11000)
+        self.assertEqual(trade.low_water_mark, 9000)
+        self.assertEqual(trade.low_water_mark_datetime, t2)
+
+        t3 = datetime(2023, 11, 29, 3)
+        trade.update({
+            "last_reported_price": 12000,
+            "last_reported_price_datetime": t3,
+        })
+        self.assertEqual(trade.high_water_mark, 12000)
+        self.assertEqual(trade.high_water_mark_datetime, t3)
+        self.assertEqual(trade.low_water_mark, 9000)
+
+    def test_high_and_low_water_mark_survive_to_dict_from_dict(self):
+        order = Order(
+            external_id="123",
+            target_symbol="BTC",
+            trading_symbol="EUR",
+            order_side="BUY",
+            order_type="LIMIT",
+            price=10000,
+            amount=1,
+            filled=1,
+            remaining=0,
+            status="OPEN",
+            created_at=datetime(2017, 8, 17, 12, 42, 48),
+        )
+        trade = Trade(
+            id=1,
+            orders=[order],
+            target_symbol="BTC",
+            trading_symbol="EUR",
+            amount=1,
+            available_amount=0,
+            filled_amount=0,
+            remaining=1,
+            open_price=10000,
+            opened_at=datetime(2023, 11, 29),
+            closed_at=None,
+            status="OPEN",
+            cost=10000,
+        )
+        trade.update({
+            "last_reported_price": 11000,
+            "last_reported_price_datetime": datetime(2023, 11, 29, 1),
+        })
+        trade.update({
+            "last_reported_price": 9000,
+            "last_reported_price_datetime": datetime(2023, 11, 29, 2),
+        })
+
+        data = trade.to_dict()
+        self.assertEqual(data["high_water_mark"], 11000)
+        self.assertIsNotNone(data["high_water_mark_datetime"])
+        self.assertEqual(data["low_water_mark"], 9000)
+        self.assertIsNotNone(data["low_water_mark_datetime"])
+
+        rehydrated = Trade.from_dict(data)
+        self.assertEqual(rehydrated.high_water_mark, 11000)
+        self.assertEqual(rehydrated.low_water_mark, 9000)
+        self.assertIsNotNone(rehydrated.high_water_mark_datetime)
+        self.assertIsNotNone(rehydrated.low_water_mark_datetime)
+
     # def test_stop_loss_manual_with_dataframe(self):
     #     """
     #     Test for checking if stoplos function works on trade. The test uses

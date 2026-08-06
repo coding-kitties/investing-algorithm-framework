@@ -59,6 +59,14 @@
 
 ## Introduction
 
+> **v9.0.0 alpha is out!** The pre-release of v9.0 is now available on
+> PyPI as an alpha pre-release. Since pip doesn't install pre-releases by
+> default, pin the version explicitly or pass `--pre`:
+> ```bash
+> pip install investing-algorithm-framework==9.0.0a1
+> ```
+> You can find the blog post here: [v9.0 Release](docusaurus/blog/2026-08-02-v9.0-release.md).
+
 `Investing Algorithm Framework` is a Python framework that covers the entire quant workflow: define a strategy once, vector-backtest thousands of parameter variants to find promising signals, narrow down with a storage layer that ranks 10k+ results in milliseconds, validate the winners in a realistic event-driven simulation, compare everything in a single interactive HTML dashboard, and deploy the best performer live, all with the same `TradingStrategy` class, no code rewrites between stages.
 
 Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy variant is actually better, whether the result is robust across time windows, and how to go from research to production. This framework closes that gap.
@@ -67,29 +75,47 @@ Most quant frameworks stop at "here's your backtest result." You get a number, m
 
 <details open>
 <summary>
+  <strong>What's New in v9.0</strong>
+</summary> <br>
+
+Full details: [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md) · [CHANGELOG](CHANGELOG.md) · [OBTF spec](https://github.com/Quant-Commons/Open-Backtest-Format)
+
+- **New Open Backtest Format (.OBTF)**: OBTF packs studies, universes, windows, vector/event runs, summaries, metrics, trades, orders, positions, snapshots, execution assumptions and Monte Carlo tests into a single versioned `.obtf` file per algorithm (zstd + MessagePack + Parquet under the hood), so your results are portable, future-proof, and never scattered across folders again.
+- **Dual engine native**: vector and event engines now run as first-class citizens of every backtest, so you can sweep thousands of signal ideas and validate the winners under realistic execution *in the same bundle*, with zero risk of one engine's save wiping out the other's results. Now a .obtf bundle is a complete record of your vector and event backtests of a single strategy.
+- **Short and Long Signals support**: a couple of new methods (`generate_short_signals` / `generate_cover_signals`) are all it takes to unlock full short-selling: SHORT/COVER order routing, correct P&L and collateral handling, and fill-based trade creation across vector, event, and live trading.
+- **Enhanced Study definitions**: reusable `Study`, `Universe` and `BacktestWindow` building blocks give you rolling, anchored, holdout and walk-forward k-fold validation, cross-sectional pipelines, signal cooldowns, and Monte Carlo–backed ranking, so you can trust your edge before you trade it.
+- **Custom commision nd slippage models*: pluggable slippage and commission models (percentage, fixed, bps, volume-aware) snapshot every study's cost assumptions via `ExecutionConfig` and attribute fees down to the order and trade level, so your numbers hold up in the real world.
+- **State of the art backtest storage and indexings**: a swappable `BacktestStore`, SQLite indexing across engines, studies, universes and lineage, content-addressed OHLCV deduplication, and a full `iaf` CLI for migrating, indexing, ranking and pruning results, so a growing research pipeline never becomes a mess.
+- **See more, faster**: an expanded metrics suite (CAGR, Sharpe, Sortino, Calmar, VaR/CVaR, drawdown/recovery, benchmark comparisons) paired with per-engine, per-study HTML reports and pooled or per-universe summaries, so you spot the winning strategy at a glance.
+- **Portfolio sync operations**: recurring or one-off per-market deposit schedules, environment-based credential resolution make it easier to manage live portfolios.
+
+> ⚠️ **v9.0 is an alpha release** with breaking API and persisted-data changes from v8. Legacy readers and selected compatibility properties remain available to assist migration, but new output is written in the v9 OBTF model — validate strategy behavior, execution assumptions and stored backtests before adopting in production.
+
+</details>
+
+<details open>
+<summary>
   <strong>Features</strong>
 </summary> <br>
 
-- 📊 **[30+ Metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics)** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
-- 🧮 **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)** — Rank, filter and score entire universes of symbols every iteration with a tidy factor table
-- ⚡ **[Vector Backtesting for Signal Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)** — Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
-- 🏃 **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting)** — Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management
-- 🔀 **[Permutation Testing / Monte Carlo Simulations](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Assess the statistical robustness of your strategies by running them across randomized market scenarios to see how often your results could occur by chance
-- 🚀 **[Deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)** — Once the best strategy is identified through backtesting and comparison, deploy it to production locally or in the cloud (AWS Lambda / Azure Functions) to start live trading
-- ⚔️ **[Multi-Strategy Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Rank, filter & compare strategies in a single interactive report
-- 🪟 **[Multi-Window Robustness](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Test across different time periods with window coverage analysis
-- 📈 **[Equity & Drawdown Charts](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Overlay equity curves, rolling Sharpe, drawdown & return distributions
-- 🗓️ **[Monthly Heatmaps & Yearly Returns](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Calendar heatmap per strategy with return/growth toggles
-- 🎯 **[Return Scenario Projections](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Good, average, bad & very bad year projections from backtest data
-- 📉 **[Benchmark Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
-- 📄 **[One-Click HTML Report](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Self-contained file, no server, dark & light theme, shareable
-- 📦 **[Custom `.iafbt` Backtest Bundle Format](https://coding-kitties.github.io/investing-algorithm-framework/Data/backtest_data)** — An explicit, versioned, compressed, language-portable container (zstd + msgpack with magic-byte header) plus a separate parquet index for fast filtering without loading. ~21× smaller and ~27× fewer files than standard filebased directory layouts, with parallel I/O for fast load/save of large amounts of backtests.
-- 🗄️ **[Tiered Backtest Storage Layer](examples/storage_layer_demo/README.md)** — Manage thousands of `.iafbt` bundles with a Tier-1 SQLite index (sub-100 ms ranks/filters over 10k+ backtests), a swappable `BacktestStore` protocol (`LocalDirStore`, `LocalTieredStore`), content-addressed Tier-3 OHLCV deduplication, and a CLI (`iaf index` / `iaf list` / `iaf rank` / `iaf migrate-store`) that plugs straight into the HTML dashboard.
-- 🌐 **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
-- � **[Per-Market Deposit Schedules & Portfolio Sync](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/portfolio-sync)** — Declare recurring or one-shot external cash flows on a market with `deposit_schedule=` / `auto_sync=True`. Backtests simulate the deposits; live mode reconciles with the broker — same `context.sync_portfolio()` API in both modes.
+- 🔁 **Long & Short signals support for Live trading & Backtesting**: Build strategies as a pipeline of entry/exit signals, position sizing, and order generation, each independently overridable. Long-only by default; opt into shorts by overriding two methods. The same strategy class runs unchanged in vector backtests, event-driven backtests, and live.
+- 🗂️ **Open Backtest Format storage** — One `{algorithm_id}.ofbt` per algorithm holds every study (in-sample sweep, time-OOS, universe-OOS, walk-forward, stress test) as a first-class slot with its own universe, windows, engine runs and summary. See [Open-Backtest-Format](https://github.com/Quant-Commons/Open-Backtest-Format) for the reference spec.
+- 📊 **[30+ Metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics)**: CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
+- 🧮 **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)**: Rank, filter and score entire universes of symbols every iteration with a tidy factor table
+- ⚡ **[Vector Backtesting for Signal Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)**: Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
+- 🏃 **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting)**: Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management
+- 🔀 **[Permutation Testing / Monte Carlo Simulations](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Assess the statistical robustness of your strategies by running them across randomized market scenarios to see how often your results could occur by chance
+- 🚀 **[Deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)**: Once the best strategy is identified through backtesting and comparison, deploy it to production locally or in the cloud (AWS Lambda / Azure Functions) to start live trading
+- ⚔️ **[Multi-Strategy Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Rank, filter & compare strategies in a single interactive report
+- 🪟 **[Multi-Window Robustness](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Test across different time periods with window coverage analysis
+- 📈 **[Charts & Performance Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Equity curves, rolling Sharpe, drawdown & return distributions, monthly heatmaps, yearly returns, and good/average/bad/very-bad return scenario projections — all rendered side-by-side per strategy
+- 📉 **[Benchmark Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
+- 📄 **[One-Click HTML Report](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Self-contained file, no server, dark & light theme, shareable
+- 🗄️ **[Tiered Backtest Storage Layer](examples/storage_layer_demo/README.md)**: Manage thousands of `.obtf` bundles with a Tier-1 SQLite index (sub-100 ms ranks/filters over 10k+ backtests), a swappable `BacktestStore` protocol (`LocalDirStore`, `LocalTieredStore`), content-addressed Tier-3 OHLCV deduplication, and a CLI (`iaf index` / `iaf list` / `iaf rank` / `iaf migrate-store`) that plugs straight into the HTML dashboard.
+- 🌐 **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)**: Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
+- 🪙 **[Per-Market Deposit Schedules & Portfolio Sync](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/portfolio-sync)**: Declare recurring or one-shot external cash flows on a market with `deposit_schedule=` / `auto_sync=True`. Backtests simulate the deposits; live mode reconciles with the broker — same `context.sync_portfolio()` API in both modes.
 - 📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
 - ⏱️ **Signal Cooldowns**: Throttle whipsaw with declarative `CooldownRule`s: per-symbol or portfolio-wide, side-aware (`trigger="sell"`, `blocks="buy"`), enforced identically by the vector and event-driven engines
-- 🚀 **[Build → Backtest → Deploy](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
 
 </details>
 
@@ -168,6 +194,14 @@ class MyStrategy(TradingStrategy):
 
     def generate_sell_signals(self, data):
         ...
+
+    # Optional — opt in to short selling (vector + event engines, #433/#434).
+    # Override BOTH to enable; otherwise the engine stays long-only.
+    def generate_short_signals(self, data):
+        ...
+
+    def generate_cover_signals(self, data):
+        ...
 ```
 
 → [Strategy docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/strategies)
@@ -238,7 +272,7 @@ Every backtest produces a **self-contained HTML dashboard** — open it in any b
   </a>
 </p>
 
-Every backtest API — vector or event-driven — returns the same `Backtest` object, which the `BacktestReport` consumes directly. So whether you're iterating over an in-memory list or a folder of persisted `.iafbt` bundles, the path to the dashboard is the same:
+Every backtest API — vector or event-driven — returns the same `Backtest` object, which the `BacktestReport` consumes directly. So whether you're iterating over an in-memory list or a folder of persisted `.obtf` bundles, the path to the dashboard is the same:
 
 ```python
 from investing_algorithm_framework import BacktestReport
@@ -252,7 +286,7 @@ backtests = app.run_vector_backtests(
     strategies=[StrategyA(), StrategyB(), StrategyC()],
     backtest_date_ranges=[range_2022, range_2023, range_2024],
     n_workers=-1,
-    backtest_storage_directory="./my-backtests/",  # persists .iafbt bundles
+    backtest_storage_directory="./my-backtests/",  # persists .obtf bundles
     show_progress=True,
 )
 BacktestReport(backtests=backtests).save("sweep_report.html")
@@ -305,9 +339,9 @@ BacktestReport(backtests=winners).save("top25_by_sharpe.html")
   <strong>Backtest Storage Layer — scale to thousands of backtests</strong>
 </summary> <br>
 
-Once you start sweeping parameter grids and walk-forward windows, a flat folder of `.iafbt` bundles stops scaling: every comparison re-decodes multi-MB Parquet metric blobs just to read a Sharpe number. The storage layer fixes that with three tiers behind a single `BacktestStore` protocol:
+Once you start sweeping parameter grids and walk-forward windows, a flat folder of `.obtf` bundles stops scaling: every comparison re-decodes multi-MB Parquet metric blobs just to read a Sharpe number. The storage layer fixes that with three tiers behind a single `BacktestStore` protocol:
 
-- **Tier-1 — SQLite index (`index.sqlite`)**: one row per bundle with every scalar from `BacktestSummaryMetrics` promoted to its own column. Ranking 10k+ bundles becomes a sub-100 ms SQL query — no `.iafbt` is opened.
+- **Tier-1 — SQLite index (`index.sqlite`)**: one row per bundle with every scalar from `BacktestSummaryMetrics` promoted to its own column. Ranking 10k+ bundles becomes a sub-100 ms SQL query — no `.obtf` is opened.
 - **Tier-2 — `BacktestStore` adapters**: `LocalDirStore` (flat folder of bundles) or `LocalTieredStore` (hive-partitioned layout). Same handle-based API, swap the implementation without touching call sites.
 - **Tier-3 — content-addressed OHLCV chunks**: SHA-256 deduped per-symbol OHLCV blobs shared across every bundle that references them. `garbage_collect_ohlcv()` reclaims orphans.
 
@@ -324,7 +358,7 @@ from investing_algorithm_framework.services.backtest_store import (
     LocalDirStore,
 )
 
-# 1. Build (or refresh) the Tier-1 SQLite index over a folder of .iafbt bundles.
+# 1. Build (or refresh) the Tier-1 SQLite index over a folder of .obtf bundles.
 build_index("./my-backtests/")          # equivalent to: iaf index ./my-backtests/
 
 # 2. Pick the top 20 by Sharpe straight from SQLite — no Parquet decoded.
@@ -490,7 +524,7 @@ import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import (
-    TradingStrategy, DataSource, TimeUnit, DataType,
+    TradingStrategy, DataSource, TimeUnit, Schedule, DataType,
     PositionSize, ScalingRule, StopLossRule, CooldownRule,
 )
 
@@ -503,8 +537,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
     Sell when RSI is overbought AND a recent EMA crossunder occurred.
     Scale into winners, trail a stop loss, and let the framework handle the rest.
     """
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC", "ETH"]
     data_sources = [
         DataSource(
@@ -706,6 +739,7 @@ python -m unittest discover -s tests
 
 - [Open an issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new) for bugs or ideas
 - Read the [Contributing Guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing%20Guide/contributing)
+- Read the [Architecture references](/docs/architecture/README.md)
 - PRs go against the `dev` branch
 
 ## Resources

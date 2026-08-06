@@ -36,13 +36,11 @@ class Test(TestBase):
                 "status": "OPEN",
             }
         )
-        trades = trade_service.get_all({"status": TradeStatus.CREATED.value})
-        self.assertEqual(1, len(trades))
+        # v9.0 (#431) — no trade exists until the order fills.
         trades = trade_service.get_all({"status": TradeStatus.OPEN.value})
         self.assertEqual(0, len(trades))
-        order_service.update(order.id, {"filled": 10})
-        trades = trade_service.get_all({"status": TradeStatus.CREATED.value})
-        self.assertEqual(0, len(trades))
+        order_service.update(order.id, {"filled": 1, "remaining": 0,
+                                        "status": "CLOSED"})
         trades = trade_service.get_all({"status": TradeStatus.OPEN.value})
         self.assertEqual(1, len(trades))
         trades = trade_service.get_all({"status": TradeStatus.CLOSED.value})

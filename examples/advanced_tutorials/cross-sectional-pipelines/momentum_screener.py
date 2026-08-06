@@ -38,6 +38,7 @@ from investing_algorithm_framework import (
     TimeUnit,
     TradingStrategy,
     create_app,
+    Schedule,
 )
 
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
@@ -61,8 +62,7 @@ class MomentumScreener(Pipeline):
 
 class CrossSectionalMomentum(TradingStrategy):
     algorithm_id = "cross-sectional-momentum"
-    time_unit = TimeUnit.DAY
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
     trading_symbol = TRADING_SYMBOL
     symbols = SYMBOLS

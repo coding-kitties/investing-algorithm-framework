@@ -1,5 +1,5 @@
 from pyindicators import ema, is_crossover, is_above, is_below, is_crossunder
-from investing_algorithm_framework import TradingStrategy, TimeUnit, Context, \
+from investing_algorithm_framework import TradingStrategy, TimeUnit, Schedule, Context, \
     OrderSide, DataSource
 
 class CrossOverStrategyV3(TradingStrategy):
@@ -18,8 +18,7 @@ class CrossOverStrategyV3(TradingStrategy):
     take profit are both trailing, meaning that they will move up
     with the price when the price goes up.
     """
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbol_pairs = ["BTC/EUR"]
     market_data_sources = [
         DataSource(

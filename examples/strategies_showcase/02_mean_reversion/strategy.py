@@ -1,7 +1,7 @@
 """Mean-reversion strategy: Bollinger + RSI."""
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 import pandas as pd
 from pyindicators import bollinger_bands, rsi
@@ -9,15 +9,18 @@ from pyindicators import bollinger_bands, rsi
 from investing_algorithm_framework import (
     DataSource,
     DataType,
+    Schedule,
+    SignalSeries,
+    SignalSide,
     TimeUnit,
     TradingStrategy,
+    signal_series_from_column,
 )
 
 
 class MeanReversionStrategy(TradingStrategy):
     algorithm_id = "mean-reversion-bollinger-rsi"
-    time_unit = TimeUnit.HOUR
-    interval = 24
+    schedule = Schedule.every(24, TimeUnit.HOUR)
     market = "BITVAVO"
     trading_symbol = "EUR"
 
@@ -55,8 +58,6 @@ class MeanReversionStrategy(TradingStrategy):
             symbols=symbols,
             trading_symbol=self.trading_symbol,
             data_sources=data_sources,
-            time_unit=self.time_unit,
-            interval=self.interval,
         )
         self.set_parameters({
             "symbol": symbol,
@@ -80,18 +81,29 @@ class MeanReversionStrategy(TradingStrategy):
         )
         df = rsi(df, period=self.rsi_period,
                  source_column="Close", result_column="rsi")
+        df["entry"] = (
+            (df["Close"] < df["bb_lo"])
+            & (df["rsi"] < self.rsi_buy_below)
+        ).fillna(False).astype(bool)
+        df["exit"] = (
+            (df["Close"] > df["bb_mid"])
+            | (df["rsi"] > self.rsi_sell_above)
+        ).fillna(False).astype(bool)
         return df
 
-    def generate_buy_signals(
+    def generate_signal_series(
         self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
+    ) -> Iterable[SignalSeries]:
         df = self._prepare(data[f"{self.symbol}-ohlcv"])
-        sig = (df["Close"] < df["bb_lo"]) & (df["rsi"] < self.rsi_buy_below)
-        return {self.symbols[0]: sig.fillna(False).astype(bool)}
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        df = self._prepare(data[f"{self.symbol}-ohlcv"])
-        sig = (df["Close"] > df["bb_mid"]) | (df["rsi"] > self.rsi_sell_above)
-        return {self.symbols[0]: sig.fillna(False).astype(bool)}
+        yield signal_series_from_column(
+            df, "entry",
+            side=SignalSide.OPEN_LONG,
+            symbol=self.symbols[0],
+            source="bollinger_rsi",
+        )
+        yield signal_series_from_column(
+            df, "exit",
+            side=SignalSide.CLOSE_LONG,
+            symbol=self.symbols[0],
+            source="bollinger_rsi",
+        )

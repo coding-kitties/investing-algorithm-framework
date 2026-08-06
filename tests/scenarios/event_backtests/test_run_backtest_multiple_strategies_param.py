@@ -75,7 +75,7 @@ class Test(TestCase):
         metrics = backtest.get_backtest_metrics(date_range)
         run = backtest.get_backtest_run(date_range)
         self.assertEqual(run.initial_unallocated, 400)
-        self.assertEqual(run.trading_symbol, "EUR")
+        self.assertEqual(run.portfolio_snapshots[0].trading_symbol, "EUR")
         self.assertIsNotNone(metrics.total_growth)
         self.assertAlmostEqual(
             metrics.total_growth, metrics.total_net_gain, delta=0.01

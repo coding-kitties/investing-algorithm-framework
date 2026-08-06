@@ -1,7 +1,7 @@
 """Trend-following strategy: EMA(fast) crossing EMA(slow)."""
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 import pandas as pd
 from pyindicators import crossover, crossunder, ema
@@ -9,15 +9,18 @@ from pyindicators import crossover, crossunder, ema
 from investing_algorithm_framework import (
     DataSource,
     DataType,
+    Schedule,
+    SignalSeries,
+    SignalSide,
     TimeUnit,
     TradingStrategy,
+    signal_series_from_column,
 )
 
 
 class TrendFollowingStrategy(TradingStrategy):
     algorithm_id = "trend-following-ema-crossover"
-    time_unit = TimeUnit.HOUR
-    interval = 24
+    schedule = Schedule.every(24, TimeUnit.HOUR)
     market = "BITVAVO"
     trading_symbol = "EUR"
 
@@ -50,8 +53,6 @@ class TrendFollowingStrategy(TradingStrategy):
             symbols=symbols,
             trading_symbol=self.trading_symbol,
             data_sources=data_sources,
-            time_unit=self.time_unit,
-            interval=self.interval,
         )
         self.set_parameters({
             "symbol": symbol,
@@ -60,7 +61,6 @@ class TrendFollowingStrategy(TradingStrategy):
             "slow_period": slow_period,
         })
 
-    # ------------------------------------------------------------------ #
     def _prepare(self, df: pd.DataFrame) -> pd.DataFrame:
         df = ema(df, period=self.fast_period,
                  source_column="Close", result_column="ema_fast")
@@ -70,18 +70,23 @@ class TrendFollowingStrategy(TradingStrategy):
                        second_column="ema_slow", result_column="x_up")
         df = crossunder(df, first_column="ema_fast",
                         second_column="ema_slow", result_column="x_dn")
+        df["x_up"] = df["x_up"].fillna(False).astype(bool)
+        df["x_dn"] = df["x_dn"].fillna(False).astype(bool)
         return df
 
-    def generate_buy_signals(
+    def generate_signal_series(
         self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
+    ) -> Iterable[SignalSeries]:
         df = self._prepare(data[f"{self.symbol}-ohlcv"])
-        sig = df["x_up"].fillna(False).astype(bool)
-        return {self.symbols[0]: sig}
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        df = self._prepare(data[f"{self.symbol}-ohlcv"])
-        sig = df["x_dn"].fillna(False).astype(bool)
-        return {self.symbols[0]: sig}
+        yield signal_series_from_column(
+            df, "x_up",
+            side=SignalSide.OPEN_LONG,
+            symbol=self.symbols[0],
+            source="ema_cross",
+        )
+        yield signal_series_from_column(
+            df, "x_dn",
+            side=SignalSide.CLOSE_LONG,
+            symbol=self.symbols[0],
+            source="ema_cross",
+        )
