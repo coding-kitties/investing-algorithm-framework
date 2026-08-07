@@ -10,6 +10,9 @@ on:
       - 'investing_algorithm_framework/**'
       - 'tests/**'
       - '.github/workflows/test.yml'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+  workflow_dispatch: {}
 
 jobs:
   linting:
