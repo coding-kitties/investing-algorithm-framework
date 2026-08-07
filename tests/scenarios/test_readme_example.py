@@ -114,8 +114,8 @@ class TestReadmeExample(TestCase):
         # Verify the main strategy example exists
         main_example = extract_main_example_from_readme(self.readme_path)
         self.assertIn('RSIEMACrossoverStrategy', main_example)
-        self.assertIn('generate_buy_signals', main_example)
-        self.assertIn('generate_sell_signals', main_example)
+        self.assertIn('generate_signals', main_example)
+        self.assertIn('generate_signal_series', main_example)
 
     def test_readme_strategy_class_is_valid_python(self):
         """The RSIEMACrossoverStrategy code from README compiles."""
@@ -149,8 +149,8 @@ class TestReadmeExample(TestCase):
         cls = namespace['RSIEMACrossoverStrategy']
 
         # Verify class attributes
-        self.assertTrue(hasattr(cls, 'generate_buy_signals'))
-        self.assertTrue(hasattr(cls, 'generate_sell_signals'))
+        self.assertTrue(hasattr(cls, 'generate_signals'))
+        self.assertTrue(hasattr(cls, 'generate_signal_series'))
         self.assertTrue(hasattr(cls, 'scaling_rules'))
         self.assertTrue(hasattr(cls, 'stop_losses'))
         self.assertTrue(hasattr(cls, 'position_sizes'))
