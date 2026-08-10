@@ -266,7 +266,11 @@ function rebuildWindowCoverage() {
       if (has) present++;
       return has;
     });
-    return { idx: i, name: s.name, color: s.color, windows: windows, present: present, pct: Math.round(present / totalWindows * 100) };
+    return {
+      idx: i, name: s.name, color: s.color, tag: s.tag, windows: windows,
+      present: present, pct: Math.round(present / totalWindows * 100),
+      filteredOut: !!s.filteredOut, filteredOutAt: s.filteredOutAt,
+    };
   });
 
   // Find shared windows (all selected strategies have this window)
@@ -279,6 +283,7 @@ function rebuildWindowCoverage() {
     if (allHave) sharedCount++;
   }
   var comparableByAll = indices.length > 1 ? sharedCount : totalWindows;
+  var prunedCount = coverageData.filter(function(d){return d.filteredOut;}).length;
 
   // Build HTML
   var html = '<div class="chart-card collapsed">';
@@ -295,14 +300,23 @@ function rebuildWindowCoverage() {
     var comparableColor = pctComparable === 100 ? 'var(--green)' : pctComparable >= 50 ? 'var(--amber)' : 'var(--red)';
     html += '<div class="wc-summary-item">Comparability: <strong style="color:' + comparableColor + '">' + pctComparable + '%</strong></div>';
   }
+  if (prunedCount > 0) {
+    html += '<div class="wc-summary-item">Pruned by window filter: <strong style="color:var(--purple)">' + prunedCount + '/' + indices.length + '</strong></div>';
+  }
   html += '</div>';
 
   // Coverage bars
   html += '<div style="margin-bottom:1rem">';
   coverageData.forEach(function(d) {
-    var barColor = d.pct === 100 ? 'var(--green)' : d.pct >= 50 ? 'var(--amber)' : 'var(--red)';
+    // A window_filter_function prune is expected, partial coverage —
+    // color it distinctly from a genuine (unexplained) coverage gap.
+    var barColor = d.filteredOut ? 'var(--purple)'
+      : d.pct === 100 ? 'var(--green)' : d.pct >= 50 ? 'var(--amber)' : 'var(--red)';
+    var prunedBadge = d.filteredOut
+      ? ' <span class="pruned-badge" title="Progressively pruned by window_filter_function">Pruned' + (d.filteredOutAt ? ' after ' + d.filteredOutAt : '') + '</span>'
+      : '';
     html += '<div class="wc-bar-wrap">';
-    html += '<div class="wc-bar-label"><span class="sb-dot" style="background:'+d.color+'"></span> '+d.name+(d.tag ? ' <span class="tag-badge">'+d.tag+'</span>' : '')+'</div>';
+    html += '<div class="wc-bar-label"><span class="sb-dot" style="background:'+d.color+'"></span> '+d.name+(d.tag ? ' <span class="tag-badge">'+d.tag+'</span>' : '')+prunedBadge+'</div>';
     html += '<div class="wc-bar"><div class="wc-bar-fill" style="width:'+d.pct+'%;background:'+barColor+'"></div>';
     html += '<div class="wc-bar-text">'+d.present+'/'+totalWindows+' ('+d.pct+'%)</div></div>';
     html += '</div>';
@@ -330,10 +344,15 @@ function rebuildWindowCoverage() {
 
   // Data rows
   coverageData.forEach(function(d) {
-    html += '<div class="wc-cell wc-strat" title="'+d.name+'"><span class="sb-dot" style="background:'+d.color+'"></span> '+d.name+(d.tag ? ' <span class="tag-badge">'+d.tag+'</span>' : '')+'</div>';
+    var rowTitle = d.filteredOut
+      ? d.name + ' \u2013 pruned by window_filter_function' + (d.filteredOutAt ? ' after ' + d.filteredOutAt : '')
+      : d.name;
+    html += '<div class="wc-cell wc-strat" title="'+rowTitle+'"><span class="sb-dot" style="background:'+d.color+'"></span> '+d.name+(d.tag ? ' <span class="tag-badge">'+d.tag+'</span>' : '')+'</div>';
     d.windows.forEach(function(has, wi) {
-      var cls = has ? 'present' : 'missing';
-      var title = d.name + ' \u2013 ' + RUN_LABELS[wi][1] + ': ' + (has ? 'Run' : 'Missing');
+      var missingIsPrune = !has && d.filteredOut;
+      var cls = has ? 'present' : (missingIsPrune ? 'pruned' : 'missing');
+      var title = d.name + ' \u2013 ' + RUN_LABELS[wi][1] + ': '
+        + (has ? 'Run' : (missingIsPrune ? 'Pruned' : 'Missing'));
       html += '<div class="wc-cell" title="'+title+'"><div class="wc-dot '+cls+'"></div></div>';
     });
   });

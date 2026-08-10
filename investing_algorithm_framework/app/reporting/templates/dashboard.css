@@ -138,6 +138,8 @@ body { font-family:'Inter',-apple-system,sans-serif; background:var(--bg); color
 .wc-dot { width:14px; height:14px; border-radius:50%; flex-shrink:0; }
 .wc-dot.present { background:var(--green); }
 .wc-dot.missing { background:var(--border); }
+.wc-dot.pruned { background:var(--purple); }
+.pruned-badge { font-size:0.58rem; padding:1px 6px; border-radius:8px; background:rgba(167,139,250,0.15); color:var(--purple); font-weight:600; vertical-align:middle; margin-left:4px; white-space:nowrap; }
 .wc-bar-wrap { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
 .wc-bar-label { font-size:0.7rem; font-weight:600; color:var(--text-secondary); min-width:80px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wc-bar { flex:1; height:18px; background:var(--surface2); border-radius:4px; overflow:hidden; position:relative; }

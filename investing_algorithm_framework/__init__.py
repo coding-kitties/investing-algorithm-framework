@@ -398,5 +398,8 @@ __all__ = [
     "ExecutionConfig",
     "WindowPart",
     "BacktestWindow",
-    "StudySampleType"
+    "StudySampleType",
+    "ScheduledDeposit",
+    "SyncResult",
+    "PortfolioOutOfSyncError"
 ]

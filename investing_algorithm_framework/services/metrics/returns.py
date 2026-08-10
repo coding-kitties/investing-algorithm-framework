@@ -96,6 +96,17 @@ def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, 
     })
 
     prev_value = yearly_df['total_value'].shift(1)
+    if len(prev_value) > 0 and pd.isna(prev_value.iloc[0]):
+        # There is no prior year-end for the first row, so shift(1)
+        # leaves it NaN and dropna() below would silently drop the
+        # backtest's first calendar year. Anchor it to the very first
+        # snapshot (the initial portfolio value) instead — but only
+        # when more than one snapshot actually falls within/before
+        # that first year; a single snapshot has no meaningful return
+        # to report (keeps ``[]`` for single-snapshot inputs).
+        first_year_end = yearly_df.index[0]
+        if (df.index <= first_year_end).sum() > 1:
+            prev_value.iloc[0] = df['total_value'].iloc[0]
     yearly_df['return'] = (
         (yearly_df['total_value'] - yearly_df['cash_flow']) / prev_value - 1
     )

@@ -165,6 +165,10 @@ class BacktestReport:
     directory_path: str = None
     # Backward compat with old API (backtest: Backtest)
     backtest: object = None
+    # Optional study name (or Study instance) to scope multi-study
+    # bundles to a single study. When None, every study on each
+    # backtest is rendered as its own strategy (see ``_engine_views``).
+    study: object = None
     _source_tags: List[str] = field(
         default_factory=list, repr=False
     )
@@ -181,10 +185,6 @@ class BacktestReport:
             else:
                 self.backtests = [self.backtest]
             self.backtest = None
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def show(self, backtest_date_range=None, browser=False):
         if not self.html_report:
@@ -356,38 +356,82 @@ backtest_utils import (
     # ------------------------------------------------------------------
 
     def _engine_views(self):
-        """Expand ``self.backtests`` to one entry per populated engine.
+        """Expand ``self.backtests`` to one entry per populated
+        (study, engine) combination.
 
-        Each entry is a dict ``{'backtest', 'engine', 'dual'}`` where
-        ``dual`` is True when the source backtest carries runs for
-        both engines. Builders treat each entry as an independent
-        "strategy" so vector and event results render as separate
-        pages in the dashboard — satisfying the v9.0 requirement that
-        the report distinguishes the two engines.
+        Each entry is a dict ``{'backtest', 'study', 'engine', 'dual',
+        'multi_study'}`` where ``dual`` is True when the study carries
+        runs for both engines and ``multi_study`` is True when the
+        source backtest has more than one study. Builders treat each
+        entry as an independent "strategy" so vector/event results —
+        and separate studies (e.g. in-sample vs. out-of-sample) —
+        render as separate pages in the dashboard, and always pass an
+        explicit ``study=`` down to ``Backtest.get_runs()``/
+        ``get_summary()`` so multi-study bundles never hit the
+        default-study disambiguation error.
 
-        Backtests that report no populated engines fall back to a
-        single vector view for backward compatibility with empty /
+        Backtests with no studies at all fall back to a single vector
+        view (``study=None``) for backward compatibility with empty /
         legacy fixtures.
+
+        When ``self.study`` is set (a study name or a ``Study``
+        instance), each backtest is narrowed to that single study —
+        backtests that don't carry a matching study contribute no
+        views at all.
         """
+        study_filter = self.study
+        if study_filter is not None and hasattr(study_filter, "name"):
+            study_filter = study_filter.name
+
         views = []
         for bt_idx, bt in enumerate(self.backtests):
-            engines = list(bt.engines()) or [ENGINE_VECTOR]
-            dual = len(engines) > 1
-            for engine in engines:
+            study_names = bt.list_studies()
+            if not study_names:
                 views.append({
                     "backtest": bt,
                     "backtest_index": bt_idx,
-                    "engine": engine,
-                    "dual": dual,
+                    "study": None,
+                    "engine": ENGINE_VECTOR,
+                    "dual": False,
+                    "multi_study": False,
                 })
+                continue
+
+            if study_filter is not None:
+                study_names = [
+                    name for name in study_names if name == study_filter
+                ]
+                if not study_names:
+                    continue
+
+            multi_study = len(study_names) > 1
+            for study_name in study_names:
+                study = bt.get_study(study_name)
+                engines = list(study.populated_engines()) or [ENGINE_VECTOR]
+                dual = len(engines) > 1
+                for engine in engines:
+                    views.append({
+                        "backtest": bt,
+                        "backtest_index": bt_idx,
+                        "study": study_name,
+                        "engine": engine,
+                        "dual": dual,
+                        "multi_study": multi_study,
+                    })
         return views
 
     @staticmethod
     def _engine_label(view) -> str:
-        """Suffix appended to algorithm_id when both engines coexist."""
-        if not view["dual"]:
+        """Suffix appended to algorithm_id for dual-engine and/or
+        multi-study views."""
+        parts = []
+        if view.get("multi_study") and view.get("study"):
+            parts.append(view["study"])
+        if view["dual"]:
+            parts.append(view["engine"])
+        if not parts:
             return ""
-        return f" ({view['engine']})"
+        return f" ({', '.join(parts)})"
 
     # ------------------------------------------------------------------
     # Full HTML assembly
@@ -407,6 +451,12 @@ backtest_utils import (
         # a comparison (vector vs event) even when it is the only
         # backtest loaded.
         engine_views = self._engine_views()
+        if not engine_views:
+            study_name = getattr(self.study, "name", self.study)
+            raise OperationalException(
+                f"No backtest has study {study_name!r}. Available "
+                f"studies: {sorted({s for bt in self.backtests for s in bt.list_studies()})!r}."
+            )
         is_single = len(engine_views) == 1
         strategies = self._build_strategies_data()
         run_data = self._build_run_data()
@@ -497,12 +547,12 @@ backtest_utils import (
             bt = view["backtest"]
             engine = view["engine"]
             color = STRATEGY_COLORS[i % len(STRATEGY_COLORS)]
-            runs = bt.get_runs(engine)
+            runs = bt.get_runs(engine, study=view["study"])
 
             # Summary metrics: each engine view binds to its own
             # per-engine summary (design doc section 7 / Stage 6).
             summary_dict = {}
-            primary_summary = bt.get_summary(engine)
+            primary_summary = bt.get_summary(engine, study=view["study"])
             if primary_summary is not None:
                 summary_dict = primary_summary.to_dict()
 
@@ -548,6 +598,13 @@ backtest_utils import (
             if not tag and bt_idx < len(self._source_tags):
                 tag = self._source_tags[bt_idx]
 
+            # Surfaces window_filter_function's progressive-pruning
+            # marker (set by BacktestService) so partial window
+            # coverage can be explained as "pruned", not a data gap.
+            meta = bt.metadata or {}
+            filtered_out = bool(meta.get('filtered_out'))
+            filtered_out_at = meta.get('filtered_out_at_date_range')
+
             strategies.append({
                 'id': f'strat-{i}',
                 'name': algo_name,
@@ -559,6 +616,8 @@ backtest_utils import (
                 'runNameMap': run_name_map,
                 'runLabels': run_labels_list,
                 'parameters': bt.parameters or {},
+                'filteredOut': filtered_out,
+                'filteredOutAt': filtered_out_at,
             })
 
         return strategies
@@ -568,7 +627,7 @@ backtest_utils import (
 
         for i, view in enumerate(self._engine_views()):
             bt = view["backtest"]
-            runs = bt.get_runs(view["engine"])
+            runs = bt.get_runs(view["engine"], study=view["study"])
 
             for j, run in enumerate(runs):
                 rid = f"run-{i}-{j}"
@@ -633,7 +692,8 @@ backtest_utils import (
                 yr = []
                 if m and m.yearly_returns:
                     yr = [
-                        [v, str(d.year) if hasattr(d, 'year') else str(d)]
+                        [v * 100 if abs(v) < 1 else v,
+                         str(d.year) if hasattr(d, 'year') else str(d)]
                         for v, d in m.yearly_returns
                     ]
 
@@ -913,7 +973,7 @@ backtest_utils import (
         windows = {}
         for view in self._engine_views():
             bt = view["backtest"]
-            for run in bt.get_runs(view["engine"]):
+            for run in bt.get_runs(view["engine"], study=view["study"]):
                 name = run.backtest_date_range_name or ''
                 if name not in windows:
                     ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
@@ -936,7 +996,7 @@ backtest_utils import (
         labels, seen = [], set()
         for view in self._engine_views():
             bt = view["backtest"]
-            for run in bt.get_runs(view["engine"]):
+            for run in bt.get_runs(view["engine"], study=view["study"]):
                 name = run.backtest_date_range_name or ''
                 if name not in seen:
                     ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
@@ -1013,7 +1073,7 @@ backtest_utils import (
         windows = {}
         for view in self._engine_views():
             bt = view["backtest"]
-            for run in bt.get_runs(view["engine"]):
+            for run in bt.get_runs(view["engine"], study=view["study"]):
                 name = run.backtest_date_range_name or ''
                 if name not in windows:
                     windows[name] = {
