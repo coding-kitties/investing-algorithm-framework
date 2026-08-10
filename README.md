@@ -63,7 +63,7 @@
 > PyPI as an alpha pre-release. Since pip doesn't install pre-releases by
 > default, pin the version explicitly or pass `--pre`:
 > ```bash
-> pip install investing-algorithm-framework==9.0.0a1
+> pip install investing-algorithm-framework==9.0.0a2
 > ```
 > You can find the blog post here: [v9.0 Release](docusaurus/blog/2026-08-02-v9.0-release.md).
 

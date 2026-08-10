@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a2] — 2026-08-10
+
+### Fixed
+
+- **`BacktestReport` multi-study bundles** (`app/reporting/backtest_report.py`)
+  - `BacktestReport`/`BacktestReport.open` accept a new `study=` argument
+    (a study name or `Study` instance) to scope a report to a single study
+    on a multi-study bundle. Previously, opening a report over a bundle
+    with more than one study always raised `OperationalException:
+    Backtest has N studies — pass study= to disambiguate`, with no way to
+    pass a `study=` through `BacktestReport` itself.
+  - Without an explicit `study=`, every study on a bundle is now rendered
+    as its own strategy entry (labelled with the study name) instead of
+    raising.
+  - Progressively-pruned strategies (via a `window_filter_function`) are
+    now labelled "Pruned after `<window>`" in the Window Coverage panel,
+    using the `filtered_out` / `filtered_out_at_date_range` metadata the
+    backtest service already persists on the bundle.
+- **Yearly returns in the HTML report** (#597)
+  - Fixed a scale mismatch where `_build_run_data()`'s yearly-returns
+    series embedded raw decimal ratios (e.g. `0.358`) while the chart
+    renders values as already-scaled percentages, showing `+0.4%`
+    instead of `+35.8%`.
+  - Fixed `get_yearly_returns()` (`services/metrics/returns.py`)
+    silently dropping a backtest's first calendar year: `shift(1)` has
+    no prior year-end for the first row, so it was `NaN` and removed by
+    `dropna()`. The first year's return is now anchored to the initial
+    portfolio snapshot when more than one snapshot exists in that year.
+
 ## [9.0.0a1] — 2026-05-28
 
 ### Headline
