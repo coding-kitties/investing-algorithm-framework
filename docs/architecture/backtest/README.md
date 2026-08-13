@@ -17,6 +17,7 @@ system.
 | [backtest_storage.md](backtest_storage.md) | On-disk `.obtf` bundle format (v5): outer envelope layout, msgpack body shape, Parquet blob extraction, OHLCV side-store, read/write API contracts, versioning policy |
 | [backtesting_workflow.md](backtesting_workflow.md) | Step-by-step workflow: in-sample sweeps, OOS extension, multi-universe studies, event-engine runs, adding Monte-Carlo significance tests |
 | [sota_quant_workflow.md](sota_quant_workflow.md) | State-of-the-art quant workflow: how the framework maps onto industry-standard walk-forward practices |
+| [vector-vs-event-engine-parity.md](vector-vs-event-engine-parity.md) | Evidence that the vector and event backtest engines produce consistent results, backed by automated tests, plus the `warmup_window` tuning that closes the residual gap |
 
 ---
 
