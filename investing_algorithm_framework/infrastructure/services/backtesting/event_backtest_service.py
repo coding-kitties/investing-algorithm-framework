@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime, timezone
-from collections import defaultdict
 from typing import Dict, List
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
@@ -9,6 +8,7 @@ from investing_algorithm_framework.domain.models.trade.trade_status import \
     TradeStatus
 from investing_algorithm_framework.services import DataProviderService, \
     create_backtest_metrics
+from .schedule_generation import generate_backtest_schedule
 
 
 logger = logging.getLogger(__name__)
@@ -139,38 +139,15 @@ class EventBacktestService:
 
         Returns:
             Dict mapping datetime to strategy_ids and task_ids to run.
+
+        Delegates to the shared implementation in
+        ``schedule_generation.py`` — kept in sync with
+        ``BacktestService.generate_schedule`` since both engines
+        drive the same event loop.
         """
-        schedule = defaultdict(
-            lambda: {
-                "strategy_ids": set(),
-                "task_ids": set(tasks),
-                "scheduled_function_calls": [],
-            }
+        return generate_backtest_schedule(
+            strategies, tasks, start_date, end_date
         )
-
-        for strategy in strategies:
-            sid = strategy.strategy_profile.strategy_id
-            strat_schedule = strategy.strategy_profile.schedule
-            for t in strat_schedule.iter_run_times(start_date, end_date):
-                schedule[t]["strategy_ids"].add(sid)
-
-            for sf in strategy.strategy_profile.scheduled_functions or []:
-                for t in sf.schedule.iter_run_times(start_date, end_date):
-                    _ = schedule[t]
-                    schedule[t]["scheduled_function_calls"].append(
-                        (sid, sf.func)
-                    )
-
-        return {
-            ts: {
-                "strategy_ids": sorted(data["strategy_ids"]),
-                "task_ids": sorted(data["task_ids"]),
-                "scheduled_function_calls": list(
-                    data["scheduled_function_calls"]
-                ),
-            }
-            for ts, data in schedule.items()
-        }
 
     def _create_backtest_run(
         self,

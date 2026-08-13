@@ -5,7 +5,6 @@ import logging
 import multiprocessing
 import os
 import threading
-from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -33,6 +32,7 @@ from .checkpoint_manifest import (
     compute_strategy_manifest_hash,
     normalize_checkpoint_entry,
 )
+from .schedule_generation import generate_backtest_schedule
 from .vector_backtest_service import VectorBacktestService
 
 
@@ -500,41 +500,15 @@ class BacktestService:
         polars-based OHLCV pipeline) keep their existing semantics. Use
         ``Schedule.materialize_polars(start, end)`` on an individual
         schedule if you need a vectorised polars-native fire-times series.
+
+        Delegates to the shared implementation in
+        ``schedule_generation.py`` — kept in sync with
+        ``EventBacktestService.generate_schedule`` since both engines
+        drive the same event loop.
         """
-        schedule = defaultdict(
-            lambda: {
-                "strategy_ids": set(),
-                "task_ids": set(tasks),
-                "scheduled_function_calls": [],
-            }
+        return generate_backtest_schedule(
+            strategies, tasks, start_date, end_date
         )
-
-        for strategy in strategies:
-            sid = strategy.strategy_profile.strategy_id
-            strat_schedule = strategy.strategy_profile.schedule
-            for t in strat_schedule.iter_run_times(start_date, end_date):
-                schedule[t]["strategy_ids"].add(sid)
-
-            for sf in strategy.strategy_profile.scheduled_functions or []:
-                for t in sf.schedule.iter_run_times(start_date, end_date):
-                    # Touch the bucket so it exists in the output, but
-                    # do not add to strategy_ids — the function fires
-                    # independently of the parent strategy tick.
-                    _ = schedule[t]
-                    schedule[t]["scheduled_function_calls"].append(
-                        (sid, sf.func)
-                    )
-
-        return {
-            ts: {
-                "strategy_ids": sorted(data["strategy_ids"]),
-                "task_ids": sorted(data["task_ids"]),
-                "scheduled_function_calls": list(
-                    data["scheduled_function_calls"]
-                ),
-            }
-            for ts, data in schedule.items()
-        }
 
     def _get_initial_unallocated(self) -> float:
         """

@@ -81,6 +81,7 @@ class EventLoopService:
         self.data_sources = set()
         self.next_run_times = {}
         self._scheduled_function_last_runs = {}
+        self._task_last_runs = {}
         self.history = {}
 
         # One-shot flag: live-mode envelope validation runs once per
@@ -191,6 +192,52 @@ class EventLoopService:
             if strategy.schedule.is_due(current_datetime, last_run):
                 due.append(strategy)
                 entry["last_run"] = current_datetime
+
+        return due
+
+    def _get_tasks_by_ids(self, task_ids: List[str]):
+        """
+        Returns the tasks matching the given worker IDs. Unlike
+        ``_get_strategies``, an empty/None ``task_ids`` means "no
+        tasks are due" (not "all tasks") — the backtest schedule
+        always provides an explicit (possibly empty) list per tick.
+
+        Args:
+            task_ids: A list of task worker IDs to retrieve.
+
+        Returns:
+            List[Task]: The tasks matching the provided IDs.
+        """
+        if not task_ids:
+            return []
+
+        return [
+            self._tasks_lookup[task_id]
+            for task_id in task_ids
+            if task_id in self._tasks_lookup
+        ]
+
+    def _get_due_tasks(self, current_datetime=None):
+        """
+        Checks which tasks are due to run based on their Schedule.
+
+        Args:
+            current_datetime: Optional; the datetime to check against.
+                If None, uses the current datetime in UTC.
+
+        Returns:
+            List[Task]: A list of tasks that are due to run.
+        """
+        due = []
+
+        if current_datetime is None:
+            current_datetime = datetime.now(timezone.utc)
+
+        for task in self.tasks:
+            last_run = self._task_last_runs.get(task.worker_id)
+            if task.schedule.is_due(current_datetime, last_run):
+                due.append(task)
+                self._task_last_runs[task.worker_id] = current_datetime
 
         return due
 
@@ -341,6 +388,10 @@ class EventLoopService:
             for strategy in self.strategies
         }
         self._scheduled_function_last_runs = {}
+        self._task_last_runs = {}
+        self._tasks_lookup = {
+            task.worker_id: task for task in self.tasks
+        }
 
         # Collect all data sources and initialize history
         for strategy in self.strategies:
@@ -419,11 +470,14 @@ class EventLoopService:
                     )
                     strategy_ids = schedule[current_time]["strategy_ids"]
                     strategies = self._get_strategies(strategy_ids)
+                    task_ids = schedule[current_time]["task_ids"]
+                    tasks = self._get_tasks_by_ids(task_ids)
                     sf_calls = schedule[current_time].get(
                         "scheduled_function_calls", []
                     )
                     self._run_iteration(
                         strategies=strategies,
+                        tasks=tasks,
                         scheduled_function_calls=sf_calls,
                     )
 
@@ -433,13 +487,15 @@ class EventLoopService:
                         INDEX_DATETIME, current_time
                     )
                     strategy_ids = schedule[current_time]["strategy_ids"]
-                    # task_ids = schedule[current_time]["task_ids"]
+                    task_ids = schedule[current_time]["task_ids"]
                     strategies = self._get_strategies(strategy_ids)
+                    tasks = self._get_tasks_by_ids(task_ids)
                     sf_calls = schedule[current_time].get(
                         "scheduled_function_calls", []
                     )
                     self._run_iteration(
                         strategies=strategies,
+                        tasks=tasks,
                         scheduled_function_calls=sf_calls,
                     )
         else:
@@ -448,10 +504,11 @@ class EventLoopService:
                     config = self._configuration_service.config
                     current_time = config[INDEX_DATETIME]
                     strategies = self._get_due_strategies(current_time)
+                    tasks = self._get_due_tasks(current_time)
                     sf_calls = self._get_due_scheduled_functions(current_time)
                     self._run_iteration(
                         strategies=strategies,
-                        tasks=self.tasks,
+                        tasks=tasks,
                         scheduled_function_calls=sf_calls,
                     )
                     current_time = datetime.now(timezone.utc)
@@ -472,11 +529,12 @@ class EventLoopService:
                             config = self._configuration_service.config
                             current_time = config[INDEX_DATETIME]
                             strategies = self._get_due_strategies(current_time)
+                            tasks = self._get_due_tasks(current_time)
                             sf_calls = \
                                 self._get_due_scheduled_functions(current_time)
                             self._run_iteration(
                                 strategies=strategies,
-                                tasks=self.tasks,
+                                tasks=tasks,
                                 scheduled_function_calls=sf_calls,
                             )
                             current_time = datetime.now(timezone.utc)
@@ -492,11 +550,12 @@ class EventLoopService:
                         config = self._configuration_service.config
                         current_time = config[INDEX_DATETIME]
                         strategies = self._get_due_strategies(current_time)
+                        tasks = self._get_due_tasks(current_time)
                         sf_calls = \
                             self._get_due_scheduled_functions(current_time)
                         self._run_iteration(
                             strategies=strategies,
-                            tasks=self.tasks,
+                            tasks=tasks,
                             scheduled_function_calls=sf_calls,
                         )
                         current_time = datetime.now(timezone.utc)
@@ -747,16 +806,16 @@ class EventLoopService:
             ohlcv_data=orders_trades_update_ohlcv_data
         )
 
-        # Step 4: Run all tasks
-        for task in self.tasks:
-            task.run(data_object)
+        # Step 4: Run all due tasks. ``tasks`` is the caller-resolved,
+        # schedule-filtered list (see _get_due_tasks/_get_tasks_by_ids);
+        # fall back to every registered task only if no list was given.
+        for task in (self.tasks if tasks is None else tasks):
+            logger.info(f"Running task {task.worker_id}")
+            task.run(self.context)
 
         # Step 5: Run all strategies
         if not strategies:
             return
-
-        for task in self.tasks:
-            logger.info(f"Running task {task.__class__.__name__}")
 
         for strategy in strategies:
 
