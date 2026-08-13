@@ -1,16 +1,17 @@
 """Sample trading strategy.
 
 A strategy is *declarative*: declare your data sources and implement
-``generate_buy_signals`` / ``generate_sell_signals``. Each must return a
-dict mapping ``symbol -> pd.Series[bool]`` with the same index as the
-incoming OHLCV data. The framework handles order routing, position
+``generate_signals`` (event-driven backtest / paper / live) and/or
+``generate_signal_series`` (vector backtest) to yield ``Signal`` /
+``SignalSeries`` objects. The framework handles order routing, position
 sizing, stop-loss and take-profit on top of those signals.
 
-This same strategy is used by both the vector-backtest engine and the
-event-driven engine (and live), which guarantees that what you backtest
-is what you deploy.
+This same strategy class can be run on both the vector-backtest engine
+and the event-driven engine (and live), which guarantees that what you
+backtest is what you deploy — implement whichever method(s) match the
+engine(s) you plan to use.
 """
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 import pandas as pd
 from pyindicators import sma, crossover, crossunder
@@ -21,8 +22,13 @@ from investing_algorithm_framework import (
     DataType,
     TimeUnit,
     PositionSize,
+    Signal,
+    SignalSeries,
+    SignalSide,
     StopLossRule,
     TakeProfitRule,
+    signals_from_column,
+    signal_series_from_column,
 )
 
 
@@ -86,20 +92,43 @@ class MyTradingStrategy(TradingStrategy):
         )
         return df
 
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
+    def generate_signals(
+        self, context, data: Dict[str, Any]
+    ) -> Iterable[Signal]:
+        """Event mode (event-driven backtest / paper / live): one bar,
+        zero-or-one decision per side."""
         df = self._add_indicators(data["btc_eur_ohlcv_1h"])
         df = crossover(
             df, "sma_fast", "sma_slow", result_column="cross_up"
         )
-        return {"BTC": df["cross_up"].fillna(False).astype(bool)}
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        df = self._add_indicators(data["btc_eur_ohlcv_1h"])
         df = crossunder(
             df, "sma_fast", "sma_slow", result_column="cross_down"
         )
-        return {"BTC": df["cross_down"].fillna(False).astype(bool)}
+        yield from signals_from_column(
+            df, "cross_up", side=SignalSide.OPEN_LONG,
+            symbol="BTC", source="sma_cross",
+        )
+        yield from signals_from_column(
+            df, "cross_down", side=SignalSide.CLOSE_LONG,
+            symbol="BTC", source="sma_cross",
+        )
+
+    def generate_signal_series(
+        self, data: Dict[str, Any]
+    ) -> Iterable[SignalSeries]:
+        """Vector mode: declare intent over the whole backtest window."""
+        df = self._add_indicators(data["btc_eur_ohlcv_1h"])
+        df = crossover(
+            df, "sma_fast", "sma_slow", result_column="cross_up"
+        )
+        df = crossunder(
+            df, "sma_fast", "sma_slow", result_column="cross_down"
+        )
+        yield signal_series_from_column(
+            df, "cross_up", side=SignalSide.OPEN_LONG,
+            symbol="BTC", source="sma_cross",
+        )
+        yield signal_series_from_column(
+            df, "cross_down", side=SignalSide.CLOSE_LONG,
+            symbol="BTC", source="sma_cross",
+        )

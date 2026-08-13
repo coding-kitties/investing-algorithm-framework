@@ -1547,9 +1547,8 @@ class App:
     ) -> Backtest:
         """
         Run vectorized backtests for a strategy. The provided
-        strategy needs to have its 'generate_buy_signals' and
-        'generate_sell_signals' methods implemented to support vectorized
-        backtesting.
+        strategy needs to have its 'generate_signal_series' method
+        implemented to support vectorized backtesting.
 
         Args:
             strategy (TradingStrategy) (Optional): The strategy object
@@ -2258,9 +2257,8 @@ class App:
     ) -> Backtest:
         """
         Run vectorized backtests for a strategy. The provided
-        strategy needs to have its 'generate_buy_signals' and
-        'generate_sell_signals' methods implemented to support vectorized
-        backtesting.
+        strategy needs to have its 'generate_signal_series' method
+        implemented to support vectorized backtesting.
 
         Args:
             strategy (TradingStrategy) (Optional): The strategy object
