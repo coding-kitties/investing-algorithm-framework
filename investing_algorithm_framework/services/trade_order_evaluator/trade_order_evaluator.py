@@ -66,6 +66,10 @@ class TradeOrderEvaluator(ABC):
 
         for take_profit_order in take_profits_orders_data:
             take_profits = take_profit_order["take_profits"]
+            # `_create_order` deletes "trades"/"stop_losses"/
+            # "take_profits" from this dict in place (OrderService.
+            # create), so capture the trade refs before calling it.
+            trades = take_profit_order.get("trades", [])
             self._create_order(take_profit_order)
             self.trade_take_profit_service.mark_triggered(
                 [
@@ -75,7 +79,7 @@ class TradeOrderEvaluator(ABC):
                 trigger_date=current_date
             )
             self._dispatch_hook_for_trades(
-                take_profit_order, "on_trade_take_profit_triggered"
+                trades, "on_trade_take_profit_triggered"
             )
 
     def _check_stop_losses(self):
@@ -85,6 +89,8 @@ class TradeOrderEvaluator(ABC):
 
         for stop_loss_order in stop_losses_orders_data:
             stop_losses = stop_loss_order["stop_losses"]
+            # See note in _check_take_profits: capture before mutation.
+            trades = stop_loss_order.get("trades", [])
 
             self._create_order(stop_loss_order)
             self.trade_stop_loss_service.mark_triggered(
@@ -113,19 +119,18 @@ class TradeOrderEvaluator(ABC):
                 "on_trade_trailing_stop_loss_triggered" if trailing
                 else "on_trade_stop_loss_triggered"
             )
-            self._dispatch_hook_for_trades(stop_loss_order, hook_name)
+            self._dispatch_hook_for_trades(trades, hook_name)
 
-    def _dispatch_hook_for_trades(self, order_data, hook_name):
+    def _dispatch_hook_for_trades(self, trades, hook_name):
         """
-        Notify the owning strategy for each trade referenced in an
-        order dict built by ``get_triggered_stop_loss_orders`` /
-        ``get_triggered_take_profit_orders``. No-op if no hooks are
-        active for any strategy.
+        Notify the owning strategy for each trade dict (each with a
+        "trade_id" key) referenced by a triggered stop-loss/take-profit
+        order. No-op if no hooks are active for any strategy.
         """
         dispatcher = getattr(self.trade_service, "trade_hook_dispatcher", None)
         if dispatcher is None:
             return
 
-        for trade_ref in order_data.get("trades", []):
+        for trade_ref in trades:
             trade = self.trade_service.get(trade_ref["trade_id"])
             dispatcher.dispatch(hook_name, trade)

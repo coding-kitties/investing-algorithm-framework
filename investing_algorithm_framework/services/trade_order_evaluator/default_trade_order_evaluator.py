@@ -44,8 +44,13 @@ class DefaultTradeOrderEvaluator(TradeOrderEvaluator):
                     "last_reported_price_datetime": last_row_date,
                     "updated_at": current_date
                 }
-                open_trade.update(update_data)
+                # Route through TradeService.update() (not a direct
+                # domain-object mutation + bulk save) so stop-loss/
+                # take-profit prices advance and the on_trade_*_updated
+                # hooks fire — matches the documented per-iteration
+                # price-tracking behaviour (docs/architecture/
+                # orders_and_trades/trades.md §8).
+                self.trade_service.update(open_trade.id, update_data)
 
-            self.trade_service.save_all(open_trades)
             self._check_take_profits()
             self._check_stop_losses()
