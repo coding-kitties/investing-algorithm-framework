@@ -165,6 +165,10 @@ examples/tutorial/data
 examples/tutorial/backtest_results
 examples/tutorial/resources
 examples/**/resources/
+examples/advanced_strategy/*.csv
+examples/advanced_strategy/databases/
+examples/advanced_strategy/backtest_databases/
+examples/advanced_strategy/data/
 .data_cache/
 
 # Investing Algorithm Framework backtest bundles
