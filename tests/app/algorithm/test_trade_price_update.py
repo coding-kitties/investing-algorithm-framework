@@ -8,8 +8,11 @@ from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
     MarketCredential, DataSource, INDEX_DATETIME, DataType, \
     CSVOHLCVDataProvider, BacktestDateRange, Schedule
+from investing_algorithm_framework.app.eventloop import EventLoopService
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
+from investing_algorithm_framework.services import \
+    DefaultTradeOrderEvaluator
 from tests.resources import random_string, \
     PortfolioProviderTest, OrderExecutorTest
 
@@ -30,11 +33,6 @@ class StrategyOne(TradingStrategy):
         pass
 
 
-@unittest.skip(
-    "Integration test: requires full app backtest lifecycle "
-    "with trade price update — re-enable when backtest "
-    "trade-price pipeline is stabilized"
-)
 class Test(TestCase):
 
     def setUp(self) -> None:
@@ -127,7 +125,36 @@ class Test(TestCase):
         )
         order_service = app.container.order_service()
         order_service.check_pending_orders()
-        app.run(number_of_iterations=1)
+
+        # `app.run()` always re-initializes data sources via the live
+        # (non-backtest) path, which would discard the backtest
+        # registration above — drive the event loop directly instead,
+        # reusing the already-initialized backtest data providers.
+        trade_order_evaluator = DefaultTradeOrderEvaluator(
+            trade_service=app.container.trade_service(),
+            order_service=order_service,
+            trade_stop_loss_service=app.container.trade_stop_loss_service(),
+            trade_take_profit_service=app.container
+            .trade_take_profit_service(),
+            configuration_service=app.container.configuration_service(),
+            blotter=app.get_blotter(),
+            context=app.context,
+        )
+        event_loop_service = EventLoopService(
+            configuration_service=app.container.configuration_service(),
+            portfolio_snapshot_service=app.container
+            .portfolio_snapshot_service(),
+            context=app.context,
+            order_service=order_service,
+            portfolio_service=app.container.portfolio_service(),
+            data_provider_service=app.container.data_provider_service(),
+            trade_service=app.container.trade_service(),
+        )
+        event_loop_service.initialize(
+            algorithm, trade_order_evaluator=trade_order_evaluator
+        )
+        event_loop_service.start(number_of_iterations=1)
+
         trade = app.context.get_trades()[0]
         self.assertIsNotNone(trade)
         self.assertIsNotNone(trade.last_reported_price)
