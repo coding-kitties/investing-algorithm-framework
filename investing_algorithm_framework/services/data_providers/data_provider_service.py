@@ -21,8 +21,11 @@ class DataProviderIndex:
         data_providers_lookup (dict): Dictionary to store the lookup
             for order executors based on market.
     """
-    def __init__(self, data_providers=[]):
-        self.data_providers = data_providers
+    def __init__(self, data_providers=None):
+        # Mutable default avoided: a `[]` default would be created once
+        # at function-definition time and shared/mutated across every
+        # instance created without an explicit argument.
+        self.data_providers = list(data_providers or [])
         self.data_providers_lookup = defaultdict()
         self.ohlcv_data_providers = defaultdict()
         self.ohlcv_data_providers_no_market = defaultdict()
@@ -437,7 +440,7 @@ class DataProviderService:
         self,
         configuration_service=None,
         market_credential_service=None,
-        default_data_providers: List[DataProvider] = [],
+        default_data_providers: List[DataProvider] = None,
     ):
         """
         Initialize the DataProviderService with a list of data providers.
@@ -446,8 +449,11 @@ class DataProviderService:
             default_data_providers (List[DataProvider]): A list of default
                 data providers to use.
         """
-        self.default_data_providers = default_data_providers
-        self.data_provider_index = DataProviderIndex(default_data_providers)
+        # Mutable default avoided: see DataProviderIndex.__init__.
+        self.default_data_providers = list(default_data_providers or [])
+        self.data_provider_index = DataProviderIndex(
+            self.default_data_providers
+        )
         self.configuration_service = configuration_service
         self.market_credential_service = market_credential_service
 

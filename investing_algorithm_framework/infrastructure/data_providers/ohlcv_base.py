@@ -122,7 +122,9 @@ class OHLCVDataProviderBase(DataProvider):
             data = self._get_data_from_storage(
                 symbol=data_source.symbol,
                 time_frame=data_source.time_frame,
-                storage_path=data_source.storage_path,
+                storage_path=(
+                    data_source.storage_path or self.get_storage_directory()
+                ),
                 start_date=start_date,
                 end_date=end_date,
             )
@@ -580,8 +582,9 @@ class OHLCVDataProviderBase(DataProvider):
 
         if self.config is not None \
                 and RESOURCE_DIRECTORY in self.config:
+            data_directory_name = self.config.get(DATA_DIRECTORY, "data")
             return os.path.join(
-                self.config[RESOURCE_DIRECTORY], DATA_DIRECTORY
+                self.config[RESOURCE_DIRECTORY], data_directory_name
             )
 
         return None

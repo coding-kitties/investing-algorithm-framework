@@ -12,8 +12,7 @@ from dateutil import parser
 from investing_algorithm_framework.domain import OperationalException, \
     DATETIME_FORMAT, DataProvider, convert_polars_to_pandas, \
     NetworkError, TimeFrame, MarketCredential, DataType, DataSource, \
-    RESOURCE_DIRECTORY, CCXT_DATETIME_FORMAT, DATA_DIRECTORY, \
-    DATETIME_FORMAT_FILE_NAME
+    RESOURCE_DIRECTORY, CCXT_DATETIME_FORMAT, DATA_DIRECTORY
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -66,8 +65,6 @@ class CCXTOHLCVDataProvider(DataProvider):
         pandas: bool = False,
         config=None
     ):
-        if warmup_window is not None and window_size is None:
-            window_size = warmup_window
         """
         Initialize the CCXT OHLCV Data Provider.
 
@@ -84,6 +81,9 @@ class CCXTOHLCVDataProvider(DataProvider):
             storage_directory: (str, optional): the storage directory where
                 the OHLCV data need to be stored.
         """
+        if warmup_window is not None and window_size is None:
+            window_size = warmup_window
+
         if data_provider_identifier is None:
             data_provider_identifier = self.data_provider_identifier
 
@@ -148,7 +148,9 @@ class CCXTOHLCVDataProvider(DataProvider):
                 symbol=symbol,
                 market=market,
                 time_frame=data_source.time_frame,
-                storage_path=data_source.storage_path,
+                storage_path=(
+                    data_source.storage_path or self.get_storage_directory()
+                ),
                 start_date=start_date,
                 end_date=end_date
             )
@@ -219,31 +221,28 @@ class CCXTOHLCVDataProvider(DataProvider):
 
         storage_directory_path = self.get_storage_directory()
 
-        # Check if the data source is already available in the storage path
-        data = self._get_data_from_storage(
-            symbol=self.symbol,
-            market=self.market,
-            time_frame=self.time_frame,
-            storage_path=storage_directory_path,
-            start_date=required_start_date,
-            end_date=backtest_end_date
-        )
-
-        if data is None:
-            # Disable pandas if it is set to True, because logic
-            # depends on polars DataFrame
-            has_pandas_flag = self.pandas
-            self.pandas = False
-
-            # If the data is not available in the storage path,
-            # retrieve it from the CCXT data provider
-            data = self.get_data(
+        # Canonical merge-and-slice cache: reuses whatever is already on
+        # disk for this (symbol, market, time_frame) and only downloads
+        # the sub-range(s) not yet cached, instead of re-downloading the
+        # full window on every backtest run that touches this symbol.
+        if storage_directory_path is not None:
+            data = self._get_or_fetch_data(
+                symbol=self.symbol,
+                market=self.market,
+                time_frame=self.time_frame,
+                storage_path=storage_directory_path,
                 start_date=required_start_date,
                 end_date=backtest_end_date,
-                save=True,
+                persist=True,
             )
-
-            self.pandas = has_pandas_flag
+        else:
+            data = self.get_ohlcv(
+                symbol=self.symbol,
+                time_frame=self.time_frame,
+                from_timestamp=required_start_date,
+                market=self.market,
+                to_timestamp=backtest_end_date,
+            )
 
         self.data = data
 
@@ -441,16 +440,17 @@ class CCXTOHLCVDataProvider(DataProvider):
                 time_frame=self.time_frame,
                 window_size=self.window_size
             )
-        data = self._get_data_from_storage(
-            symbol=self.symbol,
-            market=self.market,
-            time_frame=self.time_frame,
-            storage_path=self.get_storage_directory(),
-            start_date=start_date,
-            end_date=end_date
-        )
+        storage_directory = self.get_storage_directory()
 
-        if data is None:
+        if storage_directory is None:
+            if save:
+                raise OperationalException(
+                    "Storage directory is not set for "
+                    "the CCXTOHLCVDataProvider. Make sure to set the "
+                    "storage directory in the configuration or "
+                    "in the constructor."
+                )
+
             data = self.get_ohlcv(
                 symbol=self.symbol,
                 time_frame=self.time_frame,
@@ -458,27 +458,19 @@ class CCXTOHLCVDataProvider(DataProvider):
                 market=self.market,
                 to_timestamp=end_date
             )
-
-            if save:
-                storage_directory = self.get_storage_directory()
-
-                if storage_directory is None:
-                    raise OperationalException(
-                        "Storage directory is not set for "
-                        "the CCXTOHLCVDataProvider. Make sure to set the "
-                        "storage directory in the configuration or "
-                        "in the constructor."
-                    )
-
-                self.save_data_to_storage(
-                    symbol=self.symbol,
-                    market=self.market,
-                    time_frame=self.time_frame,
-                    start_date=start_date,
-                    end_date=end_date,
-                    data=data,
-                    storage_directory_path=storage_directory
-                )
+        else:
+            # Canonical merge-and-slice cache: only the sub-range(s) not
+            # already cached on disk are downloaded. `save` only controls
+            # whether newly downloaded data is persisted back to disk.
+            data = self._get_or_fetch_data(
+                symbol=self.symbol,
+                market=self.market,
+                time_frame=self.time_frame,
+                storage_path=storage_directory,
+                start_date=start_date,
+                end_date=end_date,
+                persist=save,
+            )
 
         if self.pandas:
             data = convert_polars_to_pandas(data)
@@ -815,247 +807,311 @@ class CCXTOHLCVDataProvider(DataProvider):
                 f" named as {market.upper()}_SECRET_KEY"
             )
 
-    def save_data_to_storage(
-        self,
-        symbol: str,
-        market: str,
-        time_frame: TimeFrame,
-        start_date: datetime,
-        end_date: datetime,
-        data: pl.DataFrame,
-        storage_directory_path: str,
-    ):
-        """
-        Function to save data to the storage path.
-
-        Args:
-            symbol (str): The symbol for which the data is saved.
-            market (str): The market for which the data is saved.
-            time_frame (TimeFrame): The time frame for which the data is saved.
-            data (pl.DataFrame): The data to save.
-            storage_directory_path (str): The path to the storage directory.
-            start_date (datetime): The start date for the data.
-            end_date (datetime): The end date for the data.
-
-        Returns:
-            None
-        """
-        if storage_directory_path is None:
-            raise OperationalException(
-                "Storage path is not set. Please set the storage path "
-                "before saving data."
-            )
-
-        if not os.path.isdir(storage_directory_path):
-            os.makedirs(storage_directory_path)
-
-        filename = self._create_filename(
-            symbol=symbol,
-            market=market,
-            time_frame=time_frame.value,
-            start_date=start_date,
-            end_date=end_date
-        )
-        storage_path = os.path.join(storage_directory_path, filename)
-        if os.path.exists(storage_path):
-            os.remove(storage_path)
-
-        # Create the file
-        if not os.path.exists(storage_path):
-            with open(storage_path, 'w'):
-                pass
-
-        data.write_csv(storage_path)
-
-    def _create_filename(
-        self,
-        symbol: str,
-        market: str,
-        time_frame: str,
-        start_date: datetime,
-        end_date: datetime
+    def _canonical_storage_file_name(
+        self, symbol: str, market: str, time_frame
     ) -> str:
         """
-        Creates a filename for the data file based on the parameters.
-        The date format is YYYYMMDDHH for both start and end dates.
-
-        Args:
-            symbol (str): The symbol of the data.
-            market (str): The market of the data.
-            time_frame (str): The time frame of the data.
-            start_date (datetime): The start date of the data.
-            end_date (datetime): The end date of the data.
-
-        Returns:
-            str: The generated filename.
+        Deterministic, date-range-free file name for the single cache
+        file that holds all OHLCV data ever downloaded for a given
+        (symbol, market, time_frame) combination.
         """
-        datetime_format = self.config[DATETIME_FORMAT_FILE_NAME]
-        symbol = symbol.upper().replace('/', '-')
-        start_date_str = start_date.strftime(datetime_format)
-        end_date_str = end_date.strftime(datetime_format)
-        filename = (
-            f"OHLCV_{symbol}_{market.upper()}_{time_frame}_{start_date_str}_"
-            f"{end_date_str}.csv"
+        tf = time_frame.value if hasattr(time_frame, "value") else time_frame
+        safe_symbol = symbol.upper().replace('/', '-')
+        return f"OHLCV_{safe_symbol}_{market.upper()}_{tf}.csv"
+
+    def _canonical_storage_file_path(
+        self, storage_path, symbol: str, market: str, time_frame
+    ) -> Union[str, None]:
+        if storage_path is None or symbol is None or market is None \
+                or time_frame is None:
+            return None
+
+        return os.path.join(
+            storage_path,
+            self._canonical_storage_file_name(symbol, market, time_frame),
         )
-        return filename
+
+    def _read_ohlcv_csv(self, file_path: str) -> Union[pl.DataFrame, None]:
+        """
+        Reads a single OHLCV CSV file from disk and normalizes its
+        Datetime column to a UTC, millisecond-precision datetime, so it
+        can be safely merged with other cached/downloaded frames.
+        """
+        if not os.path.exists(file_path):
+            return None
+
+        try:
+            data = pl.read_csv(file_path, low_memory=True)
+        except Exception as e:
+            logger.warning(
+                f"Error reading cached OHLCV data from {file_path}: {e}"
+            )
+            return None
+
+        if "Datetime" not in data.columns:
+            logger.warning(
+                f"No 'Datetime' column found in {file_path}. "
+                f"Available columns: {data.columns}"
+            )
+            return None
+
+        try:
+            # Legacy files (pre canonical cache) were written with an
+            # ISO offset (e.g. "...+00:00"); the canonical cache writes
+            # a plain UTC string. Try the generic parser first since it
+            # handles both, falling back to an explicit-UTC reparse of
+            # naive timestamps.
+            data = data.with_columns(
+                pl.col("Datetime").str.to_datetime(time_zone="UTC")
+            )
+        except Exception:
+            try:
+                data = data.with_columns(
+                    pl.col("Datetime").str.to_datetime()
+                    .dt.replace_time_zone("UTC")
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Could not parse Datetime column in {file_path}: {e}"
+                )
+                return None
+
+        # Normalize to a fixed time unit so cached rows can be safely
+        # concatenated with freshly downloaded rows (which use "ms").
+        data = data.with_columns(
+            pl.col("Datetime").cast(pl.Datetime("ms", "UTC"))
+        )
+
+        numeric_columns = [
+            column for column in
+            ("Open", "High", "Low", "Close", "Volume")
+            if column in data.columns
+        ]
+
+        if numeric_columns:
+            data = data.with_columns(
+                [pl.col(c).cast(pl.Float64) for c in numeric_columns]
+            )
+
+        self.data_file_path = file_path
+        return data.sort("Datetime")
+
+    def _read_legacy_files(
+        self, storage_path, symbol: str, market: str, time_frame
+    ) -> Union[pl.DataFrame, None]:
+        """
+        Backward compatibility: before the canonical single-file cache,
+        every downloaded window was saved as its own
+        "OHLCV_<SYMBOL>_<MARKET>_<TIME_FRAME>_<START>_<END>.csv" file.
+        Scans for any such files matching (symbol, market, time_frame)
+        and merges them, so pre-existing caches keep working.
+        """
+        if storage_path is None or not os.path.isdir(storage_path):
+            return None
+
+        tf = time_frame.value if hasattr(time_frame, "value") else time_frame
+        safe_symbol = symbol.upper().replace('/', '-')
+        prefix = f"OHLCV_{safe_symbol}_{market.upper()}_{tf}_"
+        matches = [
+            os.path.join(storage_path, file_name)
+            for file_name in os.listdir(storage_path)
+            if file_name.startswith(prefix) and file_name.endswith(".csv")
+        ]
+
+        if not matches:
+            return None
+
+        frames = [self._read_ohlcv_csv(path) for path in matches]
+        return self._merge_ohlcv_frames(frames)
+
+    def _read_canonical_file(
+        self, storage_path, symbol: str, market: str, time_frame
+    ) -> Union[pl.DataFrame, None]:
+        """
+        Reads the full canonical cache file for (symbol, market,
+        time_frame) from disk, if it exists. Falls back to scanning
+        for pre-existing legacy (date-range-suffixed) files. Read-only:
+        never writes to disk. Returns None if there is no cached data
+        at all yet.
+        """
+        file_path = self._canonical_storage_file_path(
+            storage_path, symbol, market, time_frame
+        )
+
+        if file_path is not None and os.path.exists(file_path):
+            return self._read_ohlcv_csv(file_path)
+
+        return self._read_legacy_files(
+            storage_path, symbol, market, time_frame
+        )
+
+    def _write_canonical_file(
+        self, storage_path, symbol: str, market: str, time_frame, data
+    ) -> None:
+        if data is None or len(data) == 0:
+            return
+
+        file_path = self._canonical_storage_file_path(
+            storage_path, symbol, market, time_frame
+        )
+
+        if file_path is None:
+            return
+
+        os.makedirs(storage_path, exist_ok=True)
+        write_data = data.with_columns(
+            pl.col("Datetime").dt.strftime("%Y-%m-%d %H:%M:%S")
+        )
+        write_data.write_csv(file_path)
+        self.data_file_path = file_path
+
+
+    def _find_missing_ranges(
+        self, cached, start_date: datetime, end_date: datetime, time_frame
+    ) -> List[tuple]:
+        """
+        Compares the already-cached range to [start_date, end_date] and
+        returns the sub-range(s) that still need to be downloaded. An
+        empty list means the request is already fully covered by the
+        cache.
+        """
+        if cached is None or len(cached) == 0:
+            return [(start_date, end_date)]
+
+        step = timedelta(
+            minutes=TimeFrame.from_value(time_frame).amount_of_minutes
+        )
+        cached_min = cached["Datetime"].min()
+        cached_max = cached["Datetime"].max()
+        gaps = []
+
+        if start_date < cached_min:
+            gap_end = min(cached_min - step, end_date)
+            if start_date <= gap_end:
+                gaps.append((start_date, gap_end))
+
+        if end_date > cached_max:
+            gap_start = max(cached_max + step, start_date)
+            if gap_start <= end_date:
+                gaps.append((gap_start, end_date))
+
+        return gaps
+
+    def _merge_ohlcv_frames(
+        self, frames: List
+    ) -> Union[pl.DataFrame, None]:
+        frames = [
+            frame for frame in frames if frame is not None and len(frame) > 0
+        ]
+
+        if not frames:
+            return None
+
+        merged = frames[0]
+
+        for frame in frames[1:]:
+            merged = pl.concat([merged, frame], how="vertical_relaxed")
+
+        return merged.unique(subset=["Datetime"], keep="last").sort(
+            "Datetime"
+        )
+
+    def _get_or_fetch_data(
+        self,
+        symbol: str,
+        market: str,
+        time_frame,
+        storage_path: str,
+        start_date: datetime,
+        end_date: datetime,
+        persist: bool = True,
+    ) -> pl.DataFrame:
+        """
+        Canonical merge-and-slice cache.
+
+        Loads whatever is already cached on disk for (symbol, market,
+        time_frame) — including any pre-existing legacy cache files —
+        and downloads only the sub-range(s) not yet covered, instead
+        of re-downloading the full requested range every time. If new
+        data actually had to be downloaded and `persist` is True, the
+        merged result is (re)written to the single canonical cache
+        file for this symbol/market/time_frame (also migrating a
+        legacy cache file to the canonical format in the process).
+        Returns the requested [start_date, end_date] slice.
+        """
+        cached = self._read_canonical_file(
+            storage_path, symbol, market, time_frame
+        )
+        gaps = self._find_missing_ranges(
+            cached, start_date, end_date, time_frame
+        )
+
+        if not gaps:
+            merged = cached
+        else:
+            downloaded = [
+                self.get_ohlcv(
+                    symbol=symbol,
+                    time_frame=TimeFrame.from_value(time_frame),
+                    from_timestamp=gap_start,
+                    market=market,
+                    to_timestamp=gap_end,
+                )
+                for gap_start, gap_end in gaps
+            ]
+            merged = self._merge_ohlcv_frames([cached] + downloaded)
+
+            if persist:
+                self._write_canonical_file(
+                    storage_path, symbol, market, time_frame, merged
+                )
+
+        if merged is None or len(merged) == 0:
+            return merged
+
+        return merged.filter(
+            (pl.col("Datetime") >= start_date)
+            & (pl.col("Datetime") <= end_date)
+        )
 
     def _get_data_from_storage(
         self,
         storage_path,
         symbol: str,
         market: str,
-        time_frame: TimeFrame,
+        time_frame,
         start_date: datetime,
         end_date: datetime,
     ) -> Union[pl.DataFrame, None]:
         """
-        Helper function to retrieve the data from the storage path if
-        it exists. If the data does not exist, it returns None.
+        Read-only cache lookup: returns the requested [start_date,
+        end_date] slice only if the canonical cache file already fully
+        covers it. Returns None otherwise (no network access, no
+        writes).
         """
-        data = None
-        if storage_path is None:
+        cached = self._read_canonical_file(
+            storage_path, symbol, market, time_frame
+        )
+
+        if cached is None:
             return None
 
-        # Loop through all files in the data storage path
-        if not os.path.isdir(storage_path):
-            logger.debug(
-                f"Storage path {storage_path} does not exist or is not a "
-                "directory."
-            )
+        cached_min = cached["Datetime"].min()
+        cached_max = cached["Datetime"].max()
+
+        if cached_min is None or cached_min > start_date \
+                or cached_max is None or cached_max < end_date:
             return None
 
-        for file_name in os.listdir(storage_path):
-            if file_name.startswith("OHLCV_") and file_name.endswith(".csv"):
+        data = cached.filter(
+            (pl.col("Datetime") >= start_date)
+            & (pl.col("Datetime") <= end_date)
+        )
 
-                try:
-                    data_source_spec = self.\
-                        _get_data_source_specification_from_file_name(
-                            file_name
-                        )
-
-                    if data_source_spec is None:
-                        continue
-
-                    if data_source_spec.symbol.upper() == symbol.upper() and \
-                        data_source_spec.market.upper() == market.upper() and \
-                            data_source_spec.time_frame.equals(time_frame):
-
-                        # Check if the data source specification matches
-                        # the start and end date if its specified
-                        if (data_source_spec.start_date is not None and
-                            data_source_spec.end_date is not None and
-                                (data_source_spec.start_date <= start_date
-                                 and data_source_spec.end_date >= end_date)):
-
-                            # If the data source specification matches,
-                            # read the file
-                            file_path = os.path.join(storage_path, file_name)
-                            self.data_file_path = file_path
-
-                            # Read CSV as-is first
-                            data = pl.read_csv(file_path, low_memory=True)
-
-                            # Check what columns we have
-                            if "Datetime" in data.columns:
-                                # Try to parse the datetime column
-                                try:
-                                    # Try the ISO format with timezone first
-                                    data = data.with_columns(
-                                        pl.col("Datetime").str.to_datetime(
-                                            format="%Y-%m-%dT%H:%M:%S%.f%z",
-                                            time_zone="UTC"
-                                        )
-                                    )
-                                except Exception as e1:
-                                    try:
-                                        # Fallback: let Polars infer the format
-                                        data = data.with_columns(
-                                            pl.col("Datetime").str.to_datetime(
-                                                time_zone="UTC"
-                                            )
-                                        )
-                                    except Exception as e2:
-                                        logger.warning(
-                                            f"Could not parse Datetime "
-                                            f"column in {file_name}: "
-                                            f"Format error: {str(e1)}, "
-                                            f"Infer error: {str(e2)}"
-                                        )
-                                        continue
-                            else:
-                                logger.warning(
-                                    f"No 'Datetime' column "
-                                    f"found in {file_name}. "
-                                    f"Available columns: {data.columns}"
-                                )
-                                continue
-
-                            # Filter by date range
-                            data = data.filter(
-                                (pl.col("Datetime") >= start_date) &
-                                (pl.col("Datetime") <= end_date)
-                            )
-                            break
-
-                except Exception as e:
-                    logger.warning(
-                        f"Error reading data from {file_name}: {str(e)}"
-                    )
-                    continue
+        if len(data) == 0:
+            return None
 
         return data
-
-    def _get_data_source_specification_from_file_name(
-        self, file_name: str
-    ) -> Union[DataSource, None]:
-        """
-        Extracts the data source specification from the OHLCV data filename.
-        Given that the file name is in the format:
-
-        "OHLCV_<SYMBOL>_<MARKET>_<TIME_FRAME>_<START_DATE>_<END_DATE>.csv",
-        this function extracts all attributes and returns a DataSource object.
-        This object can then later be used to compare it to the datasource
-        object that is passed to the get_data method.
-
-        Args:
-            file_name (str): The file name from which to extract the DataSource
-
-        Returns:
-            DataSource: The extracted data source specification.
-        """
-
-        try:
-            parts = file_name.split('_')
-
-            if len(parts) < 3:
-                return None
-
-            data_type = parts[0].upper()
-            symbol = parts[1].upper().replace('-', '/')
-            market = parts[2].upper()
-            time_frame_str = parts[3]
-            start_date_str = parts[4]
-            end_date_str = parts[5].replace('.csv', '')
-            return DataSource(
-                data_type=DataType.from_string(data_type),
-                symbol=symbol,
-                market=market,
-                time_frame=TimeFrame.from_string(time_frame_str),
-                start_date=parser.parse(
-                    start_date_str
-                ).replace(tzinfo=timezone.utc),
-                end_date=parser.parse(
-                    end_date_str
-                ).replace(tzinfo=timezone.utc)
-            )
-        except ValueError:
-            logger.info(
-                f"Could not extract data source attributes from "
-                f"file name: {file_name}. "
-                f"Expected format 'OHLCV_<SYMBOL>_<MARKET>_<TIME_FRAME>_"
-                f"<START_DATE>_<END_DATE>.csv."
-            )
-            return None
 
     def _precompute_sliding_windows(
         self,
