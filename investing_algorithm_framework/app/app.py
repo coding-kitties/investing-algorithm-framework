@@ -787,6 +787,74 @@ class App:
             configuration_service.add_value(APP_MODE, AppMode.WEB.value)
             self._initialize_web()
 
+    def _bind_algorithm_control_persistence(self):
+        """
+        Wires the algorithm runner's enabled/disabled control file to
+        this app's resource directory (and state handler, if any).
+        Safe to call multiple times/from multiple entry points
+        (``run()``, ``start_algorithm()``, ``stop_algorithm()``,
+        ``is_algorithm_enabled()``) since it just re-binds the same
+        path.
+        """
+        algorithm_runner = self.container.algorithm_runner()
+        algorithm_runner.bind_persistence(
+            self.resource_directory_path, state_handler=self._state_handler
+        )
+        return algorithm_runner
+
+    def start_algorithm(self) -> bool:
+        """
+        Enables the algorithm and, if it is currently running live in
+        this process, resumes it. In a stateless deployment (AWS
+        Lambda, Azure Functions) there is no in-process loop to
+        resume — enabling it here is enough, since ``run()`` checks
+        this same persisted flag on every future invocation.
+
+        Returns:
+            bool: True if an in-process loop was (re)started, False
+                otherwise (already running, or no live loop to
+                resume).
+        """
+        algorithm_runner = self._bind_algorithm_control_persistence()
+
+        try:
+            return algorithm_runner.start()
+        except OperationalException:
+            # No live event loop configured yet (e.g. this app has
+            # never called `run()` in this process, or it's a
+            # stateless deployment) — persisting 'enabled' is enough.
+            algorithm_runner.enable()
+            return False
+
+    def stop_algorithm(self, reason: str = None, wait: bool = False) -> bool:
+        """
+        Disables the algorithm and, if it is currently running live in
+        this process, signals it to stop after its current iteration.
+        In a stateless deployment (AWS Lambda, Azure Functions), this
+        persists 'disabled' so the next scheduled invocation of
+        ``run()`` skips its iteration entirely.
+
+        Args:
+            reason: Optional human-readable reason to persist
+                alongside the disabled state.
+            wait: If True, blocks until the in-process loop (if any)
+                has actually exited.
+
+        Returns:
+            bool: True if an in-process loop was signaled to stop,
+                False otherwise (it wasn't running).
+        """
+        algorithm_runner = self._bind_algorithm_control_persistence()
+        return algorithm_runner.stop(reason=reason, wait=wait)
+
+    def is_algorithm_enabled(self) -> bool:
+        """Returns whether the algorithm is currently enabled."""
+        return self._bind_algorithm_control_persistence().is_enabled()
+
+    def get_algorithm_control_state(self) -> dict:
+        """Returns the persisted enabled/disabled control state."""
+        return self._bind_algorithm_control_persistence().get_control_state()
+
     def run(self, number_of_iterations: int = None):
         """
         Entry point to run the application. This method should be called to
@@ -834,6 +902,17 @@ class App:
             config = self.container.configuration_service().get_config()
             self._state_handler.load(config[RESOURCE_DIRECTORY])
 
+        algorithm_runner = self._bind_algorithm_control_persistence()
+
+        if not algorithm_runner.is_enabled():
+            control_state = algorithm_runner.get_control_state()
+            logger.info(
+                "Algorithm is disabled (stopped via the control API "
+                f"or control file, reason: {control_state.get('reason')})"
+                " — skipping this run."
+            )
+            return
+
         self.initialize_storage()
         logger.info("App initialization complete")
         event_loop_service = None
@@ -852,9 +931,12 @@ class App:
             self.initialize_services()
             self.initialize_portfolios()
 
-            if AppMode.WEB.equals(self.config[APP_MODE]) \
-                    and not (self._flask_app and self._flask_app.testing) \
-                    and number_of_iterations is None:
+            is_live_web_run = AppMode.WEB.equals(self.config[APP_MODE]) \
+                and not (self._flask_app and self._flask_app.testing) \
+                and number_of_iterations is None
+            flask_thread = None
+
+            if is_live_web_run:
                 logger.info("Running web")
                 flask_thread = threading.Thread(
                     name='Web App',
@@ -889,12 +971,28 @@ class App:
                 algorithm, trade_order_evaluator=trade_order_evaluator
             )
 
-            try:
-                event_loop_service.start(
-                    number_of_iterations=number_of_iterations
-                )
-            except KeyboardInterrupt:
-                exit(0)
+            if is_live_web_run:
+                # Run the event loop in its own background thread so
+                # the web API can start/stop it on demand (see
+                # `/api/algorithm/start` and `/api/algorithm/stop`)
+                # without killing the process. The main thread just
+                # keeps the process alive alongside the Flask thread.
+                algorithm_runner.configure(event_loop_service)
+                algorithm_runner.start()
+
+                try:
+                    while flask_thread.is_alive():
+                        flask_thread.join(timeout=1)
+                except KeyboardInterrupt:
+                    algorithm_runner.stop(wait=True)
+                    exit(0)
+            else:
+                try:
+                    event_loop_service.start(
+                        number_of_iterations=number_of_iterations
+                    )
+                except KeyboardInterrupt:
+                    exit(0)
         except Exception as e:
             logger.error(e)
             raise e

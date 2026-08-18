@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a3] — 2026-08-18
+
+### Added
+
+- **Web API: algorithm control and insights** (`app/web/controllers/algorithm.py`)
+  - `GET /api/algorithm/status` — run status plus the persisted enabled/disabled
+    control state.
+  - `POST /api/algorithm/start` / `POST /api/algorithm/stop` (`?wait=true`,
+    `?reason=...`) — start/stop the live event loop. The enabled/disabled flag
+    is persisted to the resource directory (and pushed immediately via a
+    configured `StateHandler`), so stateless deployments (AWS Lambda, Azure
+    Functions) honor it on their next scheduled invocation too. New
+    `App.start_algorithm()` / `App.stop_algorithm()` / `App.is_algorithm_enabled()`
+    / `App.get_algorithm_control_state()` expose the same control directly to
+    serverless handler code, without needing Flask at all.
+  - `GET /api/algorithm/insights` — equity curve, drawdown series, max drawdown,
+    win rate, Sharpe ratio, trade/portfolio counts, computed from live data.
+- **Web API: `GET /api/trades` / `GET /api/trades/count`** — trades previously
+  had no REST endpoint at all, unlike orders/positions/portfolios.
+- Wired the new algorithm start/stop/status controls into the AWS Lambda and
+  Azure Function project scaffolds (`iaf init --type aws_lambda|azure_function`).
+
+### Fixed
+
+- **Real bug in `EventLoopService.start()`** (`app/eventloop.py`): the live/
+  unbounded loop (no `schedule`, no `number_of_iterations`) ran exactly one
+  iteration and returned instead of looping indefinitely as documented. Fixed
+  by wrapping it in a `while` loop gated on a new stop flag
+  (`request_stop()`/`reset_stop()`), which is also what makes the new
+  start/stop API actually work.
+
+### Changed — reduced default install footprint
+
+- Removed `plotly` as a core dependency; all backtest-report charts now render
+  via `finterion-charts` (lighter, no bundled JS payload) instead.
+- Removed `jupyter` from core dependencies (never imported at runtime; moved to
+  the `dev` dependency group).
+- Removed the unused `Flask-Migrate` dependency (and its transitive `alembic`/
+  `Flask-SQLAlchemy`/`Mako`).
+- `boto3` and the Azure SDK packages (`azure-storage-blob`, `azure-identity`,
+  `azure-mgmt-*`) are now optional extras (`pip install
+  investing-algorithm-framework[aws]` / `[azure]`) instead of hard
+  dependencies — they were previously imported eagerly at package-import time
+  even for users who never touch cloud state storage.
+
 ## [9.0.0a2] — 2026-08-10
 
 ### Fixed

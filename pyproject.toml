@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "investing-algorithm-framework"
-version = "9.0.0a2"
+version = "9.0.0a3"
 description = "A framework for creating trading bots"
 authors = ["MDUYN"]
 readme = "README.md"
@@ -11,7 +11,6 @@ exclude = ["tests", "static", "examples", "docs"]
 python = ">=3.10,<4.0"
 wrapt = ">=1.16.0"
 Flask = ">=3.1.0"
-Flask-Migrate = ">=2.6.0"
 Flask-Cors = ">=3.0.9,<7.0.0"
 SQLAlchemy = ">=2.0.18"
 marshmallow = ">=3.5.0"
@@ -22,18 +21,17 @@ schedule = ">=1.1.0"
 tqdm = ">=4.66.1"
 tabulate = ">=0.9.0"
 polars = { version = ">=0.20.10", extras = ["numpy", "pandas"] }
-jupyter = ">=1.0.0"
-azure-storage-blob = "^12.24.0"
-azure-identity = "^1.19.0"
-azure-mgmt-storage = "^21.2.1"
-azure-mgmt-web = "^7.3.1"
-azure-mgmt-resource = "^23.2.0"
 python-dotenv = "^1.0.1"
 yfinance = {version = "^0.2.61", optional = true}
 alpha_vantage = {version = "^3.0.0", optional = true}
 polygon-api-client = {version = "^1.14.0", optional = true}
-plotly = "^6.1.2"
-boto3 = "^1.38.41"
+finterion-charts = "1.4.0"
+boto3 = {version = "^1.38.41", optional = true}
+azure-storage-blob = {version = "^12.24.0", optional = true}
+azure-identity = {version = "^1.19.0", optional = true}
+azure-mgmt-storage = {version = "^21.2.1", optional = true}
+azure-mgmt-web = {version = "^7.3.1", optional = true}
+azure-mgmt-resource = {version = "^23.2.0", optional = true}
 msgpack = ">=1.0.0"
 zstandard = ">=0.20.0"
 pyarrow = ">=14.0.0"
@@ -42,17 +40,20 @@ pyarrow = ">=14.0.0"
 yahoo = ["yfinance"]
 alpha_vantage = ["alpha_vantage"]
 polygon = ["polygon-api-client"]
-all = ["yfinance", "alpha_vantage", "polygon-api-client"]
+aws = ["boto3"]
+azure = ["azure-storage-blob", "azure-identity", "azure-mgmt-storage", "azure-mgmt-web", "azure-mgmt-resource"]
+all = ["yfinance", "alpha_vantage", "polygon-api-client", "boto3", "azure-storage-blob", "azure-identity", "azure-mgmt-storage", "azure-mgmt-web", "azure-mgmt-resource"]
 
 [tool.poetry.group.test.dependencies]
 coverage= "7.4.2"
 flake8 = "7.0.0"
 Flask-Testing = "^0.8.1"
 pyindicators = "0.11.1"
-finterion-charts = "1.4.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
+jupyter = "^1.0.0"
+
 
 [build-system]
 requires = ["poetry-core"]

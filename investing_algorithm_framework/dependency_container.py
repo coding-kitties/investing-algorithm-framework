@@ -1,6 +1,8 @@
 from dependency_injector import containers, providers
 
 from investing_algorithm_framework.app.algorithm import AlgorithmFactory
+from investing_algorithm_framework.app.algorithm_runner import \
+    AlgorithmRunner
 from investing_algorithm_framework.app.context import Context
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, BacktestService, \
@@ -34,6 +36,9 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     market_credential_service = providers.ThreadSafeSingleton(
         MarketCredentialService
+    )
+    algorithm_runner = providers.ThreadSafeSingleton(
+        AlgorithmRunner
     )
     order_repository = providers.Factory(SQLOrderRepository)
     order_executor_lookup = providers.ThreadSafeSingleton(

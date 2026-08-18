@@ -965,7 +965,6 @@ class CCXTOHLCVDataProvider(DataProvider):
         write_data.write_csv(file_path)
         self.data_file_path = file_path
 
-
     def _find_missing_ranges(
         self, cached, start_date: datetime, end_date: datetime, time_frame
     ) -> List[tuple]:

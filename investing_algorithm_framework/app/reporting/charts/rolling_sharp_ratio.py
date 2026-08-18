@@ -1,18 +1,22 @@
+import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
+from finterion_charts import ChartSpec, Indicator
+
+from ._finterion_render import FinterionChart
 
 
 def get_rolling_sharpe_ratio_chart(rolling_sharpe_ratio_series):
     """
-    Generates a Plotly figure showing the rolling Sharpe ratio series.
+    Generates a finterion-charts ChartSpec showing the rolling Sharpe
+    ratio series.
 
     Args:
         rolling_sharpe_ratio_series: List of tuples with rolling Sharpe
             ratio data. Each tuple should contain a Sharpe ratio
             value and the corresponding timestamp.
     Returns:
-        plotly.graph_objects.Figure: A Plotly figure containing
-        the rolling Sharpe ratio chart.
+        FinterionChart: A chart wrapper containing the rolling Sharpe
+        ratio chart, renderable via ``.to_html()``.
     """
     results = rolling_sharpe_ratio_series
     rolling_sharpe_ratio_df = pd.DataFrame(
@@ -22,58 +26,24 @@ def get_rolling_sharpe_ratio_chart(rolling_sharpe_ratio_series):
         rolling_sharpe_ratio_df['timestamp']
     )
 
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=rolling_sharpe_ratio_df['timestamp'],
-            y=rolling_sharpe_ratio_df['sharpe_ratio'],
-            mode='lines',
-            name='Rolling Sharpe Ratio',
-            line=dict(color='#1f77b4', width=2)
-        )
-    )
+    time_ms = rolling_sharpe_ratio_df['timestamp'] \
+        .astype("datetime64[ms]").astype("int64").to_numpy()
+    # Bars can't hold NaN (warmup period); the Sharpe values themselves
+    # (with NaN preserved as a gap) go in a column instead.
+    flat = np.ones(len(time_ms))
+    sharpe_values = rolling_sharpe_ratio_df['sharpe_ratio'].to_numpy()
 
-    last_nan_row = rolling_sharpe_ratio_df[
-        rolling_sharpe_ratio_df['sharpe_ratio'].isna()
-    ]
-    if not last_nan_row.empty:
-        last_nan_date = last_nan_row['timestamp'].max()
-        fig.add_vline(
-            x=last_nan_date,
-            line=dict(color='grey', width=1, dash='dash')
-        )
+    spec = ChartSpec(theme="finterion-light", grid="horizontal")
+    spec.with_bars(time=time_ms, open=flat, high=flat, low=flat, close=flat)
+    spec.with_column("sharpe", sharpe_values)
+    spec.add_panel(Indicator.panel(
+        id="sharpe",
+        weight=1,
+        values="sharpe",
+        kind="line",
+        color="#1f77b4",
+        title="Rolling Sharpe Ratio",
+        ref_lines=[0],
+    ))
 
-    fig.update_layout(
-        xaxis=dict(
-            showgrid=True,
-            gridcolor='lightgray',
-            tickformat='%b %Y',
-            tickfont=dict(color='black'),
-            showline=True,
-            linecolor='black',
-            ticks='outside',
-            tickcolor='black'
-        ),
-        yaxis=dict(
-            title='Rolling Sharpe Ratio',
-            showgrid=True,
-            gridcolor='lightgray',
-            tickfont=dict(color='black'),
-            showline=True,
-            linecolor='black',
-            ticks='outside',
-            tickcolor='black'
-        ),
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        font=dict(color='black'),
-        hovermode='x unified',
-        legend=dict(
-            font=dict(color='black'),
-            bgcolor='rgba(0,0,0,0)',
-            bordercolor='black'
-        ),
-        height=300,
-        margin=dict(l=20, r=20, t=30, b=20)
-    )
-    return fig
+    return FinterionChart(spec.validate(), height=300)

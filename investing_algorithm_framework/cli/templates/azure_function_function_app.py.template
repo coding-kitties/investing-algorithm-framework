@@ -1,3 +1,4 @@
+import json
 import logging
 import azure.functions as func
 
@@ -20,6 +21,10 @@ def run_trading_bot(req: func.HttpRequest) -> func.HttpResponse:
     """Manually trigger one strategy run (useful for debugging)."""
     logger.info("Manual run request received.")
     try:
+        if not trading_bot_app.is_algorithm_enabled():
+            return func.HttpResponse(
+                "Algorithm is disabled, skipped.", status_code=200
+            )
         trading_bot_app.run(number_of_iterations=1)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Trading bot run failed: %s", exc)
@@ -29,6 +34,42 @@ def run_trading_bot(req: func.HttpRequest) -> func.HttpResponse:
 
     return func.HttpResponse(
         "Trading bot executed successfully.", status_code=200
+    )
+
+
+@app.route(route="stop", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def stop_trading_bot(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Disables the algorithm. The flag is persisted via the configured
+    state handler, so the next scheduled invocation skips its run too.
+    """
+    reason = req.params.get("reason")
+    trading_bot_app.stop_algorithm(reason=reason)
+    return func.HttpResponse(
+        json.dumps(trading_bot_app.get_algorithm_control_state()),
+        status_code=200,
+        mimetype="application/json",
+    )
+
+
+@app.route(route="start", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def start_trading_bot(req: func.HttpRequest) -> func.HttpResponse:
+    """Re-enables the algorithm after a ``stop`` call."""
+    trading_bot_app.start_algorithm()
+    return func.HttpResponse(
+        json.dumps(trading_bot_app.get_algorithm_control_state()),
+        status_code=200,
+        mimetype="application/json",
+    )
+
+
+@app.route(route="status", auth_level=func.AuthLevel.ANONYMOUS)
+def status_trading_bot(req: func.HttpRequest) -> func.HttpResponse:
+    """Returns the persisted enabled/disabled control state."""
+    return func.HttpResponse(
+        json.dumps(trading_bot_app.get_algorithm_control_state()),
+        status_code=200,
+        mimetype="application/json",
     )
 
 
@@ -45,6 +86,8 @@ def run_trading_bot(req: func.HttpRequest) -> func.HttpResponse:
 def scheduled_trading_bot(timer: func.TimerRequest) -> None:
     logger.info("Scheduled trading bot triggered.")
     try:
+        # `app.run()` already skips the iteration on its own when
+        # disabled, so a plain call here is enough.
         trading_bot_app.run(number_of_iterations=1)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Scheduled trading bot run failed: %s", exc)

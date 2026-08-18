@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from threading import Event
 from time import sleep
 from typing import List, Set, Dict
 from logging import getLogger
@@ -87,6 +88,27 @@ class EventLoopService:
         # One-shot flag: live-mode envelope validation runs once per
         # process. Reset by ``cleanup`` so a new run re-validates.
         self._pipelines_live_validated: bool = False
+
+        # Set by ``request_stop`` to gracefully break out of the live
+        # (unbounded) loop in ``start``. Cleared by ``reset_stop`` so
+        # the loop can be (re)started again afterwards.
+        self._stop_event = Event()
+
+    def request_stop(self) -> None:
+        """
+        Signals a running (unbounded) ``start()`` call to stop after
+        it finishes its current iteration. Safe to call from another
+        thread.
+        """
+        self._stop_event.set()
+
+    def reset_stop(self) -> None:
+        """Clears a previous stop request so ``start()`` can run again."""
+        self._stop_event.clear()
+
+    @property
+    def stop_requested(self) -> bool:
+        return self._stop_event.is_set()
 
     @staticmethod
     def _get_data_sources_for_iteration(
@@ -500,24 +522,32 @@ class EventLoopService:
                     )
         else:
             if number_of_iterations is None:
-                try:
-                    config = self._configuration_service.config
-                    current_time = config[INDEX_DATETIME]
-                    strategies = self._get_due_strategies(current_time)
-                    tasks = self._get_due_tasks(current_time)
-                    sf_calls = self._get_due_scheduled_functions(current_time)
-                    self._run_iteration(
-                        strategies=strategies,
-                        tasks=tasks,
-                        scheduled_function_calls=sf_calls,
-                    )
-                    current_time = datetime.now(timezone.utc)
-                    self._configuration_service.add_value(
-                        INDEX_DATETIME, current_time
-                    )
-                    sleep(1)
-                except KeyboardInterrupt:
-                    exit(0)
+                # Unbounded live loop: keeps iterating until a stop is
+                # requested (e.g. via ``request_stop()`` from the web
+                # API) or the process receives a KeyboardInterrupt.
+                while not self._stop_event.is_set():
+                    try:
+                        config = self._configuration_service.config
+                        current_time = config[INDEX_DATETIME]
+                        strategies = self._get_due_strategies(current_time)
+                        tasks = self._get_due_tasks(current_time)
+                        sf_calls = \
+                            self._get_due_scheduled_functions(current_time)
+                        self._run_iteration(
+                            strategies=strategies,
+                            tasks=tasks,
+                            scheduled_function_calls=sf_calls,
+                        )
+                        current_time = datetime.now(timezone.utc)
+                        self._configuration_service.add_value(
+                            INDEX_DATETIME, current_time
+                        )
+                    except KeyboardInterrupt:
+                        break
+                    # Wakes up immediately if a stop is requested
+                    # instead of always waiting out the full second.
+                    if self._stop_event.wait(1):
+                        break
             else:
 
                 if show_progress:

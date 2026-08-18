@@ -153,6 +153,7 @@ bumpversion.egg-info/
 **/backtest_reports/
 **/backtest_reports/*
 **/databases/
+**/algorithm_control.json
 .vscode/
 .logs
 venv

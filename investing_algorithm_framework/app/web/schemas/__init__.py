@@ -4,6 +4,8 @@ from investing_algorithm_framework.app.web.schemas.portfolio import\
     PortfolioSerializer
 from investing_algorithm_framework.app.web.schemas.position import \
     PositionSerializer
+from investing_algorithm_framework.app.web.schemas.trade import \
+    TradeSerializer
 from investing_algorithm_framework.app.web.schemas.backtest_result import \
     BacktestRunSerializer, BacktestRunOrderSerializer, \
     BacktestRunTradeSerializer, BacktestRunPositionSerializer, \
@@ -14,6 +16,7 @@ __all__ = [
     "OrderSerializer",
     "PositionSerializer",
     "PortfolioSerializer",
+    "TradeSerializer",
     "BacktestRunSerializer",
     "BacktestRunOrderSerializer",
     "BacktestRunTradeSerializer",
