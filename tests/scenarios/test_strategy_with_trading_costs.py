@@ -25,6 +25,7 @@ from investing_algorithm_framework import (
     create_app, BacktestDateRange, PositionSize,
     RESOURCE_DIRECTORY, CSVOHLCVDataProvider, TradingCost,
     Schedule, SignalSide, signal_series_from_column,
+    Study, Universe, BacktestWindow, BacktestEngine,
 )
 
 
@@ -176,12 +177,17 @@ def _run_backtest(strategy_class, fee_pct=0.0, slippage_pct=0.0):
     )
     strategy = strategy_class()
     app.add_strategy(strategy)
-    backtest = app.run_vector_backtest(
-        backtest_date_range=BacktestDateRange(
-            start_date=START_DATE, end_date=END_DATE
-        ),
+    study = Study(
+        universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+        backtest_windows=[
+            BacktestWindow(train_range=BacktestDateRange(
+                start_date=START_DATE, end_date=END_DATE,
+            ))
+        ],
+        engines=[BacktestEngine.VECTOR],
     )
-    runs = backtest.get_all_backtest_runs()
+    backtests = app.run_backtest(study=study)
+    runs = backtests[0].get_all_backtest_runs()
     assert len(runs) == 1, f"Expected 1 run, got {len(runs)}"
     trades = runs[0].trades
     closed = [t for t in trades if t.status == "CLOSED"]

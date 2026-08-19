@@ -12,9 +12,9 @@ end-to-end vector backtest is wired up.
 ## Why this fits the framework
 
 - One symbol, bar-aligned, no intra-bar logic — perfect for
-  `run_vector_backtest`.
-- `generate_buy_signals` / `generate_sell_signals` return boolean `pd.Series`
-  per symbol, exactly what the vector engine expects.
+  `run_backtest(strategy=..., study=Study(engines=[BacktestEngine.VECTOR]))`.
+- `generate_signal_series` yields `SignalSeries` per symbol/side,
+  exactly what the vector engine expects.
 - `pyindicators.ema` does the heavy lifting; no custom indicator code.
 
 ## Parameters

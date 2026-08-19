@@ -107,7 +107,7 @@ errors that no amount of grid search can fix.
 
 | Feature | Status |
 |---|---|
-| `app.run_vector_backtest()` — single-window, single-strategy | Implemented |
+| `app.run_backtest(strategy=..., study=Study(engines=[BacktestEngine.VECTOR]))` — single-window, single-strategy | Implemented |
 | `backtest.get_backtest_run()` — extract trades, orders, signals | Implemented |
 | Signal series in `BacktestRun.signals` and `BacktestRun.signal_events` | Implemented |
 | `BacktestRun.recorded_values` — custom indicator snapshots | Implemented |
@@ -176,7 +176,7 @@ Phase 4 addresses.
 | Feature | Status |
 |---|---|
 | `generate_rolling_backtest_windows()` with train/gap/test splits | Implemented |
-| `app.run_vector_backtests()` with `window_filter_function` | Implemented |
+| `app.run_backtests()` with `window_filter_function` | Implemented |
 | `generate_algorithm_id(params=...)` — deterministic fingerprint | Implemented |
 | `rank_results()` — in-memory weighted scoring | Implemented |
 | `build_index()` / `rank_index()` — Tier-1 SQLite millisecond ranking | Implemented |

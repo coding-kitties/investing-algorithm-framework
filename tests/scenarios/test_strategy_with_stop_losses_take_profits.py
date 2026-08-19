@@ -9,7 +9,8 @@ import pandas as pd
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, StopLossRule, TakeProfitRule, CSVOHLCVDataProvider, Schedule
+    RESOURCE_DIRECTORY, StopLossRule, TakeProfitRule, \
+    CSVOHLCVDataProvider, Schedule, SignalSide, signal_series_from_column
 
 
 class FixedStopLossTakeProfitStrategy(TradingStrategy):
@@ -49,30 +50,23 @@ class FixedStopLossTakeProfitStrategy(TradingStrategy):
         )
     ]
 
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals = {}
-
+    def generate_signal_series(self, data: Dict[str, Any]):
         for symbol in self.symbols:
-            df = data["BTC_EUR_OHLCV"]
-            signals[symbol] = pd.Series(
-                [False] * len(df), index=df.index
-            )
-
-        return signals
-
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals = {}
-
-        for symbol in self.symbols:
-            df = data["BTC_EUR_OHLCV"]
+            df = data["BTC_EUR_OHLCV"].copy()
             buy_signal = df['Close'] == 110
-            signals[symbol] = buy_signal
-
-        return signals
+            sell_signal = pd.Series(False, index=df.index)
+            df["_buy_signal"] = buy_signal
+            df["_sell_signal"] = sell_signal
+            yield signal_series_from_column(
+                df, "_buy_signal",
+                side=SignalSide.OPEN_LONG, symbol=symbol,
+                source="test_fixture",
+            )
+            yield signal_series_from_column(
+                df, "_sell_signal",
+                side=SignalSide.CLOSE_LONG, symbol=symbol,
+                source="test_fixture",
+            )
 
 
 @unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")

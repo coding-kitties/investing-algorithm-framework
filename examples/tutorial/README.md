@@ -135,9 +135,10 @@ Visualize and understand strategy logic:
 Run your first backtest and then scale up to thousands of parameter
 combinations:
 
-- **`run_vector_backtest()`** - Single strategy vectorized backtest
-  (the baseline run)
-- **`run_vector_backtests()`** - Batch vectorized backtesting
+- **`run_backtest()`** - Single strategy backtest (the baseline run)
+- **`run_backtests()`** - Batch backtesting across many strategies
+- **`Study`** - Bundles the universe, date range(s), and engine choice
+  (set `engines=[BacktestEngine.VECTOR]` for the fast vectorized engine)
 - **`BacktestReport`** - Generate HTML reports
 - **`rank_results()`** - Rank strategies by performance
 - **`create_weights()`** - Custom ranking weights
@@ -145,13 +146,20 @@ combinations:
 - **Final filtering** - Filter combined results
 
 ```python
-# Baseline run
-backtest = app.run_vector_backtest(
-    backtest_date_range=date_range,
-    strategy=strategy,
-    initial_amount=1000,
-    risk_free_rate=0.027
+from investing_algorithm_framework import Study, Universe, \
+    BacktestWindow, BacktestEngine
+
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    risk_free_rate=0.027,
+    backtest_windows=[BacktestWindow(train_range=date_range)],
+    engines=[BacktestEngine.VECTOR],
 )
+
+# Baseline run
+backtests = app.run_backtest(strategy=strategy, study=study)
+backtest = backtests[0]
 BacktestReport(backtest).show(browser=True)
 
 # Parameter grid
@@ -162,9 +170,17 @@ params = {
 }
 strategies = [Strategy(**p) for p in generate_combinations(params)]
 
-backtests = app.run_vector_backtests(
-    backtest_date_ranges=date_ranges,
+sweep_study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,
+    study=sweep_study,
     window_filter_function=window_filter,
     final_filter_function=final_filter,
     show_progress=True
@@ -187,9 +203,9 @@ Advanced backtesting features:
 - **Storage directories** - Persist results to disk
 
 ```python
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
+    study=sweep_study,
     n_workers=-1,  # Use all CPU cores
     use_checkpoints=True,
     backtest_storage_directory="./backtests/experiment_1",
@@ -209,16 +225,29 @@ Realistic trade simulation:
 - More accurate slippage and fill modeling
 
 ```python
-# Single event-based backtest
-backtest = app.run_backtest(
-    backtest_date_range=date_range,
-    initial_amount=1000
+event_study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=date_range)],
+    engines=[BacktestEngine.EVENT_DRIVEN],
 )
 
+# Single event-based backtest
+backtests = app.run_backtest(strategy=strategy, study=event_study)
+backtest = backtests[0]
+
 # Batch event-based backtests
+sweep_event_study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.EVENT_DRIVEN],
+)
 backtests = app.run_backtests(
-    backtest_date_ranges=date_ranges,
     strategies=strategies,
+    study=sweep_event_study,
     n_workers=4
 )
 ```
@@ -303,10 +332,8 @@ full contract.
 ### Backtesting
 | Function | Description |
 |----------|-------------|
-| `run_vector_backtest()` | Single vectorized backtest |
-| `run_vector_backtests()` | Batch vectorized backtests |
-| `run_backtest()` | Single event-based backtest |
-| `run_backtests()` | Batch event-based backtests |
+| `run_backtest()` | Single strategy backtest (vector or event engine, via `Study.engines`) |
+| `run_backtests()` | Batch backtest across many strategies (vector or event engine, via `Study.engines`) |
 
 ### Analysis & Ranking
 | Function | Description |

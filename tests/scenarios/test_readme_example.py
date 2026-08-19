@@ -14,9 +14,13 @@ from unittest import TestCase
 
 from investing_algorithm_framework import (
     BacktestDateRange,
+    BacktestEngine,
+    BacktestWindow,
     DATA_DIRECTORY,
     RESOURCE_DIRECTORY,
     SnapshotInterval,
+    Study,
+    Universe,
     create_app,
 )
 
@@ -182,19 +186,25 @@ class TestReadmeExample(TestCase):
         )
 
         strategy = strategy_class(algorithm_id="readme-example-test")
-        backtest = app.run_vector_backtest(
-            initial_amount=1000,
-            backtest_date_range=BacktestDateRange(
-                start_date=datetime(2023, 9, 1, tzinfo=timezone.utc),
-                end_date=datetime(2023, 11, 15, tzinfo=timezone.utc),
-            ),
-            strategy=strategy,
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
+            backtest_windows=[
+                BacktestWindow(train_range=BacktestDateRange(
+                    start_date=datetime(2023, 9, 1, tzinfo=timezone.utc),
+                    end_date=datetime(2023, 11, 15, tzinfo=timezone.utc),
+                ))
+            ],
+            engines=[BacktestEngine.VECTOR],
+        )
+        backtests = app.run_backtest(
+            strategy=strategy,
+            study=study,
+            snapshot_interval=SnapshotInterval.DAILY,
             use_checkpoints=False,
         )
+        backtest = backtests[0]
 
         self.assertIsNotNone(backtest)
         self.assertEqual(len(backtest.get_all_backtest_runs()), 1)

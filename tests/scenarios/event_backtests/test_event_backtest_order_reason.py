@@ -17,7 +17,8 @@ import pandas as pd
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
     RESOURCE_DIRECTORY, CSVOHLCVDataProvider, ScalingRule, Schedule, \
-    SignalSide, SignalSeries, signals_from_column
+    SignalSide, SignalSeries, signals_from_column, Study, Universe, \
+    BacktestWindow, BacktestEngine
 
 # Reuse the same CSV as test_event_vs_vector_backtest.py
 CSV_FILENAME = "OHLCV_BTC-EUR_BITVAVO_2h_SCALING_FAST.csv"
@@ -130,6 +131,19 @@ def _create_app(name):
     return app
 
 
+def _build_study(engine):
+    return Study(
+        universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+        risk_free_rate=0.027,
+        backtest_windows=[
+            BacktestWindow(train_range=BacktestDateRange(
+                start_date=START_DATE, end_date=END_DATE,
+            ))
+        ],
+        engines=[engine],
+    )
+
+
 class TestEventBacktestBuySellMetadata(TestCase):
     """
     Event backtest with simple buy/sell strategy.
@@ -140,16 +154,12 @@ class TestEventBacktestBuySellMetadata(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        date_range = BacktestDateRange(
-            start_date=START_DATE, end_date=END_DATE
-        )
         app = _create_app("EventBuySellMeta")
-        backtest = app.run_backtest(
+        backtests = app.run_backtest(
             strategy=SimpleBuySellStrategy(algorithm_id="event_meta"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+            study=_build_study(BacktestEngine.EVENT_DRIVEN),
         )
-        cls.backtest_run = backtest.get_all_backtest_runs()[0]
+        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
 
     def test_orders_exist(self):
         orders = self.backtest_run.orders
@@ -194,16 +204,12 @@ class TestEventBacktestScalingMetadata(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        date_range = BacktestDateRange(
-            start_date=START_DATE, end_date=END_DATE
-        )
         app = _create_app("EventScaleMeta")
-        backtest = app.run_backtest(
+        backtests = app.run_backtest(
             strategy=ScalingStrategy(algorithm_id="event_scale"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+            study=_build_study(BacktestEngine.EVENT_DRIVEN),
         )
-        cls.backtest_run = backtest.get_all_backtest_runs()[0]
+        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
 
     def test_orders_exist(self):
         orders = self.backtest_run.orders
@@ -243,27 +249,21 @@ class TestEventVsVectorMetadataConsistency(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        date_range = BacktestDateRange(
-            start_date=START_DATE, end_date=END_DATE
-        )
-
         # Vector
         app_v = _create_app("VectorMetaComp")
-        vbt = app_v.run_vector_backtest(
+        vbts = app_v.run_backtest(
             strategy=SimpleBuySellStrategy(algorithm_id="v_comp"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+            study=_build_study(BacktestEngine.VECTOR),
         )
-        cls.vector_run = vbt.get_all_backtest_runs()[0]
+        cls.vector_run = vbts[0].get_all_backtest_runs()[0]
 
         # Event
         app_e = _create_app("EventMetaComp")
-        ebt = app_e.run_backtest(
+        ebts = app_e.run_backtest(
             strategy=SimpleBuySellStrategy(algorithm_id="e_comp"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+            study=_build_study(BacktestEngine.EVENT_DRIVEN),
         )
-        cls.event_run = ebt.get_all_backtest_runs()[0]
+        cls.event_run = ebts[0].get_all_backtest_runs()[0]
 
     def test_same_order_count(self):
         self.assertEqual(

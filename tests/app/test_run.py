@@ -9,8 +9,6 @@ Merged from:
 import os
 import shutil
 from unittest import TestCase
-from typing import Dict, Any
-import pandas as pd
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
@@ -21,26 +19,12 @@ from tests.resources import random_string, OrderExecutorTest, \
     PortfolioProviderTest
 
 
-# ---------------------------------------------------------------------------
-# Shared test strategies
-# ---------------------------------------------------------------------------
-
 class EmptyStrategyOne(TradingStrategy):
     schedule = Schedule.every(2, TimeUnit.SECOND)
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
 
 
 class EmptyStrategyTwo(TradingStrategy):
     schedule = Schedule.every(2, TimeUnit.SECOND)
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
 
 
 class CountingStrategyOne(TradingStrategy):
@@ -56,12 +40,6 @@ class CountingStrategyOne(TradingStrategy):
     def apply_strategy(self, context, data):
         CountingStrategyOne.number_of_runs += 1
 
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
 
 class CountingStrategyTwo(TradingStrategy):
     schedule = Schedule.every(2, TimeUnit.SECOND)
@@ -75,12 +53,6 @@ class CountingStrategyTwo(TradingStrategy):
 
     def apply_strategy(self, context, data):
         CountingStrategyTwo.number_of_runs += 1
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
 
 
 # ---------------------------------------------------------------------------

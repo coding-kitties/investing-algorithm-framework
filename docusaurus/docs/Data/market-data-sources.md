@@ -47,7 +47,10 @@ data_source = DataSource(
 ### Single Data Source
 
 ```python
-from investing_algorithm_framework import TradingStrategy, TimeUnit, DataSource, PositionSize
+from investing_algorithm_framework import (
+    TradingStrategy, TimeUnit, DataSource, PositionSize,
+    SignalSide, signals_from_column,
+)
 
 class MyStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
@@ -69,25 +72,23 @@ class MyStrategy(TradingStrategy):
         PositionSize(symbol="BTC", percentage=0.5),
     ]
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         df = data["btc_1h"]  # Access by identifier
         close = df["Close"]
         ma50 = close.rolling(50).mean()
         ma200 = close.rolling(200).mean()
 
         # Golden cross signal
-        buy_signal = (ma50 > ma200) & (ma50.shift(1) <= ma200.shift(1))
-        return {"BTC": buy_signal}
-
-    def generate_sell_signals(self, data):
-        df = data["btc_1h"]
-        close = df["Close"]
-        ma50 = close.rolling(50).mean()
-        ma200 = close.rolling(200).mean()
-
+        df["buy_signal"] = (ma50 > ma200) & (ma50.shift(1) <= ma200.shift(1))
         # Death cross signal
-        sell_signal = (ma50 < ma200) & (ma50.shift(1) >= ma200.shift(1))
-        return {"BTC": sell_signal}
+        df["sell_signal"] = (ma50 < ma200) & (ma50.shift(1) >= ma200.shift(1))
+
+        yield from signals_from_column(
+            df, "buy_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "sell_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
 ### Multiple Assets

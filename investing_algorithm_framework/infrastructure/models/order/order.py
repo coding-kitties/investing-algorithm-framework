@@ -56,6 +56,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     triggered_at = Column(DateTime(timezone=True), default=None)
     sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
     metadata_json = Column(Text, default=None)
+    strategy_id = Column(String, default=None)
     trade_allocations = relationship(
         'SQLTradeAllocation', back_populates='order'
     )
@@ -105,6 +106,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             metadata=order.metadata,
             stop_price=order.get_stop_price(),
             triggered_at=order.get_triggered_at(),
+            strategy_id=getattr(order, "strategy_id", None),
         )
         return sql_order
 

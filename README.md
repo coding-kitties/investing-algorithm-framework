@@ -274,16 +274,33 @@ Every backtest produces a **self-contained HTML dashboard** — open it in any b
 Every backtest API — vector or event-driven — returns the same `Backtest` object, which the `BacktestReport` consumes directly. So whether you're iterating over an in-memory list or a folder of persisted `.obtf` bundles, the path to the dashboard is the same:
 
 ```python
-from investing_algorithm_framework import BacktestReport
+from investing_algorithm_framework import (
+    BacktestReport, Study, Universe, BacktestWindow, BacktestEngine,
+)
 
 # --- Single event-driven backtest ---
-backtest = app.run_backtest(backtest_date_range=date_range)
-BacktestReport(backtests=[backtest]).save("event_report.html")
+event_study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=date_range)],
+    engines=[BacktestEngine.EVENT_DRIVEN],
+)
+backtests = app.run_backtest(strategy=strategy, study=event_study)
+BacktestReport(backtests=backtests).save("event_report.html")
 
 # --- A sweep of vector backtests (parameter grid / multi-window) ---
-backtests = app.run_vector_backtests(
+sweep_study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr)
+        for dr in [range_2022, range_2023, range_2024]
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=[StrategyA(), StrategyB(), StrategyC()],
-    backtest_date_ranges=[range_2022, range_2023, range_2024],
+    study=sweep_study,
     n_workers=-1,
     backtest_storage_directory="./my-backtests/",  # persists .obtf bundles
     show_progress=True,

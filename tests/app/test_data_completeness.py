@@ -1,7 +1,5 @@
 import os
-from typing import Dict, Any
 from datetime import datetime, timezone
-import pandas as pd
 from unittest.mock import patch
 
 from investing_algorithm_framework import PortfolioConfiguration, \
@@ -23,16 +21,6 @@ class TestStrategy(TradingStrategy):
         )
     ]
 
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        return {}
-
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        return {}
-
 
 class TestStrategyIncompleteData(TradingStrategy):
     schedule = Schedule.every(1, TimeUnit.DAY)
@@ -47,16 +35,6 @@ class TestStrategyIncompleteData(TradingStrategy):
             data_provider_identifier="BITVAVO"
         )
     ]
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        return {}
-
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        return {}
 
 
 class TestConfig(TestBase):

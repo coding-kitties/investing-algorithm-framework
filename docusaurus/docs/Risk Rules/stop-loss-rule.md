@@ -100,7 +100,7 @@ The first rule peels off a third of the position on tight pullbacks; the second 
 
 ## Resolution Order
 
-`StopLossRule` is evaluated **before** sell signals from `generate_sell_signals()`, so it always wins on the same bar — defensive exits cannot be drowned out by signal noise. See the table in the [Risk Rules Overview](./overview.md#resolution-order).
+`StopLossRule` is evaluated **before** `CLOSE_LONG` signals from `generate_signals()`, so it always wins on the same bar — defensive exits cannot be drowned out by signal noise. See the table in the [Risk Rules Overview](./overview.md#resolution-order).
 
 ## Interaction With Other Rules
 

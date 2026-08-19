@@ -34,12 +34,6 @@ class _PipelineStrategy(TradingStrategy):
     schedule = Schedule.every(1, TimeUnit.HOUR)
     symbols = ["BTC"]
 
-    def generate_buy_signals(self, data):  # pragma: no cover - not exercised
-        return {}
-
-    def generate_sell_signals(self, data):  # pragma: no cover - not exercised
-        return {}
-
 
 def _ds(warmup_window=None):
     kwargs = dict(

@@ -85,10 +85,10 @@ When more than one rule could fire at the same bar, the engine evaluates them in
 
 1. **Stop loss** (highest priority — defensive exit).
 2. **Take profit**.
-3. **Sell signal** from `generate_sell_signals()`.
-4. **Scale-out signal** (only if no full sell fired).
-5. **Buy signal** from `generate_buy_signals()` — gated by `CooldownRule` and `ScalingRule.cooldown_in_bars`.
-6. **Scale-in signal** — gated by `ScalingRule.max_entries` and `max_position_percentage`.
+3. **`CLOSE_LONG` signal** from `generate_signals()`.
+4. **`SCALE_OUT` signal** (only if no full close fired).
+5. **`OPEN_LONG` signal** from `generate_signals()` — gated by `CooldownRule` and `ScalingRule.cooldown_in_bars`.
+6. **`SCALE_IN` signal** — gated by `ScalingRule.max_entries` and `max_position_percentage`.
 
 Within each step, `TradingCost` is applied to the fill price, and `PositionSize` (or the relevant `scale_in_percentage`) determines the order amount.
 

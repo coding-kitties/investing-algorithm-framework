@@ -18,6 +18,10 @@ from investing_algorithm_framework import (
     RESOURCE_DIRECTORY,
     DATA_DIRECTORY,
     SnapshotInterval,
+    Study,
+    Universe,
+    BacktestWindow,
+    BacktestEngine,
 )
 from tests.resources.strategies_for_testing.strategy_v1 import (
     CrossOverStrategyV1,
@@ -44,11 +48,17 @@ class Test(TestCase):
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
         )
-        backtest = app.run_backtest(
-            backtest_date_range=date_range,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
+        backtests = app.run_backtest(
             strategy=CrossOverStrategyV1,
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
+        backtest = backtests[0]
         elapsed_time = time.time() - start_time
         self.assertLess(
             elapsed_time, 30,

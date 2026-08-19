@@ -87,6 +87,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         server_default=text("0"),
     )
     metadata_json = Column(Text, default=None)
+    strategy_id = Column(String, default=None)
     # Stop losses should be actively loaded
     stop_losses = relationship(
         'SQLTradeStopLoss',
@@ -127,6 +128,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         take_profits=[],
         is_short=False,
         metadata=None,
+        strategy_id=None,
     ):
         self.orders = [buy_order]
         self.open_price = buy_order.price
@@ -155,6 +157,16 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         self.metadata = metadata if metadata is not None else {}
         if self.metadata:
             self.metadata_json = json.dumps(self.metadata)
+
+        # Strategy that opened this trade, if known. Falls back to
+        # metadata['strategy_id'], then the opening order's strategy_id.
+        if strategy_id is None:
+            if isinstance(self.metadata, dict) and \
+                    "strategy_id" in self.metadata:
+                strategy_id = self.metadata.get("strategy_id")
+            else:
+                strategy_id = getattr(buy_order, "strategy_id", None)
+        self.strategy_id = strategy_id
 
         if sell_orders is not None:
             self.orders.extend(sell_orders)

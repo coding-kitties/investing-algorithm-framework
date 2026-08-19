@@ -14,8 +14,9 @@ couple of the framework's other composition points (a `Task`,
 - **Both backtest engines, one strategy**: implements
   `generate_signal_series` (vector engine) *and* `generate_signals`
   (event-driven backtest / live) from the exact same indicator
-  columns — swap `run_backtest` for `run_vector_backtest` in
-  `backtest.py` and it runs unmodified.
+  columns — set `Study(engines=[BacktestEngine.VECTOR])` instead of
+  `BacktestEngine.EVENT_DRIVEN` in `backtest.py` and it runs
+  unmodified.
 - **Declarative risk management**: a trailing 5% stop loss and a
   fixed 8% take profit, attached via `stop_losses` / `take_profits`.
 - **`ConflictPolicy`**: the long and short signals can legitimately

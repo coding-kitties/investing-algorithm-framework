@@ -23,8 +23,13 @@ from datetime import datetime, timedelta, timezone
 
 from investing_algorithm_framework import (
     BacktestDateRange,
+    BacktestEngine,
+    BacktestWindow,
+    PortfolioConfiguration,
     RESOURCE_DIRECTORY,
     SnapshotInterval,
+    Study,
+    Universe,
     create_app,
 )
 from investing_algorithm_framework.domain.backtesting.backtest import Backtest
@@ -66,18 +71,28 @@ class TestMultiStudyRunnerIntegration(unittest.TestCase):
 
     def _run(self, *, date_range, study_name, study_description=None):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        return app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
-            strategies=[SimpleVectorStrategy(algorithm_id=self.algo_id)],
-            snapshot_interval=SnapshotInterval.DAILY,
+        app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                market="BITVAVO",
+                trading_symbol="EUR",
+                initial_balance=1000
+            )
+        )
+        study = Study(
+            name=study_name,
+            description=study_description,
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
+        return app.run_backtests(
+            strategies=[SimpleVectorStrategy(algorithm_id=self.algo_id)],
+            study=study,
+            snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=self.storage,
             use_checkpoints=True,
-            study_name=study_name,
-            study_description=study_description,
         )
 
     def _open(self) -> Backtest:

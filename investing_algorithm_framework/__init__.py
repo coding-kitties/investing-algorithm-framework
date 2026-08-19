@@ -142,7 +142,18 @@ from .services import (
     TradeTakeProfitService,
     TradeStopLossService,
 )
-from .notebook.magic import load_ipython_extension  # noqa: F401
+try:
+    from .notebook.magic import load_ipython_extension  # noqa: F401
+except ImportError:
+    # IPython is an optional dependency (install with
+    # `pip install investing-algorithm-framework[notebook]`) — don't
+    # let its absence break importing the framework itself.
+    def load_ipython_extension(ipython):  # pragma: no cover
+        raise ImportError(
+            "IPython is required to use the %backtest magic. Install "
+            "it with `pip install investing-algorithm-framework"
+            "[notebook]`."
+        )
 
 
 __all__ = [

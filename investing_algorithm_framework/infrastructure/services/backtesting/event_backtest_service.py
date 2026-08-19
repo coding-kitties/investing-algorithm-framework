@@ -275,9 +275,13 @@ class EventBacktestService:
             if hasattr(algorithm, 'algorithm_id')
             else algorithm.id
         )
+        strategy_ids = [
+            s.strategy_id for s in getattr(algorithm, 'strategies', [])
+        ]
 
         return Backtest(
             algorithm_id=algorithm_id,
+            strategy_ids=strategy_ids,
             event_runs=[run],
             event_summary=generate_backtest_summary_metrics(
                 [run.backtest_metrics]

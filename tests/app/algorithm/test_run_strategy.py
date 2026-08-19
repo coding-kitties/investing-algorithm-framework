@@ -1,9 +1,6 @@
 import os
 import shutil
-from typing import Dict, Any
 from unittest import TestCase
-
-import pandas as pd
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, Algorithm, \
@@ -17,22 +14,10 @@ from tests.resources import random_string, OrderExecutorTest, \
 class StrategyOne(TradingStrategy):
     id = "strategy_one"
     schedule = Schedule.every(2, TimeUnit.SECOND)
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
 
 class StrategyTwo(TradingStrategy):
     id = "strategy_two"
     schedule = Schedule.every(2, TimeUnit.SECOND)
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
 
 class Test(TestCase):
     portfolio_configurations = [

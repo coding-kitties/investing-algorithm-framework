@@ -10,8 +10,12 @@ from pathlib import Path
 
 from investing_algorithm_framework import (
     BacktestDateRange,
+    BacktestEngine,
+    BacktestWindow,
     CSVOHLCVDataProvider,
     RESOURCE_DIRECTORY,
+    Study,
+    Universe,
     create_app,
 )
 
@@ -47,10 +51,14 @@ def main() -> None:
     date_range = BacktestDateRange(
         start_date=BACKTEST_START_DATE, end_date=END_DATE
     )
-    backtest = app.run_backtest(
-        strategy=strategy, backtest_date_range=date_range,
+    study = Study(
+        universe=Universe(market="BITVAVO", trading_symbol="EUR"),
         risk_free_rate=0.03,
+        backtest_windows=[BacktestWindow(train_range=date_range)],
+        engines=[BacktestEngine.EVENT_DRIVEN],
     )
+    backtests = app.run_backtest(strategy=strategy, study=study)
+    backtest = backtests[0]
     run = backtest.get_all_backtest_runs()[0]
 
     print(f"\nTrades: {len(run.get_trades())}")

@@ -23,12 +23,12 @@ import logging.config
 from typing import Dict, Any
 from datetime import datetime, timezone
 
-import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, PositionSize, create_app, RESOURCE_DIRECTORY, \
     BacktestDateRange, BacktestReport, TakeProfitRule, StopLossRule, \
+    SignalSide, signals_from_column, \
     DEFAULT_LOGGING_CONFIG
 
 
@@ -181,20 +181,19 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
         return ema_data, rsi_data
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+    def generate_signals(self, context, data: Dict[str, Any]):
         """
-        Generate buy signals based on the moving average crossover.
+        Generate buy/sell signals per symbol based on the RSI level
+        and a recent EMA crossover/crossunder confirmation.
 
-        data (Dict[str, Any]): Dictionary containing all the data for
-            the strategy data sources.
+        Args:
+            context: Strategy context (portfolio, positions, orders).
+            data (Dict[str, Any]): Dictionary containing all the data for
+                the strategy data sources.
 
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating buy signals (True/False).
+        Yields:
+            Signal: Zero or more OPEN_LONG / CLOSE_LONG signals.
         """
-
-        signals = {}
-
         for symbol in self.symbols:
             ema_data_identifier = f"{symbol}_ema_data"
             rsi_data_identifier = f"{symbol}_rsi_data"
@@ -208,54 +207,33 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                 self.ema_crossover_result_column].rolling(
                 window=self.ema_cross_lookback_window
             ).max().astype(bool)
-
-            # use only RSI column
-            rsi_oversold = rsi_data[self.rsi_result_column] \
-                < self.rsi_oversold_threshold
-
-            buy_signal = rsi_oversold & ema_crossover_lookback
-            buy_signals = buy_signal.fillna(False).astype(bool)
-            signals[symbol] = buy_signals
-        return signals
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        """
-        Generate sell signals based on the moving average crossover.
-
-        Args:
-            data (Dict[str, Any]): Dictionary containing all the data for
-                the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating sell signals (True/False).
-        """
-
-        signals = {}
-        for symbol in self.symbols:
-            ema_data_identifier = f"{symbol}_ema_data"
-            rsi_data_identifier = f"{symbol}_rsi_data"
-            ema_data, rsi_data = self._prepare_indicators(
-                data[ema_data_identifier].copy(),
-                data[rsi_data_identifier].copy()
-            )
-
-            # Confirmed by crossover between short-term EMA and long-term EMA
-            # within a given lookback window
+            # crossunder confirmed
             ema_crossunder_lookback = ema_data[
                 self.ema_crossunder_result_column].rolling(
                 window=self.ema_cross_lookback_window
             ).max().astype(bool)
 
             # use only RSI column
+            rsi_oversold = rsi_data[self.rsi_result_column] \
+                < self.rsi_oversold_threshold
             rsi_overbought = rsi_data[self.rsi_result_column] \
-               >= self.rsi_overbought_threshold
+                >= self.rsi_overbought_threshold
 
-            # Combine both conditions
-            sell_signal = rsi_overbought & ema_crossunder_lookback
-            sell_signal = sell_signal.fillna(False).astype(bool)
-            signals[symbol] = sell_signal
-        return signals
+            rsi_data["buy_signal"] = (
+                rsi_oversold & ema_crossover_lookback
+            ).fillna(False).astype(bool)
+            rsi_data["sell_signal"] = (
+                rsi_overbought & ema_crossunder_lookback
+            ).fillna(False).astype(bool)
+
+            yield from signals_from_column(
+                rsi_data, "buy_signal",
+                side=SignalSide.OPEN_LONG, symbol=symbol,
+            )
+            yield from signals_from_column(
+                rsi_data, "sell_signal",
+                side=SignalSide.CLOSE_LONG, symbol=symbol,
+            )
 
 
 if __name__ == "__main__":
@@ -300,20 +278,13 @@ Let's break down each part of this example:
 ### 1. Imports and Setup
 
 ```python
-import logging.config
-from typing import Dict, Any
-from datetime import datetime, timezone
-
-import pandas as pd
-from pyindicators import ema, rsi, crossover, crossunder
-
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, PositionSize, create_app, \
     BacktestDateRange, BacktestReport, TakeProfitRule, StopLossRule, \
+    SignalSide, signals_from_column, \
     DEFAULT_LOGGING_CONFIG
 ```
 
-- **pandas**: For data manipulation and analysis
 - **pyindicators**: Technical analysis library for RSI and EMA calculations
 - **Framework imports**: Core classes for strategy development, backtesting, and risk management
 
@@ -436,23 +407,25 @@ def _prepare_indicators(self, rsi_data, ema_data):
 ### 7. Strategy Logic
 
 ```python
-def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+def generate_signals(self, context, data: Dict[str, Any]):
     # Buy when RSI is oversold AND EMA crossover occurred recently
     rsi_oversold = rsi_data[self.rsi_result_column] < self.rsi_oversold_threshold
     ema_crossover_lookback = ema_data[self.ema_crossover_result_column].rolling(
         window=self.ema_cross_lookback_window).max().astype(bool)
+    rsi_data["buy_signal"] = (rsi_oversold & ema_crossover_lookback).fillna(False)
 
-    buy_signal = rsi_oversold & ema_crossover_lookback
-    return buy_signal
-
-def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
     # Sell when RSI is overbought AND EMA crossunder occurred recently
     rsi_overbought = rsi_data[self.rsi_result_column] >= self.rsi_overbought_threshold
     ema_crossunder_lookback = ema_data[self.ema_crossunder_result_column].rolling(
         window=self.ema_cross_lookback_window).max().astype(bool)
+    rsi_data["sell_signal"] = (rsi_overbought & ema_crossunder_lookback).fillna(False)
 
-    sell_signal = rsi_overbought & ema_crossunder_lookback
-    return sell_signal
+    yield from signals_from_column(
+        rsi_data, "buy_signal", side=SignalSide.OPEN_LONG, symbol=symbol,
+    )
+    yield from signals_from_column(
+        rsi_data, "sell_signal", side=SignalSide.CLOSE_LONG, symbol=symbol,
+    )
 ```
 
 **Trading Logic:**

@@ -13,10 +13,7 @@ Merged from:
 """
 import os
 from decimal import Decimal
-from typing import Dict, Any
 from unittest.mock import patch
-
-import pandas as pd
 
 from investing_algorithm_framework import TradingStrategy, TimeUnit, Schedule, \
     CSVOHLCVDataProvider
@@ -35,12 +32,6 @@ class GetAllocatedStrategy(TradingStrategy):
             order_side="BUY",
             price=10,
         )
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
 
 
 # ---------------------------------------------------------------------------

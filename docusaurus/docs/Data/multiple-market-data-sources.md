@@ -11,7 +11,10 @@ Learn how to use multiple data sources across different assets, timeframes, and 
 Use multiple `DataSource` objects to trade several assets simultaneously:
 
 ```python
-from investing_algorithm_framework import TradingStrategy, TimeUnit, DataSource, PositionSize
+from investing_algorithm_framework import (
+    TradingStrategy, TimeUnit, DataSource, PositionSize,
+    SignalSide, signals_from_column,
+)
 
 class MultiAssetStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
@@ -57,27 +60,20 @@ class MultiAssetStrategy(TradingStrategy):
         PositionSize(symbol="DOT", percentage=0.25),
     ]
 
-    def generate_buy_signals(self, data):
-        signals = {}
-
+    def generate_signals(self, context, data):
         for symbol in self.symbols:
             identifier = f"{symbol.lower()}_4h"
             df = data[identifier]
             ma50 = df["Close"].rolling(50).mean()
-            signals[symbol] = df["Close"] > ma50
+            df["buy_signal"] = df["Close"] > ma50
+            df["sell_signal"] = df["Close"] < ma50
 
-        return signals
-
-    def generate_sell_signals(self, data):
-        signals = {}
-
-        for symbol in self.symbols:
-            identifier = f"{symbol.lower()}_4h"
-            df = data[identifier]
-            ma50 = df["Close"].rolling(50).mean()
-            signals[symbol] = df["Close"] < ma50
-
-        return signals
+            yield from signals_from_column(
+                df, "buy_signal", side=SignalSide.OPEN_LONG, symbol=symbol,
+            )
+            yield from signals_from_column(
+                df, "sell_signal", side=SignalSide.CLOSE_LONG, symbol=symbol,
+            )
 ```
 
 ## Multiple Timeframes
@@ -134,7 +130,7 @@ class MultiTimeframeStrategy(TradingStrategy):
             return "bearish"
         return "neutral"
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         daily_df = data["btc_daily"]
         h4_df = data["btc_4h"]
         h1_df = data["btc_1h"]
@@ -148,21 +144,22 @@ class MultiTimeframeStrategy(TradingStrategy):
         h1_cross_above = (h1_df["Close"] > h1_ma) & (h1_df["Close"].shift(1) <= h1_ma.shift(1))
 
         # Only buy when all timeframes align bullish
-        buy_signal = h1_cross_above.copy()
+        h1_df["buy_signal"] = h1_cross_above.copy()
 
         if daily_trend != "bullish" or h4_trend != "bullish":
-            buy_signal = buy_signal & False
-
-        return {"BTC": buy_signal}
-
-    def generate_sell_signals(self, data):
-        h1_df = data["btc_1h"]
-        h1_ma = h1_df["Close"].rolling(20).mean()
+            h1_df["buy_signal"] = False
 
         # Sell on hourly MA cross below
-        sell_signal = (h1_df["Close"] < h1_ma) & (h1_df["Close"].shift(1) >= h1_ma.shift(1))
+        h1_df["sell_signal"] = (
+            (h1_df["Close"] < h1_ma) & (h1_df["Close"].shift(1) >= h1_ma.shift(1))
+        )
 
-        return {"BTC": sell_signal}
+        yield from signals_from_column(
+            h1_df, "buy_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            h1_df, "sell_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
 ## Mixing Markets
@@ -250,27 +247,20 @@ class DynamicMultiAssetStrategy(TradingStrategy):
             **kwargs
         )
 
-    def generate_buy_signals(self, data):
-        signals = {}
-
+    def generate_signals(self, context, data):
         for symbol in self.symbols:
             identifier = f"{symbol.lower()}_{self._time_frame}"
             df = data[identifier]
             ma20 = df["Close"].rolling(20).mean()
-            signals[symbol] = df["Close"] > ma20
+            df["buy_signal"] = df["Close"] > ma20
+            df["sell_signal"] = df["Close"] < ma20
 
-        return signals
-
-    def generate_sell_signals(self, data):
-        signals = {}
-
-        for symbol in self.symbols:
-            identifier = f"{symbol.lower()}_{self._time_frame}"
-            df = data[identifier]
-            ma20 = df["Close"].rolling(20).mean()
-            signals[symbol] = df["Close"] < ma20
-
-        return signals
+            yield from signals_from_column(
+                df, "buy_signal", side=SignalSide.OPEN_LONG, symbol=symbol,
+            )
+            yield from signals_from_column(
+                df, "sell_signal", side=SignalSide.CLOSE_LONG, symbol=symbol,
+            )
 
 # Usage
 strategy = DynamicMultiAssetStrategy(
@@ -303,7 +293,7 @@ class CorrelationStrategy(TradingStrategy):
         returns2 = df2["Close"].pct_change()
         return returns1.rolling(window).corr(returns2)
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         btc_df = data["btc"]
         eth_df = data["eth"]
 
@@ -312,15 +302,17 @@ class CorrelationStrategy(TradingStrategy):
 
         # Buy BTC when correlation is high and ETH is rising
         eth_momentum = eth_df["Close"].pct_change(5)
+        btc_df["buy_signal"] = (correlation > 0.7) & (eth_momentum > 0.02)
 
-        buy_signal = (correlation > 0.7) & (eth_momentum > 0.02)
-
-        return {"BTC": buy_signal}
-
-    def generate_sell_signals(self, data):
-        btc_df = data["btc"]
         ma = btc_df["Close"].rolling(20).mean()
-        return {"BTC": btc_df["Close"] < ma}
+        btc_df["sell_signal"] = btc_df["Close"] < ma
+
+        yield from signals_from_column(
+            btc_df, "buy_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            btc_df, "sell_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
 ## Data Source Patterns

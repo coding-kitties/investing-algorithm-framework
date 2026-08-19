@@ -112,6 +112,11 @@ def _apply_forward_only_migrations(bind):
         "NOT NULL DEFAULT 0",
         "ALTER TABLE trade_take_profits ADD COLUMN is_short BOOLEAN "
         "NOT NULL DEFAULT 0",
+        # Strategy attribution — lets orders/trades be traced back to
+        # the strategy that created them (multi-strategy algorithms).
+        # NULL for any row created before this column existed.
+        "ALTER TABLE orders ADD COLUMN strategy_id VARCHAR",
+        "ALTER TABLE trades ADD COLUMN strategy_id VARCHAR",
     ]
     for stmt in statements:
         try:

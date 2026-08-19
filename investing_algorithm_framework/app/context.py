@@ -64,6 +64,27 @@ class Context:
         self._fx_rate_provider = None
         self._base_currency = None
         self._recorded_values = {}  # key -> list of (datetime, value)
+        # Set by EventLoopService right before it runs a strategy, so
+        # orders/trades created during that call can be attributed to
+        # the strategy that created them without every strategy author
+        # having to pass strategy_id explicitly.
+        self._current_strategy_id = None
+
+    def _attach_strategy_attribution(self, order_data: dict) -> None:
+        """
+        Stamps ``order_data`` with the strategy currently running (if
+        any), unless the caller already supplied an explicit
+        ``strategy_id`` or ``metadata['strategy_id']``.
+        """
+        strategy_id = self._current_strategy_id
+
+        if strategy_id is None:
+            return
+
+        order_data.setdefault("strategy_id", strategy_id)
+        metadata = order_data.setdefault("metadata", {}) or {}
+        order_data["metadata"] = metadata
+        metadata.setdefault("strategy_id", strategy_id)
 
     def _validate_target_symbol(self, target_symbol, market=None):
         """
@@ -194,6 +215,7 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
+        self._attach_strategy_attribution(order_data)
         order_data["_execute"] = execute
         order_data["_validate"] = validate
         order_data["_sync"] = sync
@@ -351,6 +373,7 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
+        self._attach_strategy_attribution(order_data)
         order_data["_execute"] = execute
         order_data["_validate"] = validate
         order_data["_sync"] = sync
@@ -488,6 +511,7 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
+        self._attach_strategy_attribution(order_data)
         order_data["_execute"] = execute
         order_data["_validate"] = validate
         order_data["_sync"] = sync
@@ -583,6 +607,7 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
+        self._attach_strategy_attribution(order_data)
         order_data["_execute"] = execute
         order_data["_validate"] = validate
         order_data["_sync"] = sync
@@ -671,6 +696,7 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
+        self._attach_strategy_attribution(order_data)
         order_data["_execute"] = execute
         order_data["_validate"] = validate
         order_data["_sync"] = sync

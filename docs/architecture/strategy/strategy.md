@@ -21,7 +21,7 @@ one of two execution modes:
                      │       TradingStrategy          │
                      │                                │
                      │  generate_signals(ctx, data)   │◄── event   (app.run_backtest, paper, live)
-                     │  generate_signal_series(data)  │◄── vector  (app.run_vector_backtest)
+                     │  generate_signal_series(data)  │◄── vector  (app.run_backtest with engines=[BacktestEngine.VECTOR])
                      │                                │
                      │  + class-level slots:          │
                      │    position_sizes,             │
@@ -67,7 +67,7 @@ method(s) corresponding to the modes it supports.
 
 | Aspect | `generate_signals` (event) | `generate_signal_series` (vector) |
 |---|---|---|
-| Triggered by | `app.run_backtest`, paper, live | `app.run_vector_backtest` |
+| Triggered by | `app.run_backtest`, paper, live | `app.run_backtest` with `study.engines=[BacktestEngine.VECTOR]` |
 | Called per backtest | once **per scheduled tick** | **once total**, before simulation |
 | `context` parameter | yes — portfolio, positions, cash, open orders | **no** — that state doesn't exist yet |
 | `data["<id>"]` shape | dataframe truncated to `now` | dataframe covering the **entire window** |
@@ -130,9 +130,10 @@ helper.
 
 ### 2.6 Validation
 
-`app.run_vector_backtest(...)` calls
-`validate_strategy_for_vector_backtest(strategy)` before doing any
-work. The validator uses a class-identity check:
+`app.run_backtest(...)` calls
+`validate_strategy_for_vector_backtest(strategy)` when the vector
+engine is selected, before doing any work. The validator uses a
+class-identity check:
 
 ```python
 own_method  = type(strategy).generate_signal_series

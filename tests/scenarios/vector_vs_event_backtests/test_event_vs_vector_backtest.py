@@ -6,7 +6,8 @@ from unittest import TestCase
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
     RESOURCE_DIRECTORY, CSVOHLCVDataProvider, Schedule, SignalSide, \
-    signals_from_column, signal_series_from_column
+    signals_from_column, signal_series_from_column, Study, Universe, \
+    BacktestWindow, BacktestEngine
 
 # ═══════════════════════════════════════════════════════════════════════
 # Fast CSV price sequence (OHLCV_BTC-EUR_BITVAVO_2h_LONG_SHORT_CYCLE.csv):
@@ -52,6 +53,23 @@ LONG_START_DATE = datetime(2020, 12, 20, 10, 0, 0, tzinfo=timezone.utc)
 LONG_END_DATE = datetime(2020, 12, 20, 16, 0, 0, tzinfo=timezone.utc)
 SHORT_START_DATE = datetime(2020, 12, 20, 22, 0, 0, tzinfo=timezone.utc)
 SHORT_END_DATE = datetime(2020, 12, 21, 6, 0, 0, tzinfo=timezone.utc)
+MARKET = "BITVAVO"
+TRADING_SYMBOL = "EUR"
+
+
+def _build_study(
+    date_range, risk_free_rate=None, engine=BacktestEngine.VECTOR
+):
+    # Old run_vector_backtest/run_backtest calls were explicit engine
+    # choices, not auto-detected — force the engine here too, to keep
+    # the vector-vs-event comparison deterministic regardless of
+    # auto-detection.
+    return Study(
+        universe=Universe(market=MARKET, trading_symbol=TRADING_SYMBOL),
+        risk_free_rate=risk_free_rate,
+        backtest_windows=[BacktestWindow(train_range=date_range)],
+        engines=[engine],
+    )
 
 
 def _make_data_source():
@@ -346,20 +364,25 @@ class TestEventVsVectorBacktestLong(_EventVsVectorParityAssertions, TestCase):
         )
 
         app_v = _create_app("VectorLongTest")
-        vector_bt = app_v.run_vector_backtest(
-            strategy=LongCycleStrategy(algorithm_id="vector_long"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+        vector_study = _build_study(
+            date_range, risk_free_rate=0.027, engine=BacktestEngine.VECTOR
         )
-        cls.vector_run = vector_bt.get_all_backtest_runs()[0]
+        vector_backtests = app_v.run_backtest(
+            strategy=LongCycleStrategy(algorithm_id="vector_long"),
+            study=vector_study,
+        )
+        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
 
         app_e = _create_app("EventLongTest")
-        event_bt = app_e.run_backtest(
-            strategy=LongCycleStrategy(algorithm_id="event_long"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+        event_study = _build_study(
+            date_range, risk_free_rate=0.027,
+            engine=BacktestEngine.EVENT_DRIVEN,
         )
-        cls.event_run = event_bt.get_all_backtest_runs()[0]
+        event_backtests = app_e.run_backtest(
+            strategy=LongCycleStrategy(algorithm_id="event_long"),
+            study=event_study,
+        )
+        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
 
 
 class TestEventVsVectorBacktestShort(_EventVsVectorParityAssertions, TestCase):
@@ -377,20 +400,25 @@ class TestEventVsVectorBacktestShort(_EventVsVectorParityAssertions, TestCase):
         )
 
         app_v = _create_app("VectorShortTest")
-        vector_bt = app_v.run_vector_backtest(
-            strategy=ShortCycleStrategy(algorithm_id="vector_short"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+        vector_study = _build_study(
+            date_range, risk_free_rate=0.027, engine=BacktestEngine.VECTOR
         )
-        cls.vector_run = vector_bt.get_all_backtest_runs()[0]
+        vector_backtests = app_v.run_backtest(
+            strategy=ShortCycleStrategy(algorithm_id="vector_short"),
+            study=vector_study,
+        )
+        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
 
         app_e = _create_app("EventShortTest")
-        event_bt = app_e.run_backtest(
-            strategy=ShortCycleStrategy(algorithm_id="event_short"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+        event_study = _build_study(
+            date_range, risk_free_rate=0.027,
+            engine=BacktestEngine.EVENT_DRIVEN,
         )
-        cls.event_run = event_bt.get_all_backtest_runs()[0]
+        event_backtests = app_e.run_backtest(
+            strategy=ShortCycleStrategy(algorithm_id="event_short"),
+            study=event_study,
+        )
+        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
 
 
 class TestEventVsVectorBacktestCombinedDynamicSizing(
@@ -421,21 +449,26 @@ class TestEventVsVectorBacktestCombinedDynamicSizing(
         )
 
         app_v = _create_app("VectorCombinedDynamicTest")
-        vector_bt = app_v.run_vector_backtest(
+        vector_study = _build_study(
+            date_range, risk_free_rate=0.027, engine=BacktestEngine.VECTOR
+        )
+        vector_backtests = app_v.run_backtest(
             strategy=CombinedCycleStrategy(algorithm_id="vector_combined"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+            study=vector_study,
             dynamic_position_sizing=True,
         )
-        cls.vector_run = vector_bt.get_all_backtest_runs()[0]
+        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
 
         app_e = _create_app("EventCombinedDynamicTest")
-        event_bt = app_e.run_backtest(
-            strategy=CombinedCycleStrategy(algorithm_id="event_combined"),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+        event_study = _build_study(
+            date_range, risk_free_rate=0.027,
+            engine=BacktestEngine.EVENT_DRIVEN,
         )
-        cls.event_run = event_bt.get_all_backtest_runs()[0]
+        event_backtests = app_e.run_backtest(
+            strategy=CombinedCycleStrategy(algorithm_id="event_combined"),
+            study=event_study,
+        )
+        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
 
 
 if __name__ == "__main__":

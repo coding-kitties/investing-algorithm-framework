@@ -9,7 +9,7 @@ Python framework path.
 
 | Side | What it does | What it represents |
 |------|--------------|--------------------|
-| **`python_bench.py`** | Runs `app.run_vector_backtests(...)` with a real `TradingStrategy`, real `CSVOHLCVDataProvider` data sources, real bundle write, real metric aggregation. | The end-user code path today. |
+| **`python_bench.py`** | Runs `app.run_backtests(..., study=Study(engines=[BacktestEngine.VECTOR]))` with a real `TradingStrategy`, real `CSVOHLCVDataProvider` data sources, real bundle write, real metric aggregation. | The end-user code path today. |
 | **`rust_bench/`** | A standalone Cargo binary that loads the same parquet OHLCV, computes the same EMA + RSI signals, runs the same long-only execution loop with fees + slippage, **persists every order and per-bar portfolio snapshot to a per-backtest SQLite database** (mirroring the framework's native behavior), and prints throughput. **No PyO3, no framework abstractions.** | The **best-case ceiling** for what a future `iaf-core` Rust kernel could achieve. |
 
 Both sides:

@@ -1,8 +1,8 @@
 """Unit tests for the runner-level universe helpers added in Phase 2b.
 
 These cover :func:`_build_strategy_universe_map` and
-:func:`_apply_universes` directly (the post-run hook used by
-``run_*_backtests(universe=...)``), without spinning up the full
+:func:`_apply_study_to_backtests` directly (the post-run hook used by
+``run_backtest``/``run_backtests``), without spinning up the full
 backtest engine.
 """
 from datetime import datetime, timezone
@@ -12,9 +12,10 @@ from unittest.mock import MagicMock
 
 from investing_algorithm_framework import Backtest, Universe
 from investing_algorithm_framework.app.app import (
-    _apply_universes,
+    _apply_study_to_backtests,
     _build_strategy_universe_map,
 )
+from investing_algorithm_framework.domain.backtesting.study import Study
 from investing_algorithm_framework.domain import (
     BacktestDateRange,
     BacktestMetrics,
@@ -179,7 +180,9 @@ class ApplyUniversesTests(TestCase):
 
     def test_noop_when_no_universes(self):
         bt = _make_backtest("alg-a", ["BTC"])
-        _apply_universes([bt], None, [_make_strategy("alg-a", ["BTC"])], None)
+        _apply_study_to_backtests(
+            [bt], Study(), [_make_strategy("alg-a", ["BTC"])], None
+        )
         self.assertEqual(bt.universes, [])
 
     def test_stamps_universe_and_tags_runs(self):
@@ -187,7 +190,7 @@ class ApplyUniversesTests(TestCase):
                      trading_symbol="EUR", market="BITVAVO")
         bt = _make_backtest("alg-a", ["BTC", "ETH"])
         s = _make_strategy("alg-a", ["BTC", "ETH"])
-        _apply_universes([bt], u, [s], None)
+        _apply_study_to_backtests([bt], Study(universe=u), [s], None)
         self.assertEqual(bt.universes, [u])
         self.assertEqual(
             bt.vector_runs[0].metadata.get("universe_key"), "basket",
@@ -211,7 +214,7 @@ class ApplyUniversesTests(TestCase):
             # Simulate the runner having persisted the bundle first.
             save_bundle(bt, target)
 
-            _apply_universes([bt], u, [s], tmp)
+            _apply_study_to_backtests([bt], Study(universe=u), [s], tmp)
 
             reloaded = open_bundle(target)
             self.assertEqual(
@@ -229,7 +232,7 @@ class ApplyUniversesTests(TestCase):
         bt = _make_backtest("alg-a", ["BTC", "ETH"])
         bt.vector_runs[0].metadata = {"universe_key": "preexisting"}
         s = _make_strategy("alg-a", ["BTC", "ETH"])
-        _apply_universes([bt], u, [s], None)
+        _apply_study_to_backtests([bt], Study(universe=u), [s], None)
         self.assertEqual(
             bt.vector_runs[0].metadata.get("universe_key"), "preexisting",
         )
@@ -240,4 +243,4 @@ class ApplyUniversesTests(TestCase):
         bt = _make_backtest("alg-a", ["BTC", "DOGE"])
         s = _make_strategy("alg-a", ["BTC", "DOGE"])
         with self.assertRaises(OperationalException):
-            _apply_universes([bt], u, [s], None)
+            _apply_study_to_backtests([bt], Study(universe=u), [s], None)

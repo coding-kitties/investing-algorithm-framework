@@ -861,7 +861,10 @@ class BacktestService:
                 identifier="backtest_portfolio",
                 market=study.universe.market or "BACKTEST",
                 trading_symbol=study.universe.trading_symbol or "USDT",
-                initial_balance=initial_capital or 1000.0,
+                initial_balance=initial_capital if initial_capital is not None
+                else getattr(
+                    matching_configuration, "initial_balance", 1000.0
+                ),
                 fee_percentage=getattr(
                     matching_configuration, "fee_percentage", 0.0
                 ),
@@ -901,7 +904,7 @@ class BacktestService:
         # pass over survivors) so a strategy eliminated mid-sweep by a
         # progressive ``window_filter_function`` still has the full
         # window list on disk — it never reaches the final survivor
-        # list that ``_apply_backtest_windows`` (app.py) restamps.
+        # list that ``_apply_study_to_backtests`` (app.py) restamps.
         study_backtest_windows = list(study.backtest_windows or [])
         # Same rationale as ``study_backtest_windows`` above — without
         # this, a mid-sweep checkpoint save writes a study with

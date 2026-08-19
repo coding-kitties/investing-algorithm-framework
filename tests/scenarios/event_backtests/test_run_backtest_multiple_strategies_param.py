@@ -19,6 +19,10 @@ from investing_algorithm_framework import (
     RESOURCE_DIRECTORY,
     DATA_DIRECTORY,
     SnapshotInterval,
+    Study,
+    Universe,
+    BacktestWindow,
+    BacktestEngine,
 )
 from tests.resources.strategies_for_testing.strategy_v1 import (
     CrossOverStrategyV1,
@@ -61,11 +65,17 @@ class Test(TestCase):
         ]
         dot_strategy.position_sizes_lookup = {}
 
-        backtest = app.run_backtest(
-            backtest_date_range=date_range,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
+        backtests = app.run_backtest(
             strategies=[btc_strategy, dot_strategy],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
+        backtest = backtests[0]
         elapsed_time = time.time() - start_time
         self.assertLess(
             elapsed_time, 30,

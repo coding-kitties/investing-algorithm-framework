@@ -7,7 +7,8 @@ import pandas as pd
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
     RESOURCE_DIRECTORY, ScalingRule, CSVOHLCVDataProvider, Schedule, \
-    SignalSide, signal_series_from_column
+    SignalSide, signal_series_from_column, Study, Universe, \
+    BacktestWindow, BacktestEngine
 
 # ═══════════════════════════════════════════════════════════════════════
 # Fast CSV price sequence (OHLCV_BTC-EUR_BITVAVO_2h_SCALING_FAST.csv):
@@ -243,12 +244,17 @@ def _run_backtest(strategy_class, algorithm_id, end_date=None):
     date_range = BacktestDateRange(
         start_date=START_DATE, end_date=end_date or END_DATE
     )
-    backtest = app.run_vector_backtest(
-        strategy=strategy_class(algorithm_id=algorithm_id),
-        backtest_date_range=date_range,
+    study = Study(
+        universe=Universe(market="BITVAVO", trading_symbol="EUR"),
         risk_free_rate=0.027,
+        backtest_windows=[BacktestWindow(train_range=date_range)],
+        engines=[BacktestEngine.VECTOR],
     )
-    return backtest, date_range
+    backtests = app.run_backtest(
+        strategy=strategy_class(algorithm_id=algorithm_id),
+        study=study,
+    )
+    return backtests[0], date_range
 
 
 def _get_run(strategy_class, algorithm_id, end_date=None):

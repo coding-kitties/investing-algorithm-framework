@@ -27,10 +27,16 @@ report.show()  # Opens in browser (or renders inline in Jupyter)
 After running a backtest, pass the result directly:
 
 ```python
-backtest = app.run_backtest(
-    backtest_date_range=backtest_range,
-    initial_amount=1000
+from investing_algorithm_framework import Study, Universe, BacktestWindow
+
+study = Study(
+    universe=Universe(market="bitvavo", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=backtest_range)],
 )
+
+backtests = app.run_backtest(study=study)
+backtest = backtests[0]
 
 report = BacktestReport(backtest)
 report.show(browser=True)
@@ -200,8 +206,8 @@ Toggle between dark and light mode using the sun icon in the top-right corner.
 ```python
 from datetime import datetime, timezone
 from investing_algorithm_framework import (
-    create_app, BacktestDateRange, BacktestReport,
-    recalculate_backtests_in_directory,
+    create_app, BacktestDateRange, BacktestReport, Study, Universe,
+    BacktestWindow, recalculate_backtests_in_directory,
 )
 
 app = create_app()
@@ -221,10 +227,15 @@ date_ranges = [
     ),
 ]
 
-app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="bitvavo", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=dr) for dr in date_ranges],
+)
+
+app.run_backtests(
     strategies=my_strategies,
-    backtest_date_ranges=date_ranges,
-    initial_amount=1000,
+    study=study,
     backtest_storage_directory="./backtests"
 )
 

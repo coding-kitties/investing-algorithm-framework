@@ -14,11 +14,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from unittest import TestCase
 
-import pandas as pd
-
 from investing_algorithm_framework import TradingStrategy, Algorithm, \
     create_app, RESOURCE_DIRECTORY, PortfolioConfiguration, \
-    BacktestDateRange, TimeUnit, Schedule
+    BacktestDateRange, TimeUnit, Schedule, Study, Universe, \
+    BacktestWindow, BacktestEngine
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
@@ -31,21 +30,17 @@ from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
 class BacktestTestStrategy(TradingStrategy):
     strategy_id = "test_strategy"
     schedule = Schedule.every(1, TimeUnit.MINUTE)
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
+    def generate_signal_series(self, data: Dict[str, Any]):
+        return iter(())
 
 
 class HourlyTestStrategy(TradingStrategy):
     """Strategy with hourly interval (used for initial_amount/balance tests)."""
     schedule = Schedule.every(2, TimeUnit.HOUR)
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
+    def generate_signal_series(self, data: Dict[str, Any]):
+        return iter(())
 
 
 # ---------------------------------------------------------------------------
@@ -100,11 +95,14 @@ class TestBacktestInitialConfig(BacktestTestBase):
         algorithm = Algorithm()
         algorithm.add_strategy(HourlyTestStrategy)
         app.add_algorithm(algorithm)
-        backtest = app.run_backtest(
-            backtest_date_range=date_range,
-            initial_amount=1000,
-            risk_free_rate=0.027
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="USDT"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+        backtest = app.run_backtest(algorithm=algorithm, study=study)[0]
         run = backtest.get_backtest_run(date_range)
         metrics = backtest.get_backtest_metrics(date_range)
         self.assertEqual(run.initial_unallocated, 1000)
@@ -134,10 +132,13 @@ class TestBacktestInitialConfig(BacktestTestBase):
         algorithm = Algorithm()
         algorithm.add_strategy(HourlyTestStrategy)
         app.add_algorithm(algorithm)
-        backtest = app.run_backtest(
-            backtest_date_range=date_range,
-            risk_free_rate=0.027
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="USDT"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+        backtest = app.run_backtest(algorithm=algorithm, study=study)[0]
         run = backtest.get_backtest_run(date_range)
         metrics = backtest.get_backtest_metrics(date_range)
         self.assertEqual(run.initial_unallocated, 500)
@@ -180,11 +181,14 @@ class TestBacktestReportCreation(BacktestTestBase):
             start_date=start_date,
             end_date=end_date
         )
-        return app.run_backtest(
-            algorithm=algorithm,
-            backtest_date_range=backtest_date_range,
-            risk_free_rate=0.027
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=backtest_date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+        return app.run_backtest(algorithm=algorithm, study=study)[0]
 
     def test_report_json_creation(self):
         """Test that the backtest report is saved as JSON."""
@@ -245,9 +249,20 @@ class TestRunBacktests(BacktestTestBase):
             start_date=start_date,
             end_date=end_date
         )
-        reports = app.run_backtests(
-            algorithms=[algorithm_one, algorithm_two, algorithm_three],
-            backtest_date_ranges=[backtest_date_range],
-            risk_free_rate=0.027
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=backtest_date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+
+        # run_backtests has no algorithm=/algorithms= support, so each
+        # independent algorithm is run via its own run_backtest call.
+        reports = []
+
+        for algorithm in (algorithm_one, algorithm_two, algorithm_three):
+            backtests = app.run_backtest(algorithm=algorithm, study=study)
+            reports.append(backtests[0])
+
         self.assertEqual(3, len(reports))

@@ -3,11 +3,11 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 from typing import Dict, Any
-import pandas as pd
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
-    BacktestDateRange, Schedule
+    BacktestDateRange, Schedule, Study, Universe, BacktestWindow, \
+    BacktestEngine
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 
@@ -15,13 +15,9 @@ from investing_algorithm_framework.infrastructure.database import \
 class TestStrategy(TradingStrategy):
     strategy_id = "test_strategy"
     schedule = Schedule.every(1, TimeUnit.MINUTE)
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
+    def generate_signal_series(self, data: Dict[str, Any]):
+        return iter(())
 
 
 class Test(TestCase):
@@ -75,11 +71,14 @@ class Test(TestCase):
             start_date=start_date,
             end_date=end_date
         )
-        backtest = app.run_backtest(
-            algorithm=algorithm,
-            backtest_date_range=backtest_date_range,
-            risk_free_rate=0.027
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=backtest_date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+        backtests = app.run_backtest(algorithm=algorithm, study=study)
+        backtest = backtests[0]
         backtest.save(self.backtest_report_save_directory)
         # Check if the backtest report exists
         self.assertTrue(os.path.isdir(self.backtest_report_save_directory))
@@ -105,11 +104,14 @@ class Test(TestCase):
             start_date=start_date,
             end_date=end_date
         )
-        backtest = app.run_backtest(
-            algorithm=algorithm,
-            backtest_date_range=backtest_date_range,
-            risk_free_rate=0.027
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=backtest_date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+        backtests = app.run_backtest(algorithm=algorithm, study=study)
+        backtest = backtests[0]
 
         backtest.save(self.backtest_report_save_directory)
         # Check if the backtest report exists

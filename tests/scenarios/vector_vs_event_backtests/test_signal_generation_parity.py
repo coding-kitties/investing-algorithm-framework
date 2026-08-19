@@ -21,12 +21,13 @@ This module deliberately separates two very different questions that
 
 2. **Engine-level trade parity**
    (:class:`TestEngineLevelTradeParity`) — running the *same*
-   strategy through ``app.run_backtest`` (event) and
-   ``app.run_vector_backtest`` (vector) end-to-end on the same fixed
-   CSV dataset and date range, do the resulting trades line up
-   (count, timing, direction)? Given (1), exact equality is not
-   guaranteed — this asserts the two stay within a small, documented
-   tolerance instead of silently diverging.
+   strategy through ``app.run_backtest`` with
+   ``study.engines=[BacktestEngine.EVENT_DRIVEN]`` (event) and
+   ``study.engines=[BacktestEngine.VECTOR]`` (vector) end-to-end on
+   the same fixed CSV dataset and date range, do the resulting trades
+   line up (count, timing, direction)? Given (1), exact equality is
+   not guaranteed — this asserts the two stay within a small,
+   documented tolerance instead of silently diverging.
 
 3. **The fix** (:class:`TestEngineParityWithRecommendedWarmup`) —
    doubling ``warmup_window`` relative to the strategy's slowest
@@ -51,7 +52,7 @@ import pandas as pd
 
 from investing_algorithm_framework import (
     create_app, BacktestDateRange, RESOURCE_DIRECTORY, CSVOHLCVDataProvider,
-    SnapshotInterval,
+    SnapshotInterval, Study, Universe, BacktestWindow, BacktestEngine,
 )
 from tests.resources.strategies_for_testing.strategy_v1 import (
     CrossOverStrategyV1,
@@ -76,6 +77,22 @@ BAR_MINUTES = 120  # "2h" timeframe
 # sliding window, so cost per sample is constant regardless of how
 # deep into the file it is.
 FULL_HISTORY_SAMPLE_STRIDE = 4
+
+MARKET = "BITVAVO"
+TRADING_SYMBOL = "EUR"
+
+
+def _build_study(
+    date_range, risk_free_rate=None, engine=BacktestEngine.VECTOR
+):
+    # Old run_vector_backtest/run_backtest calls were explicit engine
+    # choices, not auto-detected — force the engine here too.
+    return Study(
+        universe=Universe(market=MARKET, trading_symbol=TRADING_SYMBOL),
+        risk_free_rate=risk_free_rate,
+        backtest_windows=[BacktestWindow(train_range=date_range)],
+        engines=[engine],
+    )
 
 
 def _load_ohlcv_csv(path):
@@ -309,13 +326,15 @@ class TestEngineLevelTradeParity(TestCase):
             ),
             priority=1,
         )
-        vector_backtest = app_vector.run_vector_backtest(
-            strategy=CrossOverStrategyV1(algorithm_id="vector_parity"),
-            backtest_date_range=date_range,
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
+        vector_study = _build_study(
+            date_range, risk_free_rate=0.027, engine=BacktestEngine.VECTOR
         )
-        cls.vector_run = vector_backtest.get_all_backtest_runs()[0]
+        vector_backtests = app_vector.run_backtest(
+            strategy=CrossOverStrategyV1(algorithm_id="vector_parity"),
+            study=vector_study,
+            snapshot_interval=SnapshotInterval.DAILY,
+        )
+        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
 
         app_event = create_app(name="EventSignalParity", config=config)
         app_event.add_market(
@@ -331,13 +350,16 @@ class TestEngineLevelTradeParity(TestCase):
             ),
             priority=1,
         )
-        event_backtest = app_event.run_backtest(
-            strategy=CrossOverStrategyV1(algorithm_id="event_parity"),
-            backtest_date_range=date_range,
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
+        event_study = _build_study(
+            date_range, risk_free_rate=0.027,
+            engine=BacktestEngine.EVENT_DRIVEN,
         )
-        cls.event_run = event_backtest.get_all_backtest_runs()[0]
+        event_backtests = app_event.run_backtest(
+            strategy=CrossOverStrategyV1(algorithm_id="event_parity"),
+            study=event_study,
+            snapshot_interval=SnapshotInterval.DAILY,
+        )
+        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
 
         cls.v_trades = sorted(
             cls.vector_run.get_trades(), key=lambda t: t.opened_at
@@ -486,13 +508,15 @@ class TestEngineParityWithRecommendedWarmup(TestCase):
         app_vector.add_data_provider(
             data_provider=_make_data_provider(), priority=1
         )
-        vector_backtest = app_vector.run_vector_backtest(
-            strategy=_make_strategy("vector_warmup2x"),
-            backtest_date_range=date_range,
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
+        vector_study = _build_study(
+            date_range, risk_free_rate=0.027, engine=BacktestEngine.VECTOR
         )
-        cls.vector_run = vector_backtest.get_all_backtest_runs()[0]
+        vector_backtests = app_vector.run_backtest(
+            strategy=_make_strategy("vector_warmup2x"),
+            study=vector_study,
+            snapshot_interval=SnapshotInterval.DAILY,
+        )
+        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
 
         app_event = create_app(name="EventRecommendedWarmup", config=config)
         app_event.add_market(
@@ -501,13 +525,16 @@ class TestEngineParityWithRecommendedWarmup(TestCase):
         app_event.add_data_provider(
             data_provider=_make_data_provider(), priority=1
         )
-        event_backtest = app_event.run_backtest(
-            strategy=_make_strategy("event_warmup2x"),
-            backtest_date_range=date_range,
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
+        event_study = _build_study(
+            date_range, risk_free_rate=0.027,
+            engine=BacktestEngine.EVENT_DRIVEN,
         )
-        cls.event_run = event_backtest.get_all_backtest_runs()[0]
+        event_backtests = app_event.run_backtest(
+            strategy=_make_strategy("event_warmup2x"),
+            study=event_study,
+            snapshot_interval=SnapshotInterval.DAILY,
+        )
+        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
 
         cls.v_trades = sorted(
             cls.vector_run.get_trades(), key=lambda t: t.opened_at
@@ -577,4 +604,3 @@ class TestEngineLevelTradeParityFullHistory(TestEngineLevelTradeParity):
     """
 
     ENGINE_WINDOW_DAYS = 730
-

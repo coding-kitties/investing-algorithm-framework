@@ -27,7 +27,8 @@ just produced or loaded from an `.obtf` bundle.
 ```python
 from investing_algorithm_framework import BacktestDateRange
 
-backtest = app.run_backtest(...)  # or app.run_vector_backtest(...)
+backtests = app.run_backtest(...)
+backtest = backtests[0]
 
 # Cross-window roll-up
 summary = backtest.get_backtest_summary()

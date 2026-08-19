@@ -6,7 +6,7 @@ sidebar_position: 3
 
 ## Overview
 
-This guide covers the **optimized version** of `run_vector_backtests` that maintains 100% functional compatibility while providing significant performance improvements for large-scale backtesting (10,000+ strategies).
+This guide covers the performance-tuning parameters (`n_workers`, `batch_size`, `checkpoint_batch_size`, `use_checkpoints`) built into `app.run_backtests()` / `app.run_backtest()`, providing significant performance improvements for large-scale backtesting (10,000+ strategies). These are not a separate method — they are keyword arguments on the same call you already use.
 
 ## Key Optimizations Implemented
 
@@ -23,7 +23,7 @@ checkpointed_ids = self._get_checkpointed_from_cache(checkpoint_cache, date_rang
 ```
 
 ### 2. **Batch Processing (60-70% Memory Reduction)**
-**Problem**: Holds all backtests in memory simultaneously  
+**Problem**: Holds all backtests in memory simultaneously
 **Solution**: Process and save backtests in configurable batches
 
 ```python
@@ -35,7 +35,7 @@ if len(batch_buffer) >= checkpoint_batch_size:
 ```
 
 ### 3. **Batch Disk Writes (70-80% Write Reduction)**
-**Problem**: Saves each backtest individually to disk  
+**Problem**: Saves each backtest individually to disk
 **Solution**: Accumulate backtests and save in batches
 
 ```python
@@ -44,7 +44,7 @@ save_backtests_to_directory(backtests=batch_buffer, ...)
 ```
 
 ### 4. **Selective Loading (Reduces Load Time)**
-**Problem**: Loads all backtests for filtering operations  
+**Problem**: Loads all backtests for filtering operations
 **Solution**: Only load backtests that are actually needed
 
 ```python
@@ -55,7 +55,7 @@ checkpointed_backtests = self._load_backtests_from_cache(
 ```
 
 ### 5. **More Aggressive Memory Management**
-**Problem**: Memory cleanup happens infrequently  
+**Problem**: Memory cleanup happens infrequently
 **Solution**: Call `gc.collect()` after each batch
 
 ## Performance Improvements
@@ -68,9 +68,9 @@ For **10,000 backtests**:
 - **Disk I/O**: 80-90% reduction
 - **File System Calls**: 70-80% reduction
 
-### Parallel Mode (NEW!) 
+### Parallel Mode (NEW!)
 - **Runtime (4 cores)**: 5-6x faster than original (~30min vs 180min)
-- **Runtime (8 cores)**: 8-10x faster than original (~18min vs 180min)  
+- **Runtime (8 cores)**: 8-10x faster than original (~18min vs 180min)
 - **Runtime (16 cores)**: 10-12x faster than original (~15min vs 180min)
 - **Memory**: Scales with workers (~1-2GB per worker)
 - **Disk I/O**: Same 80-90% reduction as sequential
@@ -79,20 +79,34 @@ For **10,000 backtests**:
 
 ## Usage
 
-### Same Interface as Original
+### Tuning `run_backtests()`
+
+These optimizations are always available as keyword arguments on
+`app.run_backtests()` (or `app.run_backtest()` for a single strategy)
+— there is no separate "optimized" method to switch to, just
+parameters to tune.
 
 ```python
-# Drop-in replacement - just change the method name!
-backtests = app.run_vector_backtests_with_checkpoints_optimized(
-    initial_amount=1000,
-    strategies=strategies,
-    backtest_date_ranges=[date_range_1, date_range_2],
-    snapshot_interval=SnapshotInterval.DAILY,
+from investing_algorithm_framework import Study, Universe, \
+    BacktestWindow, BacktestEngine, SnapshotInterval
+
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=date_range_1),
+        BacktestWindow(train_range=date_range_2),
+    ],
     risk_free_rate=0.027,
-    trading_symbol="EUR",
-    market="BITVAVO",
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
+    strategies=strategies,
+    study=study,
+    snapshot_interval=SnapshotInterval.DAILY,
     show_progress=True,
-    # New optional parameters:
+    # Performance-tuning parameters:
+    use_checkpoints=True,
     batch_size=100,  # Number of strategies per batch
     checkpoint_batch_size=50,  # Backtests before disk write
     n_workers=None,  # None = sequential, -1 = all cores, N = N cores
@@ -107,10 +121,10 @@ import os
 # Use all but one CPU core (recommended)
 n_workers = os.cpu_count() - 1
 
-backtests = app.run_vector_backtests_with_checkpoints_optimized(
-    initial_amount=1000,
+backtests = app.run_backtests(
     strategies=strategies,  # Can handle 10,000+ strategies
-    backtest_date_ranges=[date_range_1, date_range_2],
+    study=study,
+    use_checkpoints=True,
     n_workers=n_workers,  # Enable parallel processing!
     batch_size=100,
     checkpoint_batch_size=50,
@@ -118,14 +132,6 @@ backtests = app.run_vector_backtests_with_checkpoints_optimized(
 )
 
 # Expected speedup: 5-10x depending on CPU cores
-```
-    trading_symbol="EUR",
-    market="BITVAVO",
-    show_progress=True,
-    # New optional parameters:
-    batch_size=100,  # Number of strategies per batch
-    checkpoint_batch_size=50,  # Backtests before disk write
-)
 ```
 
 ### Configuration Parameters
@@ -139,7 +145,7 @@ backtests = app.run_vector_backtests_with_checkpoints_optimized(
 #### `checkpoint_batch_size` (default: 50)
 - Number of backtests to accumulate before saving to disk
 - Higher = fewer disk writes but more memory
-- Lower = more disk writes but less memory  
+- Lower = more disk writes but less memory
 - **Recommended**: 25-100 for 10k strategies
 
 ## New Helper Methods
@@ -170,14 +176,14 @@ Optimized version for single date range execution with batching.
 
 *N = number of date ranges, M = number of strategies*
 
-## When to Use Each Version
+## When to Tune These Parameters
 
-### Use `run_vector_backtests_with_checkpoints` (Original)
+### Defaults are fine for small runs
 - ✓ Small number of strategies (<100)
 - ✓ Testing/debugging
-- ✓ When you need proven, battle-tested code
+- ✓ `use_checkpoints=False`, `n_workers=None` (sequential) is the proven, battle-tested default
 
-### Use `run_vector_backtests_with_checkpoints_optimized` (New)
+### Tune `n_workers`/`batch_size`/`checkpoint_batch_size` for scale
 - ✓ Large number of strategies (1,000+)
 - ✓ Production workloads
 - ✓ Memory-constrained environments
@@ -185,51 +191,61 @@ Optimized version for single date range execution with batching.
 
 ## Functional Equivalence
 
-The optimized version is **100% functionally equivalent** to the original:
-- ✓ Same parameters (except optional batch sizes)
-- ✓ Same return values
+Tuning `n_workers`/`batch_size`/`checkpoint_batch_size` never changes
+the semantics of `run_backtests()`:
+- ✓ Same return values (`List[Backtest]`) regardless of tuning
 - ✓ Same filter function behavior
 - ✓ Same checkpoint format
 - ✓ Same error handling
-- ✓ Interoperable with original (can resume from either version)
+- ✓ Checkpoints written with one set of values can be resumed with another
 
 ## Testing Recommendations
 
 ### Benchmark Test
 ```python
+import os
 import time
 
 strategies = [...]  # Your 10k strategies
 
-# Original version
+# Default (sequential, small batches)
 start = time.time()
-results1 = app.run_vector_backtests_with_checkpoints(
-    strategies=strategies, ...
+results1 = app.run_backtests(
+    strategies=strategies, study=study,
 )
 original_time = time.time() - start
 
-# Optimized version  
+# Tuned (parallel, larger batches)
 start = time.time()
-results2 = app.run_vector_backtests_with_checkpoints_optimized(
-    strategies=strategies, ...,
+results2 = app.run_backtests(
+    strategies=strategies, study=study,
+    use_checkpoints=True,
+    n_workers=os.cpu_count() - 1,
     batch_size=100,
-    checkpoint_batch_size=50
+    checkpoint_batch_size=50,
 )
 optimized_time = time.time() - start
 
-print(f"Original: {original_time:.1f}s")
-print(f"Optimized: {optimized_time:.1f}s")
+print(f"Default: {original_time:.1f}s")
+print(f"Tuned: {optimized_time:.1f}s")
 print(f"Speedup: {original_time/optimized_time:.1f}x")
 ```
 
 ### Memory Monitoring
 ```python
+import os
 import tracemalloc
 
 tracemalloc.start()
 
 # Run your backtests
-results = app.run_vector_backtests_with_checkpoints_optimized(...)
+results = app.run_backtests(
+    strategies=strategies, study=study,
+    use_checkpoints=True,
+    n_workers=os.cpu_count() - 1,
+    batch_size=100,
+    checkpoint_batch_size=50,
+)
 
 current, peak = tracemalloc.get_traced_memory()
 print(f"Current memory: {current / 1024**2:.1f} MB")
@@ -240,7 +256,7 @@ tracemalloc.stop()
 ## Architecture
 
 ```
-Original Flow:
+Naive flow (no tuning, conceptual baseline):
 ├── For each date range:
 │   ├── Load checkpoints from disk (SLOW!)
 │   ├── For each strategy:
@@ -249,7 +265,7 @@ Original Flow:
 │   └── Update checkpoint file
 └── Load all backtests for summary
 
-Optimized Flow:
+How run_backtests() actually executes (tuned):
 ├── Load checkpoints ONCE into cache
 ├── For each date range:
 │   ├── Check cache (FAST!)
@@ -285,19 +301,17 @@ def iter_backtests_from_disk(directory):
         yield Backtest.open(path)
 ```
 
-## File Modified
+## Where This Lives
 
 - `/investing_algorithm_framework/infrastructure/services/backtesting/backtest_service.py`
-  - Added `run_vector_backtests_with_checkpoints_optimized()` method (lines 1276-1631)
-  - Added `_load_checkpoint_cache()` helper method
-  - Added `_get_checkpointed_from_cache()` helper method  
-  - Added `_batch_save_and_checkpoint()` helper method
-  - Added `_load_backtests_from_cache()` helper method
-  - Added `_run_single_date_range_optimized()` helper method
+  - `BacktestService.run_vector_backtests()` — the internal method `app.run_backtests()`/`app.run_backtest()` delegate to for the vector engine; implements the checkpoint cache, batching, and parallel-worker logic described above
+  - `_load_checkpoint_cache()` helper method
+  - `_get_checkpointed_from_cache()` helper method
+  - `_batch_save_and_checkpoint()` helper method
+  - `_load_backtests_from_cache()` helper method
 
 ## Summary
 
-The optimized version provides **massive performance improvements** for large-scale backtesting while maintaining 100% compatibility with the original implementation. It's a drop-in replacement that you can use immediately to speed up your 10,000+ backtest workflows!
+These parameters provide **massive performance improvements** for large-scale backtesting on the same `run_backtests()`/`run_backtest()` call you already use for small runs!
 
-**Recommendation**: Start with the optimized version for your large-scale testing, and adjust `batch_size` and `checkpoint_batch_size` parameters based on your available memory and disk I/O capabilities.
-
+**Recommendation**: Start with the defaults for small-scale testing, and adjust `n_workers`, `batch_size` and `checkpoint_batch_size` based on your available memory, CPU cores, and disk I/O capabilities once you scale up.

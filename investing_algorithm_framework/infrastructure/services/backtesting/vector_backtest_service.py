@@ -474,6 +474,7 @@ class VectorBacktestService:
                 if tc.fee_percentage else None,
                 slippage=fill_price - price,
                 metadata={"order_reason": order_reason},
+                strategy_id=getattr(strategy, "strategy_id", None),
             )
             orders.append(buy_order)
             trade = Trade(
@@ -665,6 +666,7 @@ class VectorBacktestService:
                 if tc.fee_percentage else None,
                 slippage=price - fill_price,
                 metadata={"order_reason": order_reason, "is_short": True},
+                strategy_id=getattr(strategy, "strategy_id", None),
             )
             orders.append(short_order)
             trade = Trade(

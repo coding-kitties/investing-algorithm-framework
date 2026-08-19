@@ -167,8 +167,10 @@ class TradeService(RepositoryService):
             "cost": fill_amount * fill_price,
             "status": TradeStatus.OPEN.value,
         }
-        strategy_id = (buy_order.metadata or {}).get("strategy_id")
+        strategy_id = getattr(buy_order, "strategy_id", None) or \
+            (buy_order.metadata or {}).get("strategy_id")
         if strategy_id is not None:
+            data["strategy_id"] = strategy_id
             data["metadata"] = {"strategy_id": strategy_id}
 
         trade = self.create(data)
@@ -252,8 +254,10 @@ class TradeService(RepositoryService):
             "status": TradeStatus.OPEN.value,
             "is_short": True,
         }
-        strategy_id = (short_order.metadata or {}).get("strategy_id")
+        strategy_id = getattr(short_order, "strategy_id", None) or \
+            (short_order.metadata or {}).get("strategy_id")
         if strategy_id is not None:
+            data["strategy_id"] = strategy_id
             data["metadata"] = {"strategy_id": strategy_id}
 
         trade = self.create(data)

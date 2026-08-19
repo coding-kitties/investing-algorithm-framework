@@ -24,6 +24,10 @@ from investing_algorithm_framework import (
     TradingStrategy,
     create_app,
     signals_from_column,
+    Study,
+    Universe,
+    BacktestWindow,
+    BacktestEngine,
 )
 
 
@@ -132,14 +136,19 @@ class TestEventBacktestShortSelling(TestCase):
             start_date=START_DATE, end_date=END_DATE
         )
         app = _create_app("EventShortSelling")
-        backtest = app.run_backtest(
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
+        backtests = app.run_backtest(
             strategy=ShortAt120CoverAt90Strategy(
                 algorithm_id="event_short"
             ),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+            study=study,
         )
-        cls.backtest_run = backtest.get_all_backtest_runs()[0]
+        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
 
     def test_short_and_cover_orders_exist(self):
         orders = self.backtest_run.orders
@@ -187,14 +196,19 @@ class TestEventBacktestShortWithStopLoss(TestCase):
             start_date=START_DATE, end_date=END_DATE
         )
         app = _create_app("EventShortStopLoss")
-        backtest = app.run_backtest(
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
+        backtests = app.run_backtest(
             strategy=ShortWithStopLossStrategy(
                 algorithm_id="event_short_sl"
             ),
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+            study=study,
         )
-        cls.backtest_run = backtest.get_all_backtest_runs()[0]
+        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
 
     def test_stop_loss_attached_to_short_trade_is_inverted(self):
         trades = self.backtest_run.trades

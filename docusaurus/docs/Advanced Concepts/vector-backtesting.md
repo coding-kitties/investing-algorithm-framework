@@ -41,7 +41,7 @@ Use vector backtesting when:
 - Working with large strategy sets (100+ strategies)
 
 :::warning Order types not modelled in vector backtests
-Vector backtesting evaluates strategy **signals** (`generate_buy_signals`, `generate_sell_signals`) against the price series. It does **not** simulate the order book, intra-bar price paths, partial fills, or order-type semantics.
+Vector backtesting evaluates strategy **signals** (`generate_signal_series`) against the price series. It does **not** simulate the order book, intra-bar price paths, partial fills, or order-type semantics.
 
 This means the following are **only evaluated in event-driven backtests** and live trading:
 
@@ -59,7 +59,8 @@ The recommended workflow is to use vector backtests to **screen parameter combin
 ### Single Strategy, Single Date Range
 
 ```python
-from investing_algorithm_framework import create_app, BacktestDateRange, SnapshotInterval
+from investing_algorithm_framework import create_app, BacktestDateRange, \
+    SnapshotInterval, Study, Universe, BacktestWindow, BacktestEngine
 from datetime import datetime, timezone
 
 app = create_app()
@@ -78,13 +79,17 @@ date_range = BacktestDateRange(
 )
 
 # Run backtest
-backtest = app.run_vector_backtest(
-    strategy=strategy,
-    backtest_date_range=date_range,
-    initial_amount=1000,
-    market="BITVAVO",
-    trading_symbol="EUR"
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=date_range)],
+    engines=[BacktestEngine.VECTOR],
 )
+backtests = app.run_backtest(
+    strategy=strategy,
+    study=study,
+)
+backtest = backtests[0]
 
 print(f"Total return: {backtest.backtest_summary.total_growth_percentage}%")
 ```
@@ -116,12 +121,17 @@ date_ranges = [
 ]
 
 # Run backtests
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    initial_amount=1000,
-    market="BITVAVO",
-    trading_symbol="EUR"
+    study=study,
 )
 
 # Each backtest contains runs for all date ranges
@@ -138,15 +148,20 @@ Checkpointing saves completed backtests to disk, allowing you to resume interrup
 #### Enabling Checkpoints
 
 ```python
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    initial_amount=1000,
-    market="BITVAVO",
-    trading_symbol="EUR",
     # Enable checkpointing
     use_checkpoints=True,
-    backtest_storage_directory="./backtest_storage"
+    backtest_storage_directory="./backtest_storage",
+    study=study,
 )
 ```
 
@@ -221,23 +236,25 @@ skip-on-match behaviour. They are safe in CI, AWS Lambda, parallel
 workers, and headless notebooks.
 
 ```python
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    initial_amount=1000,
-    market="BITVAVO",
-    trading_symbol="EUR",
     use_checkpoints=True,
     backtest_storage_directory="./backtest_storage",
-
     # Rerun only strategies whose code or params changed:
     force_rerun="stale",
-
     # Or rerun everything, ignoring checkpoints:
-    # force_rerun=True,
-
+    # force_rerun=True
     # Log a single line per matched-checkpoint batch:
     on_checkpoint_match="warn",
+    study=study,
 )
 ```
 
@@ -270,17 +287,22 @@ Parallelization distributes backtests across multiple CPU cores for massive spee
 ```python
 import os
 
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,  # 1000 strategies
-    backtest_date_ranges=date_ranges,
-    initial_amount=1000,
-    market="BITVAVO",
-    trading_symbol="EUR",
     use_checkpoints=True,
     backtest_storage_directory="./backtest_storage",
     # Parallel processing configuration
     n_workers=os.cpu_count() - 1,  # Use all but one CPU core
-    show_progress=True
+    show_progress=True,
+    study=study,
 )
 ```
 
@@ -332,18 +354,23 @@ Batching processes strategies in smaller chunks to manage memory usage and enabl
 #### Configuration
 
 ```python
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,  # 10,000 strategies
-    backtest_date_ranges=date_ranges,
-    initial_amount=1000,
-    market="BITVAVO",
-    trading_symbol="EUR",
     use_checkpoints=True,
     backtest_storage_directory="./backtest_storage",
     # Batching configuration
-    batch_size=100,              # Process 100 strategies at a time
-    checkpoint_batch_size=50,    # Save checkpoint every 50 backtests
-    show_progress=True
+    batch_size=100,  # Process 100 strategies at a time
+    checkpoint_batch_size=50,  # Save checkpoint every 50 backtests
+    show_progress=True,
+    study=study,
 )
 ```
 
@@ -388,13 +415,18 @@ The storage directory persists all backtest results to disk, enabling checkpoint
 #### Configuration
 
 ```python
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    initial_amount=1000,
-    market="BITVAVO",
-    trading_symbol="EUR",
-    backtest_storage_directory="./my_backtests"  # Can be relative or absolute path
+    backtest_storage_directory="./my_backtests",  # Can be relative or absolute path
+    study=study,
 )
 ```
 
@@ -474,13 +506,18 @@ def filter_profitable_strategies(backtests, date_range):
             filtered.append(backtest)
     return filtered
 
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in [period1, period2, period3]
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,  # 1000 strategies
-    backtest_date_ranges=[period1, period2, period3],
-    initial_amount=1000,
-    market="BITVAVO",
-    trading_symbol="EUR",
-    window_filter_function=filter_profitable_strategies  # Apply after each period
+    window_filter_function=filter_profitable_strategies,  # Apply after each period
+    study=study,
 )
 ```
 
@@ -590,7 +627,7 @@ When using `backtest_storage_directory`, filtered-out backtests are **marked wit
 - ✅ Can review why strategies were filtered
 
 **Loading Behavior**:
-- Filtered-out backtests are excluded from `run_vector_backtests()` results
+- Filtered-out backtests are excluded from `run_backtests()` results
 - But remain in storage for future runs with different filters
 - Load manually with `load_backtests_from_directory()` if needed
 
@@ -615,13 +652,18 @@ def select_top_performers(backtests):
     # Return top 10
     return sorted_backtests[:10]
 
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in [period1, period2, period3]
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,  # 1000 strategies
-    backtest_date_ranges=[period1, period2, period3],
-    initial_amount=1000,
-    market="BITVAVO",
-    trading_symbol="EUR",
-    final_filter_function=select_top_performers  # Apply at the end
+    final_filter_function=select_top_performers,  # Apply at the end
+    study=study,
 )
 
 # Result: 10 best strategies
@@ -695,9 +737,8 @@ def score_and_select(backtests):
 
 **Use Both Together**:
 ```python
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,  # 10,000 strategies
-    backtest_date_ranges=[p1, p2, p3, p4],
     # Window filter: Eliminate poor performers progressively
     window_filter_function=lambda b, dr: [
         bt for bt in b
@@ -708,7 +749,8 @@ backtests = app.run_vector_backtests(
         b,
         key=lambda bt: bt.backtest_summary.total_growth_percentage,
         reverse=True
-    )[:100]
+    )[:100],
+    study=study,
 )
 # Result: Top 100 strategies that passed all filters
 ```
@@ -722,16 +764,16 @@ For optimal performance with different dataset sizes:
 #### Small Datasets (< 100 strategies)
 
 ```python
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     # Sequential processing is fine
     n_workers=None,
     # Process all at once
     batch_size=100,
     checkpoint_batch_size=50,
     # Optional storage
-    backtest_storage_directory="./storage"
+    backtest_storage_directory="./storage",
+    study=study,
 )
 ```
 
@@ -740,9 +782,8 @@ backtests = app.run_vector_backtests(
 #### Medium Datasets (100-1,000 strategies)
 
 ```python
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     # Enable parallelization
     n_workers=os.cpu_count() - 1,
     # Moderate batching
@@ -750,7 +791,8 @@ backtests = app.run_vector_backtests(
     checkpoint_batch_size=25,
     # Enable checkpointing
     use_checkpoints=True,
-    backtest_storage_directory="./storage"
+    backtest_storage_directory="./storage",
+    study=study,
 )
 ```
 
@@ -759,9 +801,8 @@ backtests = app.run_vector_backtests(
 #### Large Datasets (1,000-10,000 strategies)
 
 ```python
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     # Maximum parallelization
     n_workers=-1,  # Use all cores
     # Smaller batches for memory management
@@ -772,7 +813,8 @@ backtests = app.run_vector_backtests(
     backtest_storage_directory="./storage",
     # Use window filter to reduce computation
     window_filter_function=eliminate_poor_performers,
-    show_progress=True
+    show_progress=True,
+    study=study,
 )
 ```
 
@@ -781,9 +823,8 @@ backtests = app.run_vector_backtests(
 #### Extra Large Datasets (10,000+ strategies)
 
 ```python
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     # Maximum parallelization
     n_workers=-1,
     # Very small batches
@@ -795,7 +836,8 @@ backtests = app.run_vector_backtests(
     # Aggressive filtering
     window_filter_function=strict_filter,
     final_filter_function=top_n_selector,
-    show_progress=True
+    show_progress=True,
+    study=study,
 )
 ```
 
@@ -814,12 +856,12 @@ def get_memory_usage():
 
 print(f"Memory before: {get_memory_usage():.2f} GB")
 
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     # Memory management settings
     batch_size=10,  # Smaller batches = less memory
-    n_workers=4,    # Fewer workers = less memory
+    n_workers=4,  # Fewer workers = less memory
+    study=study,
 )
 
 print(f"Memory after: {get_memory_usage():.2f} GB")
@@ -832,11 +874,11 @@ import time
 
 start = time.time()
 
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     n_workers=os.cpu_count() - 1,
-    show_progress=True
+    show_progress=True,
+    study=study,
 )
 
 duration = time.time() - start
@@ -852,16 +894,16 @@ print(f"Performance: {strategies_per_second:.2f} backtests/second")
 
 ```python
 # ✅ GOOD: Results preserved, checkpointing enabled
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    backtest_storage_directory="./storage"
+    backtest_storage_directory="./storage",
+    study=study,
 )
 
 # ❌ BAD: Results lost if process crashes, no checkpointing
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges
+    study=study,
 )
 ```
 
@@ -869,18 +911,18 @@ backtests = app.run_vector_backtests(
 
 ```python
 # ✅ GOOD: Can resume if interrupted
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,  # 5000 strategies
-    backtest_date_ranges=date_ranges,
     use_checkpoints=True,
-    backtest_storage_directory="./storage"
+    backtest_storage_directory="./storage",
+    study=study,
 )
 
 # ❌ BAD: 2 hours wasted if process crashes
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,  # 5000 strategies
-    backtest_date_ranges=date_ranges,
-    use_checkpoints=False
+    use_checkpoints=False,
+    study=study,
 )
 ```
 
@@ -890,17 +932,17 @@ backtests = app.run_vector_backtests(
 import os
 
 # ✅ GOOD: 5-8x speedup on multi-core systems
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    n_workers=os.cpu_count() - 1
+    n_workers=os.cpu_count() - 1,
+    study=study,
 )
 
 # ❌ BAD: Single-threaded, slow
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    n_workers=None
+    n_workers=None,
+    study=study,
 )
 ```
 
@@ -908,17 +950,17 @@ backtests = app.run_vector_backtests(
 
 ```python
 # ✅ GOOD: Eliminate poor performers early
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,  # 10,000 strategies
-    backtest_date_ranges=[p1, p2, p3, p4, p5],
-    window_filter_function=eliminate_poor_performers  # Reduces computation
+    window_filter_function=eliminate_poor_performers,  # Reduces computation
+    study=study,
 )
 # Runs: 10,000 → 3,000 → 1,000 → 400 → 150 = much faster!
 
 # ❌ BAD: Run all strategies for all periods
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,  # 10,000 strategies
-    backtest_date_ranges=[p1, p2, p3, p4, p5]
+    study=study,
 )
 # Runs: 10,000 × 5 = 50,000 backtests!
 ```
@@ -927,17 +969,17 @@ backtests = app.run_vector_backtests(
 
 ```python
 # ✅ GOOD: See progress and estimate completion time
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    show_progress=True  # Shows progress bars
+    show_progress=True,  # Shows progress bars
+    study=study,
 )
 
 # ❌ BAD: No feedback, can't estimate completion
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    show_progress=False
+    show_progress=False,
+    study=study,
 )
 ```
 
@@ -945,17 +987,17 @@ backtests = app.run_vector_backtests(
 
 ```python
 # ✅ GOOD: Tuned for system resources
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     batch_size=50,  # Adjust based on RAM
     checkpoint_batch_size=25,  # Adjust based on disk speed
+    study=study,
 )
 
 # ❌ BAD: Default may not be optimal
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges
+    study=study,
 )
 ```
 
@@ -963,17 +1005,17 @@ backtests = app.run_vector_backtests(
 
 ```python
 # ✅ GOOD: Continue despite individual strategy errors
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    continue_on_error=True  # Skip failed strategies
+    continue_on_error=True,  # Skip failed strategies
+    study=study,
 )
 
 # ❌ BAD: One error stops entire run
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
-    continue_on_error=False
+    continue_on_error=False,
+    study=study,
 )
 ```
 
@@ -1005,20 +1047,25 @@ print(f"Testing {len(strategies)} strategy combinations")
 # Result: 3 × 3 × 4 = 36 strategies
 
 # Run optimization
-backtests = app.run_vector_backtests(
-    strategies=strategies,
-    backtest_date_ranges=[
-        BacktestDateRange(
-            start_date=datetime(2022, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
-            name="Train"
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=10000,
+    backtest_windows=[
+        BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=datetime(2022, 1, 1, tzinfo=timezone.utc),
+                end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
+                name="Train"
+            )
         )
     ],
-    initial_amount=10000,
-    market="BITVAVO",
-    trading_symbol="EUR",
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
+    strategies=strategies,
     n_workers=-1,
-    show_progress=True
+    show_progress=True,
+    study=study,
 )
 
 # Find best parameters
@@ -1062,17 +1109,22 @@ def keep_profitable(backtests, date_range):
     ]
 
 # Run walk-forward backtest
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=10000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in periods
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,  # 1000 strategies
-    backtest_date_ranges=periods,
-    initial_amount=10000,
-    market="BITVAVO",
-    trading_symbol="EUR",
     window_filter_function=keep_profitable,
     use_checkpoints=True,
     backtest_storage_directory="./walk_forward",
     n_workers=-1,
-    show_progress=True
+    show_progress=True,
+    study=study,
 )
 
 print(f"Strategies profitable in all periods: {len(backtests)}")
@@ -1118,28 +1170,33 @@ def top_100(backtests):
     return [b for score, b in scored[:100]]
 
 # Run optimization
-backtests = app.run_vector_backtests(
-    strategies=strategies,
-    backtest_date_ranges=[
-        BacktestDateRange(
-            start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2021, 12, 31, tzinfo=timezone.utc),
-            name="Train 1"
-        ),
-        BacktestDateRange(
-            start_date=datetime(2022, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
-            name="Train 2"
-        ),
-        BacktestDateRange(
-            start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2025, 12, 31, tzinfo=timezone.utc),
-            name="Validation"
-        )
+train_test_ranges = [
+    BacktestDateRange(
+        start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        end_date=datetime(2021, 12, 31, tzinfo=timezone.utc),
+        name="Train 1"
+    ),
+    BacktestDateRange(
+        start_date=datetime(2022, 1, 1, tzinfo=timezone.utc),
+        end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
+        name="Train 2"
+    ),
+    BacktestDateRange(
+        start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        end_date=datetime(2025, 12, 31, tzinfo=timezone.utc),
+        name="Validation"
+    )
+]
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=10000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in train_test_ranges
     ],
-    initial_amount=10000,
-    market="BITVAVO",
-    trading_symbol="EUR",
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
+    strategies=strategies,
     # Progressive filtering
     window_filter_function=min_performance,
     final_filter_function=top_100,
@@ -1149,7 +1206,8 @@ backtests = app.run_vector_backtests(
     checkpoint_batch_size=25,
     use_checkpoints=True,
     backtest_storage_directory="./optimization",
-    show_progress=True
+    show_progress=True,
+    study=study,
 )
 
 print(f"Top 100 strategies identified from {len(strategies)} candidates")
@@ -1178,32 +1236,42 @@ import os
 
 # First run (may be interrupted)
 try:
-    backtests = app.run_vector_backtests(
+    study = Study(
+        universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+        initial_capital=10000,
+        backtest_windows=[
+            BacktestWindow(train_range=dr) for dr in date_ranges
+        ],
+        engines=[BacktestEngine.VECTOR],
+    )
+    backtests = app.run_backtests(
         strategies=strategies,  # 5000 strategies
-        backtest_date_ranges=date_ranges,
-        initial_amount=10000,
-        market="BITVAVO",
-        trading_symbol="EUR",
         use_checkpoints=True,
         backtest_storage_directory="./checkpoint_demo",
         n_workers=-1,
-        show_progress=True
+        show_progress=True,
+        study=study,
     )
 except KeyboardInterrupt:
     print("Interrupted! Partial results saved.")
 
 # Second run - resumes from checkpoint
 print("Resuming from checkpoint...")
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=10000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,  # Same strategies
-    backtest_date_ranges=date_ranges,
-    initial_amount=10000,
-    market="BITVAVO",
-    trading_symbol="EUR",
     use_checkpoints=True,
     backtest_storage_directory="./checkpoint_demo",  # Same directory
     n_workers=-1,
-    show_progress=True
+    show_progress=True,
+    study=study,
 )
 
 # Output:
@@ -1286,11 +1354,12 @@ its parameters will trigger a rerun automatically. To force a rerun
 explicitly, use:
 
 ```python
-backtests = app.run_vector_backtests(
+backtests = app.run_backtests(
     ...,
     use_checkpoints=True,
     backtest_storage_directory="./storage",
     force_rerun=True,  # rerun everything once
+    study=study,
 )
 ```
 
@@ -1303,7 +1372,7 @@ This is expected behavior! Filtered backtests are marked with metadata but prese
 
 ```python
 # They're excluded from results automatically
-backtests = app.run_vector_backtests(...)
+backtests = app.run_backtests(...)
 # backtests will not include filtered-out strategies
 
 # But they remain in storage for future runs

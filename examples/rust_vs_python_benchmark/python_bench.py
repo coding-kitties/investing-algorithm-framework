@@ -1,7 +1,7 @@
 """
 Python benchmark — runs a parameter sweep through the
 investing-algorithm-framework's vectorized backtest engine
-(`app.run_vector_backtests`).
+(`app.run_backtests(..., study=Study(engines=[BacktestEngine.VECTOR]))`).
 
 This represents the *current* end-user code path: framework data
 providers, the `TradingStrategy` lifecycle, signal generation in
@@ -27,15 +27,19 @@ import pandas as pd
 
 from investing_algorithm_framework import (
     BacktestDateRange,
+    BacktestEngine,
+    BacktestWindow,
     DataSource,
     DataType,
     PositionSize,
     Schedule,
     SignalSeries,
     SignalSide,
+    Study,
     TimeUnit,
     TradingCost,
     TradingStrategy,
+    Universe,
     create_app,
 )
 from investing_algorithm_framework.infrastructure import (
@@ -284,9 +288,14 @@ def main() -> None:
         shutil.rmtree(BACKTEST_DIR)
 
     t0 = time.perf_counter()
-    backtests = app.run_vector_backtests(
+    study = Study(
+        universe=Universe(market=market, trading_symbol="USD"),
+        backtest_windows=[BacktestWindow(train_range=date_range)],
+        engines=[BacktestEngine.VECTOR],
+    )
+    backtests = app.run_backtests(
         strategies=strategies,
-        backtest_date_ranges=[date_range],
+        study=study,
         n_workers=args.workers,
         backtest_storage_directory=str(BACKTEST_DIR),
         show_progress=True,

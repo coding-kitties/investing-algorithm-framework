@@ -20,7 +20,10 @@ Vector backtesting is a high-performance backtesting approach that processes mar
 ### Single Strategy
 
 ```python
-from investing_algorithm_framework import create_app, BacktestDateRange, SnapshotInterval
+from investing_algorithm_framework import (
+    create_app, BacktestDateRange, SnapshotInterval, Study, Universe,
+    BacktestWindow, BacktestEngine,
+)
 from datetime import datetime, timezone
 
 app = create_app()
@@ -30,13 +33,18 @@ backtest_range = BacktestDateRange(
     end_date=datetime(2024, 1, 1, tzinfo=timezone.utc)
 )
 
-backtest = app.run_vector_backtest(
-    backtest_date_range=backtest_range,
-    strategy=my_strategy,
-    initial_amount=1000,
-    market="bitvavo",
-    trading_symbol="EUR"
+study = Study(
+    universe=Universe(market="bitvavo", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=backtest_range)],
+    engines=[BacktestEngine.VECTOR],
 )
+
+backtests = app.run_backtest(
+    strategy=my_strategy,
+    study=study,
+)
+backtest = backtests[0]
 ```
 
 ### Multiple Strategies
@@ -50,13 +58,20 @@ strategies = [
     MyStrategy(rsi_period=20),
 ]
 
-backtests = app.run_vector_backtests(
-    backtest_date_ranges=[date_range_1, date_range_2],
+study = Study(
+    universe=Universe(market="bitvavo", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=date_range_1),
+        BacktestWindow(train_range=date_range_2),
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+
+backtests = app.run_backtests(
     strategies=strategies,
-    initial_amount=1000,
     snapshot_interval=SnapshotInterval.DAILY,
-    market="bitvavo",
-    trading_symbol="EUR"
+    study=study,
 )
 ```
 
@@ -65,11 +80,17 @@ backtests = app.run_vector_backtests(
 ### Save to Directory
 
 ```python
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="bitvavo", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=dr) for dr in date_ranges],
+    engines=[BacktestEngine.VECTOR],
+)
+
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     backtest_storage_directory="./my_backtests",
-    initial_amount=1000
+    study=study,
 )
 ```
 
@@ -86,12 +107,18 @@ backtests = load_backtests_from_directory("./my_backtests")
 Resume interrupted backtests without losing progress:
 
 ```python
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="bitvavo", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=dr) for dr in date_ranges],
+    engines=[BacktestEngine.VECTOR],
+)
+
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     backtest_storage_directory="./my_backtests",
     use_checkpoints=True,
-    initial_amount=1000
+    study=study,
 )
 ```
 
@@ -108,12 +135,18 @@ def final_filter(backtest):
     """Filter at the end"""
     return backtest.backtest_summary.sharpe_ratio > 1.0
 
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="bitvavo", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=dr) for dr in date_ranges],
+    engines=[BacktestEngine.VECTOR],
+)
+
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     window_filter_function=window_filter,
     final_filter_function=final_filter,
-    initial_amount=1000
+    study=study,
 )
 ```
 
@@ -124,11 +157,17 @@ Utilize multiple CPU cores for faster backtesting:
 ```python
 import os
 
-backtests = app.run_vector_backtests(
+study = Study(
+    universe=Universe(market="bitvavo", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[BacktestWindow(train_range=dr) for dr in date_ranges],
+    engines=[BacktestEngine.VECTOR],
+)
+
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
     n_workers=os.cpu_count() - 1,
-    initial_amount=1000
+    study=study,
 )
 ```
 

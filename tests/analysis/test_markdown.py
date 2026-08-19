@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-from investing_algorithm_framework.app.app import _apply_backtest_windows
+from investing_algorithm_framework.app.app import _apply_study_to_backtests
+from investing_algorithm_framework.domain.backtesting.study import Study
 from investing_algorithm_framework.analysis.markdown import (
     _run_matches,
     create_backtest_metrics_table,
@@ -274,7 +275,15 @@ class TestShowTradeInsights(unittest.TestCase):
             train_range=date_range,
         )
 
-        _apply_backtest_windows([backtest], [visualization_window])
+        _apply_study_to_backtests(
+            [backtest],
+            Study(
+                name="visualization_study",
+                backtest_windows=[visualization_window],
+            ),
+            [],
+            None,
+        )
 
         result = show_trade_insights(
             [backtest],

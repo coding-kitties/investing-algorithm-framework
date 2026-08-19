@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
-    BacktestDateRange, Schedule
+    BacktestDateRange, Schedule, Study, Universe, BacktestWindow
 
 
 class TestStrategy(TradingStrategy):
@@ -74,9 +74,19 @@ class Test(TestCase):
             start_date=start_date,
             end_date=end_date
         )
-        reports = app.run_backtests(
-            algorithms=[algorithm_one, algorithm_two, algorithm_three],
-            backtest_date_ranges=[backtest_date_range],
-            risk_free_rate=0.027
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=backtest_date_range)],
         )
+
+        # run_backtests has no algorithm=/algorithms= support, so each
+        # independent algorithm is run via its own run_backtest call.
+        reports = []
+
+        for algorithm in (algorithm_one, algorithm_two, algorithm_three):
+            backtests = app.run_backtest(algorithm=algorithm, study=study)
+            reports.append(backtests[0])
+
         self.assertEqual(3, len(reports))

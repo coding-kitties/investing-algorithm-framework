@@ -7,6 +7,7 @@ class TradeSerializer(Schema):
     trading_symbol = fields.String(dump_only=True)
     status = fields.String(dump_only=True)
     is_short = fields.Boolean(dump_only=True)
+    strategy_id = fields.String(dump_only=True)
     amount = fields.Float(dump_only=True)
     available_amount = fields.Float(dump_only=True)
     filled_amount = fields.Float(dump_only=True)

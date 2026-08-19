@@ -21,7 +21,8 @@ from unittest import TestCase
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
     RESOURCE_DIRECTORY, CSVOHLCVDataProvider, Schedule, SignalSide, \
-    signals_from_column, StopLossRule, TakeProfitRule
+    signals_from_column, StopLossRule, TakeProfitRule, Study, Universe, \
+    BacktestWindow, BacktestEngine
 
 CSV_FILENAME = "OHLCV_BTC-EUR_BITVAVO_2h_RISK_RULE_HOOKS.csv"
 WARMUP = 5
@@ -186,12 +187,16 @@ class TestTrailingStopLossHooks(TestCase):
         date_range = BacktestDateRange(
             start_date=SL_START_DATE, end_date=SL_END_DATE
         )
-        backtest = app.run_backtest(
+        backtests = app.run_backtest(
             strategy=cls.strategy,
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+            study=Study(
+                universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+                risk_free_rate=0.027,
+                backtest_windows=[BacktestWindow(train_range=date_range)],
+                engines=[BacktestEngine.EVENT_DRIVEN],
+            ),
         )
-        cls.backtest_run = backtest.get_all_backtest_runs()[0]
+        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
 
     def test_one_trade_was_opened_and_closed(self):
         trades = self.backtest_run.get_trades()
@@ -284,12 +289,16 @@ class TestTakeProfitHooks(TestCase):
         date_range = BacktestDateRange(
             start_date=TP_START_DATE, end_date=TP_END_DATE
         )
-        backtest = app.run_backtest(
+        backtests = app.run_backtest(
             strategy=cls.strategy,
-            backtest_date_range=date_range,
-            risk_free_rate=0.027,
+            study=Study(
+                universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+                risk_free_rate=0.027,
+                backtest_windows=[BacktestWindow(train_range=date_range)],
+                engines=[BacktestEngine.EVENT_DRIVEN],
+            ),
         )
-        cls.backtest_run = backtest.get_all_backtest_runs()[0]
+        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
 
     def test_one_trade_was_opened_and_closed(self):
         trades = self.backtest_run.get_trades()

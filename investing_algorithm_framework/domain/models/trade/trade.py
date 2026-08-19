@@ -78,6 +78,7 @@ class Trade(BaseModel):
         take_profits=None,
         metadata=None,
         is_short=None,
+        strategy_id=None,
     ):
         self.id = id
         self.orders = orders
@@ -126,6 +127,19 @@ class Trade(BaseModel):
             else:
                 is_short = False
         self.is_short = bool(is_short)
+        # Strategy that opened this trade, if known. When the caller
+        # does not pass an explicit value we derive it from (in order):
+        #   1. metadata flag
+        #   2. the strategy_id of the first (opening) order on the trade.
+        if strategy_id is None:
+            if (isinstance(self.metadata, dict)
+                    and "strategy_id" in self.metadata):
+                strategy_id = self.metadata.get("strategy_id")
+            elif self.orders:
+                strategy_id = getattr(
+                    self.orders[0], "strategy_id", None
+                )
+        self.strategy_id = strategy_id
 
     def update(self, data):
 
@@ -368,6 +382,7 @@ class Trade(BaseModel):
             "filled_amount": self.filled_amount,
             "available_amount": self.available_amount,
             "metadata": self.metadata if self.metadata else {},
+            "strategy_id": getattr(self, "strategy_id", None),
         }
 
     @staticmethod
@@ -460,6 +475,7 @@ class Trade(BaseModel):
             take_profits=take_profits,
             metadata=data.get("metadata", {}),
             is_short=data.get("is_short"),
+            strategy_id=data.get("strategy_id"),
         )
 
     def __repr__(self):

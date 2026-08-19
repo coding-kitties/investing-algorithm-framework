@@ -48,6 +48,7 @@ class Order(BaseModel):
         metadata=None,
         stop_price=None,
         triggered_at=None,
+        strategy_id=None,
     ):
         if target_symbol is None:
             raise OperationalException("Target symbol is not specified")
@@ -96,6 +97,14 @@ class Order(BaseModel):
         self.metadata = metadata if metadata is not None else {}
         self.stop_price = stop_price
         self.triggered_at = triggered_at
+        # Strategy that created this order, if known — populated
+        # automatically by Context.create_*_order() from the strategy
+        # currently running. Falls back to metadata['strategy_id'] for
+        # orders created before this field existed.
+        self.strategy_id = strategy_id or (
+            self.metadata.get("strategy_id")
+            if isinstance(self.metadata, dict) else None
+        )
 
     def get_id(self):
         return self.id
@@ -293,6 +302,7 @@ class Order(BaseModel):
             "triggered_at": ensure_iso(self.triggered_at)
             if self.triggered_at else None,
             "metadata": self.metadata if hasattr(self, 'metadata') else {},
+            "strategy_id": getattr(self, "strategy_id", None),
         }
 
     @staticmethod
@@ -341,6 +351,7 @@ class Order(BaseModel):
             metadata=data.get("metadata", {}),
             stop_price=data.get("stop_price", None),
             triggered_at=triggered_at,
+            strategy_id=data.get("strategy_id", None),
         )
         return order
 

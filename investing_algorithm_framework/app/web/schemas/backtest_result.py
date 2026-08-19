@@ -27,6 +27,7 @@ class BacktestRunOrderSerializer(Schema):
     updated_at = fields.DateTime(dump_only=True)
     filled = fields.Float(dump_only=True)
     remaining = fields.Float(dump_only=True)
+    strategy_id = fields.String(dump_only=True)
 
 
 class BacktestRunTradeSerializer(Schema):
@@ -36,6 +37,7 @@ class BacktestRunTradeSerializer(Schema):
     status = fields.String(dump_only=True)
     opened_at = fields.DateTime(dump_only=True)
     closed_at = fields.DateTime(dump_only=True)
+    strategy_id = fields.String(dump_only=True)
 
 
 class BacktestRunPositionSerializer(Schema):

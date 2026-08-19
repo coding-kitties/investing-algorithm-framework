@@ -43,6 +43,8 @@ from unittest import TestCase
 
 from investing_algorithm_framework import (
     BacktestDateRange,
+    BacktestEngine,
+    BacktestWindow,
     CooldownBlocks,
     CooldownRule,
     CooldownTrigger,
@@ -54,9 +56,11 @@ from investing_algorithm_framework import (
     Schedule,
     SignalSide,
     StopLossRule,
+    Study,
     TakeProfitRule,
     TimeUnit,
     TradingStrategy,
+    Universe,
     create_app,
 )
 from investing_algorithm_framework.domain.models.signal_helpers import (
@@ -356,29 +360,36 @@ def _closing_order(trade):
     raise AssertionError(f"No closing order on trade {trade.id!r}")
 
 
+def _build_study(start, end, engine):
+    return Study(
+        universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+        risk_free_rate=0.0,
+        backtest_windows=[
+            BacktestWindow(train_range=BacktestDateRange(
+                start_date=start, end_date=end,
+            ))
+        ],
+        engines=[engine],
+    )
+
+
 def _run_event_backtest(strategy_cls, csv_filename, start, end, name):
     app = _create_app(name, csv_filename)
-    bt = app.run_backtest(
+    backtests = app.run_backtest(
         strategy=strategy_cls(algorithm_id=name),
-        backtest_date_range=BacktestDateRange(
-            start_date=start, end_date=end,
-        ),
-        risk_free_rate=0.0,
+        study=_build_study(start, end, BacktestEngine.EVENT_DRIVEN),
     )
-    return bt.get_all_backtest_runs()[0]
+    return backtests[0].get_all_backtest_runs()[0]
 
 
 def _run_vector_backtest(strategy_cls, csv_filename, start, end, name):
     app = _create_app(name, csv_filename)
-    bt = app.run_vector_backtest(
+    backtests = app.run_backtest(
         strategy=strategy_cls(algorithm_id=name),
-        backtest_date_range=BacktestDateRange(
-            start_date=start, end_date=end,
-        ),
-        risk_free_rate=0.0,
+        study=_build_study(start, end, BacktestEngine.VECTOR),
         show_progress=False,
     )
-    return bt.get_all_backtest_runs()[0]
+    return backtests[0].get_all_backtest_runs()[0]
 
 
 # ─────────────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ sidebar_position: 4
 
 ## Overview
 
-The optimized backtest function includes **optional parallel processing** using Python's `ProcessPoolExecutor`, allowing you to leverage all CPU cores for massive speedups when running thousands of backtests.
+The `n_workers` parameter on `app.run_backtests()` / `app.run_backtest()` enables **optional parallel processing** using Python's `ProcessPoolExecutor`, allowing you to leverage all CPU cores for massive speedups when running thousands of backtests.
 
 ## Performance Comparison
 
@@ -14,11 +14,10 @@ For **10,000 backtests**:
 
 | Configuration | Runtime | Speedup | Best Use Case |
 |---------------|---------|---------|---------------|
-| Original (sequential) | ~180 min | 1x | Baseline |
-| Optimized (sequential) | ~90 min | 2x | Single-core or I/O bound |
-| Optimized (4 cores) | ~30 min | 6x | Typical laptop |
-| Optimized (8 cores) | ~20 min | 9x | Desktop/server |
-| Optimized (16 cores) | ~15 min | 12x | High-end server |
+| Sequential (`n_workers=None`) | ~90 min | 1x | Baseline / single-core / I/O bound |
+| Parallel (4 cores) | ~30 min | 3x | Typical laptop |
+| Parallel (8 cores) | ~20 min | 4.5x | Desktop/server |
+| Parallel (16 cores) | ~15 min | 6x | High-end server |
 
 ## When to Use Parallel Processing
 
@@ -43,11 +42,23 @@ For **10,000 backtests**:
 ```python
 import os
 
+from investing_algorithm_framework import Study, Universe, \
+    BacktestWindow, BacktestEngine
+
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=date_range_1),
+        BacktestWindow(train_range=date_range_2),
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+
 # Use all available cores
-backtests = app.run_vector_backtests_with_checkpoints_optimized(
-    initial_amount=1000,
+backtests = app.run_backtests(
     strategies=strategies,  # 10,000 strategies
-    backtest_date_ranges=[date_range_1, date_range_2],
+    study=study,
     n_workers=-1,  # Use all CPU cores
     show_progress=True,
 )
@@ -59,10 +70,9 @@ backtests = app.run_vector_backtests_with_checkpoints_optimized(
 # Leave one core free for system
 n_cores = os.cpu_count() - 1
 
-backtests = app.run_vector_backtests_with_checkpoints_optimized(
-    initial_amount=1000,
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=[date_range_1, date_range_2],
+    study=study,
     n_workers=n_cores,  # e.g., 7 cores on an 8-core machine
     batch_size=100,
     checkpoint_batch_size=50,
@@ -76,10 +86,9 @@ backtests = app.run_vector_backtests_with_checkpoints_optimized(
 # Use half available cores (safer for shared systems)
 n_cores = max(1, os.cpu_count() // 2)
 
-backtests = app.run_vector_backtests_with_checkpoints_optimized(
-    initial_amount=1000,
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=[date_range_1, date_range_2],
+    study=study,
     n_workers=n_cores,
     show_progress=True,
 )
@@ -162,8 +171,9 @@ n_workers = min(os.cpu_count() - 1, recommended_workers)
 
 print(f"Using {n_workers} workers (Memory: {check_memory()})")
 
-backtests = app.run_vector_backtests_with_checkpoints_optimized(
+backtests = app.run_backtests(
     strategies=strategies,
+    study=study,
     n_workers=n_workers,
     ...
 )
@@ -219,28 +229,28 @@ strategies_sample = strategies[:100]  # Test with 100 strategies
 
 # Test sequential
 start = time.time()
-results_seq = app.run_vector_backtests_with_checkpoints_optimized(
+results_seq = app.run_backtests(
     strategies=strategies_sample,
+    study=study,
     n_workers=None,  # Sequential
-    ...
 )
 seq_time = time.time() - start
 
 # Test parallel with 4 workers
 start = time.time()
-results_par4 = app.run_vector_backtests_with_checkpoints_optimized(
+results_par4 = app.run_backtests(
     strategies=strategies_sample,
+    study=study,
     n_workers=4,
-    ...
 )
 par4_time = time.time() - start
 
 # Test parallel with all cores
 start = time.time()
-results_par_all = app.run_vector_backtests_with_checkpoints_optimized(
+results_par_all = app.run_backtests(
     strategies=strategies_sample,
+    study=study,
     n_workers=-1,
-    ...
 )
 par_all_time = time.time() - start
 
@@ -348,21 +358,21 @@ def _run_single_backtest_worker(args):
     import cProfile
     import pstats
     from io import StringIO
-    
+
     # Profile the backtest
     profiler = cProfile.Profile()
     profiler.enable()
-    
+
     # Run backtest (existing code)
     result = ... # existing worker code
-    
+
     profiler.disable()
-    
+
     # Optional: Log profiling stats
     s = StringIO()
     ps = pstats.Stats(profiler, stream=s).sort_stats('cumtime')
     ps.print_stats(10)
-    
+
     return result
 ```
 
@@ -371,24 +381,25 @@ def _run_single_backtest_worker(args):
 ```python
 import os
 import psutil
-from investing_algorithm_framework import create_app
+from investing_algorithm_framework import create_app, Study, Universe, \
+    BacktestWindow, BacktestEngine
 
 # Configuration
 def get_optimal_config():
     total_cores = os.cpu_count()
     available_ram_gb = psutil.virtual_memory().available / 1024**3
-    
+
     # Calculate workers
     n_workers = min(
         total_cores - 1,
         int(available_ram_gb / 2),
         8  # Cap at 8 for stability
     )
-    
+
     # Calculate batch sizes
     checkpoint_batch = max(25, n_workers * 5)
     batch = max(50, n_workers * 10)
-    
+
     return n_workers, checkpoint_batch, batch
 
 # Setup
@@ -406,10 +417,18 @@ print(f"  Total strategies: {len(strategies)}")
 print(f"  Expected time: ~{len(strategies) / (100 * n_workers):.1f} minutes")
 
 # Run optimized backtests
-backtests = app.run_vector_backtests_with_checkpoints_optimized(
-    initial_amount=1000,
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=1000,
+    backtest_windows=[
+        BacktestWindow(train_range=dr) for dr in date_ranges
+    ],
+    engines=[BacktestEngine.VECTOR],
+)
+backtests = app.run_backtests(
     strategies=strategies,
-    backtest_date_ranges=date_ranges,
+    study=study,
+    use_checkpoints=True,
     n_workers=n_workers,
     batch_size=batch,
     checkpoint_batch_size=checkpoint_batch,
@@ -430,4 +449,3 @@ print(f"\nCompleted {len(backtests)} backtests successfully!")
 ✅ **Consider platform** (Linux > macOS > Windows for parallel performance)
 
 With proper configuration, parallel processing can reduce 10,000 backtest runtime from **3 hours to 15-20 minutes**!
-

@@ -5,7 +5,10 @@ import subprocess
 import time
 import zipfile
 
-import boto3
+try:
+    import boto3
+except ImportError:  # pragma: no cover - exercised via command() guard
+    boto3 = None
 import click
 
 from investing_algorithm_framework.domain import AWS_S3_STATE_BUCKET_NAME
@@ -451,6 +454,12 @@ def command(
     Returns:
         None
     """
+    if boto3 is None:
+        raise click.ClickException(
+            "boto3 is required to deploy to AWS Lambda. Install it "
+            "with `pip install investing-algorithm-framework[aws]`."
+        )
+
     if project_dir is None:
         # Get the current working directory
         project_dir = os.getcwd()

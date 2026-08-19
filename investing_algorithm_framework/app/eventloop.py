@@ -858,22 +858,26 @@ class EventLoopService:
             else:
                 data = {}
 
-            # Step 5b: Pipeline evaluation now lives inside the
-            # strategy's phase set (EvaluatePipelinesPhase) so the
-            # eventloop no longer materialises pipeline frames
-            # itself. The phase reads strategy.pipelines and writes
-            # the evaluated long-form panels into ``data`` keyed by
-            # the pipeline class name before generate_signals fires.
-            for on_strategy_run_hook in \
-                    self._algorithm.on_strategy_run_hooks:
-                on_strategy_run_hook.execute(
-                    strategy=strategy,
-                    context=self.context,
-                    data=data
-                )
+            self.context._current_strategy_id = strategy.strategy_id
+            try:
+                # Step 5b: Pipeline evaluation now lives inside the
+                # strategy's phase set (EvaluatePipelinesPhase) so the
+                # eventloop no longer materialises pipeline frames
+                # itself. The phase reads strategy.pipelines and writes
+                # the evaluated long-form panels into ``data`` keyed by
+                # the pipeline class name before generate_signals fires.
+                for on_strategy_run_hook in \
+                        self._algorithm.on_strategy_run_hooks:
+                    on_strategy_run_hook.execute(
+                        strategy=strategy,
+                        context=self.context,
+                        data=data
+                    )
 
-            logger.info(f"Running strategy {strategy.strategy_id}")
-            strategy.run_strategy(context=self.context, data=data)
+                logger.info(f"Running strategy {strategy.strategy_id}")
+                strategy.run_strategy(context=self.context, data=data)
+            finally:
+                self.context._current_strategy_id = None
 
         # Step 5c: dispatch any ScheduledFunction hooks due at this tick.
         # Each entry is either a (strategy, ScheduledFunction) tuple
@@ -911,7 +915,11 @@ class EventLoopService:
                         f"Running scheduled function "
                         f"{strat.strategy_id}.{func_name}"
                     )
-                    func(context=self.context, data=sf_data)
+                    self.context._current_strategy_id = strat.strategy_id
+                    try:
+                        func(context=self.context, data=sf_data)
+                    finally:
+                        self.context._current_strategy_id = None
 
         # Step 7: Snapshot the portfolios if needed and update history
         created_orders = self._order_service.get_all(

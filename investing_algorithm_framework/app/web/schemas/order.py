@@ -10,3 +10,4 @@ class OrderSerializer(Schema):
     status = fields.String(dump_only=True)
     order_type = fields.String(dump_only=True)
     order_side = fields.String(dump_only=True)
+    strategy_id = fields.String(dump_only=True)

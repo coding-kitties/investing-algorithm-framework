@@ -5247,14 +5247,15 @@ files = [
 cffi = ["cffi (>=1.17,<2.0)", "cffi (>=2.0.0b)"]
 
 [extras]
-all = ["alpha_vantage", "azure-identity", "azure-mgmt-resource", "azure-mgmt-storage", "azure-mgmt-web", "azure-storage-blob", "boto3", "polygon-api-client", "yfinance"]
+all = ["alpha_vantage", "azure-identity", "azure-mgmt-resource", "azure-mgmt-storage", "azure-mgmt-web", "azure-storage-blob", "boto3", "ipython", "polygon-api-client", "yfinance"]
 alpha-vantage = ["alpha_vantage"]
 aws = ["boto3"]
 azure = ["azure-identity", "azure-mgmt-resource", "azure-mgmt-storage", "azure-mgmt-web", "azure-storage-blob"]
+notebook = ["ipython"]
 polygon = ["polygon-api-client"]
 yahoo = ["yfinance"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "ac7f7ab8b6bd52122ea45c5bb9f9fd6d619827165923e92c9ce846d369be1629"
+content-hash = "37406cc2c80f245ae192a60f61a7b68a1610025b3bf06a360e8808d91e4f3bdf"

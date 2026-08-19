@@ -90,7 +90,7 @@ Before running a full backtest, you can inspect the data to:
 
 ```python
 from investing_algorithm_framework import (
-    create_app, TradingStrategy, BacktestDateRange, 
+    create_app, TradingStrategy, BacktestDateRange,
     DataSource, TimeUnit, PortfolioConfiguration
 )
 from datetime import datetime, timezone
@@ -99,7 +99,7 @@ from datetime import datetime, timezone
 class MyStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 4
-    
+
     data_sources = [
         DataSource(
             identifier="btc_data",
@@ -109,14 +109,14 @@ class MyStrategy(TradingStrategy):
             market="BITVAVO"
         )
     ]
-    
-    def generate_buy_signals(self, data):
-        # Strategy logic here
-        pass
-    
-    def generate_sell_signals(self, data):
-        # Strategy logic here
-        pass
+
+    def generate_signal_series(self, data):
+        # Strategy logic here, e.g.:
+        # yield signal_series_from_column(
+        #     df, "buy_signal", side=SignalSide.OPEN_LONG,
+        #     symbol="BTC", source="my_strategy"
+        # )
+        return iter(())
 
 # Create and configure the app
 app = create_app()
@@ -153,7 +153,7 @@ print(btc_df.head())
 class MultiAssetStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 1
-    
+
     data_sources = [
         DataSource(
             identifier="btc_1h",
@@ -260,13 +260,13 @@ ax.plot(df.index, long_ma, label="MA 50", linewidth=1)
 # Mark buy signals
 buy_dates = df.index[buy_signals]
 buy_prices = df.loc[buy_signals, "Close"]
-ax.scatter(buy_dates, buy_prices, marker="^", color="green", 
+ax.scatter(buy_dates, buy_prices, marker="^", color="green",
            s=100, label="Buy Signal", zorder=5)
 
 # Mark sell signals
 sell_dates = df.index[sell_signals]
 sell_prices = df.loc[sell_signals, "Close"]
-ax.scatter(sell_dates, sell_prices, marker="v", color="red", 
+ax.scatter(sell_dates, sell_prices, marker="v", color="red",
            s=100, label="Sell Signal", zorder=5)
 
 ax.set_title("Strategy Signals Visualization")
@@ -297,7 +297,7 @@ df = ema(df, period=50, source_column="Close", result_column="EMA_50")
 df = rsi(df, period=14, source_column="Close", result_column="RSI")
 
 # Create multi-panel figure
-fig, axes = plt.subplots(3, 1, figsize=(14, 10), 
+fig, axes = plt.subplots(3, 1, figsize=(14, 10),
                           gridspec_kw={'height_ratios': [3, 1, 1]})
 
 # Price panel
@@ -358,12 +358,19 @@ df.describe()
 A powerful use case is comparing your backtest results with the underlying data:
 
 ```python
+from investing_algorithm_framework import Study, Universe, BacktestWindow
+
 # Run backtest
-backtest = app.run_vector_backtest(
-    strategy=my_strategy,
-    backtest_date_range=backtest_range,
-    initial_amount=10000
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=10000,
+    backtest_windows=[BacktestWindow(train_range=backtest_range)],
 )
+backtests = app.run_backtest(
+    strategy=my_strategy,
+    study=study,
+)
+backtest = backtests[0]
 
 # Get the same data used in backtest
 data = app.get_backtest_data(

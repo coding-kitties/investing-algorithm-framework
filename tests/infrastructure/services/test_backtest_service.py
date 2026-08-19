@@ -34,6 +34,12 @@ from investing_algorithm_framework import (
     Backtest,
     OperationalException,
     Schedule,
+    Study,
+    Universe,
+    BacktestWindow,
+    BacktestEngine,
+    SignalSide,
+    signal_series_from_column,
 )
 from investing_algorithm_framework.domain import BUNDLE_EXT
 from investing_algorithm_framework.infrastructure import BacktestService
@@ -99,31 +105,26 @@ class SimpleVectorStrategy(TradingStrategy):
             ],
         )
 
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        """Generate buy signals - buy at every 10th candle."""
-        signals = {}
+    def generate_signal_series(self, data: Dict[str, Any]):
+        """Buy every 10th candle, sell 5 candles after each buy."""
         for symbol in self.symbols:
-            df = data[f"{symbol}_ohlcv"]
+            df = data[f"{symbol}_ohlcv"].copy()
             buy_signal = pd.Series(False, index=df.index)
-            # Generate buy signal every 10 candles
             buy_signal.iloc[::10] = True
-            signals[symbol] = buy_signal
-        return signals
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        """Generate sell signals - sell 5 candles after each buy."""
-        signals = {}
-        for symbol in self.symbols:
-            df = data[f"{symbol}_ohlcv"]
             sell_signal = pd.Series(False, index=df.index)
-            # Generate sell signal 5 candles after each buy
             sell_signal.iloc[5::10] = True
-            signals[symbol] = sell_signal
-        return signals
+            df["_buy_signal"] = buy_signal
+            df["_sell_signal"] = sell_signal
+            yield signal_series_from_column(
+                df, "_buy_signal",
+                side=SignalSide.OPEN_LONG, symbol=symbol,
+                source="test_fixture",
+            )
+            yield signal_series_from_column(
+                df, "_sell_signal",
+                side=SignalSide.CLOSE_LONG, symbol=symbol,
+                source="test_fixture",
+            )
 
 
 class SimpleEventStrategy(TradingStrategy):
@@ -222,18 +223,21 @@ class TestFilteredOutMetadataUpdate(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
 
         # Run first backtest with STRICT filter (will filter out the strategy)
         strict_filter = self._create_strict_filter(min_trades=100)
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run1 = app.run_backtests(
             strategies=[strategy],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             window_filter_function=strict_filter,
@@ -261,14 +265,10 @@ class TestFilteredOutMetadataUpdate(TestCase):
 
         lenient_filter = self._create_lenient_filter(min_trades=0)
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy2],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             window_filter_function=lenient_filter,
@@ -321,18 +321,21 @@ class TestFilteredOutMetadataUpdate(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
 
         # Run first backtest with LENIENT filter (will pass)
         lenient_filter = self._create_lenient_filter(min_trades=0)
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run1 = app.run_backtests(
             strategies=[strategy],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             window_filter_function=lenient_filter,
@@ -361,14 +364,10 @@ class TestFilteredOutMetadataUpdate(TestCase):
 
         strict_filter = self._create_strict_filter(min_trades=100)
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy2],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             window_filter_function=strict_filter,
@@ -422,14 +421,19 @@ class TestFilteredOutMetadataUpdate(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
 
         # Run first backtest with STRICT filter
         strict_filter = self._create_strict_filter(min_trades=100)
 
-        backtests_run1 = app.run_backtests(
-            algorithms=[algorithm],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
+        backtests_run1 = app.run_backtest(
+            algorithm=algorithm,
+            study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             window_filter_function=strict_filter,
@@ -456,10 +460,9 @@ class TestFilteredOutMetadataUpdate(TestCase):
 
         lenient_filter = self._create_lenient_filter(min_trades=0)
 
-        backtests_run2 = app.run_backtests(
-            algorithms=[algorithm2],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
+        backtests_run2 = app.run_backtest(
+            algorithm=algorithm2,
+            study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             window_filter_function=lenient_filter,
@@ -519,14 +522,19 @@ class TestFilteredOutMetadataUpdate(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
 
         # Run first backtest with LENIENT filter (will pass)
         lenient_filter = self._create_lenient_filter(min_trades=0)
 
-        backtests_run1 = app.run_backtests(
-            algorithms=[algorithm],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
+        backtests_run1 = app.run_backtest(
+            algorithm=algorithm,
+            study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             window_filter_function=lenient_filter,
@@ -557,10 +565,9 @@ class TestFilteredOutMetadataUpdate(TestCase):
 
         strict_filter = self._create_strict_filter(min_trades=100)
 
-        backtests_run2 = app.run_backtests(
-            algorithms=[algorithm2],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
+        backtests_run2 = app.run_backtest(
+            algorithm=algorithm2,
+            study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             window_filter_function=strict_filter,
@@ -649,14 +656,21 @@ class TestFilteredOutMetadataMultipleDateRanges(TestCase):
         ) -> List[Backtest]:
             return backtests
 
-        backtests = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range_1, date_range_2],
-            strategies=[strategy],
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
+            backtest_windows=[
+                BacktestWindow(train_range=date_range_1),
+                BacktestWindow(train_range=date_range_2),
+            ],
+            engines=[BacktestEngine.VECTOR],
+        )
+
+        backtests = app.run_backtests(
+            strategies=[strategy],
+            study=study,
+            snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             window_filter_function=pass_all_filter,
@@ -726,6 +740,14 @@ class TestStorageDirectoryIsolation(TestCase):
             name="Test Period"
         )
 
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
+
         # --- First run: Strategy A ---
         algorithm_id_a = "strategy_a_" + str(uuid.uuid4())[:4]
         strategy_a = SimpleVectorStrategy(
@@ -734,14 +756,10 @@ class TestStorageDirectoryIsolation(TestCase):
             symbol="BTC",
         )
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run1 = app.run_backtests(
             strategies=[strategy_a],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -771,14 +789,10 @@ class TestStorageDirectoryIsolation(TestCase):
             symbol="BTC",
         )
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -823,6 +837,14 @@ class TestStorageDirectoryIsolation(TestCase):
             name="Test Period"
         )
 
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
+
         # --- First run: Strategy A ---
         algorithm_id_a = "strategy_a_" + str(uuid.uuid4())[:4]
         strategy_a = SimpleVectorStrategy(
@@ -831,14 +853,10 @@ class TestStorageDirectoryIsolation(TestCase):
             symbol="BTC",
         )
 
-        app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        app.run_backtests(
             strategies=[strategy_a],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -859,14 +877,10 @@ class TestStorageDirectoryIsolation(TestCase):
                 received_algorithm_ids.append(b.algorithm_id)
             return backtests  # Pass all through
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             final_filter_function=tracking_final_filter,
@@ -918,14 +932,18 @@ class TestStorageDirectoryIsolation(TestCase):
                 )
             )
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
-            strategies=strategies_batch1,
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
+
+        backtests_run1 = app.run_backtests(
+            strategies=strategies_batch1,
+            study=study,
+            snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -949,14 +967,10 @@ class TestStorageDirectoryIsolation(TestCase):
                 )
             )
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=strategies_batch2,
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -1007,16 +1021,21 @@ class TestStorageDirectoryIsolation(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
 
         # --- First run: Algorithm A ---
         algorithm_id_a = "algo_a_" + str(uuid.uuid4())[:4]
         algorithm_a = Algorithm(algorithm_id=algorithm_id_a)
         algorithm_a.add_strategy(SimpleEventStrategy())
 
-        backtests_run1 = app.run_backtests(
-            algorithms=[algorithm_a],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
+        backtests_run1 = app.run_backtest(
+            algorithm=algorithm_a,
+            study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -1031,10 +1050,9 @@ class TestStorageDirectoryIsolation(TestCase):
         algorithm_b = Algorithm(algorithm_id=algorithm_id_b)
         algorithm_b.add_strategy(SimpleEventStrategy())
 
-        backtests_run2 = app.run_backtests(
-            algorithms=[algorithm_b],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
+        backtests_run2 = app.run_backtest(
+            algorithm=algorithm_b,
+            study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -2246,6 +2264,13 @@ class TestSessionCacheIntegration(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
 
         # --- First run: Strategy A ---
         algorithm_id_a = "session_test_a_" + str(uuid.uuid4())[:4]
@@ -2255,14 +2280,10 @@ class TestSessionCacheIntegration(TestCase):
             symbol="BTC",
         )
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run1 = app.run_backtests(
             strategies=[strategy_a],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -2288,14 +2309,10 @@ class TestSessionCacheIntegration(TestCase):
             symbol="BTC",
         )
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -2342,16 +2359,21 @@ class TestSessionCacheIntegration(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
 
         # --- First run: Algorithm A ---
         algorithm_id_a = "event_session_a_" + str(uuid.uuid4())[:4]
         algorithm_a = Algorithm(algorithm_id=algorithm_id_a)
         algorithm_a.add_strategy(SimpleEventStrategy())
 
-        backtests_run1 = app.run_backtests(
-            algorithms=[algorithm_a],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
+        backtests_run1 = app.run_backtest(
+            algorithm=algorithm_a,
+            study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -2370,10 +2392,9 @@ class TestSessionCacheIntegration(TestCase):
         algorithm_b = Algorithm(algorithm_id=algorithm_id_b)
         algorithm_b.add_strategy(SimpleEventStrategy())
 
-        backtests_run2 = app.run_backtests(
-            algorithms=[algorithm_b],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
+        backtests_run2 = app.run_backtest(
+            algorithm=algorithm_b,
+            study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -2405,6 +2426,13 @@ class TestSessionCacheIntegration(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
 
         # --- First run: Strategy A ---
         algorithm_id_a = "filter_test_a_" + str(uuid.uuid4())[:4]
@@ -2414,14 +2442,10 @@ class TestSessionCacheIntegration(TestCase):
             symbol="BTC",
         )
 
-        app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        app.run_backtests(
             strategies=[strategy_a],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
         )
@@ -2442,14 +2466,10 @@ class TestSessionCacheIntegration(TestCase):
                 received_ids.append(b.algorithm_id)
             return backtests
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
             final_filter_function=tracking_filter,

@@ -10,7 +10,9 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, Schedule
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, Schedule, \
+    Study, Universe, BacktestWindow, BacktestEngine, SignalSide, \
+    signal_series_from_column
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -130,20 +132,10 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
         return ema_data, rsi_data
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+    def generate_signal_series(self, data: Dict[str, Any]):
         """
-        Generate buy signals based on the moving average crossover.
-
-        data (Dict[str, Any]): Dictionary containing all the data for
-            the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating buy signals (True/False).
+        Generate buy/sell signal series based on the RSI + EMA crossover.
         """
-
-        signals = {}
-
         for symbol in self.symbols:
             ema_data_identifier = f"{symbol}_ema_data"
             rsi_data_identifier = f"{symbol}_rsi_data"
@@ -163,39 +155,13 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                 < self.rsi_oversold_threshold
 
             buy_signal = rsi_oversold & ema_crossover_lookback
-            buy_signals = buy_signal.fillna(False).astype(bool)
-            signals[symbol] = buy_signals
+            buy_signal = buy_signal.fillna(False).astype(bool)
 
-            # Get all dates where there is a sell signal
-            buy_signal_dates = buy_signals[buy_signals].index.tolist()
+            # Get all dates where there is a buy signal
+            buy_signal_dates = buy_signal[buy_signal].index.tolist()
 
             if buy_signal_dates:
                 self.buy_signal_dates[symbol] += buy_signal_dates
-
-        return signals
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        """
-        Generate sell signals based on the moving average crossover.
-
-        Args:
-            data (Dict[str, Any]): Dictionary containing all the data for
-                the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating sell signals (True/False).
-        """
-
-        signals = {}
-        for symbol in self.symbols:
-            ema_data_identifier = f"{symbol}_ema_data"
-            rsi_data_identifier = f"{symbol}_rsi_data"
-
-            ema_data, rsi_data = self.prepare_indicators(
-                data[ema_data_identifier].copy(),
-                data[rsi_data_identifier].copy()
-            )
 
             # Confirmed by crossover between short-term EMA and long-term EMA
             # within a given lookback window
@@ -211,7 +177,6 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             # Combine both conditions
             sell_signal = rsi_overbought & ema_crossunder_lookback
             sell_signal = sell_signal.fillna(False).astype(bool)
-            signals[symbol] = sell_signal
 
             # Get all dates where there is a sell signal
             sell_signal_dates = sell_signal[sell_signal].index.tolist()
@@ -219,7 +184,18 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             if sell_signal_dates:
                 self.sell_signal_dates[symbol] += sell_signal_dates
 
-        return signals
+            buy_df = pd.DataFrame({"_buy_signal": buy_signal})
+            sell_df = pd.DataFrame({"_sell_signal": sell_signal})
+            yield signal_series_from_column(
+                buy_df, "_buy_signal",
+                side=SignalSide.OPEN_LONG, symbol=symbol,
+                source="test_fixture",
+            )
+            yield signal_series_from_column(
+                sell_df, "_sell_signal",
+                side=SignalSide.CLOSE_LONG, symbol=symbol,
+                source="test_fixture",
+            )
 
     def reset(self):
 
@@ -266,28 +242,30 @@ class Test(TestCase):
             ema_long_period=50,
             ema_cross_lookback_window=10,
         )
-        vector_backtests = app.run_vector_backtest(
-            initial_amount=1000,
-            backtest_date_range=date_range,
-            strategy=strategy,
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO"
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
         )
-        run = vector_backtests.get_all_backtest_runs()[0]
+        vector_backtests = app.run_backtest(
+            strategy=strategy,
+            study=study,
+            snapshot_interval=SnapshotInterval.DAILY,
+        )
+        run = vector_backtests[0].get_all_backtest_runs()[0]
 
         vector_trade_count = len(run.get_trades())
         self.assertGreater(vector_trade_count, 0, "Should have at least 1 vector trade")
         strategy.reset()
-        event_backtest = app.run_backtest(
-            initial_amount=1000,
-            backtest_date_range=date_range,
+        study.engines = [BacktestEngine.EVENT_DRIVEN]
+        event_backtests = app.run_backtest(
             strategy=strategy,
+            study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027
         )
-        run = event_backtest.get_all_backtest_runs()[0]
+        run = event_backtests[0].get_all_backtest_runs()[0]
         event_trade_count = len(run.get_trades())
         self.assertEqual(vector_trade_count, event_trade_count,
                          f"Vector and event trade counts should match: "

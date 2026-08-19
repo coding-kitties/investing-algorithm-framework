@@ -42,7 +42,8 @@ complementary angles are tested:
    every 4th bar across the *entire* ~2-year history (~2,340 samples,
    spanning bull/bear/sideways regimes).
 2. **Engine-level trade parity** (`TestEngineLevelTradeParity`) —
-   full `app.run_backtest` (event) vs. `app.run_vector_backtest`
+   full `app.run_backtest` with `study.engines=[BacktestEngine.EVENT_DRIVEN]`
+   (event) vs. `study.engines=[BacktestEngine.VECTOR]`
    (vector), comparing the actual resulting trades over a 365-day
    window, with an opt-in 730-day (full-history) variant for deeper
    manual verification (`TestEngineLevelTradeParityFullHistory`).

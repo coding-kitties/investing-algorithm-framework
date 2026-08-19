@@ -2,8 +2,6 @@ import os
 import shutil
 from unittest import TestCase
 
-from typing import Dict, Any
-import pandas as pd
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, Algorithm, \
     MarketCredential, Schedule
@@ -42,14 +40,6 @@ class StrategyOne(TradingStrategy):
     ):
         StrategyOne.number_of_runs += 1
 
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
-
 
 class StrategyTwo(TradingStrategy):
     schedule = Schedule.every(2, TimeUnit.SECOND)
@@ -80,14 +70,6 @@ class StrategyTwo(TradingStrategy):
         data,
     ):
         StrategyTwo.number_of_runs += 1
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
 
 class Test(TestCase):
 

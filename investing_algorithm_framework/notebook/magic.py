@@ -37,12 +37,31 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from IPython.core.magic import (
-    Magics,
-    magics_class,
-    cell_magic,
-    line_magic,
-)
+try:
+    from IPython.core.magic import (
+        Magics,
+        magics_class,
+        cell_magic,
+        line_magic,
+    )
+except ImportError:
+    # IPython is an optional dependency (install with
+    # `pip install investing-algorithm-framework[notebook]`). Provide
+    # no-op fallbacks so this module stays importable without it --
+    # `load_ipython_extension` is only ever invoked by a running
+    # IPython shell, where the real IPython is guaranteed installed.
+    class Magics:  # noqa: N801 - mirrors IPython.core.magic.Magics
+        def __init__(self, *args, **kwargs):
+            pass
+
+    def magics_class(cls):
+        return cls
+
+    def cell_magic(func):
+        return func
+
+    def line_magic(func):
+        return func
 
 
 def _build_parser():
@@ -97,8 +116,7 @@ def _build_parser():
         "--vectorized",
         action="store_true",
         default=False,
-        help="Use vectorized backtesting (run_vector_backtest) instead "
-        "of event-driven.",
+        help="Use vectorized backtesting instead of event-driven.",
     )
     parser.add_argument(
         "--show-progress",
@@ -204,8 +222,12 @@ def _run_backtest(args, strategies):
     from investing_algorithm_framework.create_app import create_app
     from investing_algorithm_framework.domain import (
         BacktestDateRange,
+        BacktestEngine,
+        BacktestWindow,
         PortfolioConfiguration,
         SnapshotInterval,
+        Study,
+        Universe,
         RESOURCE_DIRECTORY,
     )
 
@@ -256,30 +278,28 @@ def _run_backtest(args, strategies):
     market = args.market
     trading_symbol = args.trading_symbol
 
+    study = Study(
+        name="notebook_backtest",
+        universe=Universe(
+            market=market or "", trading_symbol=trading_symbol or "",
+        ),
+        initial_capital=args.initial_amount,
+        risk_free_rate=args.risk_free_rate,
+        backtest_windows=[BacktestWindow(train_range=backtest_date_range)],
+    )
     if args.vectorized:
-        backtest = app.run_vector_backtest(
-            strategy=strategy,
-            backtest_date_range=backtest_date_range,
-            initial_amount=args.initial_amount,
-            market=market,
-            trading_symbol=trading_symbol,
-            snapshot_interval=snapshot_interval,
-            risk_free_rate=args.risk_free_rate,
-            show_progress=args.show_progress,
-            fill_missing_data=fill_missing,
-        )
+        study.engines = [BacktestEngine.VECTOR]
     else:
-        backtest = app.run_backtest(
-            strategy=strategy,
-            backtest_date_range=backtest_date_range,
-            initial_amount=args.initial_amount,
-            market=market,
-            trading_symbol=trading_symbol,
-            snapshot_interval=snapshot_interval,
-            risk_free_rate=args.risk_free_rate,
-            show_progress=args.show_progress,
-            fill_missing_data=fill_missing,
-        )
+        study.engines = [BacktestEngine.EVENT_DRIVEN]
+
+    backtests = app.run_backtest(
+        strategy=strategy,
+        study=study,
+        snapshot_interval=snapshot_interval,
+        show_progress=args.show_progress,
+        fill_missing_data=fill_missing,
+    )
+    backtest = backtests[0]
 
     return backtest
 

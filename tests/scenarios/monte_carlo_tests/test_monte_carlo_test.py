@@ -10,7 +10,8 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, \
-    RESOURCE_DIRECTORY, DATA_DIRECTORY, PositionSize, Schedule
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, PositionSize, Schedule, \
+    SignalSide, signal_series_from_column
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -130,20 +131,10 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
         return ema_data, rsi_data
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+    def generate_signal_series(self, data: Dict[str, Any]):
         """
-        Generate buy signals based on the moving average crossover.
-
-        data (Dict[str, Any]): Dictionary containing all the data for
-            the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating buy signals (True/False).
+        Generate buy/sell signal series based on the RSI + EMA crossover.
         """
-
-        signals = {}
-
         for symbol in self.symbols:
             ema_data_identifier = f"{symbol}_ema_data"
             rsi_data_identifier = f"{symbol}_rsi_data"
@@ -163,39 +154,13 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                 < self.rsi_oversold_threshold
 
             buy_signal = rsi_oversold & ema_crossover_lookback
-            buy_signals = buy_signal.fillna(False).astype(bool)
-            signals[symbol] = buy_signals
+            buy_signal = buy_signal.fillna(False).astype(bool)
 
-            # Get all dates where there is a sell signal
-            buy_signal_dates = buy_signals[buy_signals].index.tolist()
+            # Get all dates where there is a buy signal
+            buy_signal_dates = buy_signal[buy_signal].index.tolist()
 
             if buy_signal_dates:
                 self.buy_signal_dates[symbol] += buy_signal_dates
-
-        return signals
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        """
-        Generate sell signals based on the moving average crossover.
-
-        Args:
-            data (Dict[str, Any]): Dictionary containing all the data for
-                the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating sell signals (True/False).
-        """
-        signals = {}
-
-        for symbol in self.symbols:
-            ema_data_identifier = f"{symbol}_ema_data"
-            rsi_data_identifier = f"{symbol}_rsi_data"
-
-            ema_data, rsi_data = self.prepare_indicators(
-                data[ema_data_identifier].copy(),
-                data[rsi_data_identifier].copy()
-            )
 
             # Confirmed by crossover between short-term EMA and long-term EMA
             # within a given lookback window
@@ -211,7 +176,6 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             # Combine both conditions
             sell_signal = rsi_overbought & ema_crossunder_lookback
             sell_signal = sell_signal.fillna(False).astype(bool)
-            signals[symbol] = sell_signal
 
             # Get all dates where there is a sell signal
             sell_signal_dates = sell_signal[sell_signal].index.tolist()
@@ -219,7 +183,18 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             if sell_signal_dates:
                 self.sell_signal_dates[symbol] += sell_signal_dates
 
-        return signals
+            buy_df = pd.DataFrame({"_buy_signal": buy_signal})
+            sell_df = pd.DataFrame({"_sell_signal": sell_signal})
+            yield signal_series_from_column(
+                buy_df, "_buy_signal",
+                side=SignalSide.OPEN_LONG, symbol=symbol,
+                source="test_fixture",
+            )
+            yield signal_series_from_column(
+                sell_df, "_sell_signal",
+                side=SignalSide.CLOSE_LONG, symbol=symbol,
+                source="test_fixture",
+            )
 
 @unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):

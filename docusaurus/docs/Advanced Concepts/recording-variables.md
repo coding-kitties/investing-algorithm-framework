@@ -47,19 +47,22 @@ Each call stores the values together with the current backtest timestamp. You ca
 Vectorized backtests don't use a `context` object. Instead, override `generate_recorded_values()` on your strategy and return a dictionary of `pandas.Series`:
 
 ```python
-import pandas as pd
-from investing_algorithm_framework import TradingStrategy
+from investing_algorithm_framework import (
+    TradingStrategy, SignalSide, signal_series_from_column,
+)
 
 class MyVectorStrategy(TradingStrategy):
     symbols = ["BTC"]
 
-    def generate_buy_signals(self, data):
-        # ... your buy logic ...
-        pass
-
-    def generate_sell_signals(self, data):
-        # ... your sell logic ...
-        pass
+    def generate_signal_series(self, data):
+        df = data["BTC/EUR_1d"]
+        # ... compute boolean "entry" / "exit" columns on df ...
+        yield signal_series_from_column(
+            df, "entry", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "exit", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
     def generate_recorded_values(self, data):
         ohlcv = data["BTC/EUR_1d"]

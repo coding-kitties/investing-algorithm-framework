@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a4] — 2026-08-19
+
+### Added
+
+- **Combined multi-strategy event-driven backtests** (`app/app.py`): `run_backtest(algorithm=...)`
+  now runs every strategy on the given `Algorithm` TOGETHER, sharing one portfolio, in ONE
+  `Backtest` — the backtest-mode equivalent of how `app.run()` executes multiple strategies live.
+  Raises a clear `OperationalException` if it resolves to the vector engine (not supported for
+  combined multi-strategy backtests yet).
+- **`algorithms=` (independent Algorithms)** on both `run_backtest`/`run_backtests`: each Algorithm
+  runs on its own portfolio, yielding its own Backtest — the Algorithm-level equivalent of
+  `strategies=`. Only supported by the event-driven engine.
+- **`strategy_id` attribution on `Order`/`Trade`**: new DB column (auto-migrated via
+  `_apply_forward_only_migrations()`) plus a new `Context._attach_strategy_attribution()` /
+  `EventLoopService` wiring that stamps `strategy_id` on every order/trade created during a tick,
+  so combined multi-strategy backtests (and live runs) can be broken down per strategy. Exposed on
+  the `OrderSerializer`/`TradeSerializer`/`BacktestRunOrderSerializer`/`BacktestRunTradeSerializer`.
+- **`ipython` optional extra** (`pip install investing-algorithm-framework[notebook]`) for the
+  `%%backtest` Jupyter magic — previously undeclared, see Fixed below.
+
+### Changed — Breaking: consolidated backtest API around `Study`
+
+- `App.run_vector_backtest` / `App.run_vector_backtests` are **removed**. `App.run_backtest` /
+  `App.run_backtests` are now the only two backtest entry points; both accept `strategy=`/
+  `strategies=`/`algorithm=`/`algorithms=` (exactly one) and a required `study=Study(...)`, and
+  auto-detect the engine (vector vs event-driven) from whether the strategy overrides
+  `generate_signal_series` — unless `Study(engines=[BacktestEngine.VECTOR/EVENT_DRIVEN])` is set
+  explicitly.
+- The old backward-compat `backtest_date_range=`/`backtest_date_ranges=`/`market=`/
+  `trading_symbol=`/`initial_amount=` kwargs are **removed** from `run_backtest`/`run_backtests` —
+  use `Study(universe=Universe(market=..., trading_symbol=...), initial_capital=...,
+  backtest_windows=[BacktestWindow(train_range=...)])` instead. `run_backtest`/`run_backtests` now
+  always return `List[Backtest]` (previously returned a single `Backtest` when called with the old
+  `backtest_date_range=` shim).
+- `window_part` (which part of each `Study.backtest_windows` entry to run) is now purely a `Study`
+  attribute (`Study(window_part=...)`) — the redundant call-time override parameter was removed
+  from both methods.
+- Consolidated three separate post-run stamping helpers (`_apply_study_fields`, `_apply_universes`,
+  `_apply_backtest_windows`) into one `_apply_study_to_backtests(backtests, study, ...)` that takes
+  the `Study` object directly and does a single re-save pass instead of three.
+
+### Changed — legacy strategy protocol removed
+
+- The dead, never-called pre-v9.0 `generate_buy_signals`/`generate_sell_signals` protocol has been
+  fully removed from the test suite, examples, and documentation. Strategies must implement
+  `generate_signals` (event-driven) and/or `generate_signal_series` (vector) — see
+  `docs/architecture/strategy/strategy.md` and the `strategies.md` guide for the current API.
+
+### Fixed
+
+- **Release-breaking bug: `import investing_algorithm_framework` crashed on a clean install**
+  without the (correctly optional, per 9.0.0a3) `boto3`/`azure-*`/`ipython` packages. The
+  dependency-injector wiring step (`container.wire(packages=["investing_algorithm_framework"])`,
+  run by every `create_app()`) auto-imports every submodule in the package to discover `@inject`
+  usages, which forced eager top-level imports of `boto3` (`cli/deploy_to_aws_lambda.py`), the
+  Azure SDK (`cli/deploy_to_azure_function.py`), and `IPython` (`notebook/magic.py`, re-exported
+  from the top-level `__init__.py`) regardless of whether those features were ever used. All three
+  are now guarded with `try`/`except ImportError`, with a clear error raised only at the point of
+  actual use (the AWS Lambda / Azure Function deploy CLI commands) instead of at import time.
+  Verified in a from-scratch venv with zero extras installed.
+- Docusaurus documentation (`vector-backtesting.md`, `backtesting.md`, `backtest-storage.md`,
+  `backtest-reports.md`, `metrics.md`, `strategies.md`, `simple-example.md`, and others) and
+  `examples/` scripts updated to match the consolidated `run_backtest`/`run_backtests` + `Study`
+  API and the `generate_signals`/`generate_signal_series` protocol.
+
 ## [9.0.0a3] — 2026-08-18
 
 ### Added

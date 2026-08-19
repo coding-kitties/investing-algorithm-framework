@@ -37,10 +37,13 @@ There are two main approaches to creating strategies:
 
 #### Approach 1: Signal-Based Strategy (Recommended)
 
-Implement `generate_buy_signals` and `generate_sell_signals` methods that return pandas Series with boolean signals:
+Override `generate_signals` and yield `Signal` objects using the `signals_from_column` helper, which inspects the latest row of a boolean column and emits at most one signal per call:
 
 ```python
-from investing_algorithm_framework import TradingStrategy, TimeUnit, DataSource, PositionSize
+from investing_algorithm_framework import (
+    TradingStrategy, TimeUnit, DataSource, PositionSize,
+    SignalSide, signals_from_column,
+)
 import pandas as pd
 
 class MySignalStrategy(TradingStrategy):
@@ -71,57 +74,44 @@ class MySignalStrategy(TradingStrategy):
         PositionSize(symbol="ETH", percentage=0.3),  # 30% of portfolio
     ]
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         """
-        Generate buy signals for each symbol.
+        Yield buy/sell signals for each symbol.
 
         Args:
-            data: Dictionary with data source identifiers as keys
+            context: Strategy context (portfolio, positions, orders).
+            data: Dictionary with data source identifiers as keys.
 
-        Returns:
-            Dict[str, pd.Series]: Boolean series for each symbol
+        Yields:
+            Signal: Zero or more OPEN_LONG / CLOSE_LONG signals.
         """
-        signals = {}
-
-        # BTC buy signal logic
+        # BTC signal logic
         btc_data = data["btc_eur_1h"]
-        btc_close = btc_data["Close"]
-        btc_ma20 = btc_close.rolling(20).mean()
-        signals["BTC"] = btc_close > btc_ma20  # Buy when price above MA20
+        btc_ma20 = btc_data["Close"].rolling(20).mean()
+        btc_data["buy_signal"] = btc_data["Close"] > btc_ma20  # above MA20
+        btc_data["sell_signal"] = btc_data["Close"] < btc_ma20  # below MA20
+        yield from signals_from_column(
+            btc_data, "buy_signal",
+            side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            btc_data, "sell_signal",
+            side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
-        # ETH buy signal logic
+        # ETH signal logic
         eth_data = data["eth_eur_1h"]
-        eth_close = eth_data["Close"]
-        eth_ma20 = eth_close.rolling(20).mean()
-        signals["ETH"] = eth_close > eth_ma20
-
-        return signals
-
-    def generate_sell_signals(self, data):
-        """
-        Generate sell signals for each symbol.
-
-        Args:
-            data: Dictionary with data source identifiers as keys
-
-        Returns:
-            Dict[str, pd.Series]: Boolean series for each symbol
-        """
-        signals = {}
-
-        # BTC sell signal logic
-        btc_data = data["btc_eur_1h"]
-        btc_close = btc_data["Close"]
-        btc_ma20 = btc_close.rolling(20).mean()
-        signals["BTC"] = btc_close < btc_ma20  # Sell when price below MA20
-
-        # ETH sell signal logic
-        eth_data = data["eth_eur_1h"]
-        eth_close = eth_data["Close"]
-        eth_ma20 = eth_close.rolling(20).mean()
-        signals["ETH"] = eth_close < eth_ma20
-
-        return signals
+        eth_ma20 = eth_data["Close"].rolling(20).mean()
+        eth_data["buy_signal"] = eth_data["Close"] > eth_ma20
+        eth_data["sell_signal"] = eth_data["Close"] < eth_ma20
+        yield from signals_from_column(
+            eth_data, "buy_signal",
+            side=SignalSide.OPEN_LONG, symbol="ETH",
+        )
+        yield from signals_from_column(
+            eth_data, "sell_signal",
+            side=SignalSide.CLOSE_LONG, symbol="ETH",
+        )
 ```
 
 #### Approach 2: Custom Strategy Logic
@@ -201,7 +191,10 @@ app.run()
 ### Moving Average Crossover Strategy
 
 ```python
-from investing_algorithm_framework import TradingStrategy, TimeUnit, DataSource, PositionSize
+from investing_algorithm_framework import (
+    TradingStrategy, TimeUnit, DataSource, PositionSize,
+    SignalSide, signals_from_column,
+)
 import pandas as pd
 
 class MovingAverageCrossover(TradingStrategy):
@@ -229,7 +222,7 @@ class MovingAverageCrossover(TradingStrategy):
         self.short_window = short_window
         self.long_window = long_window
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         df = data["btc_eur_1h"]
         close = df["Close"]
 
@@ -237,21 +230,20 @@ class MovingAverageCrossover(TradingStrategy):
         long_ma = close.rolling(window=self.long_window).mean()
 
         # Golden cross: short MA crosses above long MA
-        buy_signal = (short_ma > long_ma) & (short_ma.shift(1) <= long_ma.shift(1))
-
-        return {"BTC": buy_signal}
-
-    def generate_sell_signals(self, data):
-        df = data["btc_eur_1h"]
-        close = df["Close"]
-
-        short_ma = close.rolling(window=self.short_window).mean()
-        long_ma = close.rolling(window=self.long_window).mean()
-
+        df["buy_signal"] = (
+            (short_ma > long_ma) & (short_ma.shift(1) <= long_ma.shift(1))
+        )
         # Death cross: short MA crosses below long MA
-        sell_signal = (short_ma < long_ma) & (short_ma.shift(1) >= long_ma.shift(1))
+        df["sell_signal"] = (
+            (short_ma < long_ma) & (short_ma.shift(1) >= long_ma.shift(1))
+        )
 
-        return {"BTC": sell_signal}
+        yield from signals_from_column(
+            df, "buy_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "sell_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
 ### RSI Strategy with Stop Loss and Take Profit
@@ -259,7 +251,8 @@ class MovingAverageCrossover(TradingStrategy):
 ```python
 from investing_algorithm_framework import (
     TradingStrategy, TimeUnit, DataSource,
-    PositionSize, StopLossRule, TakeProfitRule
+    PositionSize, StopLossRule, TakeProfitRule,
+    SignalSide, signals_from_column,
 )
 import pandas as pd
 
@@ -306,23 +299,25 @@ class RSIStrategy(TradingStrategy):
         rs = gain / loss
         return 100 - (100 / (1 + rs))
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         df = data["btc_eur_4h"]
         rsi = self.calculate_rsi(df["Close"])
 
         # Buy when RSI crosses above oversold level
-        buy_signal = (rsi > self.oversold) & (rsi.shift(1) <= self.oversold)
-
-        return {"BTC": buy_signal}
-
-    def generate_sell_signals(self, data):
-        df = data["btc_eur_4h"]
-        rsi = self.calculate_rsi(df["Close"])
-
+        df["buy_signal"] = (
+            (rsi > self.oversold) & (rsi.shift(1) <= self.oversold)
+        )
         # Sell when RSI crosses below overbought level
-        sell_signal = (rsi < self.overbought) & (rsi.shift(1) >= self.overbought)
+        df["sell_signal"] = (
+            (rsi < self.overbought) & (rsi.shift(1) >= self.overbought)
+        )
 
-        return {"BTC": sell_signal}
+        yield from signals_from_column(
+            df, "buy_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "sell_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
 ## Key Methods
@@ -536,12 +531,16 @@ Without a `ScalingRule`, behavior is identical to the default: one entry, one fu
 A **sell signal always takes priority** over scale-out. If both fire on the same bar/step, the position is fully closed. This ensures you can always exit a position completely, regardless of scaling rules.
 :::
 
-### Minimal API — No Extra Methods Needed
+### Signals Drive Scaling — No Extra Methods Needed
 
-In the common case, you only need `generate_buy_signals` and `generate_sell_signals`. The `ScalingRule` handles the rest:
+`ScalingRule` doesn't add new methods to override. It's driven entirely by the `SignalSide` values your `generate_signals` method yields via `signals_from_column`:
 
-- **`generate_scale_in_signals()`** defaults to `None` → **buy signals are automatically reused as scale-in triggers**
-- **`generate_scale_out_signals()`** defaults to `None` → **no automatic scale-out** (only full sell via `generate_sell_signals`)
+- **`SignalSide.OPEN_LONG`** — first entry, opens with the full `PositionSize`
+- **`SignalSide.SCALE_IN`** — adds `scale_in_percentage` of the original `PositionSize` (requires an existing position, capped by `max_entries`)
+- **`SignalSide.SCALE_OUT`** — partially closes `scale_out_percentage` of the current position
+- **`SignalSide.CLOSE_LONG`** — full exit, always wins over `SCALE_OUT` if both fire on the same bar
+
+Each side must be emitted explicitly. Unlike the vector engine's legacy fallback, an event-driven strategy gets **no automatic reuse** of the open signal as a scale-in signal — a plain `OPEN_LONG` signal is simply dropped while a position is already open, so you must yield a `SCALE_IN` signal for every add.
 
 ```python
 class MyStrategy(TradingStrategy):
@@ -549,25 +548,34 @@ class MyStrategy(TradingStrategy):
         ScalingRule(symbol="BTC", max_entries=3, scale_in_percentage=50),
     ]
 
-    def generate_buy_signals(self, data):
-        # This is also used for scale-in decisions automatically
-        ...
+    def generate_signals(self, context, data):
+        df = data["btc_eur_1h"]
+        ma20 = df["Close"].rolling(20).mean()
+        df["entry_signal"] = df["Close"] > ma20
+        df["exit_signal"] = df["Close"] < ma20
 
-    def generate_sell_signals(self, data):
-        # This always triggers a full exit
-        ...
+        # Same condition drives both the initial entry and every scale-in
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "exit_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
-You only need to override `generate_scale_in_signals` or `generate_scale_out_signals` when the conditions to **add to** or **trim** a position differ from your regular buy/sell logic. For example:
-- Buy on RSI oversold, but scale-in only on new highs
-- No scale-out on sell signal — instead trim 25% when volatility spikes
+Only add a `SCALE_OUT` signal when the conditions to **trim** a position should differ from your full-exit logic. For example:
+- Buy/scale-in on RSI oversold and new highs, but full-exit only on RSI overbought
+- Trim 25% when volatility spikes, independent of the exit signal
 
 ### Basic Pyramiding Example
 
 ```python
 from investing_algorithm_framework import (
     TradingStrategy, TimeUnit, DataSource,
-    PositionSize, ScalingRule
+    PositionSize, ScalingRule, SignalSide, signals_from_column,
 )
 import pandas as pd
 
@@ -601,18 +609,22 @@ class PyramidingStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         df = data["btc_eur_1h"]
-        close = df["Close"]
-        ma20 = close.rolling(20).mean()
-        # Buy signal also used as scale-in (default fallback)
-        return {"BTC": close > ma20}
+        ma20 = df["Close"].rolling(20).mean()
+        df["entry_signal"] = df["Close"] > ma20
+        df["exit_signal"] = df["Close"] < ma20
 
-    def generate_sell_signals(self, data):
-        df = data["btc_eur_1h"]
-        close = df["Close"]
-        ma20 = close.rolling(20).mean()
-        return {"BTC": close < ma20}
+        # Same condition drives the initial entry and every scale-in
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "exit_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
 In this example:
@@ -625,7 +637,7 @@ The `cooldown_in_bars=3` prevents back-to-back signals from triggering on every 
 
 ### Separate Scale-In and Scale-Out Signals
 
-For more control, override `generate_scale_in_signals` and `generate_scale_out_signals`:
+For more control, yield distinct `SignalSide.SCALE_IN` / `SignalSide.SCALE_OUT` signals from different conditions than your open/close signals:
 
 ```python
 class AdvancedScalingStrategy(TradingStrategy):
@@ -656,32 +668,36 @@ class AdvancedScalingStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        """Initial entry: RSI crosses above oversold."""
-        df = data["btc_eur_1h"]
-        rsi = self._calculate_rsi(df["Close"])
-        return {"BTC": (rsi > 30) & (rsi.shift(1) <= 30)}
-
-    def generate_sell_signals(self, data):
-        """Full exit: RSI crosses below overbought."""
-        df = data["btc_eur_1h"]
-        rsi = self._calculate_rsi(df["Close"])
-        return {"BTC": (rsi < 70) & (rsi.shift(1) >= 70)}
-
-    def generate_scale_in_signals(self, data):
-        """Add to position when price makes a new high."""
+    def generate_signals(self, context, data):
         df = data["btc_eur_1h"]
         close = df["Close"]
+        rsi = self._calculate_rsi(close)
+
+        # Initial entry / full exit: RSI crosses oversold / overbought
+        df["entry_signal"] = (rsi > 30) & (rsi.shift(1) <= 30)
+        df["exit_signal"] = (rsi < 70) & (rsi.shift(1) >= 70)
+
+        # Scale-in: price makes a new high
         rolling_high = close.rolling(20).max()
-        return {"BTC": close >= rolling_high}
+        df["scale_in_signal"] = close >= rolling_high
 
-    def generate_scale_out_signals(self, data):
-        """Reduce position when volatility spikes."""
-        df = data["btc_eur_1h"]
-        close = df["Close"]
+        # Scale-out: volatility spikes
         vol = close.pct_change().rolling(20).std()
         avg_vol = vol.rolling(50).mean()
-        return {"BTC": vol > avg_vol * 2}
+        df["scale_out_signal"] = vol > avg_vol * 2
+
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "exit_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "scale_in_signal", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "scale_out_signal", side=SignalSide.SCALE_OUT, symbol="BTC",
+        )
 
     def _calculate_rsi(self, prices, period=14):
         delta = prices.diff()
@@ -692,10 +708,10 @@ class AdvancedScalingStrategy(TradingStrategy):
 ```
 
 **Signal priority:**
-- If `generate_scale_in_signals` is not overridden → buy signals are reused for scale-in decisions
-- If `generate_scale_out_signals` is not overridden → no automatic scale-out (only full sell signals apply)
-- **Sell always takes priority over scale-out**: if both fire on the same step, the position is fully closed
-- Cooldown applies after any action (buy, sell, scale-in, scale-out) — see `cooldown_in_bars`
+- `SCALE_IN` requires an existing position and an available `ScalingRule` entry slot — there is no fallback to the `OPEN_LONG` condition, so emit it explicitly whenever it differs
+- `SCALE_OUT` requires an existing position; emitting no `SCALE_OUT` signal means no partial trims ever happen
+- **`CLOSE_LONG` always takes priority over `SCALE_OUT`**: if both fire on the same bar, the position is fully closed
+- Cooldown applies after any action (open, close, scale-in, scale-out) — see `cooldown_in_bars`
 
 ## Metadata
 
@@ -789,12 +805,12 @@ print(f"Number of trades: {results.number_of_trades}")
 Check for sufficient data before generating signals:
 
 ```python
-def generate_buy_signals(self, data):
+def generate_signals(self, context, data):
     df = data["btc_eur_1h"]
 
     if len(df) < self.required_window:
-        # Return empty signals if not enough data
-        return {"BTC": pd.Series([False] * len(df), index=df.index)}
+        # Not enough data yet — yield no signals
+        return
 
     # Generate signals...
 ```

@@ -19,9 +19,19 @@ This is the loop most users run, whether they have 10 backtests or 10,000.
 ### 1. Run a sweep, persist the bundles
 
 ```python
-backtests = app.run_vector_backtests(
+from investing_algorithm_framework import Study, Universe, BacktestWindow
+
+study = Study(
+    universe=Universe(market="bitvavo", trading_symbol="EUR"),
+    backtest_windows=[
+        BacktestWindow(train_range=dr)
+        for dr in [range_2022, range_2023, range_2024]
+    ],
+)
+
+backtests = app.run_backtests(
     strategies=[StrategyA(), StrategyB(), StrategyC()],
-    backtest_date_ranges=[range_2022, range_2023, range_2024],
+    study=study,
     n_workers=-1,
     backtest_storage_directory="./my-backtests/",   # writes .obtf here
     show_progress=True,

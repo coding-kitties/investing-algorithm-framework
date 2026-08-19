@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "investing-algorithm-framework"
-version = "9.0.0a3"
+version = "9.0.0a4"
 description = "A framework for creating trading bots"
 authors = ["MDUYN"]
 readme = "README.md"
@@ -32,6 +32,7 @@ azure-identity = {version = "^1.19.0", optional = true}
 azure-mgmt-storage = {version = "^21.2.1", optional = true}
 azure-mgmt-web = {version = "^7.3.1", optional = true}
 azure-mgmt-resource = {version = "^23.2.0", optional = true}
+ipython = {version = ">=8.0.0", optional = true}
 msgpack = ">=1.0.0"
 zstandard = ">=0.20.0"
 pyarrow = ">=14.0.0"
@@ -42,7 +43,8 @@ alpha_vantage = ["alpha_vantage"]
 polygon = ["polygon-api-client"]
 aws = ["boto3"]
 azure = ["azure-storage-blob", "azure-identity", "azure-mgmt-storage", "azure-mgmt-web", "azure-mgmt-resource"]
-all = ["yfinance", "alpha_vantage", "polygon-api-client", "boto3", "azure-storage-blob", "azure-identity", "azure-mgmt-storage", "azure-mgmt-web", "azure-mgmt-resource"]
+notebook = ["ipython"]
+all = ["yfinance", "alpha_vantage", "polygon-api-client", "boto3", "azure-storage-blob", "azure-identity", "azure-mgmt-storage", "azure-mgmt-web", "azure-mgmt-resource", "ipython"]
 
 [tool.poetry.group.test.dependencies]
 coverage= "7.4.2"
@@ -51,7 +53,6 @@ Flask-Testing = "^0.8.1"
 pyindicators = "0.11.1"
 
 [tool.poetry.group.dev.dependencies]
-ipykernel = "^6.29.5"
 jupyter = "^1.0.0"
 
 

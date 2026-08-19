@@ -6,7 +6,8 @@ from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
-    BacktestDateRange, Schedule
+    BacktestDateRange, Schedule, Study, Universe, BacktestWindow, \
+    BacktestEngine
 
 
 class TestStrategy(TradingStrategy):
@@ -77,11 +78,19 @@ class Test(TestCase):
             start_date=start_date,
             end_date=end_date
         )
-        backtest = app.run_backtest(
-            algorithm=algorithm,
-            backtest_date_range=backtest_date_range,
-            risk_free_rate=0.027
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[
+                BacktestWindow(train_range=backtest_date_range)
+            ],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+        backtests = app.run_backtest(
+            algorithm=algorithm,
+            study=study,
+        )
+        backtest = backtests[0]
         self._tmpdir = tempfile.mkdtemp()
         path = os.path.join(
             self._tmpdir, "test_algorithm_backtest"

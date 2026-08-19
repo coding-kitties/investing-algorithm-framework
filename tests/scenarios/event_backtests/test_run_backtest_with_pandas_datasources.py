@@ -21,6 +21,10 @@ from investing_algorithm_framework import (
     DATA_DIRECTORY,
     PandasOHLCVDataProvider,
     convert_polars_to_pandas,
+    Study,
+    Universe,
+    BacktestWindow,
+    BacktestEngine,
 )
 from tests.resources.strategies_for_testing.strategy_v1 import (
     CrossOverStrategyV1,
@@ -70,11 +74,17 @@ class Test(TestCase):
         )
         app.add_data_provider(data_provider, priority=1)
         algorithm.add_strategy(strategy)
-        backtest = app.run_backtest(
-            backtest_date_range=date_range,
-            algorithm=algorithm,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
             risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+        backtests = app.run_backtest(
+            algorithm=algorithm,
+            study=study,
+        )
+        backtest = backtests[0]
         elapsed_time = time.time() - start_time
         self.assertLess(
             elapsed_time, 30,
