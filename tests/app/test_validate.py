@@ -88,6 +88,20 @@ class TestValidate(TestCase):
         with self.assertRaises(OperationalException):
             app.validate()
 
+    def test_validate_require_portfolio_false_skips_portfolio_check(self):
+        """A strategy-only sandbox check (no market/portfolio/credentials)
+        should not raise when require_portfolio=False."""
+        app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+        app.add_strategy(EmptyStrategy)
+        app.validate(require_portfolio=False)
+
+    def test_validate_require_portfolio_false_still_runs_hooks(self):
+        app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+        app.add_strategy(EmptyStrategy)
+        app.on_initialize(RecordingAppHook)
+        app.validate(require_portfolio=False)
+        self.assertEqual(1, RecordingAppHook.calls)
+
     def test_validate_does_not_start_event_loop_or_flask(self):
         app = self._create_app()
         app.validate()

@@ -928,7 +928,7 @@ class App:
             except Exception as e:
                 logger.error(e)
 
-    def validate(self) -> None:
+    def validate(self, require_portfolio: bool = True) -> None:
         """
         Runs the same setup `run()` performs before entering its live
         event loop (config, hooks, storage, algorithm resolution, data
@@ -943,10 +943,20 @@ class App:
         Never starts EventLoopService, never starts the Flask thread,
         executes no strategy iterations, places no orders.
 
+        Args:
+            require_portfolio (bool): When True (default), also runs
+                `initialize_services()`/`initialize_portfolios()`, so a
+                configured market/portfolio (and resolvable market
+                credentials) is required, matching `run()` exactly.
+                Set to False to validate only config, hooks, storage
+                and data source declarations — e.g. for a sandbox that
+                checks a strategy's definition without a connected
+                exchange or credentials.
+
         Raises:
             Exception: Any exception raised during config, hook,
-                algorithm, data source, service, or portfolio
-                initialization.
+                algorithm, data source, or (when `require_portfolio`
+                is True) service/portfolio initialization.
         """
         self.initialize_config()
 
@@ -956,8 +966,10 @@ class App:
         self.initialize_storage()
         algorithm = self.get_algorithm()
         self.initialize_data_sources(algorithm.data_sources)
-        self.initialize_services()
-        self.initialize_portfolios()
+
+        if require_portfolio:
+            self.initialize_services()
+            self.initialize_portfolios()
 
     def add_portfolio_configuration(self, portfolio_configuration):
         """

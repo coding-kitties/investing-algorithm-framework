@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a6] — 2026-08-20
+
+### Added
+
+- **`App.validate(require_portfolio=True)`**: new opt-in flag. When set to `False`, `validate()`
+  only checks config, `on_initialize` hooks, storage, and data source declarations — it skips
+  `initialize_services()`/`initialize_portfolios()`, so it no longer requires a configured
+  portfolio, market, or resolvable market credentials. Intended for sandboxes that validate a
+  strategy's definition without a connected exchange (the default, `True`, is unchanged and still
+  mirrors `run()` exactly).
+
 ## [9.0.0a5] — 2026-08-20
 
 ### Added
