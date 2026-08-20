@@ -5,6 +5,7 @@ Covers:
   * Universe-refresh cadence cache
   * Per-pipeline error resilience in non-backtest environments
 """
+import logging
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest import TestCase
@@ -277,12 +278,25 @@ class TestEvaluatePipelinesPhaseResilience(TestCase):
 
     def test_live_mode_swallows_pipeline_error(self):
         phase, state = self._setup(Environment.DEV)
-        phase.run(state)
+        logger_name = (
+            "investing_algorithm_framework.services.strategy_phases"
+            ".evaluate_pipelines"
+        )
+        # Failure is expected here — assertLogs both captures the
+        # traceback (keeping it out of the test console) and confirms
+        # it was actually logged.
+        with self.assertLogs(logger_name, level=logging.ERROR):
+            phase.run(state)
         self.assertIn("_DailyPipeline", state.data)
         # Empty output — schema preserved, no rows.
         self.assertEqual(state.data["_DailyPipeline"].height, 0)
 
     def test_backtest_mode_reraises_pipeline_error(self):
         phase, state = self._setup(Environment.BACKTEST)
-        with self.assertRaises(RuntimeError):
-            phase.run(state)
+        logger_name = (
+            "investing_algorithm_framework.services.strategy_phases"
+            ".evaluate_pipelines"
+        )
+        with self.assertLogs(logger_name, level=logging.ERROR):
+            with self.assertRaises(RuntimeError):
+                phase.run(state)

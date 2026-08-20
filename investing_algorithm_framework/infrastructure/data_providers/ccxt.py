@@ -710,11 +710,19 @@ class CCXTOHLCVDataProvider(DataProvider):
                 "internet connection"
             )
 
-        # Predefined column names
-        col_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
+        # Explicit dtypes so an empty `data` list (no candles in range)
+        # still yields a typed Datetime column instead of Null.
+        schema = {
+            "Datetime": pl.Utf8,
+            "Open": pl.Float64,
+            "High": pl.Float64,
+            "Low": pl.Float64,
+            "Close": pl.Float64,
+            "Volume": pl.Float64,
+        }
 
         # Combine the Series into a DataFrame with given column names
-        df = pl.DataFrame(data, schema=col_names, orient="row").with_columns(
+        df = pl.DataFrame(data, schema=schema, orient="row").with_columns(
             pl.col("Datetime").str.to_datetime(time_unit="ms", time_zone="UTC")
         )
         return df

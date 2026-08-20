@@ -928,6 +928,37 @@ class App:
             except Exception as e:
                 logger.error(e)
 
+    def validate(self) -> None:
+        """
+        Runs the same setup `run()` performs before entering its live
+        event loop (config, hooks, storage, algorithm resolution, data
+        sources, services, portfolios), then returns.
+
+        Meant to be called by tooling that has already imported an
+        entry module (e.g. an `app.py` built via `create_app()` +
+        `add_strategy(...)` + `add_market(...)`) and obtained its
+        `App` instance — not by the entry file itself, since
+        `if __name__ == "__main__": app.run()` never fires on import.
+
+        Never starts EventLoopService, never starts the Flask thread,
+        executes no strategy iterations, places no orders.
+
+        Raises:
+            Exception: Any exception raised during config, hook,
+                algorithm, data source, service, or portfolio
+                initialization.
+        """
+        self.initialize_config()
+
+        for hook in self._on_initialize_hooks:
+            hook.on_run(self.context)
+
+        self.initialize_storage()
+        algorithm = self.get_algorithm()
+        self.initialize_data_sources(algorithm.data_sources)
+        self.initialize_services()
+        self.initialize_portfolios()
+
     def add_portfolio_configuration(self, portfolio_configuration):
         """
         Function to add a portfolio configuration to the app. The portfolio

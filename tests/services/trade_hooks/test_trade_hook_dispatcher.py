@@ -5,6 +5,7 @@ using minimal :class:`TradingStrategy` subclasses and plain objects
 standing in for ``Trade`` (the dispatcher only reads ``.metadata`` and
 ``.id`` off whatever is passed to ``dispatch``).
 """
+import logging
 from types import SimpleNamespace
 from unittest import TestCase
 
@@ -193,10 +194,17 @@ class TestTradeHookDispatcherDispatch(TestCase):
         strategy = _RaisingStrategy(strategy_id="s1")
         dispatcher.configure([strategy], context="ctx")
 
-        # Must not propagate.
-        dispatcher.dispatch(
-            "on_trade_created", _trade(strategy_id="s1")
+        logger_name = (
+            "investing_algorithm_framework.services.trade_hooks"
+            ".trade_hook_dispatcher"
         )
+        # Failure is expected here — assertLogs both captures the
+        # traceback (keeping it out of the test console) and confirms
+        # it was actually logged. Must not propagate.
+        with self.assertLogs(logger_name, level=logging.ERROR):
+            dispatcher.dispatch(
+                "on_trade_created", _trade(strategy_id="s1")
+            )
 
     def test_unknown_strategy_id_on_trade_is_ignored(self):
         dispatcher = TradeHookDispatcher()

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a5] — 2026-08-20
+
+### Added
+
+- **`App.validate()`**: runs the same setup `run()` performs before entering its live event loop
+  (config, `on_initialize` hooks, storage, algorithm resolution, data sources, services,
+  portfolios) and then returns, without starting `EventLoopService`, the Flask thread, or executing
+  any strategy iteration/order placement. Intended for tooling that has imported an entry module
+  (e.g. one built via `create_app()` + `add_strategy(...)` + `add_market(...)`) to fail fast on
+  configuration errors (missing portfolio, failing `on_initialize` hook, etc.) before a real `run()`.
+
+### Fixed
+
+- **`CCXTOHLCVDataProvider.get_ohlcv`**: fetching a date range with zero returned candles (e.g. a
+  gap before a symbol's listing date) crashed with `polars.exceptions.SchemaError: invalid series
+  dtype: expected String, got null for series with name Datetime` instead of returning an empty
+  frame, because the OHLCV `DataFrame` was built with column names only and no dtypes, so Polars
+  inferred `Null` for an empty `data` list. An explicit schema is now passed so empty results are
+  typed correctly.
+- Reduced unrelated console noise from expected-exception test paths (pipeline evaluation errors,
+  vector pipeline injection errors, trade-hook dispatch errors) by capturing their logged
+  tracebacks with `assertLogs` instead of letting them print during test runs.
+
 ## [9.0.0a4] — 2026-08-19
 
 ### Added
