@@ -59,6 +59,7 @@ from .infrastructure import AzureBlobStorageStateHandler, \
     JSONURLDataProvider, ParquetURLDataProvider, \
     CCXTOHLCVDataProvider, CCXTTickerDataProvider, \
     PandasOHLCVDataProvider, OHLCVDataProviderBase, \
+    FXMacroDataOHLCVDataProvider, \
     YahooOHLCVDataProvider, \
     AlphaVantageOHLCVDataProvider, PolygonOHLCVDataProvider, \
     AWSS3StorageStateHandler
@@ -228,6 +229,7 @@ __all__ = [
     'ParquetURLDataProvider', "CCXTOHLCVDataProvider",
     "CCXTTickerDataProvider",
     "OHLCVDataProviderBase",
+    "FXMacroDataOHLCVDataProvider",
     "YahooOHLCVDataProvider",
     "AlphaVantageOHLCVDataProvider",
     "PolygonOHLCVDataProvider",
