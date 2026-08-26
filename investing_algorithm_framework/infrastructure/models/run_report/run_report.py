@@ -36,6 +36,7 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
     positions_json = Column(Text, default=None)
     portfolios_json = Column(Text, default=None)
     trades_json = Column(Text, default=None)
+    score_cards_json = Column(Text, default=None)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -47,6 +48,7 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
         self.positions_json = json.dumps(self.positions or [])
         self.portfolios_json = json.dumps(self.portfolios or [])
         self.trades_json = json.dumps(self.trades or [])
+        self.score_cards_json = json.dumps(self.score_cards or [])
 
     @reconstructor
     def init_on_load(self):
@@ -60,11 +62,14 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
             if self.portfolios_json else []
         self.trades = json.loads(self.trades_json) \
             if self.trades_json else []
+        self.score_cards = json.loads(self.score_cards_json) \
+            if self.score_cards_json else []
 
     def update(self, data):
         data = dict(data)
         json_fields = (
-            "orders", "signals", "positions", "portfolios", "trades"
+            "orders", "signals", "positions", "portfolios", "trades",
+            "score_cards",
         )
         for field_name in json_fields:
             if field_name in data:

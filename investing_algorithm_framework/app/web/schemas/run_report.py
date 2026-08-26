@@ -14,3 +14,4 @@ class RunReportSerializer(Schema):
     positions = fields.Raw(dump_only=True)
     portfolios = fields.Raw(dump_only=True)
     trades = fields.Raw(dump_only=True)
+    score_cards = fields.Raw(dump_only=True)

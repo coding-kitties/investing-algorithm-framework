@@ -56,6 +56,27 @@ class NoSignalScoreCardStrategy(TradingStrategy):
         yield
 
 
+class OpenLongOnceEverStrategy(TradingStrategy):
+    """Signals exactly once across the lifetime of the process, so a
+    second ``app.run()`` call on the same app creates no new order —
+    used to test that a pre-existing order gets picked up by a later
+    run's report when it is *updated* (e.g. filled) rather than
+    created during that run.
+    """
+    schedule = Schedule.every(2, TimeUnit.SECOND)
+    symbols = ["BTC"]
+    position_sizes = [
+        PositionSize(symbol="BTC", percentage_of_portfolio=50.0)
+    ]
+    _fired = False
+
+    def generate_signals(self, context, data):
+        if OpenLongOnceEverStrategy._fired:
+            return
+        OpenLongOnceEverStrategy._fired = True
+        yield Signal(symbol="BTC", side=SignalSide.OPEN_LONG)
+
+
 class TestRunReport(TestCase):
 
     def setUp(self) -> None:
@@ -263,4 +284,63 @@ class TestRunReport(TestCase):
 
         report = app.get_last_run_report()
         self.assertTrue(report["is_paper"])
+
+    @patch(
+        "investing_algorithm_framework.services.data_providers."
+        "DataProviderService.get_ticker_data"
+    )
+    def test_report_has_top_level_score_cards(self, mock_get_ticker):
+        mock_get_ticker.return_value = {
+            "symbol": "BTCEUR", "ask": 100, "bid": 90
+        }
+        app = self._create_app(strategy_cls=NoSignalScoreCardStrategy)
+        app.run(number_of_iterations=1)
+
+        report = app.get_last_run_report()
+        self.assertEqual(1, len(report["score_cards"]))
+        score_card = report["score_cards"][0]
+        self.assertEqual("BTC", score_card["symbol"])
+        self.assertEqual(
+            "NoSignalScoreCardStrategy", score_card["strategy_id"]
+        )
+        self.assertEqual("RSI neutral - no signal", score_card["summary"])
+        self.assertEqual("rsi_14", score_card["entries"][0]["name"])
+
+    @patch(
+        "investing_algorithm_framework.services.data_providers."
+        "DataProviderService.get_ohlcv_data"
+    )
+    @patch(
+        "investing_algorithm_framework.services.data_providers."
+        "DataProviderService.get_ticker_data"
+    )
+    def test_run_report_includes_orders_updated_this_run(
+        self, mock_get_ticker, mock_get_ohlcv
+    ):
+        mock_get_ticker.return_value = {
+            "symbol": "BTCEUR", "ask": 100, "bid": 90
+        }
+        mock_get_ohlcv.return_value = None
+        OpenLongOnceEverStrategy._fired = False
+        app = self._create_app(strategy_cls=OpenLongOnceEverStrategy)
+        app.run(number_of_iterations=1)
+
+        first_report = app.get_last_run_report()
+        self.assertEqual(1, len(first_report["orders"]))
+        order_id = first_report["orders"][0]["id"]
+        self.assertEqual("OPEN", first_report["orders"][0]["status"])
+
+        # Second run yields no new signal, so the only reason the
+        # order from the first run should reappear is that the
+        # pending-order check filled it (updated_at, not created_at,
+        # falls inside this run's window).
+        app.run(number_of_iterations=1)
+        second_report = app.get_last_run_report()
+
+        updated_order = next(
+            (o for o in second_report["orders"] if o["id"] == order_id),
+            None,
+        )
+        self.assertIsNotNone(updated_order)
+        self.assertEqual("CLOSED", updated_order["status"])
 

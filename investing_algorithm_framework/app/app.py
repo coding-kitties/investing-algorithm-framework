@@ -3173,13 +3173,15 @@ class App:
         Assemble and persist a :class:`RunReport` for the run that
         just finished.
 
-        Orders are filtered to those created at or after
-        ``run_started_at`` so only orders from this invocation are
-        included; positions, portfolios, and trades reflect current
-        state (there are typically few enough of these live that a
-        full snapshot is more useful than a diff). Each order/trade
-        dict already carries its own ``strategy_id``, so a report
-        covering several strategies can be attributed per-order.
+        Orders are filtered to those created *or updated* at or after
+        ``run_started_at``, so an order placed in a previous run that
+        only got filled (or otherwise changed status) in this one is
+        still included — not just brand-new orders; positions,
+        portfolios, and trades reflect current state (there are
+        typically few enough of these live that a full snapshot is
+        more useful than a diff). Each order/trade dict already
+        carries its own ``strategy_id``, so a report covering several
+        strategies can be attributed per-order.
         """
         order_service = self.container.order_service()
         trade_service = self.container.trade_service()
@@ -3194,11 +3196,19 @@ class App:
                 return value.replace(tzinfo=timezone.utc)
             return value
 
+        def _touched_this_run(order):
+            created_at = _aware(order.created_at)
+            updated_at = _aware(order.updated_at)
+            return (
+                created_at is not None and created_at >= run_started_at
+            ) or (
+                updated_at is not None and updated_at >= run_started_at
+            )
+
         run_started_at = _aware(run_started_at)
         orders = [
             order.to_dict() for order in order_service.get_all()
-            if order.created_at is not None
-            and _aware(order.created_at) >= run_started_at
+            if _touched_this_run(order)
         ]
         positions = [
             position.to_dict() for position in position_service.get_all()
@@ -3207,6 +3217,19 @@ class App:
             portfolio.to_dict() for portfolio in portfolio_service.get_all()
         ]
         trades = [trade.to_dict() for trade in trade_service.get_all()]
+        score_cards = [
+            {
+                "strategy_id": entry.get("strategy_id"),
+                "symbol": item.get("symbol"),
+                "summary": item.get("score_card", {}).get("summary"),
+                "entries": item.get("score_card", {}).get("entries", []),
+                "score_card_version": item.get("score_card", {}).get(
+                    "score_card_version"
+                ),
+            }
+            for entry in event_loop_service.signal_log
+            for item in entry.get("score_cards", [])
+        ]
         config = self.container.configuration_service().get_config()
 
         # A run is "paper" only when every configured portfolio is
@@ -3230,6 +3253,7 @@ class App:
             "positions": positions,
             "portfolios": portfolios,
             "trades": trades,
+            "score_cards": score_cards,
         })
         return report
 

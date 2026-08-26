@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a8] — 2026-08-27
+
+### Added
+
+- **`RunReport.score_cards`**: a new top-level, flattened list of every `ScoreCard` recorded via
+  `TradingStrategy.record_score_card(...)` this run — each entry carries its own `strategy_id`,
+  `symbol`, `summary`, and `entries`, so a caller no longer has to dig through
+  `report["signals"][i]["score_cards"]` to find them.
+
+### Fixed
+
+- **`RunReport.orders` missed orders filled/updated after being created in a previous run**: the
+  report only included orders whose `created_at` fell inside the current run's window. An order
+  placed in an earlier run that got filled (or otherwise changed status) during this run is now
+  included too, matched on `created_at` **or** `updated_at`.
+
 ## [9.0.0a7] — 2026-08-27
 
 ### Added

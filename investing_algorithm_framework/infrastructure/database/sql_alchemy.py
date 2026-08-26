@@ -117,6 +117,9 @@ def _apply_forward_only_migrations(bind):
         # NULL for any row created before this column existed.
         "ALTER TABLE orders ADD COLUMN strategy_id VARCHAR",
         "ALTER TABLE trades ADD COLUMN strategy_id VARCHAR",
+        # RunReport gained a top-level score_cards list after the
+        # run_reports table already shipped in 9.0.0a7.
+        "ALTER TABLE run_reports ADD COLUMN score_cards_json TEXT",
     ]
     for stmt in statements:
         try:

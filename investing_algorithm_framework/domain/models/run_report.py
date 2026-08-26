@@ -43,6 +43,13 @@ class RunReport(BaseModel):
         portfolios: All current portfolios.
         trades: All current trades across configured portfolios. Each
             trade dict already carries its own ``strategy_id``.
+        score_cards: Every ``ScoreCard`` recorded this run via
+            ``TradingStrategy.record_score_card``, flattened across
+            all strategies/ticks into one top-level list — one entry
+            per symbol per run, each carrying its own ``strategy_id``,
+            ``symbol``, ``summary``, and ``entries``. Present even for
+            a tick where no signal/order was produced at all, so a
+            caller can see *why* nothing happened.
     """
 
     def __init__(
@@ -59,6 +66,7 @@ class RunReport(BaseModel):
         positions=None,
         portfolios=None,
         trades=None,
+        score_cards=None,
     ):
         self.id = id
         self.algorithm_id = algorithm_id
@@ -72,6 +80,7 @@ class RunReport(BaseModel):
         self.positions = positions if positions is not None else []
         self.portfolios = portfolios if portfolios is not None else []
         self.trades = trades if trades is not None else []
+        self.score_cards = score_cards if score_cards is not None else []
 
     def to_dict(self):
         def ensure_iso(value):
@@ -92,6 +101,7 @@ class RunReport(BaseModel):
             "positions": self.positions,
             "portfolios": self.portfolios,
             "trades": self.trades,
+            "score_cards": self.score_cards,
         }
 
     @staticmethod
@@ -109,6 +119,7 @@ class RunReport(BaseModel):
             positions=data.get("positions"),
             portfolios=data.get("portfolios"),
             trades=data.get("trades"),
+            score_cards=data.get("score_cards"),
         )
 
     def __repr__(self):
