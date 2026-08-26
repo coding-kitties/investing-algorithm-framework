@@ -14,7 +14,7 @@ from .ohlcv_base import OHLCVDataProviderBase
 
 logger = logging.getLogger("investing_algorithm_framework")
 
-FXMACRODATA_API_BASE_URL = "https://fxmacrodata.com/api/v1"
+FXMACRODATA_API_BASE_URL = "https://api.fxmacrodata.com/v1"
 TIMEFRAME_TO_FXMACRODATA = {
     "1d": "daily",
 }
