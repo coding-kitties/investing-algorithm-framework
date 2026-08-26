@@ -126,7 +126,7 @@ class TestFXMacroDataGetData(TestCase):
         self.assertEqual(data["Volume"].to_list(), [0.0, 0.0])
         self.assertEqual(
             captured["url"],
-            "https://fxmacrodata.com/api/v1/forex/eur/usd"
+            "https://api.fxmacrodata.com/v1/forex/eur/usd"
             "?start_date=2024-01-01&end_date=2024-01-31",
         )
         self.assertEqual(captured["accept"], "application/json")
