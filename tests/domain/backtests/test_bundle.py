@@ -17,6 +17,8 @@ from investing_algorithm_framework.domain import (
     BacktestIndex,
     BUNDLE_EXT,
     BUNDLE_FORMAT_VERSION,
+    Position,
+    PositionSnapshot,
     load_backtests_from_directory,
     migrate_backtests,
     save_backtests_to_directory,
@@ -72,6 +74,40 @@ class TestBundleRoundTrip(TestCase):
             _normalize(loaded.to_dict()),
             _normalize(self.fixture.to_dict()),
         )
+
+    def test_bundle_round_trip_preserves_hedge_mode_and_legs(self):
+        from copy import deepcopy
+
+        path = os.path.join(self.tmp, "hedge" + BUNDLE_EXT)
+        backtest = deepcopy(self.fixture)
+        run = backtest.vector_runs[0]
+        run.metadata["position_mode"] = "hedge"
+        run.positions = [Position(
+            symbol="BTC/EUR",
+            long_amount=2.0,
+            short_amount=1.5,
+            long_cost=200.0,
+            short_cost=165.0,
+        )]
+        run.portfolio_snapshots[-1].position_snapshots = [PositionSnapshot(
+            symbol="BTC/EUR",
+            amount=0.5,
+            cost=200.0,
+            long_amount=2.0,
+            short_amount=1.5,
+            long_cost=200.0,
+            short_cost=165.0,
+        )]
+
+        save_bundle(backtest, path)
+        loaded_run = open_bundle(path).vector_runs[0]
+
+        self.assertEqual("hedge", loaded_run.metadata["position_mode"])
+        self.assertEqual(2.0, loaded_run.positions[0].long_amount)
+        self.assertEqual(1.5, loaded_run.positions[0].short_amount)
+        snapshot = loaded_run.portfolio_snapshots[-1].position_snapshots[0]
+        self.assertEqual(200.0, snapshot.long_cost)
+        self.assertEqual(165.0, snapshot.short_cost)
 
     def test_bundle_starts_with_magic_and_version(self):
         path = os.path.join(self.tmp, "report" + BUNDLE_EXT)

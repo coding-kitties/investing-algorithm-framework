@@ -1,7 +1,7 @@
 from typing import Union
 from abc import ABC, abstractmethod
 
-from investing_algorithm_framework.domain import Order, Position
+from investing_algorithm_framework.domain import Order, Position, PositionMode
 
 
 class PortfolioProvider(ABC):
@@ -113,6 +113,15 @@ class PortfolioProvider(ABC):
             bool: True if the market is supported, False otherwise
         """
         raise NotImplementedError("Subclasses must implement this method.")
+
+    def supports_position_mode(self, market, position_mode) -> bool:
+        """Return whether this provider can reconcile the position mode.
+
+        HEDGE requires independent long/short leg reconciliation, so custom
+        providers must opt in explicitly. Existing providers remain NETTING
+        compatible by default.
+        """
+        return PositionMode(position_mode) == PositionMode.NETTING
 
     def __repr__(self):
         return f"{self.__class__.__name__}(priority={self.priority})"

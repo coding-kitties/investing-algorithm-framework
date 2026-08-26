@@ -218,6 +218,36 @@ class BacktestReport:
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.html_report)
 
+    def pretty_print(self):
+        """Print a summary of rejected signals across all report runs."""
+        rejection_summary = {}
+        for view in self._engine_views():
+            backtest = view["backtest"]
+            runs = backtest.get_runs(
+                view["engine"], study=view["study"]
+            )
+            for run in runs:
+                for reason, count in run.get_rejection_summary().items():
+                    rejection_summary[reason] = (
+                        rejection_summary.get(reason, 0) + count
+                    )
+
+        total_rejected = sum(rejection_summary.values())
+        if total_rejected == 0:
+            return
+
+        label_width = max(
+            len("Total rejected"),
+            *(len(reason) for reason in rejection_summary),
+        )
+        print("Signal rejections:")
+        for reason in sorted(rejection_summary):
+            print(
+                f"  {reason:<{label_width}} : "
+                f"{rejection_summary[reason]}"
+            )
+        print(f"  {'Total rejected':<{label_width}} : {total_rejected}")
+
     @staticmethod
     def _is_backtest(backtest_path):
         if not os.path.exists(backtest_path):
@@ -751,6 +781,10 @@ backtest_utils import (
                         trades_list.append({
                             'id': idx_t,
                             'sym': sym,
+                            'side': (
+                                'SHORT' if getattr(t, 'is_short', False)
+                                else 'LONG'
+                            ),
                             'opened': _fmt_date(op_dt) if op_dt else '',
                             'closed': _fmt_date(cl_dt) if cl_dt else '',
                             'open_price': round(
@@ -868,6 +902,10 @@ backtest_utils import (
                         'total_cost': round(
                             getattr(last, 'total_cost', 0) or 0, 2
                         ),
+                        'long_exposure': round(last.long_exposure, 2),
+                        'short_exposure': round(last.short_exposure, 2),
+                        'net_exposure': round(last.net_exposure, 2),
+                        'gross_exposure': round(last.gross_exposure, 2),
                     }
 
                 # Orders
@@ -936,10 +974,42 @@ backtest_utils import (
                             'amount': round(
                                 getattr(p, 'amount', 0) or 0, 6
                             ),
+                            'gross_amount': round(
+                                getattr(p, 'gross_amount', 0) or 0, 6
+                            ),
+                            'long_amount': round(
+                                getattr(p, 'long_amount', 0) or 0, 6
+                            ),
+                            'short_amount': round(
+                                getattr(p, 'short_amount', 0) or 0, 6
+                            ),
                             'cost': round(
                                 getattr(p, 'cost', 0) or 0, 2
                             ),
+                            'net_cost': round(
+                                getattr(p, 'net_cost', 0) or 0, 2
+                            ),
+                            'gross_cost': round(
+                                getattr(p, 'gross_cost', 0) or 0, 2
+                            ),
+                            'long_cost': round(
+                                getattr(p, 'long_cost', 0) or 0, 2
+                            ),
+                            'short_cost': round(
+                                getattr(p, 'short_cost', 0) or 0, 2
+                            ),
                         })
+
+                signal_rejections = [
+                    {
+                        'date': _fmt_date(event['date']),
+                        'sym': event['symbol'],
+                        'signal': event['signal'],
+                        'reason': event['reason'],
+                    }
+                    for event in run.signal_events
+                    if not event['executed']
+                ]
 
                 # Downsample heavy time series for browser perf
                 eq = _downsample(eq)
@@ -961,6 +1031,7 @@ backtest_utils import (
                     'MONTHLY_HEATMAP': heatmap,
                     'TRADES': trades_list,
                     'ORDERS': orders_list,
+                    'SIGNAL_REJECTIONS': signal_rejections,
                     'POSITIONS': positions_list,
                     'SYM_STATS': sym_stats,
                     'metrics': metrics_dict,

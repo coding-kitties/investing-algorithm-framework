@@ -4,11 +4,11 @@ import shutil
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential
-from tests.resources import FlaskTestBase
+from tests.resources import WebTestBase
 from tests.resources.strategies_for_testing import StrategyOne
 
 
-class Test(FlaskTestBase):
+class Test(WebTestBase):
     portfolio_configurations = [
         PortfolioConfiguration(
             market="BITVAVO",

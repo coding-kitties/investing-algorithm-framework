@@ -63,6 +63,12 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
         identifier=None,
         created_at=None,
         updated_at=None,
+        net_size=None,
+        realized=None,
+        total_revenue=None,
+        total_cost=None,
+        total_net_gain=None,
+        total_trade_volume=None,
     ):
 
         if identifier is None:
@@ -78,11 +84,19 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
             trading_symbol=trading_symbol,
             market=market,
             identifier=identifier,
-            net_size=unallocated,
+            net_size=net_size if net_size is not None else unallocated,
             unallocated=unallocated,
-            realized=0,
-            total_revenue=0,
-            total_cost=0,
+            realized=realized if realized is not None else 0,
+            total_revenue=(
+                total_revenue if total_revenue is not None else 0
+            ),
+            total_cost=total_cost if total_cost is not None else 0,
+            total_net_gain=(
+                total_net_gain if total_net_gain is not None else 0
+            ),
+            total_trade_volume=(
+                total_trade_volume if total_trade_volume is not None else 0
+            ),
             created_at=created_at,
             updated_at=updated_at,
             initialized=initialized,

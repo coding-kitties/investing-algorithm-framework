@@ -29,10 +29,7 @@ DEFAULT_CONFIGURATION = {
     DATETIME_FORMAT_FILE_NAME: "%Y-%m-%d-%H-%M"
 }
 
-DEFAULT_FLASK_CONFIGURATION = {
-    "DEBUG_TB_INTERCEPT_REDIRECTS": False,
-    "SQLALCHEMY_TRACK_MODIFICATIONS": False,
-    "CACHE_TYPE": 'simple',
+DEFAULT_WEB_CONFIGURATION = {
     "CORS_ORIGIN_WHITELIST": [
         'http://0.0.0.0:4100',
         'http://localhost:4100',
@@ -43,7 +40,6 @@ DEFAULT_FLASK_CONFIGURATION = {
         'http://0.0.0.0:4000',
         'http://localhost:4000',
     ],
-    "SCHEDULER_API_ENABLED": True,
 }
 
 
@@ -51,11 +47,11 @@ class ConfigurationService:
 
     def __init__(self):
         self._config = DEFAULT_CONFIGURATION.copy()
-        self._flask_config = DEFAULT_FLASK_CONFIGURATION.copy()
+        self._web_config = DEFAULT_WEB_CONFIGURATION.copy()
 
     def initialize(self):
         self._config = DEFAULT_CONFIGURATION.copy()
-        self._flask_config = DEFAULT_FLASK_CONFIGURATION.copy()
+        self._web_config = DEFAULT_WEB_CONFIGURATION.copy()
 
     @property
     def config(self):
@@ -67,9 +63,9 @@ class ConfigurationService:
         copy = self._config.copy()
         return copy
 
-    def get_flask_config(self):
+    def get_web_config(self):
         # Make a copy of the config to prevent external modifications
-        copy = self._flask_config.copy()
+        copy = self._web_config.copy()
         return copy
 
     def add_value(self, key, value):

@@ -14,7 +14,7 @@ from investing_algorithm_framework import ScalingRule
 
 ```python
 ScalingRule(
-    symbol: str,
+    symbol: str | None = None,
     max_entries: int = 1,
     scale_in_percentage: float | list[float] = 100,
     scale_out_percentage: float | list[float] = 50,
@@ -25,7 +25,7 @@ ScalingRule(
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `symbol` | `str` | — | Target symbol (e.g. `"BTC"`). |
+| `symbol` | `str \| None` | `None` | Target symbol (e.g. `"BTC"`). When `None`, this entry is a **default** used for any symbol that doesn't have its own symbol-specific `ScalingRule` — a symbol-specific entry always takes precedence. |
 | `max_entries` | `int` | `1` | Maximum total entries including the initial buy. `3` allows the initial entry plus 2 scale-ins. |
 | `scale_in_percentage` | `float \| list[float]` | `100` | Size of each scale-in as a percent of the *original* `PositionSize`. Single value applies to all; list assigns per scale-in (last value reused if list is shorter). |
 | `scale_out_percentage` | `float \| list[float]` | `50` | Percent of the *current* position to sell on each scale-out signal. Same single-vs-list semantics as `scale_in_percentage`. |
@@ -90,6 +90,17 @@ scaling_rules = [
         max_position_percentage=40,   # never exceed 40% of portfolio
         cooldown_in_bars=4,           # don't act on a new signal within 4 bars
     ),
+]
+```
+
+### Default for all symbols, with a per-symbol override
+
+```python
+scaling_rules = [
+    # Applies to every traded symbol that doesn't have its own entry.
+    ScalingRule(max_entries=3, scale_in_percentage=[50, 25]),
+    # BTC gets a tighter cap instead of the default above.
+    ScalingRule(symbol="BTC", max_entries=2, max_position_percentage=30),
 ]
 ```
 

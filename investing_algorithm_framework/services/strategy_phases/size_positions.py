@@ -22,6 +22,7 @@ phase only sorts.
 """
 from __future__ import annotations
 
+import logging
 from typing import List, Optional
 
 from investing_algorithm_framework.domain.exceptions import (
@@ -31,9 +32,13 @@ from investing_algorithm_framework.domain.models.signal import (
     Signal,
     SignalSide,
 )
+from investing_algorithm_framework.domain.models.portfolio.position_mode \
+    import PositionMode
 
 from .base import StrategyPhase
 from .phase_state import PhaseState, SizedIntent
+
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 # Map each :class:`SignalSide` to the ``order_reason`` metadata tag
@@ -58,6 +63,11 @@ class SizePositionsPhase(StrategyPhase):
         if not state.approved_signals:
             state.sized_intents = []
             return
+
+        logger.info(
+            f"Preparing orders for strategy {state.strategy.strategy_id} "
+            f"({len(state.approved_signals)} approved signal(s))"
+        )
 
         sized: List[SizedIntent] = []
         for sig in state.approved_signals:
@@ -141,6 +151,7 @@ class SizePositionsPhase(StrategyPhase):
             quote_amount=quote_amount,
             full_symbol=full_symbol,
             order_reason=_ORDER_REASON[sig.side],
+            extra_metadata=dict(sig.metadata),
         )
 
     def _size_scale_in(
@@ -209,9 +220,16 @@ class SizePositionsPhase(StrategyPhase):
         price: float,
     ) -> Optional[SizedIntent]:
         position = state.strategy.get_position(sig.symbol)
-        if position is None or position.amount <= 0:
+        if position is None:
             return None
-        amount = float(position.amount)
+        amount = (
+            position.long_amount
+            if state.position_mode == PositionMode.HEDGE
+            else position.amount
+        )
+        if amount <= 0:
+            return None
+        amount = float(amount)
         return SizedIntent(
             signal=sig,
             amount=amount,
@@ -234,11 +252,18 @@ class SizePositionsPhase(StrategyPhase):
             state.trace("size_positions.no_scaling_rule_scale_out", sig)
             return None
         position = strategy.get_position(sig.symbol)
-        if position is None or position.amount <= 0:
+        if position is None:
+            return None
+        position_amount = (
+            position.long_amount
+            if state.position_mode == PositionMode.HEDGE
+            else position.amount
+        )
+        if position_amount <= 0:
             return None
         so_index = strategy._scale_out_counts.get(sig.symbol, 0)
         pct = scaling_rule.get_scale_out_percentage(so_index)
-        amount = float(position.amount) * pct / 100.0
+        amount = float(position_amount) * pct / 100.0
         if amount <= 0:
             return None
         return SizedIntent(

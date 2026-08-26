@@ -7,7 +7,7 @@ from pyindicators import ema, rsi, crossover, crossunder, supertrend, bollinger_
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     DataType, PositionSize, StopLossRule, TakeProfitRule, \
     ScalingRule, TradingCost, CooldownRule, Schedule, TimeUnit, \
-    Signal, SignalSeries, SignalSide
+    Signal, SignalSeries, SignalSide, ScoreCard, ScoreCardEntry
 
 
 def _schedule_from_timeframe(timeframe: str) -> Schedule:
@@ -409,6 +409,8 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                     symbol=symbol,
                     side=SignalSide.OPEN_LONG,
                     source="supertrend_ema",
+                ).with_score_card(
+                    self._build_score_card(symbol, SignalSide.OPEN_LONG, data)
                 )
         for symbol, series in self._compute_sell_signals(data).items():
             if _latest(series):
@@ -416,6 +418,8 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                     symbol=symbol,
                     side=SignalSide.CLOSE_LONG,
                     source="supertrend_ema",
+                ).with_score_card(
+                    self._build_score_card(symbol, SignalSide.CLOSE_LONG, data)
                 )
         if self.enable_shorting:
             for symbol, series in (self._compute_short_signals(data)
@@ -425,6 +429,10 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                         symbol=symbol,
                         side=SignalSide.OPEN_SHORT,
                         source="supertrend_ema",
+                    ).with_score_card(
+                        self._build_score_card(
+                            symbol, SignalSide.OPEN_SHORT, data
+                        )
                     )
             for symbol, series in (self._compute_cover_signals(data)
                                    or {}).items():
@@ -433,7 +441,130 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                         symbol=symbol,
                         side=SignalSide.CLOSE_SHORT,
                         source="supertrend_ema",
+                    ).with_score_card(
+                        self._build_score_card(
+                            symbol, SignalSide.CLOSE_SHORT, data
+                        )
                     )
+
+    @staticmethod
+    def _scalar(value):
+        """Coerce a pandas/numpy scalar to a plain JSON-safe Python
+        scalar (``ScoreCardEntry`` rejects numpy dtypes and NaN)."""
+        if value is None:
+            return None
+        if hasattr(value, "item"):
+            value = value.item()
+        if isinstance(value, float):
+            if pd.isna(value):
+                return None
+            return round(value, 6)
+        return value
+
+    def _build_score_card(
+        self, symbol: str, side: SignalSide, data: Dict[str, Any]
+    ) -> ScoreCard:
+        """Explain a signal with the exact indicator readings (and
+        guardrail outcomes) that produced it at the latest bar, so
+        anyone looking at ``RunReport.signals`` (or the metadata of
+        the resulting order) can see *why* without re-running the
+        strategy.
+        """
+        ema_data, rsi_data = self.prepare_indicators(
+            ema_data=data[f"ema_data_{symbol}"],
+            rsi_data=data[f"rsi_data_{symbol}"],
+        )
+        latest = ema_data.iloc[-1]
+        rsi_value = self._scalar(
+            rsi_data[self.rsi_result_column].iloc[-1]
+        )
+        close = self._scalar(latest.get("Close"))
+        ema_short = self._scalar(latest.get(self.ema_short_result_column))
+        ema_long = self._scalar(latest.get(self.ema_long_result_column))
+        supertrend_signal = self._scalar(latest.get("supertrend_signal"))
+        supertrend_trend = self._scalar(latest.get("supertrend_trend"))
+
+        rsi_overbought = rsi_value is not None \
+            and rsi_value >= self.rsi_overbought_threshold
+        rsi_oversold = rsi_value is not None \
+            and rsi_value <= self.rsi_oversold_threshold
+
+        entries = [
+            ScoreCardEntry(
+                "supertrend_signal", supertrend_signal, group="trend",
+                description="1 = fresh bullish flip, -1 = fresh bearish "
+                            "flip, 0 = no flip this bar",
+            ),
+            ScoreCardEntry(
+                "supertrend_trend", supertrend_trend, group="trend",
+                description="1 = currently bullish, 0 = currently bearish",
+            ),
+            ScoreCardEntry("close", close, unit=self.trading_symbol,
+                           group="price"),
+            ScoreCardEntry(
+                self.ema_short_result_column, ema_short,
+                unit=self.trading_symbol, group="trend",
+            ),
+            ScoreCardEntry(
+                self.ema_long_result_column, ema_long,
+                unit=self.trading_symbol, group="trend",
+            ),
+            ScoreCardEntry(
+                self.ema_crossover_result_column,
+                self._scalar(latest.get(self.ema_crossover_result_column)),
+                group="trend",
+            ),
+            ScoreCardEntry(
+                self.ema_crossunder_result_column,
+                self._scalar(latest.get(self.ema_crossunder_result_column)),
+                group="trend",
+            ),
+            ScoreCardEntry("rsi", rsi_value, group="momentum"),
+            ScoreCardEntry(
+                "rsi_overbought_threshold", self.rsi_overbought_threshold,
+                group="momentum",
+            ),
+            ScoreCardEntry(
+                "rsi_oversold_threshold", self.rsi_oversold_threshold,
+                group="momentum",
+            ),
+        ]
+
+        if self.use_bollinger_filter:
+            entries.append(ScoreCardEntry(
+                "bollinger_upper", self._scalar(latest.get("bollinger_upper")),
+                unit=self.trading_symbol, group="volatility",
+            ))
+            entries.append(ScoreCardEntry(
+                "bollinger_lower", self._scalar(latest.get("bollinger_lower")),
+                unit=self.trading_symbol, group="volatility",
+            ))
+
+        summaries = {
+            SignalSide.OPEN_LONG:
+                "SuperTrend flipped bullish, confirmed by an EMA "
+                f"crossover within {self.ema_cross_lookback_window} bars"
+                + ("; blocked" if rsi_overbought
+                   else "; RSI not overbought"),
+            SignalSide.CLOSE_LONG:
+                "SuperTrend flipped bearish, confirmed by an EMA "
+                f"crossunder within {self.ema_cross_lookback_window} bars"
+                + ("; suppressed by the capitulation guardrail"
+                   if (rsi_oversold and self.use_bollinger_filter)
+                   else ""),
+            SignalSide.OPEN_SHORT:
+                "SuperTrend flipped bearish, confirmed by an EMA "
+                f"crossunder within {self.ema_cross_lookback_window} bars"
+                + ("; blocked" if rsi_oversold
+                   else "; RSI not oversold"),
+            SignalSide.CLOSE_SHORT:
+                "SuperTrend is bullish"
+                if self.cover_requires_current_trend
+                else "SuperTrend flipped bullish within the lookback "
+                     "window",
+        }
+
+        return ScoreCard(entries=entries, summary=summaries.get(side))
 
     def _compute_buy_signals(
         self, data: Dict[str, Any]

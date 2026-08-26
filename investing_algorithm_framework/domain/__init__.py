@@ -19,16 +19,19 @@ from .exceptions import OperationalException, ApiException, DataError, \
     PermissionDeniedApiException, ImproperlyConfigured, NetworkError, \
     PortfolioOutOfSyncError
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
-    TimeUnit, TimeFrame, PortfolioConfiguration, Portfolio, Position, \
+    TimeUnit, TimeFrame, PortfolioConfiguration, PositionMode, \
+    PaperTradingMode, Portfolio, Position, \
     Order, TradeStatus, StrategyProfile, Trade, MarketCredential, \
     AppMode, DataType, DataSource, PortfolioSnapshot, PositionSnapshot, \
     TradeTakeProfit, TradeStopLoss, Event, SnapshotInterval, \
     TakeProfitRule, StopLossRule, PositionSize, ScalingRule, TradingCost, \
-    CooldownRule, CooldownTrigger, CooldownBlocks, CooldownTracker, \
+    ExposureRule, CooldownRule, CooldownTrigger, CooldownBlocks, \
+    CooldownTracker, \
     SyncResult, ScheduledDeposit, DateRule, TimeRule, Schedule, \
     ScheduledFunction, Signal, SignalSide, SignalSeries, \
     signals_from_column, signal_series_from_column, \
-    signals_from_panel, ConflictPolicy, ConflictResolution
+    signals_from_panel, ConflictPolicy, ConflictResolution, RunReport, \
+    ScoreCard, ScoreCardEntry, SCORE_CARD_METADATA_KEY, SCORE_CARD_VERSION
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
@@ -88,6 +91,13 @@ __all__ = [
     "DATABASE_DIRECTORY_PATH",
     "DATABASE_NAME",
     "PortfolioConfiguration",
+    "PositionMode",
+    "PaperTradingMode",
+    "RunReport",
+    "ScoreCard",
+    "ScoreCardEntry",
+    "SCORE_CARD_METADATA_KEY",
+    "SCORE_CARD_VERSION",
     "RESOURCE_DIRECTORY",
     'ENVIRONMENT',
     'Environment',
@@ -184,6 +194,7 @@ __all__ = [
     'StopLossRule',
     'ScalingRule',
     'TradingCost',
+    'ExposureRule',
     "load_backtests_from_directory",
     "save_backtests_to_directory",
     "retag_backtests",

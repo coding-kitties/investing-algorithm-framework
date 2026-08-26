@@ -38,11 +38,24 @@ class BacktestRunTradeSerializer(Schema):
     opened_at = fields.DateTime(dump_only=True)
     closed_at = fields.DateTime(dump_only=True)
     strategy_id = fields.String(dump_only=True)
+    is_short = fields.Boolean(dump_only=True)
 
 
 class BacktestRunPositionSerializer(Schema):
     symbol = fields.String(dump_only=True)
     amount = fields.Float(dump_only=True)
+    cost = fields.Float(dump_only=True)
+    gross_amount = fields.Float(dump_only=True)
+    net_cost = fields.Float(dump_only=True)
+    gross_cost = fields.Float(dump_only=True)
+    long_amount = fields.Float(dump_only=True)
+    short_amount = fields.Float(dump_only=True)
+    long_cost = fields.Float(dump_only=True)
+    short_cost = fields.Float(dump_only=True)
+
+
+class PositionSnapshotSerializer(BacktestRunPositionSerializer):
+    portfolio_snapshot_id = fields.String(dump_only=True)
 
 
 class PortfolioSnapshotSerializer(Schema):
@@ -50,6 +63,13 @@ class PortfolioSnapshotSerializer(Schema):
     total_value = fields.Float(dump_only=True)
     cash = fields.Float(dump_only=True)
     created_at = fields.DateTime(dump_only=True)
+    long_exposure = fields.Float(dump_only=True)
+    short_exposure = fields.Float(dump_only=True)
+    net_exposure = fields.Float(dump_only=True)
+    gross_exposure = fields.Float(dump_only=True)
+    position_snapshots = fields.Nested(
+        PositionSnapshotSerializer, many=True, dump_only=True
+    )
 
 
 class BacktestRunSerializer(Schema):

@@ -11,6 +11,7 @@ from .portfolios import PortfolioService, BacktestPortfolioService, \
     PortfolioSnapshotService, PortfolioProviderLookup, \
     BrokerBalanceTracker
 from .positions import PositionService, PositionSnapshotService
+from .run_reports import RunReportService
 from .repository_service import RepositoryService
 from .trade_service import TradeService, TradeStopLossService, \
     TradeTakeProfitService
@@ -53,6 +54,7 @@ __all__ = [
     "RepositoryService",
     "PortfolioService",
     "PositionService",
+    "RunReportService",
     "PortfolioConfigurationService",
     "OrderBacktestService",
     "ConfigurationService",

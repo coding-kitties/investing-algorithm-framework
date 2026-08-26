@@ -7,6 +7,13 @@ opens are not scaled here — closes must always be free to fire, and
 short opens credit cash rather than debit it. This mirrors the
 legacy ``run_strategy``'s "Phase 2" cash check, which only ran over
 ``pending_buy_orders``.
+
+If the strategy declares :class:`~investing_algorithm_framework.
+domain.models.risk_rules.exposure_rule.ExposureRule`, this phase
+also enforces it: cash-consuming intents are scaled down (or dropped)
+to keep total invested value within
+``exposure_rule.max_portfolio_percentage`` of the portfolio, on top
+of the plain available-cash check.
 """
 from __future__ import annotations
 
@@ -61,6 +68,32 @@ class ApplyRiskBudgetPhase(StrategyPhase):
             return
 
         available = state.context.get_unallocated()
+
+        # An ExposureRule caps total invested value portfolio-wide
+        # (e.g. "never more than 80% invested") on top of the plain
+        # available-cash check below — tighten `available` to
+        # whatever headroom remains under the cap before scaling.
+        exposure_rule = getattr(state.strategy, "exposure_rule", None)
+        if exposure_rule is not None:
+            portfolio_value = state.context.get_portfolio_value()
+            max_allocatable = exposure_rule.get_max_allocatable(
+                portfolio_value
+            )
+            already_allocated = max(0.0, portfolio_value - available)
+            exposure_budget = max(0.0, max_allocatable - already_allocated)
+            if exposure_budget < available:
+                logger.info(
+                    "Exposure cap (%.0f%% of portfolio) limits new "
+                    "allocation to %.2f (already invested %.2f of "
+                    "%.2f portfolio value).",
+                    exposure_rule.max_portfolio_percentage,
+                    exposure_budget, already_allocated, portfolio_value,
+                )
+                state.trace(
+                    "apply_risk_budget.exposure_budget", exposure_budget
+                )
+                available = exposure_budget
+
         total = sum(it.quote_amount for it in consuming)
         if total <= available or total <= 0:
             return  # nothing to scale

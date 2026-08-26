@@ -43,16 +43,16 @@ app.add_portfolio_configuration(
 
 ## Market Credentials
 
-To connect to your broker or exchange, you'll need to provide API credentials. This is done by registering a MarketCredentials object:
+To connect to your broker or exchange, you'll need to provide API credentials. This is done by registering a `MarketCredential` object:
 
 ```python
-from investing_algorithm_framework import MarketCredentials
+from investing_algorithm_framework import MarketCredential
 
-app.add_market_credentials(
-    MarketCredentials(
+app.add_market_credential(
+    MarketCredential(
         market="BITVAVO",
         api_key="<your_api_key>",
-        api_secret="<your_api_secret>"
+        secret_key="<your_api_secret>"
     )
 )
 ```
@@ -76,7 +76,7 @@ BITVAVO_SECRET_KEY=<your_api_secret>
 Then, you can register the portfolio configuration without explicitly passing the credentials:
 
 ```python
-from investing_algorithm_framework import PortfolioConfiguration, MarketCredentials, create_app
+from investing_algorithm_framework import PortfolioConfiguration, MarketCredential, create_app
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -89,9 +89,43 @@ app.add_portfolio_configuration(
     )
 )
 app.add_market_credential(
-    MarketCredentials(market="BITVAVO")
+    MarketCredential(market="BITVAVO")
 )
 ```
+
+See [Credential Management](credentials) for the full picture (explicit credentials, custom data providers, etc.).
+
+## Configuring Market, Trading Symbol and Initial Balance from Environment Variables
+
+`market`, `trading_symbol`, and `initial_balance` can also be sourced from environment variables instead of hardcoding them — useful when the same code is deployed to multiple environments (e.g. a Docker image that trades a different market per deployment):
+
+```
+MARKET=<market_identifier>
+TRADING_SYMBOL=<trading_symbol>
+INITIAL_BALANCE=<initial_balance>
+```
+
+For example:
+
+```bash
+MARKET=BITVAVO
+TRADING_SYMBOL=EUR
+INITIAL_BALANCE=1000
+```
+
+With those set, both of the following are equivalent — arguments you do pass always take precedence over the environment variables:
+
+```python
+app.add_market()
+```
+
+```python
+from investing_algorithm_framework import PortfolioConfiguration
+
+app.add_portfolio_configuration(PortfolioConfiguration())
+```
+
+A missing `market` or `trading_symbol` (neither an argument nor an environment variable) raises an `ImproperlyConfigured` error at registration time.
 
 ## Initial Balance (Max Portfolio Size)
 
@@ -122,6 +156,57 @@ app.add_market(
 
 This prevents the algorithm from using your entire exchange balance.
 
+## Position Mode: NETTING vs. HEDGE
+
+By default, a portfolio only ever holds one direction (long or short) per symbol at a time (`PositionMode.NETTING`). Set `position_mode=PositionMode.HEDGE` to let a strategy hold an independent long **and** short position on the same symbol simultaneously:
+
+```python
+from investing_algorithm_framework import PortfolioConfiguration, PositionMode
+
+app.add_market(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    position_mode=PositionMode.HEDGE,  # default: PositionMode.NETTING
+)
+```
+
+`HEDGE` is currently backtest-only for the bundled CCXT adapters. See [Position Modes](../Advanced%20Concepts/position-modes) for the full picture, including live-trading requirements for custom adapters.
+
+## Paper Trading
+
+Set `paper_trading=True` to run against a market without ever placing a real order — useful for validating a strategy against live/near-live data before risking real capital:
+
+```python
+app.add_market(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    initial_balance=1000,  # required for paper trading — there is no
+                           # real exchange balance to seed the account
+    paper_trading=True,
+)
+```
+
+`paper_trading_mode` controls how execution is simulated:
+
+- `PaperTradingMode.AUTO` (default): use the broker's own sandbox/testnet if its exchange advertises one; otherwise fall back to the framework's local simulator.
+- `PaperTradingMode.BROKER`: require the broker's sandbox/testnet. Raises an error at registration time if it isn't available — never silently falls back.
+- `PaperTradingMode.LOCAL`: always use the framework's local, broker-agnostic simulator. No network calls are ever made to place orders; every order fills immediately at its requested price. No real credentials are required.
+
+```python
+from investing_algorithm_framework import PaperTradingMode
+
+app.add_market(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    initial_balance=1000,
+    paper_trading=True,
+    paper_trading_mode=PaperTradingMode.LOCAL,
+)
+```
+
+When the broker's sandbox is used (`BROKER`, or `AUTO` when supported), you still need sandbox-issued API credentials for that market — register them the same way as live credentials (see [Credential Management](credentials)), just using the keys your broker issued for its sandbox/testnet environment.
+
 ## Next Steps
 
 Now that you have your portfolio configured, learn how to create [Trading Strategies](strategies) that will use this portfolio configuration.
+

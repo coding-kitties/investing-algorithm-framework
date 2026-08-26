@@ -27,11 +27,13 @@ from .domain import ApiException, combine_backtests, Study, \
     OrderType, OperationalException, OrderStatus, OrderSide, tqdm, \
     TimeUnit, TimeInterval, Order, Portfolio, Backtest, DataError, \
     Position, TimeFrame, INDEX_DATETIME, MarketCredential, TakeProfitRule, \
-    PortfolioConfiguration, RESOURCE_DIRECTORY, AWS_LAMBDA_LOGGING_CONFIG, \
+    PortfolioConfiguration, PositionMode, PaperTradingMode, \
+    RESOURCE_DIRECTORY, RunReport, \
+    AWS_LAMBDA_LOGGING_CONFIG, \
     Trade, APP_MODE, AppMode, DATETIME_FORMAT, load_backtests_from_directory, \
     BacktestDateRange, convert_polars_to_pandas, BacktestRun, Universe, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, StopLossRule, \
-    ScalingRule, TradingCost, BacktestEngine, \
+    ScalingRule, TradingCost, ExposureRule, BacktestEngine, \
     CooldownRule, CooldownTrigger, CooldownBlocks, CooldownTracker, \
     TradeStatus, generate_backtest_summary_metrics, generate_algorithm_id, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
@@ -48,7 +50,8 @@ from .domain import ApiException, combine_backtests, Study, \
     DateRule, TimeRule, Schedule, ScheduledFunction, \
     Signal, SignalSide, SignalSeries, \
     signals_from_column, signal_series_from_column, signals_from_panel, \
-    ConflictPolicy, ConflictResolution  # noqa: F401
+    ConflictPolicy, ConflictResolution, ScoreCard, ScoreCardEntry, \
+    SCORE_CARD_METADATA_KEY, SCORE_CARD_VERSION  # noqa: F401
 from .domain import Pipeline, Factor, CustomFactor, Filter, \
     AverageDollarVolume, AverageTradedValue, CrossSectionalMean, \
     Neutralize, Returns, RollingBeta, RSI, SMA, StaticPerSymbol, \
@@ -167,6 +170,9 @@ __all__ = [
     "OrderStatus",
     "OrderSide",
     "PortfolioConfiguration",
+    "PositionMode",
+    "PaperTradingMode",
+    "RunReport",
     "TimeUnit",
     "DateRule",
     "TimeRule",
@@ -174,6 +180,10 @@ __all__ = [
     "ScheduledFunction",
     "Signal",
     "SignalSide",
+    "ScoreCard",
+    "ScoreCardEntry",
+    "SCORE_CARD_METADATA_KEY",
+    "SCORE_CARD_VERSION",
     "SignalSeries",
     "signals_from_column",
     "signals_from_panel",
@@ -329,6 +339,7 @@ __all__ = [
     "TakeProfitRule",
     "StopLossRule",
     "ScalingRule",
+    "ExposureRule",
     "CooldownRule",
     "CooldownTrigger",
     "CooldownBlocks",

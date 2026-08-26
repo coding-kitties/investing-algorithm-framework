@@ -63,7 +63,7 @@
 > PyPI as an alpha pre-release. Since pip doesn't install pre-releases by
 > default, pin the version explicitly or pass `--pre`:
 > ```bash
-> pip install investing-algorithm-framework==9.0.0a6
+> pip install investing-algorithm-framework==9.0.0a7
 > ```
 > You can find the blog post here: [v9.0 Release](docusaurus/blog/2026-08-02-v9.0-release.md).
 
@@ -133,6 +133,7 @@ Risk and execution behaviour are expressed as **declarative rule lists** rather 
 - **`position_sizes`**: [`PositionSize`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/position-size) per symbol (fixed amount or percentage of portfolio).
 - **`stop_losses`** / **`take_profits`**: [`StopLossRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/stop-loss-rule) / [`TakeProfitRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/take-profit-rule) with fixed or trailing thresholds and partial-exit `sell_percentage`.
 - **`scaling_rules`**: [`ScalingRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/scaling-rule) for pyramiding (`scale_in_percentage=[…]`, `max_entries`, per-symbol `cooldown_in_bars`).
+- **`exposure_rule`**: [`ExposureRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/exposure-rule) caps total invested value across the whole portfolio (e.g. never more than 80% invested) — portfolio-wide, unlike the per-symbol rules above.
 - **`cooldowns`**: [`CooldownRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/cooldown-rule) to throttle whipsaw — per-symbol or portfolio-wide, side-aware (e.g. `trigger="sell", blocks="buy", bars=12`). Enforced bar-for-bar in both the vector and event-driven engines.
 - **`trading_costs`**: [`TradingCost`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/trading-cost) per symbol (fees, slippage, fixed costs).
 
@@ -141,6 +142,7 @@ from investing_algorithm_framework import (
     TradingStrategy,
     PositionSize,
     ScalingRule,
+    ExposureRule,
     StopLossRule,
     TakeProfitRule,
     CooldownRule,
@@ -151,6 +153,10 @@ from investing_algorithm_framework import (
 
 class MyStrategy(TradingStrategy):
     symbols = ["BTC", "ETH"]
+
+    # Portfolio-wide: never invest more than 80% of the portfolio at
+    # once, across every symbol combined.
+    exposure_rule = ExposureRule(max_portfolio_percentage=80.0)
 
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20),

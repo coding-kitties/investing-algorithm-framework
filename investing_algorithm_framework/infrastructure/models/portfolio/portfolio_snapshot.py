@@ -34,6 +34,6 @@ class SQLPortfolioSnapshot(
     position_snapshots = relationship(
         "SQLPositionSnapshot",
         back_populates="portfolio_snapshot",
-        lazy="dynamic",
+        lazy="selectin",
         cascade="all,delete",
     )

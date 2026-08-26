@@ -7,18 +7,18 @@ Merged from:
 - web/controllers/position_controller/test_list_positions.py
 
 All three endpoints use the same BITVAVO/EUR setup.
-FlaskTestBase.tearDown already handles database cleanup, so we don't
+WebTestBase.tearDown already handles database cleanup, so we don't
 override it here.
 """
 import json
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential
-from tests.resources import FlaskTestBase
+from tests.resources import WebTestBase
 from tests.resources.strategies_for_testing import StrategyOne
 
 
-class TestWebControllers(FlaskTestBase):
+class TestWebControllers(WebTestBase):
     portfolio_configurations = [
         PortfolioConfiguration(
             market="BITVAVO",

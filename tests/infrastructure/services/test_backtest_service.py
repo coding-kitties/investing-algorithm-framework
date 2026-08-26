@@ -190,10 +190,6 @@ class TestFilteredOutMetadataUpdate(TestCase):
             return backtests
         return window_filter
 
-    @unittest.skip(
-        "Framework does not currently set filtered_out metadata "
-        "flag when window filter removes a backtest"
-    )
     def test_vector_backtest_filtered_out_then_passes(self):
         """
         Test that when a vector backtest is:
@@ -232,7 +228,10 @@ class TestFilteredOutMetadataUpdate(TestCase):
         )
 
         # Run first backtest with STRICT filter (will filter out the strategy)
-        strict_filter = self._create_strict_filter(min_trades=100)
+        # SimpleVectorStrategy produces ~438 closed trades over this
+        # 365-day/2h window (buy every 10th candle), so the threshold
+        # must be well above that to actually filter it out.
+        strict_filter = self._create_strict_filter(min_trades=1000)
 
         backtests_run1 = app.run_backtests(
             strategies=[strategy],
@@ -278,7 +277,7 @@ class TestFilteredOutMetadataUpdate(TestCase):
         if os.path.exists(backtest_dir):
             saved_backtest = Backtest.open(backtest_dir)
             self.assertFalse(
-                saved_backtest.metadata.get('filtered_out', True),
+                saved_backtest.metadata.get('filtered_out', False),
                 "filtered_out flag should be cleared after passing "
                 "lenient filter"
             )
@@ -288,10 +287,6 @@ class TestFilteredOutMetadataUpdate(TestCase):
                 "filtered_out_at_date_range should be removed from metadata"
             )
 
-    @unittest.skip(
-        "Framework does not currently set filtered_out metadata "
-        "flag when window filter removes a backtest"
-    )
     def test_vector_backtest_passes_then_filtered_out(self):
         """
         Test that when a vector backtest is:
@@ -362,7 +357,10 @@ class TestFilteredOutMetadataUpdate(TestCase):
             symbol="BTC",
         )
 
-        strict_filter = self._create_strict_filter(min_trades=100)
+        # SimpleVectorStrategy produces ~438 closed trades over this
+        # 365-day/2h window, so the threshold must be well above that
+        # to actually filter it out.
+        strict_filter = self._create_strict_filter(min_trades=1000)
 
         backtests_run2 = app.run_backtests(
             strategies=[strategy2],
@@ -470,20 +468,17 @@ class TestFilteredOutMetadataUpdate(TestCase):
 
         # Verify the filtered_out flag is now cleared
         if os.path.exists(backtest_dir):
-            try:
-                saved_backtest = Backtest.open(backtest_dir)
-                self.assertFalse(
-                    saved_backtest.metadata.get('filtered_out', True),
-                    "Event backtest filtered_out flag should be cleared after "
-                    "passing lenient filter"
-                )
-                self.assertNotIn(
-                    'filtered_out_at_date_range',
-                    saved_backtest.metadata,
-                    "filtered_out_at_date_range should be removed from metadata"
-                )
-            except Exception as e:
-                self.skipTest(f"Could not load backtest: {e}")
+            saved_backtest = Backtest.open(backtest_dir)
+            self.assertFalse(
+                saved_backtest.metadata.get('filtered_out', False),
+                "Event backtest filtered_out flag should be cleared after "
+                "passing lenient filter"
+            )
+            self.assertNotIn(
+                'filtered_out_at_date_range',
+                saved_backtest.metadata,
+                "filtered_out_at_date_range should be removed from metadata"
+            )
 
     def test_event_backtest_passes_then_filtered_out(self):
         """

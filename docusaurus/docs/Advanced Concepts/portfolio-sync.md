@@ -166,7 +166,9 @@ This is useful for "fund the bot immediately at start, then top up monthly" patt
 
 Every deposit/withdrawal absorbed by `sync_portfolio` (or replayed by the vector backtest) is stamped onto the next `PortfolioSnapshot.cash_flow`. The framework's return metrics use this to compute **time-weighted returns** so that depositing $1,000 into your bot does not show up as $1,000 of P&L:
 
-$$ r_t = \frac{V_t - \text{cash\_flow}_t}{V_{t-1}} - 1 $$
+```
+r_t = (V_t - cash_flow_t) / V_(t-1) - 1
+```
 
 The following metrics are TWR-adjusted: **CAGR**, **monthly returns**, **yearly returns**, **mean daily return**, **Sharpe**, **Sortino**, **volatility**, **VaR / CVaR**, and the standard-deviation family. Snapshots without a `cash_flow` field (legacy data, mocks) gracefully fall back to the classic `pct_change()` behaviour.
 

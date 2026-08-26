@@ -4,7 +4,7 @@ import ccxt
 
 from investing_algorithm_framework.domain import OrderExecutor, \
     OperationalException, Order, OrderStatus, OrderSide, OrderType, \
-    MarketCredential
+    MarketCredential, PositionMode
 
 logger = getLogger("investing_algorithm_framework")
 
@@ -13,7 +13,26 @@ class CCXTOrderExecutor(OrderExecutor):
     """
     CCXTOrderExecutor is a class that implements the OrderExecutor
     interface for executing orders using the CCXT library.
+
+    Args:
+        priority: See ``OrderExecutor``.
+        sandbox: When True, orders are routed to the exchange's own
+            sandbox/testnet (CCXT's ``set_sandbox_mode``) instead of
+            its live endpoint. Requires the exchange to advertise a
+            ``test`` URL (see ``supports_sandbox_mode``) and sandbox
+            credentials via the usual ``MarketCredential`` mechanism.
+        markets: Optional explicit list of markets this instance
+            supports. When omitted (the default, single-instance
+            registration case) any CCXT-known market is supported.
+            Set this to scope an instance to specific markets only —
+            e.g. a sandbox instance for one paper-traded market must
+            not also claim every other (live) market in the same app.
     """
+
+    def __init__(self, priority=1, sandbox=False, markets=None):
+        super().__init__(priority=priority)
+        self.sandbox = sandbox
+        self._markets = {m.upper() for m in markets} if markets else None
 
     def execute_order(self, portfolio, order, market_credential) -> Order:
         """
@@ -29,7 +48,9 @@ class CCXTOrderExecutor(OrderExecutor):
             should copy the id of the order that has been provided as a
         """
         market = portfolio.market
-        exchange = self.initialize_exchange(market, market_credential)
+        exchange = self.initialize_exchange(
+            market, market_credential, sandbox=self.sandbox
+        )
         symbol = order.get_symbol()
         amount = order.get_amount()
         price = order.get_price()
@@ -152,7 +173,9 @@ class CCXTOrderExecutor(OrderExecutor):
             Order: Instance of the canceled order.
         """
         market = portfolio.market
-        exchange = self.initialize_exchange(market, market_credential)
+        exchange = self.initialize_exchange(
+            market, market_credential, sandbox=self.sandbox
+        )
 
         if not exchange.has['cancelOrder']:
             raise OperationalException(
@@ -172,7 +195,7 @@ class CCXTOrderExecutor(OrderExecutor):
             raise OperationalException("Could not cancel order")
 
     @staticmethod
-    def initialize_exchange(market, market_credential):
+    def initialize_exchange(market, market_credential, sandbox=False):
         """
         Function to initialize the exchange for the market.
 
@@ -180,6 +203,9 @@ class CCXTOrderExecutor(OrderExecutor):
             market (str): The market to initialize the exchange for
             market_credential (MarketCredential): The market credential to use
                 for the exchange
+            sandbox (bool): When True, points the exchange client at its
+                sandbox/testnet endpoint via CCXT's ``set_sandbox_mode``.
+                Raises if the exchange doesn't advertise one.
 
         Returns:
 
@@ -204,7 +230,42 @@ class CCXTOrderExecutor(OrderExecutor):
             'apiKey': market_credential.api_key,
             'secret': market_credential.secret_key,
         })
+
+        if sandbox:
+            if not exchange.urls.get("test"):
+                raise OperationalException(
+                    f"Exchange {market} does not advertise a "
+                    f"sandbox/testnet endpoint; cannot enable "
+                    f"broker-native paper trading for this market. Use "
+                    f"PaperTradingMode.LOCAL instead."
+                )
+            exchange.set_sandbox_mode(True)
+
         return exchange
+
+    @staticmethod
+    def supports_sandbox_mode(market) -> bool:
+        """
+        Whether this market's exchange advertises a sandbox/testnet
+        endpoint (CCXT convention: ``exchange.urls["test"]``). Does not
+        require credentials — only public exchange metadata is used.
+
+        Args:
+            market (str): The market to check.
+
+        Returns:
+            bool: True if a sandbox/testnet is available.
+        """
+        market = market.lower()
+
+        if not hasattr(ccxt, market):
+            return False
+
+        try:
+            exchange = getattr(ccxt, market)()
+            return bool(exchange.urls.get("test"))
+        except Exception:
+            return False
 
     @staticmethod
     def check_credentials(
@@ -258,4 +319,16 @@ class CCXTOrderExecutor(OrderExecutor):
         Returns:
             bool: True if the market is supported, False otherwise
         """
+        if self._markets is not None:
+            return market.upper() in self._markets
+
         return hasattr(ccxt, market.lower())
+
+    def supports_position_mode(self, market, position_mode) -> bool:
+        position_mode = PositionMode(position_mode)
+        if position_mode == PositionMode.NETTING:
+            return self.supports_market(market)
+
+        # CCXT may advertise setPositionMode, but this adapter does not yet
+        # pass venue-specific LONG/SHORT leg parameters on createOrder.
+        return False

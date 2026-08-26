@@ -703,14 +703,17 @@ class BacktestService:
         Returns:
             None
         """
-        logger.info("Initializing data sources for backtest")
-
         if data_sources is None or len(data_sources) == 0:
+            logger.info("No data sources were configured")
             return
 
         # Initialize all data sources
         self._data_provider_service.index_backtest_data_providers(
             data_sources, backtest_date_range, show_progress=show_progress
+        )
+        identifiers = ', '.join(ds.get_identifier() for ds in data_sources)
+        logger.info(
+            f"Data sources initialized ({len(data_sources)}): {identifiers}"
         )
 
         description = "Preparing backtest data for all data sources"
@@ -870,6 +873,9 @@ class BacktestService:
                 ),
                 slippage_percentage=getattr(
                     matching_configuration, "slippage_percentage", 0.0
+                ),
+                position_mode=getattr(
+                    matching_configuration, "position_mode", "netting"
                 ),
             )
         else:

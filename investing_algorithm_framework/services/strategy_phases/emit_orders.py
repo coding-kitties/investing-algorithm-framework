@@ -19,7 +19,7 @@ from typing import Any, Dict
 from .base import StrategyPhase
 from .phase_state import EmittedOrder, PhaseState, SizedIntent
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class EmitOrdersPhase(StrategyPhase):
@@ -30,6 +30,11 @@ class EmitOrdersPhase(StrategyPhase):
     def run(self, state: PhaseState) -> None:
         if not state.sized_intents:
             return
+
+        logger.info(
+            f"Executing orders for strategy {state.strategy.strategy_id} "
+            f"({len(state.sized_intents)} order(s))"
+        )
 
         executor = self._resolve_executor(state)
 
@@ -54,6 +59,10 @@ class EmitOrdersPhase(StrategyPhase):
             )
 
         state.trace("emit_orders.count", len(state.emitted_orders))
+        logger.info(
+            f"Executed {len(state.emitted_orders)} order(s) for strategy "
+            f"{state.strategy.strategy_id}"
+        )
 
     # ---- helpers --------------------------------------------------- #
     @staticmethod

@@ -4,7 +4,7 @@ import shutil
 from decimal import Decimal
 from unittest import TestCase
 
-from flask_testing import TestCase as FlaskTestCase
+from fastapi.testclient import TestClient
 
 from investing_algorithm_framework import create_app, App, \
     TradingStrategy, TimeUnit, OrderStatus, PortfolioConfiguration, \
@@ -16,6 +16,17 @@ from investing_algorithm_framework.infrastructure.database import \
 from tests.resources.stubs import OrderExecutorTest, PortfolioProviderTest
 
 logger = logging.getLogger(__name__)
+
+
+class _CompatTestClient(TestClient):
+    """``fastapi.testclient.TestClient`` (httpx-based) with a Flask
+    test-client-style ``.data`` attribute added to every response, so
+    existing ``response.data.decode()`` assertions keep working."""
+
+    def request(self, *args, **kwargs):
+        response = super().request(*args, **kwargs)
+        response.data = response.content
+        return response
 
 
 class StrategyOne(TradingStrategy):
@@ -178,7 +189,7 @@ class BinanceTestBase(TestBase):
     external_balances = {"EUR": 1000}
 
 
-class FlaskTestBase(FlaskTestCase):
+class WebTestBase(TestCase):
     portfolio_configurations = []
     market_credentials = []
     iaf_app = None
@@ -188,8 +199,9 @@ class FlaskTestBase(FlaskTestCase):
     external_orders = []
     initialize = True
     resource_directory = os.path.dirname(__file__)
+    client = None
 
-    def create_app(self):
+    def setUp(self) -> None:
         self.resource_directory = os.path.dirname(__file__)
         self.iaf_app: App = create_app(
             {
@@ -250,10 +262,17 @@ class FlaskTestBase(FlaskTestCase):
                         }
                     )
 
-        self.iaf_app._flask_app.testing = True
-        return self.iaf_app._flask_app
+        # Skip starting a real uvicorn server (see App.run()'s
+        # is_live_web_run check) while still exercising the FastAPI
+        # app itself through its own TestClient. Entered explicitly so
+        # the client's background portal thread has one deterministic
+        # lifecycle for the whole test, closed again in tearDown().
+        self.iaf_app._web_app_testing = True
+        self.client = _CompatTestClient(self.iaf_app._web_app)
+        self.client.__enter__()
 
     def tearDown(self) -> None:
+        self.client.__exit__(None, None, None)
         teardown_sqlalchemy()
         database_dir = os.path.join(self.resource_directory, "databases")
         if os.path.exists(database_dir):

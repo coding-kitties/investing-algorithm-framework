@@ -2,7 +2,8 @@ import logging
 import math
 
 from dependency_injector.wiring import inject, Provide
-from flask import Blueprint, jsonify, request
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 
 from investing_algorithm_framework.dependency_container import \
     DependencyContainer
@@ -24,7 +25,7 @@ from investing_algorithm_framework.services.metrics.win_rate import (
 
 logger = logging.getLogger("investing_algorithm_framework")
 
-blueprint = Blueprint("algorithm-views", __name__)
+router = APIRouter()
 
 DEFAULT_RISK_FREE_RATE = 0.04
 
@@ -36,26 +37,26 @@ def _finite_or_none(value):
     return value
 
 
-@blueprint.route("/api/algorithm/status", methods=["GET"])
+@router.get("/api/algorithm/status")
 @inject
 def get_algorithm_status(
-    algorithm_runner=Provide[DependencyContainer.algorithm_runner],
+    algorithm_runner=Depends(Provide[DependencyContainer.algorithm_runner]),
 ):
     """Return whether the algorithm is currently running, stopped, or
     has not been started yet, along with its persisted enabled/disabled
     control state (the state a stateless deployment such as AWS Lambda
     or Azure Functions checks before each scheduled invocation).
     """
-    return jsonify({
+    return JSONResponse(content={
         **algorithm_runner.get_status_report(),
         "control": algorithm_runner.get_control_state(),
-    }), 200
+    }, status_code=200)
 
 
-@blueprint.route("/api/algorithm/start", methods=["POST"])
+@router.post("/api/algorithm/start")
 @inject
 def start_algorithm(
-    algorithm_runner=Provide[DependencyContainer.algorithm_runner],
+    algorithm_runner=Depends(Provide[DependencyContainer.algorithm_runner]),
 ):
     """
     Enables the algorithm and, if running in live web mode, (re)starts
@@ -67,19 +68,47 @@ def start_algorithm(
     try:
         started = algorithm_runner.start()
     except OperationalException as e:
-        return jsonify({"error_message": str(e)}), 409
+        return JSONResponse(content={"error_message": str(e)}, status_code=409)
 
-    return jsonify({
+    return JSONResponse(content={
         "started": started,
         **algorithm_runner.get_status_report(),
         "control": algorithm_runner.get_control_state(),
-    }), 200
+    }, status_code=200)
 
 
-@blueprint.route("/api/algorithm/stop", methods=["POST"])
+@router.post("/api/algorithm/invoke")
+@inject
+def invoke_algorithm(
+    request: Request,
+    algorithm_runner=Depends(Provide[DependencyContainer.algorithm_runner]),
+):
+    """
+    Forces the algorithm's strategies to run immediately, ignoring
+    their configured schedule. The algorithm must already be running
+    (see POST /api/algorithm/start). Pass one or more repeatable
+    ``?strategy_id=`` query params to only invoke specific strategies;
+    omit to invoke all of them.
+    """
+    strategy_ids = request.query_params.getlist("strategy_id") or None
+
+    try:
+        algorithm_runner.invoke_now(strategy_ids)
+    except OperationalException as e:
+        return JSONResponse(content={"error_message": str(e)}, status_code=409)
+
+    return JSONResponse(content={
+        "invoked": True,
+        "strategy_ids": strategy_ids,
+        **algorithm_runner.get_status_report(),
+    }, status_code=200)
+
+
+@router.post("/api/algorithm/stop")
 @inject
 def stop_algorithm(
-    algorithm_runner=Provide[DependencyContainer.algorithm_runner],
+    request: Request,
+    algorithm_runner=Depends(Provide[DependencyContainer.algorithm_runner]),
 ):
     """
     Disables the algorithm and, if running in live web mode, signals
@@ -90,24 +119,26 @@ def stop_algorithm(
     (AWS Lambda, Azure Functions) skips its next scheduled invocation.
     Pass ``?reason=...`` to record why it was stopped.
     """
-    wait = request.args.get("wait", "false").lower() in ("1", "true", "yes")
-    reason = request.args.get("reason")
+    wait = request.query_params.get("wait", "false").lower() \
+        in ("1", "true", "yes")
+    reason = request.query_params.get("reason")
     stopped = algorithm_runner.stop(wait=wait, reason=reason)
-    return jsonify({
+    return JSONResponse(content={
         "stopped": stopped,
         **algorithm_runner.get_status_report(),
         "control": algorithm_runner.get_control_state(),
-    }), 200
+    }, status_code=200)
 
 
-@blueprint.route("/api/algorithm/insights", methods=["GET"])
+@router.get("/api/algorithm/insights")
 @inject
 def get_algorithm_insights(
-    portfolio_snapshot_service=Provide[
-        DependencyContainer.portfolio_snapshot_service
-    ],
-    trade_service=Provide[DependencyContainer.trade_service],
-    portfolio_service=Provide[DependencyContainer.portfolio_service],
+    request: Request,
+    portfolio_snapshot_service=Depends(
+        Provide[DependencyContainer.portfolio_snapshot_service]
+    ),
+    trade_service=Depends(Provide[DependencyContainer.trade_service]),
+    portfolio_service=Depends(Provide[DependencyContainer.portfolio_service]),
 ):
     """
     Returns a summary of the trading algorithm's performance: equity
@@ -116,8 +147,8 @@ def get_algorithm_insights(
     it becomes more meaningful the longer the algorithm has been
     running.
     """
-    risk_free_rate = request.args.get(
-        "risk_free_rate", DEFAULT_RISK_FREE_RATE, type=float
+    risk_free_rate = float(
+        request.query_params.get("risk_free_rate", DEFAULT_RISK_FREE_RATE)
     )
     snapshots = portfolio_snapshot_service.get_all()
     trades = trade_service.get_all()
@@ -152,4 +183,4 @@ def get_algorithm_insights(
             for portfolio in portfolios
         ],
     }
-    return jsonify(insights), 200
+    return JSONResponse(content=insights, status_code=200)

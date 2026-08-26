@@ -96,6 +96,7 @@ class Executor(ABC):
             amount=intent.amount,
             price=intent.price,
             order_type=self.short_order_type,
+            validate=not metadata.get("synthetic_flip_open", False),
             metadata=metadata,
         )
 

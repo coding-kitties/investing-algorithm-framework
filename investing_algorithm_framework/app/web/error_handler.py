@@ -2,15 +2,16 @@ import logging
 from typing import Dict, List
 
 import marshmallow.exceptions as marshmallow_exceptions
-from flask import jsonify
-from werkzeug.exceptions import HTTPException
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from investing_algorithm_framework.domain import ApiException
 
 logger = logging.getLogger("investing_algorithm_framework")
 
 
-def setup_error_handler(app) -> None:
+def setup_error_handler(app):
     """
     Function that will register all the specified error handlers for the app
     """
@@ -21,9 +22,10 @@ def setup_error_handler(app) -> None:
         if not isinstance(error_message, Dict):
             error_message = error_message.replace("404 Not Found: ", '')
 
-        response = jsonify({"error_message": error_message})
-        response.status_code = status_code
-        return response
+        return JSONResponse(
+            content={"error_message": error_message},
+            status_code=status_code,
+        )
 
     def format_marshmallow_validation_error(errors: Dict):
         errors_message = {}
@@ -38,12 +40,12 @@ def setup_error_handler(app) -> None:
                 errors_message[key] = errors[key][0].lower()
         return errors_message
 
-    def error_handler(error):
+    async def error_handler(request: Request, error: Exception):
         logger.error("exception of type {} occurred".format(type(error)))
         logger.exception(error)
 
-        if isinstance(error, HTTPException):
-            return create_error_response(str(error), error.code)
+        if isinstance(error, StarletteHTTPException):
+            return create_error_response(str(error.detail), error.status_code)
         elif isinstance(error, ApiException):
             return create_error_response(
                 error.error_message, error.status_code
@@ -53,7 +55,11 @@ def setup_error_handler(app) -> None:
             return create_error_response(error_message)
         else:
             # Internal error happened that was unknown
-            return "Internal server error", 500
+            return JSONResponse(
+                content={"error_message": "Internal server error"},
+                status_code=500,
+            )
 
-    app.errorhandler(Exception)(error_handler)
+    app.add_exception_handler(StarletteHTTPException, error_handler)
+    app.add_exception_handler(Exception, error_handler)
     return app

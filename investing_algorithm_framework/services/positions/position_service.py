@@ -1,5 +1,6 @@
 import logging
 
+from investing_algorithm_framework.domain import PositionMode
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 
@@ -80,7 +81,9 @@ class PositionService(RepositoryService):
             }
         )
 
-    def update_positions_with_buy_order_filled(self, order, filled_amount):
+    def update_positions_with_buy_order_filled(
+        self, order, filled_amount, position_mode=PositionMode.NETTING
+    ):
         """
         Function to update positions with filled order.
 
@@ -105,6 +108,15 @@ class PositionService(RepositoryService):
 
         # Update the position
         position = self.get(order.position_id)
+        if PositionMode(position_mode) == PositionMode.HEDGE:
+            self.update(
+                position.id,
+                {
+                    "long_amount": position.long_amount + filled_amount,
+                    "long_cost": position.long_cost + filled_size,
+                }
+            )
+            return
         self.update(
             position.id,
             {
@@ -114,7 +126,9 @@ class PositionService(RepositoryService):
             }
         )
 
-    def update_positions_with_created_sell_order(self, order):
+    def update_positions_with_created_sell_order(
+        self, order, position_mode=PositionMode.NETTING
+    ):
         """
         Function to update positions with created order.
         If the order is filled then also the amount of the position
@@ -136,12 +150,18 @@ class PositionService(RepositoryService):
             "with created sell "
             f"order {order.get_id()} with amount {order.get_amount()}"
         )
-        self.update(
-            position.id,
-            {
-                "amount": position.get_amount() - order.get_amount(),
-            }
-        )
+        if PositionMode(position_mode) == PositionMode.HEDGE:
+            self.update(
+                position.id,
+                {"long_amount": position.long_amount - order.get_amount()}
+            )
+        else:
+            self.update(
+                position.id,
+                {
+                    "amount": position.get_amount() - order.get_amount(),
+                }
+            )
 
         if filled > 0:
 
@@ -240,7 +260,7 @@ class PositionService(RepositoryService):
         )
 
     def update_positions_with_short_order_filled(
-        self, order, filled_amount
+        self, order, filled_amount, position_mode=PositionMode.NETTING
     ):
         """Update the target position when a SHORT order fills:
         decrement (i.e. drive further negative) by ``filled_amount``.
@@ -264,6 +284,15 @@ class PositionService(RepositoryService):
             f"filled amount {filled_amount}"
         )
         position = self.get(order.position_id)
+        if PositionMode(position_mode) == PositionMode.HEDGE:
+            self.update(
+                position.id,
+                {
+                    "short_amount": position.short_amount + filled_amount,
+                    "short_cost": position.short_cost + filled_size,
+                }
+            )
+            return
         self.update(
             position.id,
             {
@@ -301,7 +330,7 @@ class PositionService(RepositoryService):
         )
 
     def update_positions_with_cover_order_filled(
-        self, order, filled_amount
+        self, order, filled_amount, position_mode=PositionMode.NETTING
     ):
         """Update the target position when a COVER order fills:
         increment (toward zero) by ``filled_amount``. Reduces the
@@ -312,6 +341,21 @@ class PositionService(RepositoryService):
             return
 
         position = self.get(order.position_id)
+        if PositionMode(position_mode) == PositionMode.HEDGE:
+            # Guard against a short leg already closed by a concurrent
+            # fill (e.g. two pending COVER orders on the same symbol).
+            fraction = (
+                filled_amount / position.short_amount
+                if position.short_amount else 0
+            )
+            self.update(
+                position.id,
+                {
+                    "short_amount": position.short_amount - filled_amount,
+                    "short_cost": position.short_cost * (1 - fraction),
+                }
+            )
+            return
         position_amount = position.get_amount() or 0
 
         # Scale the cost reduction by the fraction of the open short

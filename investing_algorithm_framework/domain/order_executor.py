@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from investing_algorithm_framework.domain import Order
+from investing_algorithm_framework.domain import Order, PositionMode
 
 
 class OrderExecutor(ABC):
@@ -104,6 +104,15 @@ class OrderExecutor(ABC):
         raise NotImplementedError(
             "Subclasses must implement this method."
         )
+
+    def supports_position_mode(self, market, position_mode) -> bool:
+        """Return whether this executor can safely route the position mode.
+
+        Custom executors must explicitly opt into HEDGE support. Keeping the
+        default at NETTING prevents an existing live adapter from being
+        treated as hedge-capable merely because it supports the venue.
+        """
+        return PositionMode(position_mode) == PositionMode.NETTING
 
     def __repr__(self):
         """

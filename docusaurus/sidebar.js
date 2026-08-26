@@ -19,6 +19,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/credentials',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/portfolio-configuration',
                 },
                 {
@@ -43,19 +47,45 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
-                    id: 'Getting Started/backtesting',
+                    id: 'Getting Started/metrics',
+                },
+            ],
+        },
+        {
+            type: 'category',
+            label: 'Risk Rules',
+            items: [
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/overview',
                 },
                 {
                     type: 'doc',
-                    id: 'Getting Started/vector-backtesting',
+                    id: 'Risk Rules/position-size',
                 },
                 {
                     type: 'doc',
-                    id: 'Getting Started/backtest-reports',
+                    id: 'Risk Rules/stop-loss-rule',
                 },
                 {
                     type: 'doc',
-                    id: 'Getting Started/deployment',
+                    id: 'Risk Rules/take-profit-rule',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/scaling-rule',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/exposure-rule',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/cooldown-rule',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/trading-cost',
                 },
             ],
         },
@@ -78,10 +108,6 @@ const sidebars = {
                 {
                     type: 'doc',
                     id: 'Data/external-data',
-                },
-                {
-                    type: 'doc',
-                    id: 'Data/backtest_data',
                 },
             ],
         },
@@ -111,6 +137,44 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Advanced Concepts/recording-variables',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/portfolio-sync',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/position-modes',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/pipelines',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/pipelines-live',
+                },
+            ],
+        },
+        {
+            type: 'category',
+            label: 'Backtesting',
+            items: [
+                {
+                    type: 'doc',
+                    id: 'Getting Started/backtesting',
+                },
+                {
+                    type: 'doc',
+                    id: 'Getting Started/event-backtesting',
+                },
+                {
+                    type: 'doc',
+                    id: 'Getting Started/vector-backtesting',
+                },
+                {
+                    type: 'doc',
                     id: 'Advanced Concepts/vector-backtesting',
                 },
                 {
@@ -123,13 +187,52 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
-                    id: 'Advanced Concepts/recording-variables',
+                    id: 'Getting Started/backtest-reports',
+                },
+                {
+                    type: 'doc',
+                    id: 'Getting Started/backtest-storage',
+                },
+                {
+                    type: 'doc',
+                    id: 'Data/backtest_data',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/pipelines-event-backtest',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/pipelines-vector-backtest',
+                },
+            ],
+        },
+        {
+            type: 'category',
+            label: 'Going Live',
+            items: [
+                {
+                    type: 'doc',
+                    id: 'Getting Started/deployment',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/paper-trading',
+                },
+                {
+                    type: 'doc',
+                    id: 'Getting Started/deployment-aws-lambda',
+                },
+                {
+                    type: 'doc',
+                    id: 'Getting Started/deployment-azure-functions',
                 },
             ],
         },
         {
             type: "category",
             label: "Contributing Guide",
+
             items: [
                 {
                     type: 'doc',

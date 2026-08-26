@@ -35,7 +35,7 @@ class LimitOrderExecutor(Executor):
             amount=intent.amount,
             price=intent.price,
             execute=True,
-            validate=True,
+            validate=not metadata.get("synthetic_flip_open", False),
             sync=True,
             metadata=metadata,
         )

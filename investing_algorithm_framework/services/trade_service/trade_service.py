@@ -6,7 +6,7 @@ from typing import Union
 from investing_algorithm_framework.domain import OrderStatus, TradeStatus, \
     Trade, OperationalException, OrderType, TradeTakeProfit, \
     TradeStopLoss, OrderSide, Environment, ENVIRONMENT, PeekableQueue, \
-    DataType, INDEX_DATETIME, random_number, random_string
+    DataType, INDEX_DATETIME, PositionMode, random_number, random_string
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 
@@ -518,7 +518,7 @@ class TradeService(RepositoryService):
         trade_queue = PriorityQueue()
 
         for trade in matching_trades:
-            if trade.available_amount > 0:
+            if not trade.is_short and trade.available_amount > 0:
                 total_available_to_close += trade.available_amount
                 trade_queue.put(trade)
 
@@ -672,12 +672,18 @@ class TradeService(RepositoryService):
         """
 
         for trade_data in trades:
+            trade = self.get(trade_data["trade_id"])
+            if trade.is_short:
+                raise OperationalException(
+                    "SELL orders can only close long trades"
+                )
             self._allocate_sell_to_trade(
                 trade_data["trade_id"], sell_order, trade_data["amount"]
             )
 
     def create_trade_allocations(
-        self, sell_order, trades=None, stop_losses=None, take_profits=None
+        self, sell_order, trades=None, stop_losses=None, take_profits=None,
+        position_mode=PositionMode.NETTING,
     ):
         """
         Create trade allocation records for a sell order, update the
@@ -752,8 +758,13 @@ class TradeService(RepositoryService):
                 cost += allocation.open_price * allocation.amount
                 net_gain += allocation.net_gain_contribution
 
-        position.cost -= cost
-        self.position_repository.save(position)
+        if PositionMode(position_mode) == PositionMode.HEDGE:
+            self.position_repository.update(
+                position.id, {"long_cost": position.long_cost - cost}
+            )
+        else:
+            position.cost -= cost
+            self.position_repository.save(position)
 
         # Update the net gain, net size of the portfolio
         portfolio = self.portfolio_repository.get(position.portfolio_id)
@@ -763,7 +774,7 @@ class TradeService(RepositoryService):
         self.portfolio_repository.save(portfolio)
 
     def update_trade_with_removed_sell_order(
-        self, sell_order
+        self, sell_order, position_mode=PositionMode.NETTING
     ) -> Trade:
         """
         Cancellation reversal — undo the effect of a sell order.
@@ -858,8 +869,13 @@ class TradeService(RepositoryService):
         position = self.position_repository.find({
             "order_id": sell_order.id
         })
-        position.cost += position_cost
-        self.position_repository.save(position)
+        if PositionMode(position_mode) == PositionMode.HEDGE:
+            self.position_repository.update(
+                position.id, {"long_cost": position.long_cost + position_cost}
+            )
+        else:
+            position.cost += position_cost
+            self.position_repository.save(position)
 
         # Update the net gain of the portfolio
         portfolio = self.portfolio_repository.get(position.portfolio_id)

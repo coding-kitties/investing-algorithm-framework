@@ -8,14 +8,15 @@ from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, BacktestService, \
     SQLPortfolioSnapshotRepository, SQLTradeRepository, \
     SQLPositionSnapshotRepository, SQLTradeStopLossRepository, \
-    SQLTradeTakeProfitRepository, SQLTradeAllocationRepository
+    SQLTradeTakeProfitRepository, SQLTradeAllocationRepository, \
+    SQLRunReportRepository
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, PortfolioConfigurationService, \
     ConfigurationService, PortfolioSnapshotService, \
     PositionSnapshotService, MarketCredentialService, TradeService, \
     PortfolioSyncService, OrderExecutorLookup, PortfolioProviderLookup, \
     DataProviderService, TradeTakeProfitService, TradeStopLossService, \
-    BrokerBalanceTracker, TradeHookDispatcher
+    BrokerBalanceTracker, TradeHookDispatcher, RunReportService
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -68,6 +69,11 @@ class DependencyContainer(containers.DeclarativeContainer):
     trade_take_profit_repository = providers\
         .Factory(SQLTradeTakeProfitRepository)
     trade_stop_loss_repository = providers.Factory(SQLTradeStopLossRepository)
+    run_report_repository = providers.Factory(SQLRunReportRepository)
+    run_report_service = providers.Factory(
+        RunReportService,
+        repository=run_report_repository,
+    )
     data_provider_service = providers.ThreadSafeSingleton(
         DataProviderService,
         configuration_service=configuration_service,

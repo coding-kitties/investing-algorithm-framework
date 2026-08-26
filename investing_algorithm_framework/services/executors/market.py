@@ -36,7 +36,7 @@ class MarketOrderExecutor(Executor):
             order_side=self._buy_side(),
             amount=intent.amount,
             execute=True,
-            validate=True,
+            validate=not metadata.get("synthetic_flip_open", False),
             sync=True,
             metadata=metadata,
         )

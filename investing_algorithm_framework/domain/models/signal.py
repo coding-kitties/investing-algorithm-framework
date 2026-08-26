@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
+from .score_card import ScoreCard, SCORE_CARD_METADATA_KEY
+
 
 class SignalSide(Enum):
     """The directional intent carried by a :class:`Signal`.
@@ -175,6 +177,26 @@ class Signal:
             strength=self.strength,
             source=self.source,
             metadata=merged,
+        )
+
+    def with_score_card(self, score_card: ScoreCard) -> "Signal":
+        """Return a copy of this signal with ``score_card`` attached
+        under the reserved ``metadata["score_card"]`` key.
+
+        A :class:`ScoreCard` is a small, versioned, JSON-only object
+        that records *why* this signal fired (or, for a rejected
+        signal, what its inputs were) — e.g. the indicator values a
+        strategy computed before deciding to emit it. Because
+        ``Signal.metadata`` already flows into ``Order.metadata`` for
+        an executed signal, and every signal (approved or rejected)
+        is captured in ``RunReport.signals``, this is enough for any
+        external tool to render the reasoning behind a decision
+        without strategy-specific code — see
+        :class:`~investing_algorithm_framework.domain.models.score_card.ScoreCard`
+        for the full design rationale.
+        """
+        return self.with_metadata(
+            **{SCORE_CARD_METADATA_KEY: score_card.to_dict()}
         )
 
     def __repr__(self) -> str:  # pragma: no cover - trivial

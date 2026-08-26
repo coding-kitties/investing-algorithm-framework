@@ -6,12 +6,13 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Optional, Any, Dict, Tuple, Callable, Union
 
-from flask import Flask
+import uvicorn
+from fastapi import FastAPI
 
 from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.app.strategy import TradingStrategy
 from investing_algorithm_framework.app.task import Task
-from investing_algorithm_framework.app.web import create_flask_app
+from investing_algorithm_framework.app.web import create_fastapi_app
 from investing_algorithm_framework.domain import DATABASE_NAME, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
@@ -23,14 +24,15 @@ from investing_algorithm_framework.domain import DATABASE_NAME, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, TimeFrame, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestMonteCarloTest, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY, Schedule, \
-    Universe
+    Universe, PositionMode, RunReport, PaperTradingMode
 from investing_algorithm_framework.domain.backtesting.study import Study
 from investing_algorithm_framework.domain.backtesting.backtest_engine import \
     BacktestEngine
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
     CCXTOHLCVDataProvider, clear_db, teardown_sqlalchemy, \
-    PandasOHLCVDataProvider, BacktestService
+    PandasOHLCVDataProvider, BacktestService, PaperTradingOrderExecutor, \
+    PaperTradingPortfolioProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestPortfolioService, DefaultTradeOrderEvaluator
 from .app_hook import AppHook
@@ -162,7 +164,7 @@ class App:
     Attributes:
         container: The dependency container for the app. This is used
             to store all the services and repositories for the app.
-        _flask_app: The flask app instance. This is used to run the
+        _web_app: The FastAPI app instance. This is used to run the
             web app.
         _state_handler: The state handler for the app. This is used
             to save and load the state of the app.
@@ -175,7 +177,12 @@ class App:
     """
 
     def __init__(self, state_handler=None, name=None):
-        self._flask_app: Optional[Flask] = None
+        self._web_app: Optional[FastAPI] = None
+        # Set directly by test harnesses to skip starting a real
+        # uvicorn server while still exercising the FastAPI app via
+        # its own TestClient (mirrors the old Flask ``app.testing``
+        # flag, which lived on the recreated Flask instance instead).
+        self._web_app_testing: bool = False
         self.container = None
         self._started = False
         self._tasks = []
@@ -187,6 +194,7 @@ class App:
         self._trade_order_evaluator = None
         self._state_handler = state_handler
         self._run_history = None
+        self._last_run_report = None
         self._name = name
         self._blotter = None
         self._fx_rate_provider = None
@@ -530,9 +538,8 @@ class App:
         Returns:
             None
         """
-        logger.info("Initializing data sources")
-
         if data_sources is None or len(data_sources) == 0:
+            logger.info("No data sources were configured")
             return
 
         data_provider_service = self.container.data_provider_service()
@@ -548,6 +555,10 @@ class App:
 
         # Initialize all data sources
         data_provider_service.index_data_providers(data_sources)
+        identifiers = ', '.join(ds.get_identifier() for ds in data_sources)
+        logger.info(
+            f"Data sources initialized ({len(data_sources)}): {identifiers}"
+        )
 
     def initialize_data_sources_backtest(
         self,
@@ -673,7 +684,7 @@ class App:
             )
         )
 
-    def initialize_services(self):
+    def initialize_services(self, require_portfolio: bool = True):
         """
         Method to initialize the app. This method should be called before
         running the algorithm. It initializes the services and the algorithm
@@ -681,28 +692,97 @@ class App:
 
         Also, it initializes all required services for the algorithm.
 
+        Args:
+            require_portfolio (bool): Whether to require a portfolio
+                configuration to be present. If True, the app will raise an
+                OperationalException if no portfolio is configured.
+
         Returns:
             None
         """
-        logger.info("Initializing app")
+        logger.info("Initializing services")
         self.initialize_order_executors()
         self.initialize_portfolio_providers()
 
         # Initialize all market credentials
         market_credential_service = self.container.market_credential_service()
-        market_credential_service.initialize()
+        if require_portfolio:
+            market_credential_service.initialize()
+
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
 
-        if portfolio_configuration_service.count() == 0:
+        if require_portfolio and portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
         configuration_service = self.container.configuration_service()
         config = configuration_service.get_config()
 
+        self._validate_live_position_modes(
+            portfolio_configuration_service, config
+        )
+
         if AppMode.WEB.equals(config[APP_MODE]):
             configuration_service.add_value(APP_MODE, AppMode.WEB.value)
             self._initialize_web()
+
+    def _validate_live_position_modes(
+        self, portfolio_configuration_service, config
+    ) -> None:
+        if Environment.BACKTEST.equals(config[ENVIRONMENT]):
+            return
+
+        order_executors = self.container.order_executor_lookup().get_all()
+        portfolio_providers = self.container \
+            .portfolio_provider_lookup().get_all()
+
+        for configuration in portfolio_configuration_service.get_all():
+            if configuration.position_mode != PositionMode.HEDGE:
+                continue
+
+            market = configuration.market
+            executors = sorted(
+                (
+                    executor for executor in order_executors
+                    if executor.supports_market(market)
+                ),
+                key=lambda executor: executor.priority,
+            )
+            providers = sorted(
+                (
+                    provider for provider in portfolio_providers
+                    if provider.supports_market(market)
+                ),
+                key=lambda provider: provider.priority,
+            )
+            missing = []
+            if not executors:
+                missing.append("no order executor supports the venue")
+            elif not executors[0].supports_position_mode(
+                market, PositionMode.HEDGE
+            ):
+                missing.append(
+                    f"{executors[0].__class__.__name__} cannot route "
+                    "directional HEDGE orders"
+                )
+            if not providers:
+                missing.append("no portfolio provider supports the venue")
+            elif not providers[0].supports_position_mode(
+                market, PositionMode.HEDGE
+            ):
+                missing.append(
+                    f"{providers[0].__class__.__name__} cannot reconcile "
+                    "independent HEDGE legs"
+                )
+
+            if missing:
+                raise OperationalException(
+                    f"Live PositionMode.HEDGE is unavailable for portfolio "
+                    f"{configuration.identifier} ({market}): "
+                    f"{'; '.join(missing)}. Use PositionMode.NETTING, run "
+                    "HEDGE in a backtest, or register HEDGE-capable order "
+                    "and portfolio adapters."
+                )
 
     def _bind_algorithm_control_persistence(self):
         """
@@ -772,7 +852,11 @@ class App:
         """Returns the persisted enabled/disabled control state."""
         return self._bind_algorithm_control_persistence().get_control_state()
 
-    def run(self, number_of_iterations: int = None):
+    def run(
+        self,
+        number_of_iterations: int = None,
+        run_immediately_on_start: bool = True,
+    ):
         """
         Entry point to run the application. This method should be called to
         start the trading bot. This method can be called in three modes:
@@ -799,6 +883,13 @@ class App:
         Args:
             number_of_iterations (int): The number of iterations to run the
                 algorithm for
+            run_immediately_on_start (bool): When True (default), every
+                strategy evaluates on the very first tick regardless of
+                its configured schedule (there is no prior run yet to
+                compare against). Set to False to instead wait for each
+                strategy's normal interval to elapse before its first
+                run — e.g. a strategy scheduled every 2 hours would only
+                run for the first time 2 hours after startup.
 
         Returns:
             None
@@ -833,6 +924,7 @@ class App:
         self.initialize_storage()
         logger.info("App initialization complete")
         event_loop_service = None
+        run_started_at = datetime.now(timezone.utc)
 
         try:
             # Run all on_after_initialize hooks
@@ -847,21 +939,38 @@ class App:
             self.initialize_data_sources(algorithm.data_sources)
             self.initialize_services()
             self.initialize_portfolios()
+            self._log_next_scheduled_runs(
+                algorithm, run_immediately_on_start=run_immediately_on_start
+            )
 
             is_live_web_run = AppMode.WEB.equals(self.config[APP_MODE]) \
-                and not (self._flask_app and self._flask_app.testing) \
+                and not self._web_app_testing \
                 and number_of_iterations is None
-            flask_thread = None
+            web_thread = None
 
             if is_live_web_run:
-                logger.info("Running web")
-                flask_thread = threading.Thread(
-                    name='Web App',
-                    target=self._flask_app.run,
-                    kwargs={"port": 8080}
+                web_port = 8080
+                logger.info(
+                    f"Running web — API: http://localhost:{web_port} "
+                    f"— Swagger docs: http://localhost:{web_port}/docs"
                 )
-                flask_thread.daemon = True
-                flask_thread.start()
+                web_thread = threading.Thread(
+                    name='Web App',
+                    target=uvicorn.run,
+                    args=(self._web_app,),
+                    kwargs={
+                        "host": "0.0.0.0",
+                        "port": web_port,
+                        # Skip uvicorn's own logging setup (its
+                        # "INFO:     ..." banner/access logs) — we
+                        # already log a nicer, consistently formatted
+                        # startup line above. Its loggers fall back to
+                        # propagating to the root logger instead.
+                        "log_config": None,
+                    },
+                )
+                web_thread.daemon = True
+                web_thread.start()
 
             trade_order_evaluator = DefaultTradeOrderEvaluator(
                 trade_service=self.container.trade_service(),
@@ -885,28 +994,67 @@ class App:
                 trade_service=self.container.trade_service(),
             )
             event_loop_service.initialize(
-                algorithm, trade_order_evaluator=trade_order_evaluator
+                algorithm, trade_order_evaluator=trade_order_evaluator,
+                run_immediately_on_start=run_immediately_on_start,
             )
+
+            if number_of_iterations is None:
+                logger.info("Startup complete — entering live loop")
+
+                # Continuous runs never naturally "finish", so build
+                # and persist a RunReport after every tick that
+                # actually ran a strategy — not just once when the
+                # loop eventually stops.
+                def _build_iteration_run_report(strategies):
+                    self._last_run_report = self._build_run_report(
+                        event_loop_service, run_started_at,
+                        algorithm=algorithm, number_of_iterations=None,
+                    )
+
+                event_loop_service.on_iteration_complete = \
+                    _build_iteration_run_report
+            else:
+                logger.info(
+                    "Startup complete — running "
+                    f"{number_of_iterations} iteration(s)"
+                )
 
             if is_live_web_run:
                 # Run the event loop in its own background thread so
                 # the web API can start/stop it on demand (see
                 # `/api/algorithm/start` and `/api/algorithm/stop`)
                 # without killing the process. The main thread just
-                # keeps the process alive alongside the Flask thread.
-                algorithm_runner.configure(event_loop_service)
+                # keeps the process alive alongside the web thread.
+                def _build_web_run_report():
+                    self._last_run_report = self._build_run_report(
+                        event_loop_service, run_started_at,
+                        algorithm=algorithm, number_of_iterations=None,
+                    )
+
+                algorithm_runner.configure(
+                    event_loop_service, on_stop=_build_web_run_report
+                )
                 algorithm_runner.start()
 
                 try:
-                    while flask_thread.is_alive():
-                        flask_thread.join(timeout=1)
+                    while web_thread.is_alive():
+                        web_thread.join(timeout=1)
                 except KeyboardInterrupt:
-                    algorithm_runner.stop(wait=True)
+                    # A local Ctrl+C is a process shutdown, not a
+                    # deliberate "stop trading" decision — don't
+                    # persist 'disabled' or the next `python
+                    # test.py` run would silently skip.
+                    algorithm_runner.stop(wait=True, persist=False)
                     exit(0)
             else:
                 try:
                     event_loop_service.start(
                         number_of_iterations=number_of_iterations
+                    )
+                    self._last_run_report = self._build_run_report(
+                        event_loop_service, run_started_at,
+                        algorithm=algorithm,
+                        number_of_iterations=number_of_iterations,
                     )
                 except KeyboardInterrupt:
                     exit(0)
@@ -940,18 +1088,16 @@ class App:
         `App` instance — not by the entry file itself, since
         `if __name__ == "__main__": app.run()` never fires on import.
 
-        Never starts EventLoopService, never starts the Flask thread,
+        Never starts EventLoopService, never starts the web thread,
         executes no strategy iterations, places no orders.
 
         Args:
             require_portfolio (bool): When True (default), also runs
-                `initialize_services()`/`initialize_portfolios()`, so a
-                configured market/portfolio (and resolvable market
-                credentials) is required, matching `run()` exactly.
-                Set to False to validate only config, hooks, storage
-                and data source declarations — e.g. for a sandbox that
-                checks a strategy's definition without a connected
-                exchange or credentials.
+                `initialize_portfolios()`, so a configured market/portfolio
+                and resolvable market credentials are required, matching
+                `run()` exactly. Set to False to initialize services,
+                including configured market credentials, without requiring
+                a portfolio or a credential for any market.
 
         Raises:
             Exception: Any exception raised during config, hook,
@@ -967,8 +1113,9 @@ class App:
         algorithm = self.get_algorithm()
         self.initialize_data_sources(algorithm.data_sources)
 
+        self.initialize_services(require_portfolio=require_portfolio)
+
         if require_portfolio:
-            self.initialize_services()
             self.initialize_portfolios()
 
     def add_portfolio_configuration(self, portfolio_configuration):
@@ -1068,18 +1215,12 @@ class App:
         - db
             - sqlite
         - services
-            - Flask app
+            - FastAPI app
             - Investing Algorithm Framework App
             - Algorithm
         """
-        # Preserve the testing flag if the flask app already exists
-        was_testing = self._flask_app.testing \
-            if self._flask_app is not None else False
         configuration_service = self.container.configuration_service()
-        self._flask_app = create_flask_app(configuration_service)
-
-        if was_testing:
-            self._flask_app.testing = True
+        self._web_app = create_fastapi_app(configuration_service)
 
     def get_portfolio_configurations(self):
         portfolio_configuration_service = self.container \
@@ -2257,6 +2398,15 @@ class App:
             else:
                 return
 
+        if not isinstance(strategy.schedule, Schedule):
+            raise OperationalException(
+                f"Schedule not set for strategy instance "
+                f"{strategy.strategy_id}. Set ``schedule = "
+                f"Schedule.every(...)`` or ``schedule = "
+                f"Schedule.on(...)`` on the class, or pass "
+                f"``schedule=`` to the constructor."
+            )
+
         has_duplicates = False
 
         for existing_strategy in self._strategies:
@@ -2271,6 +2421,7 @@ class App:
             )
 
         self._strategies.append(strategy)
+        logger.info(f"Strategy added: {strategy.strategy_id}")
 
     def add_state_handler(self, state_handler):
         """
@@ -2296,13 +2447,16 @@ class App:
 
     def add_market(
         self,
-        market,
-        trading_symbol,
+        market=None,
+        trading_symbol=None,
         api_key=None,
         secret_key=None,
         initial_balance=None,
         fee_percentage=0.0,
         slippage_percentage=0.0,
+        position_mode="netting",
+        paper_trading=False,
+        paper_trading_mode=PaperTradingMode.AUTO,
     ):
         """
         Function to add a market to the app. This function is a utility
@@ -2310,17 +2464,34 @@ class App:
         to the app.
 
         Args:
-            market: String representing the market name
-            trading_symbol: Trading symbol for the portfolio
+            market: String representing the market name. Falls back to
+                the ``MARKET`` environment variable when not given.
+            trading_symbol: Trading symbol for the portfolio. Falls
+                back to the ``TRADING_SYMBOL`` environment variable
+                when not given.
             api_key: API key for the market
             secret_key: Secret key for the market
-            initial_balance: Initial balance for the market
+            initial_balance: Initial balance for the market. Falls
+                back to the ``INITIAL_BALANCE`` environment variable
+                when not given.
             fee_percentage: Default fee percentage for all trades
                 on this market (e.g. 0.1 for 0.1%). Can be overridden
                 per-symbol via TradingCost on the strategy.
             slippage_percentage: Default slippage percentage for all
                 trades on this market (e.g. 0.05 for 0.05%). Can be
                 overridden per-symbol via TradingCost on the strategy.
+            position_mode: Position accounting mode. Defaults to NETTING;
+                HEDGE stores independent long and short legs.
+            paper_trading: When True, no real orders are ever placed
+                for this market. See ``paper_trading_mode`` for how
+                execution is simulated.
+            paper_trading_mode: One of ``PaperTradingMode.AUTO``
+                (default; prefers the broker's own sandbox/testnet,
+                falls back to the local simulator),
+                ``PaperTradingMode.BROKER`` (require the broker's
+                sandbox; raises if unsupported), or
+                ``PaperTradingMode.LOCAL`` (always simulate locally,
+                no network calls to place orders).
 
         Returns:
             None
@@ -2332,15 +2503,108 @@ class App:
             initial_balance=initial_balance,
             fee_percentage=fee_percentage,
             slippage_percentage=slippage_percentage,
+            position_mode=position_mode,
+            paper_trading=paper_trading,
+            paper_trading_mode=paper_trading_mode,
         )
-
         self.add_portfolio_configuration(portfolio_configuration)
+
+        use_broker_sandbox = False
+
+        if portfolio_configuration.paper_trading:
+            use_broker_sandbox = self._resolve_paper_trading_sandbox(
+                portfolio_configuration
+            )
+
+        if portfolio_configuration.paper_trading and not use_broker_sandbox:
+            # The local simulator never makes a network call, so it
+            # doesn't need real credentials. Placeholder values satisfy
+            # MarketCredentialService without requiring the user to
+            # configure API keys for a market that will never place a
+            # real order.
+            api_key = api_key or "paper-trading"
+            secret_key = secret_key or "paper-trading"
+
         market_credential = MarketCredential(
-            market=market,
+            market=portfolio_configuration.market,
             api_key=api_key,
             secret_key=secret_key
         )
         self.add_market_credential(market_credential)
+
+        if portfolio_configuration.paper_trading:
+            self._setup_paper_trading(
+                portfolio_configuration, use_broker_sandbox
+            )
+
+    def _resolve_paper_trading_sandbox(
+        self, portfolio_configuration: PortfolioConfiguration
+    ) -> bool:
+        """
+        Determine whether paper trading for this market should use the
+        broker's own sandbox/testnet, raising for
+        ``PaperTradingMode.BROKER`` when it isn't available.
+        """
+        market = portfolio_configuration.market
+        mode = portfolio_configuration.paper_trading_mode
+
+        if mode == PaperTradingMode.LOCAL:
+            return False
+
+        supported = (
+            CCXTOrderExecutor.supports_sandbox_mode(market)
+            and CCXTPortfolioProvider.supports_sandbox_mode(market)
+        )
+
+        if mode == PaperTradingMode.BROKER and not supported:
+            raise OperationalException(
+                f"PaperTradingMode.BROKER was requested for market "
+                f"{market}, but its exchange does not advertise a "
+                f"sandbox/testnet endpoint. Use "
+                f"PaperTradingMode.LOCAL or PaperTradingMode.AUTO "
+                f"instead."
+            )
+
+        return supported
+
+    def _setup_paper_trading(
+        self,
+        portfolio_configuration: PortfolioConfiguration,
+        use_broker_sandbox: bool,
+    ) -> None:
+        """
+        Register the order executor/portfolio provider pair for a
+        paper-traded market, scoped to that market only so it never
+        shadows a live market registered in the same app.
+        """
+        market = portfolio_configuration.market
+
+        if use_broker_sandbox:
+            logger.info(
+                f"Paper trading for {market}: using the broker's own "
+                f"sandbox/testnet"
+            )
+            self.add_order_executor(
+                CCXTOrderExecutor(
+                    priority=0, sandbox=True, markets=[market]
+                )
+            )
+            self.add_portfolio_provider(
+                CCXTPortfolioProvider(
+                    priority=0, sandbox=True, markets=[market]
+                )
+            )
+        else:
+            logger.info(
+                f"Paper trading for {market}: using the local, "
+                f"broker-agnostic simulator"
+            )
+            self.add_order_executor(
+                PaperTradingOrderExecutor(markets=[market], priority=0)
+            )
+            self.add_portfolio_provider(
+                PaperTradingPortfolioProvider(markets=[market], priority=0)
+            )
 
     def set_blotter(self, blotter):
         """
@@ -2521,7 +2785,6 @@ class App:
         from investing_algorithm_framework.domain.blotter import \
             SimulationBlotter
 
-        logger.info("Adding order executors")
         order_executor_lookup = self.container.order_executor_lookup()
         environment = self.config[ENVIRONMENT]
 
@@ -2535,12 +2798,83 @@ class App:
             if self._blotter is None:
                 self._blotter = SimulationBlotter()
         else:
-            order_executor_lookup.add_order_executor(
-                CCXTOrderExecutor(priority=3)
+            portfolio_configuration_service = self.container \
+                .portfolio_configuration_service()
+            portfolio_configurations = \
+                portfolio_configuration_service.get_all()
+            has_live_market = any(
+                not pc.paper_trading for pc in portfolio_configurations
             )
+
+            # Skip the default CCXT executor entirely when every
+            # configured market is paper-traded — it would never be
+            # selected anyway (paper executors register at priority=0)
+            # but still opens a real ccxt exchange client per market.
+            if has_live_market or not portfolio_configurations:
+                order_executor_lookup.add_order_executor(
+                    CCXTOrderExecutor(priority=3)
+                )
 
         for order_executor in order_executor_lookup.get_all():
             order_executor.config = self.config
+
+        executors = ', '.join(
+            f'{type(oe).__name__}(priority={oe.priority})'
+            for oe in order_executor_lookup.get_all()
+        ) or "none"
+        logger.info(
+            f"Order executors initialized "
+            f"({len(order_executor_lookup.get_all())}): {executors}"
+        )
+
+    @staticmethod
+    def _log_next_scheduled_runs(
+        algorithm, run_immediately_on_start: bool = True
+    ) -> None:
+        """
+        Log when each of the algorithm's strategies is next scheduled
+        to run. Called once, right after portfolio syncing completes,
+        so it's the last thing logged before the live loop starts.
+
+        When ``run_immediately_on_start`` is True (default), the very
+        first run always fires immediately once the live loop starts
+        (there is no ``last_run`` yet), so this logs that plus the
+        recurring interval for interval-based schedules. When False,
+        the first run instead waits for the normal interval to elapse,
+        so this logs that future time instead.
+        """
+        now = datetime.now(timezone.utc)
+        formatted_now = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        for strategy in algorithm.strategies:
+            schedule = strategy.schedule
+
+            if schedule is None:
+                continue
+
+            if schedule.is_interval:
+                unit = schedule.time_unit.value.lower()
+                if run_immediately_on_start:
+                    logger.info(
+                        f"Strategy '{strategy.strategy_id}': runs every "
+                        f"{schedule.interval} {unit}(s); first run at "
+                        f"{formatted_now} (now)"
+                    )
+                else:
+                    first_run = (now + schedule.step()).strftime(
+                        "%Y-%m-%d %H:%M:%S UTC"
+                    )
+                    logger.info(
+                        f"Strategy '{strategy.strategy_id}': runs every "
+                        f"{schedule.interval} {unit}(s); first run at "
+                        f"{first_run}"
+                    )
+            else:
+                logger.info(
+                    f"Strategy '{strategy.strategy_id}': runs according "
+                    "to its rule-based schedule; next run depends on "
+                    "the configured date/time rules"
+                )
 
     def initialize_portfolios(self):
         """
@@ -2571,10 +2905,9 @@ class App:
 
             # Check if there are matching portfolio configurations
             for portfolio in portfolios:
-                logger.info(
-                    f"Checking if there is an matching portfolio "
-                    "configuration "
-                    f"for portfolio {portfolio.identifier}"
+                logger.debug(
+                    f"Checking if there is a matching portfolio "
+                    f"configuration for portfolio {portfolio.identifier}"
                 )
                 portfolio_configuration = \
                     portfolio_configuration_service.get(
@@ -2669,15 +3002,19 @@ class App:
                     portfolio_configuration
                 )
 
-        logger.info("Portfolio configurations complete")
-        logger.info("Syncing portfolios")
-        portfolio_service = self.container.portfolio_service()
+        portfolio_identifiers = ', '.join(
+            p.identifier for p in portfolio_service.get_all()
+        ) or "none"
+        logger.info(
+            f"Portfolios initialized "
+            f"({len(portfolio_service.get_all())}): {portfolio_identifiers}"
+        )
         portfolio_sync_service = self.container.portfolio_sync_service()
 
         for portfolio in portfolio_service.get_all():
-            logger.info(f"Syncing portfolio {portfolio.identifier}")
             portfolio_sync_service.sync_unallocated(portfolio)
             portfolio_sync_service.sync_orders(portfolio)
+            logger.info(f"Portfolio synced: {portfolio.identifier}")
 
     def initialize_backtest_portfolios(self):
         """
@@ -2724,7 +3061,6 @@ class App:
         Returns:
             None
         """
-        logger.info("Adding portfolio providers")
         portfolio_provider_lookup = self.container\
             .portfolio_provider_lookup()
         environment = self.config[ENVIRONMENT]
@@ -2733,12 +3069,33 @@ class App:
             # In backtest mode, remove all portfolio providers
             portfolio_provider_lookup.reset()
         else:
-            portfolio_provider_lookup.add_portfolio_provider(
-                CCXTPortfolioProvider(priority=3)
+            portfolio_configuration_service = self.container \
+                .portfolio_configuration_service()
+            portfolio_configurations = \
+                portfolio_configuration_service.get_all()
+            has_live_market = any(
+                not pc.paper_trading for pc in portfolio_configurations
             )
+
+            # Skip the default CCXT provider entirely when every
+            # configured market is paper-traded — see the matching
+            # comment in initialize_order_executors().
+            if has_live_market or not portfolio_configurations:
+                portfolio_provider_lookup.add_portfolio_provider(
+                    CCXTPortfolioProvider(priority=3)
+                )
 
         for portfolio_provider in portfolio_provider_lookup.get_all():
             portfolio_provider.config = self.config
+
+        providers = ', '.join(
+            f'{type(pp).__name__}(priority={pp.priority})'
+            for pp in portfolio_provider_lookup.get_all()
+        ) or "none"
+        logger.info(
+            f"Portfolio providers initialized "
+            f"({len(portfolio_provider_lookup.get_all())}): {providers}"
+        )
 
     def get_run_history(self):
         """
@@ -2750,6 +3107,131 @@ class App:
             dict: The run history of the app
         """
         return self._run_history
+
+    def get_last_run_report(self) -> Optional[dict]:
+        """
+        Return a snapshot of what the most recent bounded ``run()``
+        invocation did — the orders it created, every signal it
+        evaluated (including ones rejected without an order), and the
+        resulting positions, portfolios, and trades.
+
+        Only populated after a non-web, bounded run (i.e. one where
+        ``number_of_iterations`` was given, such as an AWS Lambda or
+        Azure Function invocation) completes without raising. Intended
+        to be returned directly as (or merged into) that invocation's
+        response body.
+
+        Returns:
+            dict or None: The run report as a dict, or None if no
+                bounded run has completed yet in this process.
+        """
+        if self._last_run_report is None:
+            return None
+
+        return self._last_run_report.to_dict()
+
+    def get_run_reports(
+        self, algorithm_id: str = None, limit: int = None
+    ) -> List[dict]:
+        """
+        Return previously persisted run reports, most recent first.
+
+        Unlike :py:meth:`get_last_run_report` (which only reflects the
+        current process's most recent invocation), this reads from
+        the database — so a stateless deployment (AWS Lambda, Azure
+        Functions) can look back at prior invocations across separate
+        processes.
+
+        Args:
+            algorithm_id (str): Optional algorithm id to filter by.
+            limit (int): Optional maximum number of reports to return.
+
+        Returns:
+            List[dict]: Persisted run reports, most recently
+                completed first.
+        """
+        query_params = {}
+
+        if algorithm_id is not None:
+            query_params["algorithm_id"] = algorithm_id
+
+        reports = self.container.run_report_service().get_all(query_params)
+
+        if limit is not None:
+            reports = reports[:limit]
+
+        return [report.to_dict() for report in reports]
+
+    def _build_run_report(
+        self,
+        event_loop_service,
+        run_started_at: datetime,
+        algorithm=None,
+        number_of_iterations: int = None,
+    ) -> RunReport:
+        """
+        Assemble and persist a :class:`RunReport` for the run that
+        just finished.
+
+        Orders are filtered to those created at or after
+        ``run_started_at`` so only orders from this invocation are
+        included; positions, portfolios, and trades reflect current
+        state (there are typically few enough of these live that a
+        full snapshot is more useful than a diff). Each order/trade
+        dict already carries its own ``strategy_id``, so a report
+        covering several strategies can be attributed per-order.
+        """
+        order_service = self.container.order_service()
+        trade_service = self.container.trade_service()
+        position_service = self.container.position_service()
+        portfolio_service = self.container.portfolio_service()
+        run_report_service = self.container.run_report_service()
+
+        def _aware(value):
+            # SQLite round-trips can drop tzinfo; normalize to UTC so
+            # naive/aware datetimes never fail to compare.
+            if value is not None and value.tzinfo is None:
+                return value.replace(tzinfo=timezone.utc)
+            return value
+
+        run_started_at = _aware(run_started_at)
+        orders = [
+            order.to_dict() for order in order_service.get_all()
+            if order.created_at is not None
+            and _aware(order.created_at) >= run_started_at
+        ]
+        positions = [
+            position.to_dict() for position in position_service.get_all()
+        ]
+        portfolios = [
+            portfolio.to_dict() for portfolio in portfolio_service.get_all()
+        ]
+        trades = [trade.to_dict() for trade in trade_service.get_all()]
+        config = self.container.configuration_service().get_config()
+
+        # A run is "paper" only when every configured portfolio is
+        # paper-traded — a mixed live/paper setup is reported as not
+        # paper, so real activity is never mistaken for fake trades.
+        portfolio_configurations = self.container \
+            .portfolio_configuration_service().get_all()
+        is_paper = bool(portfolio_configurations) and all(
+            pc.paper_trading for pc in portfolio_configurations
+        )
+
+        report = run_report_service.create({
+            "algorithm_id": getattr(algorithm, "algorithm_id", None),
+            "environment": config.get(ENVIRONMENT),
+            "is_paper": is_paper,
+            "number_of_iterations": number_of_iterations,
+            "started_at": run_started_at,
+            "completed_at": datetime.now(timezone.utc),
+            "orders": orders,
+            "signals": list(event_loop_service.signal_log),
+            "positions": positions,
+            "portfolios": portfolios,
+            "trades": trades,
+        })
+        return report
 
     def has_run(self, worker_id) -> bool:
         """

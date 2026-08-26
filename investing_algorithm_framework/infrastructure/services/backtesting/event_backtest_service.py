@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from typing import Dict, List
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
-    BacktestRun, BacktestWindow, generate_backtest_summary_metrics, Backtest
+    BacktestRun, BacktestWindow, generate_backtest_summary_metrics, Backtest, \
+    PositionMode
 from investing_algorithm_framework.domain.models.trade.trade_status import \
     TradeStatus
 from investing_algorithm_framework.services import DataProviderService, \
@@ -172,6 +173,11 @@ class EventBacktestService:
         """
         # Get the portfolio
         portfolio = self._portfolio_service.get_all()[0]
+        portfolio_configuration = self._portfolio_configuration_service \
+            .resolve_for_portfolio(portfolio)
+        position_mode = getattr(
+            portfolio_configuration, "position_mode", PositionMode.NETTING
+        )
 
         # Get initial unallocated amount
         initial_unallocated = self._get_initial_unallocated()
@@ -195,6 +201,7 @@ class EventBacktestService:
                 {"portfolio": portfolio.id}
             ),
             recorded_values=recorded_values or {},
+            metadata={"position_mode": PositionMode(position_mode).value},
         )
 
         # Populate summary counts so consumers (CLI/MCP/reports) don't see

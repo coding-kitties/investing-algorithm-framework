@@ -31,6 +31,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Dict, List
 
+from investing_algorithm_framework.domain import PositionMode
 from investing_algorithm_framework.domain.models.signal import (
     Signal,
     SignalSide,
@@ -79,8 +80,14 @@ class ResolveConflictsPhase(StrategyPhase):
 
         # Step 2-4 — per-signal gating (open-order, state, cooldown).
         gated: List[Signal] = []
+        reversals: Dict[str, List[Signal]] = {}
         for sig in candidates:
             if not self._passes_open_order_gate(sig, state, policy):
+                continue
+            reversal = self._build_reversal(sig, state)
+            if reversal is not None:
+                if self._passes_cooldown_gate(sig, state, policy):
+                    reversals[sig.symbol] = reversal
                 continue
             if not self._passes_state_gate(sig, state):
                 continue
@@ -95,10 +102,63 @@ class ResolveConflictsPhase(StrategyPhase):
 
         approved: List[Signal] = []
         for symbol, group in by_symbol.items():
-            approved.extend(policy.resolve(group, symbol=symbol))
+            if symbol in reversals:
+                approved.extend(reversals[symbol])
+            elif state.position_mode == PositionMode.HEDGE:
+                long_group = [sig for sig in group if sig.side.is_long]
+                short_group = [sig for sig in group if sig.side.is_short]
+                approved.extend(policy.resolve(
+                    long_group, symbol=symbol
+                ))
+                approved.extend(policy.resolve(
+                    short_group, symbol=symbol
+                ))
+            else:
+                approved.extend(policy.resolve(group, symbol=symbol))
+        for symbol, reversal in reversals.items():
+            if symbol not in by_symbol:
+                approved.extend(reversal)
 
         state.approved_signals = approved
         state.trace("resolve_conflicts.approved", len(approved))
+
+    @staticmethod
+    def _build_reversal(
+        sig: Signal, state: PhaseState,
+    ) -> List[Signal] | None:
+        if state.position_mode == PositionMode.HEDGE:
+            return None
+        if not getattr(state.strategy, "flip_on_opposite_signal", False):
+            return None
+
+        symbol = sig.symbol
+        if (
+            sig.side is SignalSide.OPEN_SHORT
+            and state.strategy.has_position(symbol)
+        ):
+            close_side = SignalSide.CLOSE_LONG
+        elif sig.side is SignalSide.OPEN_LONG and any(
+            getattr(trade, "is_short", False)
+            for trade in state.context.get_open_trades(
+                target_symbol=symbol
+            )
+        ):
+            close_side = SignalSide.CLOSE_SHORT
+        else:
+            return None
+
+        close_signal = Signal(
+            symbol=symbol,
+            side=close_side,
+            strength=sig.strength,
+            source=sig.source,
+            metadata={"synthetic_flip_close": True},
+        )
+        open_signal = sig.with_metadata(synthetic_flip_open=True)
+        state.trace(
+            "resolve_conflicts.synthetic_flip", (close_signal, open_signal)
+        )
+        return [close_signal, open_signal]
 
     # ---- gate helpers --------------------------------------------- #
     @staticmethod
@@ -122,17 +182,32 @@ class ResolveConflictsPhase(StrategyPhase):
         symbol = sig.symbol
         side = sig.side
 
-        has_long_position = strategy.has_position(symbol)
-        # Open SHORT trades for the symbol (positive amount, is_short).
+        open_trades = state.context.get_open_trades(target_symbol=symbol)
+        has_long_position = any(
+            not getattr(trade, "is_short", False) for trade in open_trades
+        )
+        if not has_long_position:
+            has_long_position = strategy.has_position(symbol)
         open_short_trades = [
             t for t in state.context.get_open_trades(target_symbol=symbol)
             if getattr(t, "is_short", False)
         ]
         has_open_short = bool(open_short_trades)
 
-        # Opens require a clean slot (no long position, no open short).
-        if side in (SignalSide.OPEN_LONG, SignalSide.OPEN_SHORT):
-            if has_long_position or has_open_short:
+        if side is SignalSide.OPEN_LONG:
+            blocked = has_long_position or (
+                state.position_mode == PositionMode.NETTING and has_open_short
+            )
+            if blocked:
+                state.trace("resolve_conflicts.state_block_open", sig)
+                return False
+            return True
+        if side is SignalSide.OPEN_SHORT:
+            blocked = has_open_short or (
+                state.position_mode == PositionMode.NETTING
+                and has_long_position
+            )
+            if blocked:
                 state.trace("resolve_conflicts.state_block_open", sig)
                 return False
             return True
@@ -201,9 +276,14 @@ class ResolveConflictsPhase(StrategyPhase):
 
         # Per-symbol scaling-rule cooldown (legacy ``_cooldown_remaining``).
         # Applies to sides the policy marks as cooldown-blocked.
+        cooldown_key = symbol
+        if state.position_mode == PositionMode.HEDGE:
+            cooldown_key = (
+                symbol, "long" if side.is_long else "short"
+            )
         if (
             policy.is_blocked_by_cooldown(side)
-            and symbol in strategy._cooldown_remaining
+            and cooldown_key in strategy._cooldown_remaining
         ):
             state.trace("resolve_conflicts.scaling_cooldown", sig)
             return False
@@ -218,6 +298,11 @@ class ResolveConflictsPhase(StrategyPhase):
             signal_side=tracker_side,
             symbol=symbol,
             bar_index=state.bar_index,
+            position_side=(
+                ("long" if side.is_long else "short")
+                if state.position_mode == PositionMode.HEDGE
+                else None
+            ),
         )
         if blocked:
             state.trace(

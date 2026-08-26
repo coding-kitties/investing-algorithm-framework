@@ -2,7 +2,8 @@ import logging
 from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, Order, random_number, INDEX_DATETIME
+    OperationalException, OrderStatus, Order, PositionMode, random_number, \
+    INDEX_DATETIME
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -267,7 +268,8 @@ class OrderService(RepositoryService):
                 sell_order=order,
                 trades=trades,
                 stop_losses=stop_losses,
-                take_profits=take_profits
+                take_profits=take_profits,
+                position_mode=self._position_mode(portfolio),
             )
         elif OrderSide.COVER.equals(order_side) and trades:
             # #434 phase 3 — stash the SL/TP-triggered trade
@@ -489,6 +491,27 @@ class OrderService(RepositoryService):
                 f"Order type {order_data['order_type']} is not supported"
             )
 
+    def _position_mode(self, portfolio):
+        configuration = (
+            self.portfolio_configuration_service.resolve_for_portfolio(
+                portfolio
+            )
+        )
+        if configuration is None:
+            return PositionMode.NETTING
+        return PositionMode(configuration.position_mode)
+
+    def _closing_position_amount(self, position, order_side, portfolio):
+        if self._position_mode(portfolio) == PositionMode.HEDGE:
+            if OrderSide.SELL.equals(order_side):
+                return position.long_amount
+            if OrderSide.COVER.equals(order_side):
+                return position.short_amount
+        if OrderSide.COVER.equals(order_side):
+            return abs(min(position.get_amount() or 0, 0))
+        amount = position.get_amount()
+        return max(amount if amount is not None else 0, 0)
+
     def validate_sell_order(self, order_data, portfolio):
 
         if not self.position_service.exists(
@@ -509,10 +532,16 @@ class OrderService(RepositoryService):
                 }
             )
 
-        if position.get_amount() < order_data["amount"]:
+        position_amount = self._closing_position_amount(
+            position, OrderSide.SELL, portfolio
+        )
+        if position_amount < order_data["amount"]:
+            position_label = "open long position" \
+                if self._position_mode(portfolio) == PositionMode.HEDGE \
+                else "open position"
             raise OperationalException(
                 f"Order amount {order_data['amount']} is larger " +
-                f"then amount of open position {position.get_amount()}"
+                f"then amount of {position_label} {position_amount}"
             )
 
         if not order_data["trading_symbol"] == portfolio.trading_symbol:
@@ -572,7 +601,8 @@ class OrderService(RepositoryService):
                     "portfolio": portfolio.id,
                 }
             )
-            if position.get_amount() and position.get_amount() > 0:
+            if self._position_mode(portfolio) == PositionMode.NETTING \
+                    and position.get_amount() and position.get_amount() > 0:
                 raise OperationalException(
                     f"Can't open short on {order_data['target_symbol']}: "
                     f"existing long position of "
@@ -622,18 +652,20 @@ class OrderService(RepositoryService):
                 "portfolio": portfolio.id,
             }
         )
-        position_amount = position.get_amount() or 0
+        position_amount = self._closing_position_amount(
+            position, OrderSide.COVER, portfolio
+        )
 
-        if position_amount >= 0:
+        if position_amount <= 0:
             raise OperationalException(
                 f"Can't cover {order_data['target_symbol']}: "
-                f"position is not short (amount={position_amount})"
+                f"position has no open short leg"
             )
 
-        if order_data["amount"] > abs(position_amount):
+        if order_data["amount"] > position_amount:
             raise OperationalException(
                 f"Cover amount {order_data['amount']} exceeds open "
-                f"short size {abs(position_amount)} on "
+                f"short size {position_amount} on "
                 f"{order_data['target_symbol']}"
             )
 
@@ -660,10 +692,13 @@ class OrderService(RepositoryService):
                 f"less or equal to 0"
             )
 
-        if amount > position.get_amount():
+        position_amount = self._closing_position_amount(
+            position, OrderSide.SELL, portfolio
+        )
+        if amount > position_amount:
             raise OperationalException(
                 f"Order amount: {amount} {position.symbol}, is "
-                f"larger then position size: {position.get_amount()} "
+                f"larger then position size: {position_amount} "
                 f"{position.symbol} of the portfolio"
             )
 
@@ -755,7 +790,9 @@ class OrderService(RepositoryService):
                 "symbol": order_data["target_symbol"],
             }
         )
-        position_amount = position.get_amount() or 0
+        position_amount = self._closing_position_amount(
+            position, OrderSide.COVER, portfolio
+        )
 
         if amount <= 0:
             raise OperationalException(
@@ -763,16 +800,16 @@ class OrderService(RepositoryService):
                 f"less or equal to 0"
             )
 
-        if position_amount >= 0:
+        if position_amount <= 0:
             raise OperationalException(
-                f"Position {position.symbol} is not short "
-                f"(amount={position_amount}); cannot cover"
+                f"Position {position.symbol} has no open short leg; "
+                f"cannot cover"
             )
 
-        if amount > abs(position_amount):
+        if amount > position_amount:
             raise OperationalException(
                 f"Cover amount: {amount} {position.symbol}, exceeds "
-                f"open short size: {abs(position_amount)} "
+                f"open short size: {position_amount} "
                 f"{position.symbol}"
             )
 
@@ -998,8 +1035,10 @@ class OrderService(RepositoryService):
         Returns:
             None
         """
+        position = self.position_service.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
         self.position_service.update_positions_with_created_sell_order(
-            order
+            order, self._position_mode(portfolio)
         )
 
         filled = order.get_filled()
@@ -1108,8 +1147,10 @@ class OrderService(RepositoryService):
         # Drive the target position further negative; accrue proceeds
         # as the position's ``cost`` so net_gain math stays symmetric
         # with the long path.
+        position = self.position_service.get(current_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
         self.position_service.update_positions_with_short_order_filled(
-            current_order, filled_difference
+            current_order, filled_difference, self._position_mode(portfolio)
         )
 
         position = self.position_service.get(current_order.position_id)
@@ -1211,8 +1252,10 @@ class OrderService(RepositoryService):
 
         # Move target position toward zero; reduce the position's
         # short-side ``cost`` proportionally.
+        position = self.position_service.get(current_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
         self.position_service.update_positions_with_cover_order_filled(
-            current_order, filled_difference
+            current_order, filled_difference, self._position_mode(portfolio)
         )
 
         position = self.position_service.get(current_order.position_id)
@@ -1368,8 +1411,10 @@ class OrderService(RepositoryService):
         reserved_for_fill = filled_difference * reservation_price
         slippage_delta = reserved_for_fill - filled_size
 
+        position = self.position_service.get(current_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
         self.position_service.update_positions_with_buy_order_filled(
-            current_order, filled_difference
+            current_order, filled_difference, self._position_mode(portfolio)
         )
         position = self.position_service.get(current_order.position_id)
 
@@ -1502,13 +1547,22 @@ class OrderService(RepositoryService):
         if current_order.amount != previous_order.amount:
             difference = current_order.amount - previous_order.amount
             cost = difference * current_order.get_price()
-            self.position_service.update(
-                position.id,
-                {
-                    "amount": position.get_amount() - difference,
-                    "cost": position.get_cost() - cost
-                }
-            )
+            if self._position_mode(portfolio) == PositionMode.HEDGE:
+                self.position_service.update(
+                    position.id,
+                    {
+                        "long_amount": position.long_amount - difference,
+                        "long_cost": position.long_cost - cost,
+                    }
+                )
+            else:
+                self.position_service.update(
+                    position.id,
+                    {
+                        "amount": position.get_amount() - difference,
+                        "cost": position.get_cost() - cost
+                    }
+                )
 
         self.trade_service.update_trade_with_filled_sell_order(
             filled_difference, current_order
@@ -1555,11 +1609,21 @@ class OrderService(RepositoryService):
         remaining = order.get_amount() - order.get_filled()
 
         position = self.position_service.get(order.position_id)
-        self.position_service.update(
-            position.id,
-            {"amount": position.get_amount() + remaining}
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        position_mode = self._position_mode(portfolio)
+        if position_mode == PositionMode.HEDGE:
+            self.position_service.update(
+                position.id,
+                {"long_amount": position.long_amount + remaining}
+            )
+        else:
+            self.position_service.update(
+                position.id,
+                {"amount": position.get_amount() + remaining}
+            )
+        self.trade_service.update_trade_with_removed_sell_order(
+            order, position_mode=position_mode
         )
-        self.trade_service.update_trade_with_removed_sell_order(order)
 
     def _sync_with_buy_order_cancelled(self, order):
         self._restore_buy_order_balance(order)

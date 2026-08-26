@@ -16,6 +16,7 @@ from unittest.mock import MagicMock
 from investing_algorithm_framework import (
     ConflictPolicy,
     ConflictResolution,
+    ExposureRule,
     Signal,
     SignalSide,
 )
@@ -115,6 +116,7 @@ class _StubContext:
         price: float = 100.0,
         trading_symbol: str = "EUR",
         unallocated: float = 10_000.0,
+        portfolio_value: Optional[float] = None,
         portfolio: Optional[_StubPortfolio] = None,
         open_trades: Optional[Dict[str, List[_StubTrade]]] = None,
         position: Optional[_StubPosition] = None,
@@ -122,6 +124,8 @@ class _StubContext:
         self._price = price
         self._trading_symbol = trading_symbol
         self._unallocated = unallocated
+        self._portfolio_value = portfolio_value \
+            if portfolio_value is not None else unallocated
         self._portfolio = portfolio or _StubPortfolio()
         self._open_trades = open_trades or {}
         self._position = position or _StubPosition()
@@ -137,6 +141,9 @@ class _StubContext:
 
     def get_unallocated(self) -> float:
         return self._unallocated
+
+    def get_portfolio_value(self) -> float:
+        return self._portfolio_value
 
     def get_portfolio(self) -> _StubPortfolio:
         return self._portfolio
@@ -637,6 +644,33 @@ class TestApplyRiskBudgetPhase(TestCase):
         # Only the big one survives (after scaling).
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0].symbol, "ETH")
+
+    def test_exposure_rule_caps_new_allocation(self):
+        # Portfolio worth 1000, already 700 invested (300 unallocated),
+        # exposure cap 80% -> only 100 of headroom left, not the full
+        # 300 unallocated.
+        strategy = _StubStrategy(symbols=["BTC"])
+        strategy.exposure_rule = ExposureRule(max_portfolio_percentage=80.0)
+        context = _StubContext(unallocated=300.0, portfolio_value=1000.0)
+        state = _make_state(strategy, context)
+        state.sized_intents = [
+            self._intent("BTC", SignalSide.OPEN_LONG, 3.0, 100.0),  # 300
+        ]
+        ApplyRiskBudgetPhase().run(state)
+        self.assertEqual(1, len(state.sized_intents))
+        self.assertAlmostEqual(100.0, state.sized_intents[0].quote_amount)
+
+    def test_exposure_rule_drops_intents_when_cap_already_reached(self):
+        strategy = _StubStrategy(symbols=["BTC"])
+        strategy.exposure_rule = ExposureRule(max_portfolio_percentage=80.0)
+        # Already 800 of 1000 invested -> exactly at the 80% cap.
+        context = _StubContext(unallocated=200.0, portfolio_value=1000.0)
+        state = _make_state(strategy, context)
+        state.sized_intents = [
+            self._intent("BTC", SignalSide.OPEN_LONG, 1.0, 100.0),
+        ]
+        ApplyRiskBudgetPhase().run(state)
+        self.assertEqual(0, len(state.sized_intents))
 
 
 # --------------------------------------------------------------------- #

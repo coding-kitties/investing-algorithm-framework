@@ -127,6 +127,51 @@ def _apply_forward_only_migrations(bind):
             # dialect with different syntax — all benign at boot.
             pass
 
+    _migrate_position_legs(bind, "positions")
+    _migrate_position_legs(bind, "position_snapshots")
+
+
+def _migrate_position_legs(bind, table_name):
+    inspector = inspect(bind)
+    if table_name not in inspector.get_table_names():
+        return
+
+    existing_columns = {
+        column["name"] for column in inspector.get_columns(table_name)
+    }
+    backfills = {
+        "long_amount": (
+            "CASE WHEN CAST(amount AS REAL) >= 0 "
+            "THEN amount ELSE '0' END"
+        ),
+        "short_amount": (
+            "CASE WHEN CAST(amount AS REAL) < 0 "
+            "THEN LTRIM(amount, '-') ELSE '0' END"
+        ),
+        "long_cost": (
+            "CASE WHEN CAST(amount AS REAL) >= 0 "
+            "THEN LTRIM(cost, '-') ELSE '0' END"
+        ),
+        "short_cost": (
+            "CASE WHEN CAST(amount AS REAL) < 0 "
+            "THEN LTRIM(cost, '-') ELSE '0' END"
+        ),
+    }
+    for column, expression in backfills.items():
+        if column in existing_columns:
+            continue
+        try:
+            with bind.begin() as conn:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE {table_name} ADD COLUMN {column} "
+                    "VARCHAR NOT NULL DEFAULT '0'"
+                )
+                conn.exec_driver_sql(
+                    f"UPDATE {table_name} SET {column} = {expression}"
+                )
+        except Exception:
+            pass
+
 
 def teardown_sqlalchemy():
     """

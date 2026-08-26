@@ -22,6 +22,7 @@ or SL fill since those orders bypass the signal pipeline.
 """
 from __future__ import annotations
 
+from investing_algorithm_framework.domain import PositionMode
 from investing_algorithm_framework.domain.models.signal import SignalSide
 
 from .base import StrategyPhase
@@ -72,6 +73,8 @@ class RecordCooldownPhase(StrategyPhase):
         for emitted in state.emitted_orders:
             symbol = emitted.symbol
             side = emitted.side
+            if emitted.intent.signal.metadata.get("synthetic_flip_close"):
+                continue
             tracker_side = _TRACKER_SIDE.get(side)
             if tracker_side is None:
                 continue  # pragma: no cover - exhaustive map
@@ -82,6 +85,11 @@ class RecordCooldownPhase(StrategyPhase):
                 symbol=symbol,
                 order_side=tracker_side,
                 bar_index=bar_index,
+                position_side=(
+                    ("long" if side.is_long else "short")
+                    if state.position_mode == PositionMode.HEDGE
+                    else None
+                ),
             )
 
             # Per-side bookkeeping.
@@ -95,7 +103,12 @@ class RecordCooldownPhase(StrategyPhase):
 
             # Start per-symbol cooldown if the scaling rule asks for it.
             if scaling_rule and scaling_rule.cooldown_in_bars > 0:
-                strategy._cooldown_remaining[symbol] = (
+                cooldown_key = symbol
+                if state.position_mode == PositionMode.HEDGE:
+                    cooldown_key = (
+                        symbol, "long" if side.is_long else "short"
+                    )
+                strategy._cooldown_remaining[cooldown_key] = (
                     scaling_rule.cooldown_in_bars
                 )
 
@@ -170,6 +183,11 @@ class RecordCooldownPhase(StrategyPhase):
                 symbol=symbol,
                 order_side=tracker_side,
                 bar_index=state.bar_index,
+                position_side=(
+                    ("long" if side == "SELL" else "short")
+                    if state.position_mode == PositionMode.HEDGE
+                    else None
+                ),
             )
 
             if latest is None or created_at > latest:

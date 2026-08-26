@@ -6317,6 +6317,7 @@ function onPageSizeChange(tableKey, val) {
 var tradesHeaders = [
   {key: 'id', label: '#'},
   {key: 'sym', label: 'Symbol'},
+  {key: 'side', label: 'Position Side'},
   {key: 'opened', label: 'Opened'},
   {key: 'closed', label: 'Closed'},
   {key: 'open_price', label: 'Open Price', align: 'right'},
@@ -6352,8 +6353,14 @@ var ordersHeaders = [
 
 var positionsHeaders = [
   {key: 'sym', label: 'Symbol'},
-  {key: 'amount', label: 'Amount', align: 'right'},
-  {key: 'cost', label: 'Cost', align: 'right'},
+  {key: 'amount', label: 'Net Amount', align: 'right'},
+  {key: 'gross_amount', label: 'Gross Amount', align: 'right'},
+  {key: 'long_amount', label: 'Long Amount', align: 'right'},
+  {key: 'short_amount', label: 'Short Amount', align: 'right'},
+  {key: 'net_cost', label: 'Net Exposure', align: 'right'},
+  {key: 'gross_cost', label: 'Gross Exposure', align: 'right'},
+  {key: 'long_cost', label: 'Long Exposure', align: 'right'},
+  {key: 'short_cost', label: 'Short Exposure', align: 'right'},
 ];
 
 function buildTradesTable(stratIdx) {
@@ -6406,7 +6413,8 @@ function buildTimelineScatter(stratIdx) {
 
   var trades = rd.TRADES || [];
   var orders = rd.ORDERS || [];
-  if (trades.length === 0 && orders.length === 0) { el.innerHTML = ''; return; }
+  var signalRejections = rd.SIGNAL_REJECTIONS || [];
+  if (trades.length === 0 && orders.length === 0 && signalRejections.length === 0) { el.innerHTML = ''; return; }
 
   // Collect all points with symbol info
   var allPoints = [];
@@ -6429,6 +6437,14 @@ function buildTimelineScatter(stratIdx) {
         series: 'tradeClose', gain: t.net_gain
       });
     }
+  });
+  signalRejections.forEach(function(event) {
+    if (!event.date) return;
+    allPoints.push({
+      date: event.date, y: null, sym: event.sym,
+      label: event.sym + ' ' + event.signal + ' rejected: ' + event.reason,
+      reason: event.reason, series: 'rejected'
+    });
   });
   if (allPoints.length === 0) { el.innerHTML = ''; return; }
 
@@ -6507,9 +6523,9 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
   points.forEach(function(p) { if (!seen[p.date]) { uniqueDates.push(p.date); seen[p.date] = true; } });
 
   // Y range
-  var ys = points.map(function(p) { return p.y; });
-  var yMin = Math.min.apply(null, ys);
-  var yMax = Math.max.apply(null, ys);
+  var ys = points.filter(function(p) { return p.y !== null; }).map(function(p) { return p.y; });
+  var yMin = ys.length ? Math.min.apply(null, ys) : 0;
+  var yMax = ys.length ? Math.max.apply(null, ys) : 1;
   if (yMin === yMax) { yMin -= 1; yMax += 1; }
   var yPad = (yMax - yMin) * 0.08;
   yMin -= yPad; yMax += yPad;
@@ -6558,6 +6574,13 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
     { label: 'Trade Close +', color: COL.green, shape: 'rect' },
     { label: 'Trade Close \u2212', color: COL.red, shape: 'rect' },
   ];
+  var rejectionReasons = {};
+  points.forEach(function(p) {
+    if (p.series === 'rejected') rejectionReasons[p.reason] = true;
+  });
+  Object.keys(rejectionReasons).sort().forEach(function(reason) {
+    legendItems.push({ label: reason, color: '#9ca3af', shape: 'x' });
+  });
   ctx.font = '10px JetBrains Mono, monospace';
   var lx = pad.l + 5;
   legendItems.forEach(function(item) {
@@ -6568,6 +6591,9 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
       ctx.beginPath(); ctx.moveTo(lx, pad.t - 8); ctx.lineTo(lx + 8, pad.t - 8); ctx.lineTo(lx + 4, pad.t - 16); ctx.closePath(); ctx.fill();
     } else if (item.shape === 'triangleDown') {
       ctx.beginPath(); ctx.moveTo(lx, pad.t - 16); ctx.lineTo(lx + 8, pad.t - 16); ctx.lineTo(lx + 4, pad.t - 8); ctx.closePath(); ctx.fill();
+    } else if (item.shape === 'x') {
+      ctx.strokeStyle = item.color; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(lx, pad.t - 16); ctx.lineTo(lx + 8, pad.t - 8); ctx.moveTo(lx + 8, pad.t - 16); ctx.lineTo(lx, pad.t - 8); ctx.stroke();
     } else {
       ctx.fillRect(lx, pad.t - 16, 8, 8);
     }
@@ -6583,12 +6609,17 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
     var di = uniqueDates.indexOf(p.date);
     var xFrac = uniqueDates.length > 1 ? di / (uniqueDates.length - 1) : 0.5;
     var px = pad.l + xFrac * cw;
-    var py = pad.t + ch - ((p.y - yMin) / yRange) * ch;
+    var py = p.series === 'rejected'
+      ? pad.t + ch - 5
+      : pad.t + ch - ((p.y - yMin) / yRange) * ch;
     var radius = 5;
-    var sc = seriesColors[p.series];
+    var sc = seriesColors[p.series] || {};
     var fillC, strokeC;
 
-    if (p.series === 'tradeClose') {
+    if (p.series === 'rejected') {
+      fillC = null;
+      strokeC = '#9ca3af';
+    } else if (p.series === 'tradeClose') {
       fillC = p.gain >= 0 ? COL.green : COL.red;
       strokeC = fillC;
     } else {
@@ -6607,6 +6638,12 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
       ctx.closePath(); ctx.fill(); ctx.stroke();
     } else if (p.series === 'tradeOpen') {
       ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (p.series === 'rejected') {
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px - radius, py - radius); ctx.lineTo(px + radius, py + radius);
+      ctx.moveTo(px + radius, py - radius); ctx.lineTo(px - radius, py + radius);
+      ctx.stroke();
     } else {
       var s = radius * 1.4;
       ctx.beginPath();
@@ -6647,7 +6684,8 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
         if (dx * dx + dy * dy <= b.r * b.r) { hit = b; break; }
       }
       if (hit) {
-        tooltip.textContent = hit.date + ': ' + hit.label + ' @ ' + hit.price.toFixed(2);
+        tooltip.textContent = hit.date + ': ' + hit.label
+          + (hit.price === null ? '' : ' @ ' + hit.price.toFixed(2));
         tooltip.classList.add('visible');
         tooltip.style.left = (mx + 12) + 'px';
         tooltip.style.top = (my - 20) + 'px';

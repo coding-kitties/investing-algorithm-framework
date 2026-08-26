@@ -6,10 +6,10 @@ import pandas as pd
 
 from investing_algorithm_framework.domain import (
     INDEX_DATETIME, ConflictPolicy, CooldownRule, CooldownTracker,
-    DataSource, DataType, OperationalException, Order,
+    DataSource, DataType, ExposureRule, OperationalException, Order,
     Position, PositionSize, ScalingRule, Schedule, ScheduledFunction,
-    Signal, SignalSeries, StopLossRule, StrategyProfile, TakeProfitRule,
-    TradingCost, Trade,
+    ScoreCard, Signal, SignalSeries, StopLossRule, StrategyProfile,
+    TakeProfitRule, TradingCost, Trade,
 )
 from ..services.executors import Executor, LimitOrderExecutor
 from ..services.strategy_phases import (
@@ -78,6 +78,17 @@ class TradingStrategy:
             conflict).
         executor (Executor optional): order-routing strategy. Defaults
             to :class:`LimitOrderExecutor`.
+        flip_on_opposite_signal (bool optional): when true, an
+            ``OPEN_SHORT`` signal closes an existing long before opening
+            short, and an ``OPEN_LONG`` signal covers an existing short
+            before opening long, on the same strategy tick. Defaults to
+            false.
+        exposure_rule (ExposureRule optional): caps the total
+            percentage of portfolio value that may be invested across
+            all positions combined (e.g. "never more than 80%
+            invested"). Portfolio-wide, so unlike
+            ``scaling_rules``/``position_sizes`` there is only ever
+            one, not a per-symbol list. Defaults to None (no cap).
         metadata (optional): Dict[str, Any] - a dictionary
             containing metadata about the strategy. This can be used to
             store additional information about the strategy, such as its
@@ -91,6 +102,8 @@ class TradingStrategy:
     data_sources: List[DataSource] = []
     pipelines: List[type] = []
     traces = None
+    last_signals: List[Signal] = []
+    last_score_cards: List[Dict[str, Any]] = []
     context: Context = None
     metadata: Dict[str, Any] = None
     position_sizes: List[PositionSize] = []
@@ -104,6 +117,8 @@ class TradingStrategy:
     phases: List[StrategyPhase] = None
     conflict_policy: ConflictPolicy = None
     executor: Executor = None
+    flip_on_opposite_signal: bool = False
+    exposure_rule: ExposureRule = None
 
     def __init__(
         self,
@@ -124,6 +139,8 @@ class TradingStrategy:
         phases: List[StrategyPhase] = None,
         conflict_policy: ConflictPolicy = None,
         executor: Executor = None,
+        flip_on_opposite_signal: bool = None,
+        exposure_rule: ExposureRule = None,
         decorated=None
     ):
         if metadata is None:
@@ -134,7 +151,15 @@ class TradingStrategy:
         if strategy_id is not None:
             self.strategy_id = strategy_id
         else:
-            self.strategy_id = self.__class__.__name__
+            # Check if class has strategy_id defined as an actual value
+            # (not just a type hint, e.g. ``strategy_id: str``).
+            class_strategy_id = getattr(self.__class__, 'strategy_id', None)
+
+            if (class_strategy_id is None
+                    or isinstance(class_strategy_id, type)):
+                self.strategy_id = self.__class__.__name__
+            else:
+                self.strategy_id = class_strategy_id
 
         # Initialize algorithm_id: use provided value, fall back to class
         # attribute if set, otherwise None
@@ -375,6 +400,22 @@ class TradingStrategy:
                 self.executor = class_ex
             else:
                 self.executor = LimitOrderExecutor()
+
+        if flip_on_opposite_signal is not None:
+            self.flip_on_opposite_signal = bool(flip_on_opposite_signal)
+        else:
+            self.flip_on_opposite_signal = bool(getattr(
+                self.__class__, 'flip_on_opposite_signal', False
+            ))
+
+        if exposure_rule is not None:
+            self.exposure_rule = exposure_rule
+        else:
+            class_exposure_rule = getattr(
+                self.__class__, 'exposure_rule', None
+            )
+            self.exposure_rule = class_exposure_rule \
+                if isinstance(class_exposure_rule, ExposureRule) else None
 
         # context initialization
         self._context = None
@@ -627,6 +668,7 @@ class TradingStrategy:
             None
         """
         self.context = context
+        self._pending_score_cards = []
         state = PhaseState(
             strategy=self,
             context=context,
@@ -635,8 +677,37 @@ class TradingStrategy:
         )
         for phase in self.phases:
             phase.run(state)
-        # Capture traces so users can introspect a tick post-mortem.
+        # Capture traces and raw signals so users (and RunReport) can
+        # introspect a tick post-mortem, including signals that never
+        # turned into an order.
         self.traces = state.traces
+        self.last_signals = list(state.raw_signals)
+        self.last_score_cards = list(self._pending_score_cards)
+
+    def record_score_card(
+        self, score_card: ScoreCard, symbol: str = None
+    ) -> None:
+        """Record a :class:`ScoreCard` for this tick, independent of
+        whether :py:meth:`generate_signals` yields a ``Signal``.
+
+        Use this to explain a *non-decision* — e.g. "RSI is neutral,
+        no crossover" — so ``RunReport`` shows why nothing happened,
+        not just why something did. A score card attached to an
+        actual ``Signal`` (via :py:meth:`Signal.with_score_card`)
+        does not need this; call it only for symbols/ticks that
+        produced no signal.
+
+        Args:
+            score_card (ScoreCard): The explanation to record.
+            symbol (str, optional): The symbol this explains, if any.
+
+        Returns:
+            None
+        """
+        self._pending_score_cards.append({
+            "symbol": symbol,
+            "score_card": score_card.to_dict(),
+        })
 
     def apply_strategy(self, context, data):
         if self.decorated:
@@ -653,7 +724,9 @@ class TradingStrategy:
             data_sources=self.data_sources
         )
 
-    def get_take_profit_rule(self, symbol: str) -> Union[TakeProfitRule, None]:
+    def get_take_profit_rule(
+        self, symbol: str, side: str = None
+    ) -> Union[TakeProfitRule, None]:
         """
         Get the take profit definition for a given symbol.
 
@@ -670,11 +743,16 @@ class TradingStrategy:
 
         if self.take_profit_rules_lookup == {}:
             for tp in self.take_profits:
-                self.take_profit_rules_lookup[tp.symbol] = tp
+                self.take_profit_rules_lookup[(tp.symbol, tp.side)] = tp
 
-        return self.take_profit_rules_lookup.get(symbol, None)
+        return self.take_profit_rules_lookup.get(
+            (symbol, side),
+            self.take_profit_rules_lookup.get((symbol, None)),
+        )
 
-    def get_stop_loss_rule(self, symbol: str) -> Union[StopLossRule, None]:
+    def get_stop_loss_rule(
+        self, symbol: str, side: str = None
+    ) -> Union[StopLossRule, None]:
         """
         Get the stop loss definition for a given symbol.
 
@@ -691,13 +769,20 @@ class TradingStrategy:
 
         if self.stop_loss_rules_lookup == {}:
             for sl in self.stop_losses:
-                self.stop_loss_rules_lookup[sl.symbol] = sl
+                self.stop_loss_rules_lookup[(sl.symbol, sl.side)] = sl
 
-        return self.stop_loss_rules_lookup.get(symbol, None)
+        return self.stop_loss_rules_lookup.get(
+            (symbol, side),
+            self.stop_loss_rules_lookup.get((symbol, None)),
+        )
 
     def get_position_size(self, symbol: str) -> Union[PositionSize, None]:
         """
         Get the position size definition for a given symbol.
+
+        A symbol-specific ``PositionSize`` always takes precedence; a
+        ``PositionSize(symbol=None, ...)`` entry (if any) is used as
+        the default for any symbol without one of its own.
 
         Args:
             symbol (str): The symbol of the asset.
@@ -718,7 +803,9 @@ class TradingStrategy:
             for ps in self.position_sizes:
                 self.position_sizes_lookup[ps.symbol] = ps
 
-        position_size = self.position_sizes_lookup.get(symbol, None)
+        position_size = self.position_sizes_lookup.get(
+            symbol, self.position_sizes_lookup.get(None)
+        )
 
         if position_size is None:
             raise OperationalException(
@@ -732,6 +819,10 @@ class TradingStrategy:
     def get_scaling_rule(self, symbol: str) -> Union[ScalingRule, None]:
         """
         Get the scaling rule for a given symbol.
+
+        A symbol-specific ``ScalingRule`` always takes precedence; a
+        ``ScalingRule(symbol=None, ...)`` entry (if any) is used as
+        the default for any symbol without one of its own.
 
         Args:
             symbol (str): The symbol of the asset.
@@ -748,7 +839,9 @@ class TradingStrategy:
             for sr in self.scaling_rules:
                 self.scaling_rules_lookup[sr.symbol] = sr
 
-        return self.scaling_rules_lookup.get(symbol, None)
+        return self.scaling_rules_lookup.get(
+            symbol, self.scaling_rules_lookup.get(None)
+        )
 
     def generate_recorded_values(
         self, data: Dict[str, Any]

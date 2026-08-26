@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 
+from investing_algorithm_framework.domain import PositionMode
 from investing_algorithm_framework.domain.models.signal import SignalSide
 
 from .base import StrategyPhase
@@ -55,8 +56,15 @@ class AttachRiskRulesPhase(StrategyPhase):
 
             symbol = emitted.symbol
             order = emitted.order
-            sl_rule = strategy.get_stop_loss_rule(symbol)
-            tp_rule = strategy.get_take_profit_rule(symbol)
+            position_side = (
+                "short" if emitted.side is SignalSide.OPEN_SHORT else "long"
+            )
+            if state.position_mode == PositionMode.HEDGE:
+                sl_rule = strategy.get_stop_loss_rule(symbol, position_side)
+                tp_rule = strategy.get_take_profit_rule(symbol, position_side)
+            else:
+                sl_rule = strategy.get_stop_loss_rule(symbol)
+                tp_rule = strategy.get_take_profit_rule(symbol)
 
             if sl_rule is not None:
                 try:

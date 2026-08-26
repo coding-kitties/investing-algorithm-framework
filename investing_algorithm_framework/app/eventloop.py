@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from threading import Event
+from threading import Event, Lock
 from time import sleep
 from typing import List, Set, Dict
 from logging import getLogger
@@ -9,12 +9,61 @@ import polars as pl
 from investing_algorithm_framework.domain import Environment, ENVIRONMENT, \
     OrderStatus, DataSource, DataType, tqdm, \
     TradeStatus, SNAPSHOT_INTERVAL, SnapshotInterval, OperationalException, \
-    LAST_SNAPSHOT_DATETIME, INDEX_DATETIME
+    LAST_SNAPSHOT_DATETIME, INDEX_DATETIME, Signal
 from investing_algorithm_framework.services import TradeOrderEvaluator
 from .algorithm import Algorithm
 from .strategy import TradingStrategy
 
 logger = getLogger("investing_algorithm_framework")
+
+
+def _build_signal_report(strategy: TradingStrategy) -> Dict:
+    """Summarize one strategy's signals for this tick: every signal it
+    emitted, and whether it was approved (turned into an order) or
+    rejected (with the phase-pipeline reason it was dropped).
+
+    Best-effort: a rejection is detected by matching a raw signal's
+    ``(symbol, side, source)`` against any trace payload carrying a
+    ``Signal`` with the same key. Synthetic signals created internally
+    (e.g. by an atomic flip) are not part of ``last_signals`` and are
+    therefore not reported here.
+    """
+    raw_signals = getattr(strategy, "last_signals", None) or []
+    traces = getattr(strategy, "traces", None) or []
+
+    rejection_reasons = {}
+    for tag, payload in traces:
+        candidates = (
+            payload if isinstance(payload, (list, tuple)) else [payload]
+        )
+        for item in candidates:
+            if isinstance(item, Signal):
+                key = (item.symbol, item.side.value, item.source)
+                rejection_reasons.setdefault(key, tag)
+
+    signals = []
+    for sig in raw_signals:
+        key = (sig.symbol, sig.side.value, sig.source)
+        reason = rejection_reasons.get(key)
+        signals.append({
+            "symbol": sig.symbol,
+            "side": sig.side.value,
+            "strength": sig.strength,
+            "source": sig.source,
+            "metadata": dict(sig.metadata),
+            "status": "rejected" if reason else "approved",
+            "reason": reason,
+        })
+
+    return {
+        "strategy_id": strategy.strategy_id,
+        "signals": signals,
+        # Score cards recorded via ``record_score_card`` explain a
+        # tick even when no Signal was emitted at all (e.g. "RSI
+        # neutral, no crossover") — kept separate from ``signals``
+        # since they have no symbol/side/status of their own.
+        "score_cards": list(getattr(strategy, "last_score_cards", None) or []),
+    }
 
 
 class EventLoopService:
@@ -84,6 +133,22 @@ class EventLoopService:
         self._scheduled_function_last_runs = {}
         self._task_last_runs = {}
         self.history = {}
+        self.signal_log = []
+
+        # Thread-safe inbox for "run now" requests (e.g. from the web
+        # API's POST /api/algorithm/invoke), consumed by the loop's
+        # own thread on its next tick so strategies are still only
+        # ever executed from a single thread.
+        self._immediate_lock = Lock()
+        self._immediate_run_all = False
+        self._immediate_run_ids: Set[str] = set()
+
+        # Optional callback invoked (with the strategies that just
+        # ran) after each live iteration that actually ran at least
+        # one strategy. Wired by ``App.run()`` for continuous
+        # (unbounded) runs so a RunReport gets built/persisted after
+        # every tick, not just once when the loop eventually stops.
+        self.on_iteration_complete = None
 
         # One-shot flag: live-mode envelope validation runs once per
         # process. Reset by ``cleanup`` so a new run re-validates.
@@ -216,6 +281,67 @@ class EventLoopService:
                 entry["last_run"] = current_datetime
 
         return due
+
+    def request_immediate_run(self, strategy_ids=None) -> None:
+        """
+        Queues strategies to run on the loop's very next tick,
+        regardless of their configured schedule. Thread-safe — meant
+        to be called from another thread (e.g. the web API's request
+        handler) while the loop itself runs in the background; the
+        actual execution still only ever happens on the loop's own
+        thread.
+
+        Args:
+            strategy_ids: Optional; specific strategy IDs to run. When
+                None, every registered strategy is queued to run.
+        """
+        with self._immediate_lock:
+            if strategy_ids is None:
+                self._immediate_run_all = True
+            else:
+                self._immediate_run_ids.update(strategy_ids)
+
+        logger.info(
+            "Immediate run requested for: "
+            f"{'all strategies' if strategy_ids is None else strategy_ids}"
+        )
+
+    def _pop_immediate_strategies(self, current_datetime):
+        """
+        Atomically consumes any pending ``request_immediate_run()``
+        requests, resolves them to strategy instances, and marks them
+        as just-run (so their schedule doesn't immediately fire again
+        right after being force-run).
+
+        Returns:
+            List[TradingStrategy]: The strategies to run immediately.
+        """
+        with self._immediate_lock:
+            run_all = self._immediate_run_all
+            ids = self._immediate_run_ids
+            self._immediate_run_all = False
+            self._immediate_run_ids = set()
+
+        if run_all:
+            strategies = list(self.strategies)
+        elif ids:
+            strategies = [
+                s for s in self.strategies if s.strategy_id in ids
+            ]
+        else:
+            strategies = []
+
+        for strategy in strategies:
+            self.next_run_times[strategy.strategy_id]["last_run"] = \
+                current_datetime
+
+        if strategies:
+            logger.info(
+                "Force-running strategies (immediate run requested): "
+                f"{[s.strategy_id for s in strategies]}"
+            )
+
+        return strategies
 
     def _get_tasks_by_ids(self, task_ids: List[str]):
         """
@@ -364,6 +490,7 @@ class EventLoopService:
         self,
         algorithm: Algorithm,
         trade_order_evaluator: TradeOrderEvaluator,
+        run_immediately_on_start: bool = True,
     ):
         """
         Initializes the event loop service by calculating the schedule for
@@ -380,6 +507,12 @@ class EventLoopService:
             trade_order_evaluator (TradeOrderEvaluator): The evaluator
                 responsible for checking and updating pending orders,
                 stop losses, and take profits.
+            run_immediately_on_start (bool): When True (default), every
+                strategy fires on the very first tick regardless of its
+                schedule (there is no ``last_run`` yet to compare
+                against). When False, each strategy's ``last_run`` is
+                seeded to now instead, so the first run only happens
+                once its normal interval has actually elapsed.
 
         Returns:
             None
@@ -402,9 +535,11 @@ class EventLoopService:
         if dispatcher is not None:
             dispatcher.configure(self.strategies, self.context)
 
+        seed_last_run = None if run_immediately_on_start \
+            else datetime.now(timezone.utc)
         self.next_run_times = {
             strategy.strategy_id: {
-                "last_run": None,
+                "last_run": seed_last_run,
                 "data_sources": strategy.data_sources
             }
             for strategy in self.strategies
@@ -530,6 +665,11 @@ class EventLoopService:
                         config = self._configuration_service.config
                         current_time = config[INDEX_DATETIME]
                         strategies = self._get_due_strategies(current_time)
+                        for strategy in self._pop_immediate_strategies(
+                            current_time
+                        ):
+                            if strategy not in strategies:
+                                strategies.append(strategy)
                         tasks = self._get_due_tasks(current_time)
                         sf_calls = \
                             self._get_due_scheduled_functions(current_time)
@@ -695,9 +835,17 @@ class EventLoopService:
         from investing_algorithm_framework.domain import (
             PortfolioOutOfSyncError,
         )
-        for market in tracker.markets():
-            if not tracker.is_auto_sync(market):
-                continue
+        auto_sync_markets = [
+            market for market in tracker.markets()
+            if tracker.is_auto_sync(market)
+        ]
+
+        if not auto_sync_markets:
+            return
+
+        logger.info(f"Syncing portfolios: {auto_sync_markets}")
+
+        for market in auto_sync_markets:
             mode = tracker.get_auto_sync_error_mode(market)
             try:
                 self.context.sync_portfolio(market=market)
@@ -805,6 +953,9 @@ class EventLoopService:
                 date=current_datetime,
             )
 
+        if data_sources:
+            logger.info(f"Retrieving data ({len(data_sources)} source(s))")
+
         if Environment.BACKTEST.equals(environment):
 
             for data_source in data_sources:
@@ -840,12 +991,18 @@ class EventLoopService:
         # schedule-filtered list (see _get_due_tasks/_get_tasks_by_ids);
         # fall back to every registered task only if no list was given.
         for task in (self.tasks if tasks is None else tasks):
-            logger.info(f"Running task {task.worker_id}")
+            logger.debug(f"Running task {task.worker_id}")
             task.run(self.context)
 
         # Step 5: Run all strategies
         if not strategies:
             return
+
+        logger.info(
+            f"Running algorithm "
+            f"'{getattr(self._algorithm, 'algorithm_id', None)}' with "
+            f"strategies: {[s.strategy_id for s in strategies]}"
+        )
 
         for strategy in strategies:
 
@@ -874,8 +1031,9 @@ class EventLoopService:
                         data=data
                     )
 
-                logger.info(f"Running strategy {strategy.strategy_id}")
+                logger.debug(f"Running strategy {strategy.strategy_id}")
                 strategy.run_strategy(context=self.context, data=data)
+                self.signal_log.append(_build_signal_report(strategy))
             finally:
                 self.context._current_strategy_id = None
 
@@ -911,7 +1069,7 @@ class EventLoopService:
                         }
                     else:
                         sf_data = {}
-                    logger.info(
+                    logger.debug(
                         f"Running scheduled function "
                         f"{strat.strategy_id}.{func_name}"
                     )
@@ -942,6 +1100,18 @@ class EventLoopService:
             strategies=strategies,
             hooks=[]
         )
+
+        # Build/persist a RunReport for this tick — continuous (web or
+        # non-web) runs never naturally "finish", so without this a
+        # long-lived live run would never produce a report until
+        # stopped. No-op for backtests (RunReport is a live/paper
+        # trading concept) and when this tick had nothing due.
+        if (
+            strategies
+            and self.on_iteration_complete is not None
+            and not Environment.BACKTEST.equals(environment)
+        ):
+            self.on_iteration_complete(strategies)
 
     def _update_history(self, current_datetime, strategies, hooks):
         """

@@ -1,7 +1,11 @@
 import os
 
+from sqlalchemy import create_engine
+
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     PortfolioConfiguration, MarketCredential, Algorithm
+from investing_algorithm_framework.infrastructure.database.sql_alchemy \
+    import _apply_forward_only_migrations
 from tests.resources import TestBase
 
 
@@ -104,3 +108,67 @@ class Test(TestBase):
         )
         self.assertEqual(position.amount, 3004.5303357979318)
         self.assertEqual(position.get_amount(), 3004.5303357979318)
+
+    def test_position_legs_round_trip(self):
+        portfolio = self.app.container.portfolio_service().find({
+            "market": "BITVAVO"
+        })
+        repository = self.app.container.position_repository()
+        repository.create({
+            "symbol": "ETH",
+            "portfolio_id": portfolio.id,
+            "long_amount": 5,
+            "short_amount": 3,
+            "long_cost": 500,
+            "short_cost": 330,
+        })
+
+        position = repository.find({
+            "symbol": "ETH", "portfolio": portfolio.id
+        })
+
+        self.assertEqual(2, position.amount)
+        self.assertEqual(8, position.gross_amount)
+        self.assertEqual(170, position.net_cost)
+        self.assertEqual(830, position.gross_cost)
+
+    def test_migration_backfills_legacy_long_and_short_rows(self):
+        engine = create_engine("sqlite:///:memory:")
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "CREATE TABLE positions ("
+                "id INTEGER PRIMARY KEY, amount VARCHAR, cost VARCHAR)"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO positions (amount, cost) VALUES "
+                "('2.5', '250.25'), ('-3.5', '420.75')"
+            )
+            connection.exec_driver_sql(
+                "CREATE TABLE position_snapshots ("
+                "id INTEGER PRIMARY KEY, amount VARCHAR, cost VARCHAR)"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO position_snapshots (amount, cost) "
+                "VALUES ('-1.25', '125.5')"
+            )
+
+        _apply_forward_only_migrations(engine)
+
+        with engine.connect() as connection:
+            rows = connection.exec_driver_sql(
+                "SELECT amount, cost, long_amount, short_amount, "
+                "long_cost, short_cost FROM positions ORDER BY id"
+            ).all()
+
+        self.assertEqual(
+            ('2.5', '250.25', '2.5', '0', '250.25', '0'), rows[0]
+        )
+        self.assertEqual(
+            ('-3.5', '420.75', '0', '3.5', '0', '420.75'), rows[1]
+        )
+        with engine.connect() as connection:
+            snapshot = connection.exec_driver_sql(
+                "SELECT long_amount, short_amount, long_cost, short_cost "
+                "FROM position_snapshots"
+            ).one()
+        self.assertEqual(('0', '1.25', '0', '125.5'), snapshot)

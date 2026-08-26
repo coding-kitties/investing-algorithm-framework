@@ -634,6 +634,16 @@ class BacktestRun:
 
         return selection
 
+    def get_rejection_summary(self) -> Dict[str, int]:
+        """Return rejection counts grouped by signal event reason."""
+        summary = {}
+        for event in self.signal_events:
+            if event["executed"]:
+                continue
+            reason = event["reason"]
+            summary[reason] = summary.get(reason, 0) + 1
+        return summary
+
     def get_portfolio_snapshots(
         self,
         created_at_lt: Optional[datetime] = None,

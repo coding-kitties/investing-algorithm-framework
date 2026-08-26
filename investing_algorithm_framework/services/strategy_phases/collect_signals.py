@@ -11,12 +11,15 @@ that override :py:meth:`Pipeline.to_signals` (#503).
 """
 from __future__ import annotations
 
+import logging
 from typing import Iterable, List
 
 from investing_algorithm_framework.domain.models.signal import Signal
 
 from .base import StrategyPhase
 from .phase_state import PhaseState
+
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class CollectSignalsPhase(StrategyPhase):
@@ -56,11 +59,10 @@ class CollectSignalsPhase(StrategyPhase):
         # Tick down cooldown counters for all symbols. Mirrors the
         # legacy implementation byte-for-byte so a strategy that
         # relies on the exact post-tick state still works.
-        for symbol in list(strategy.symbols):
-            if symbol in strategy._cooldown_remaining:
-                strategy._cooldown_remaining[symbol] -= 1
-                if strategy._cooldown_remaining[symbol] <= 0:
-                    del strategy._cooldown_remaining[symbol]
+        for key in list(strategy._cooldown_remaining):
+            strategy._cooldown_remaining[key] -= 1
+            if strategy._cooldown_remaining[key] <= 0:
+                del strategy._cooldown_remaining[key]
 
         # Advance the bar index used by :class:`CooldownRule` /
         # :class:`CooldownTracker` evaluation. Each ``run_strategy``
@@ -92,6 +94,10 @@ class CollectSignalsPhase(StrategyPhase):
 
         state.raw_signals = merged
         state.trace("collect_signals.count", len(state.raw_signals))
+        logger.info(
+            f"Generated {len(merged)} signal(s) for strategy "
+            f"{strategy.strategy_id}"
+        )
 
     # ---- helpers --------------------------------------------------- #
     @staticmethod

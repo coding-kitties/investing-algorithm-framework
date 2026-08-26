@@ -1,6 +1,7 @@
 import os
 import shutil
 from unittest import TestCase
+from unittest.mock import patch
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
@@ -89,11 +90,20 @@ class TestValidate(TestCase):
             app.validate()
 
     def test_validate_require_portfolio_false_skips_portfolio_check(self):
-        """A strategy-only sandbox check (no market/portfolio/credentials)
-        should not raise when require_portfolio=False."""
+        """A strategy-only sandbox check should not require credentials."""
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         app.add_strategy(EmptyStrategy)
-        app.validate(require_portfolio=False)
+        app.add_market_credential(MarketCredential(market="BINANCE"))
+        market_credential_service = app.container.market_credential_service()
+
+        with patch.object(
+            market_credential_service,
+            "initialize",
+            wraps=market_credential_service.initialize,
+        ) as initialize:
+            app.validate(require_portfolio=False)
+
+        initialize.assert_not_called()
 
     def test_validate_require_portfolio_false_still_runs_hooks(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
@@ -105,7 +115,7 @@ class TestValidate(TestCase):
     def test_validate_does_not_start_event_loop_or_flask(self):
         app = self._create_app()
         app.validate()
-        self.assertIsNone(app._flask_app)
+        self.assertIsNone(app._web_app)
         self.assertFalse(app.has_run("EmptyStrategy"))
 
     def test_validate_does_not_place_orders(self):

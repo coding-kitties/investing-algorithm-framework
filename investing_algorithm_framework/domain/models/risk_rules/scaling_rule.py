@@ -22,7 +22,11 @@ class ScalingRule:
     one entry, one full exit.
 
     Attributes:
-        symbol (str): The target symbol this rule applies to (e.g. "BTC").
+        symbol (str | None): The target symbol this rule applies to
+            (e.g. "BTC"). When ``None``, the rule is a **default**
+            applied to every symbol that doesn't have its own
+            symbol-specific ``ScalingRule`` — a symbol-specific rule
+            always takes precedence over the default.
         max_entries (int): Maximum number of entries (including the initial
             buy). Default 1 means no pyramiding. Set to 3 to allow
             the initial entry plus 2 scale-ins.
@@ -53,7 +57,7 @@ class ScalingRule:
 
     def __init__(
         self,
-        symbol: str,
+        symbol: str = None,
         max_entries: int = 1,
         scale_in_percentage: Union[float, List[float]] = 100,
         scale_out_percentage: Union[float, List[float]] = 50,

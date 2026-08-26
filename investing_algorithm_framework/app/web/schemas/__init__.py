@@ -11,6 +11,8 @@ from investing_algorithm_framework.app.web.schemas.backtest_result import \
     BacktestRunTradeSerializer, BacktestRunPositionSerializer, \
     PortfolioSnapshotSerializer, BacktestMetricsSerializer, \
     BacktestResultSerializer, BacktestResultSummarySerializer
+from investing_algorithm_framework.app.web.schemas.run_report import \
+    RunReportSerializer
 
 __all__ = [
     "OrderSerializer",
@@ -25,4 +27,5 @@ __all__ = [
     "BacktestMetricsSerializer",
     "BacktestResultSerializer",
     "BacktestResultSummarySerializer",
+    "RunReportSerializer",
 ]

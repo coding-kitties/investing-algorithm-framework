@@ -1,4 +1,5 @@
 import unittest
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest import TestCase
@@ -208,6 +209,91 @@ class CombinedCycleStrategy(TradingStrategy):
         )
         yield signal_series_from_column(
             df, "cover", side=SignalSide.CLOSE_SHORT, symbol="BTC",
+        )
+
+
+class FlipLongToShortStrategy(TradingStrategy):
+    schedule = Schedule.every(2, TimeUnit.HOUR)
+    symbols = ["BTC"]
+    data_sources = [_make_data_source()]
+    position_sizes = [
+        PositionSize(symbol="BTC", percentage_of_portfolio=100.0),
+    ]
+    flip_on_opposite_signal = True
+
+    @staticmethod
+    def _with_signal_columns(df):
+        df = df.copy()
+        df["buy"] = df["Close"] == 110
+        df["sell"] = False
+        df["short"] = df["Close"] == 90
+        df["cover"] = False
+        return df
+
+    def generate_signals(self, context, data):
+        df = self._with_signal_columns(data["BTC_EUR_OHLCV"])
+        yield from signals_from_column(
+            df, "buy", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "short", side=SignalSide.OPEN_SHORT, symbol="BTC",
+        )
+
+    def generate_signal_series(self, data):
+        df = self._with_signal_columns(data["BTC_EUR_OHLCV"])
+        yield signal_series_from_column(
+            df, "buy", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "sell", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "short", side=SignalSide.OPEN_SHORT, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "cover", side=SignalSide.CLOSE_SHORT, symbol="BTC",
+        )
+
+
+class FlipShortToLongStrategy(TradingStrategy):
+    schedule = Schedule.every(2, TimeUnit.HOUR)
+    symbols = ["BTC"]
+    data_sources = [_make_data_source()]
+    position_sizes = [
+        PositionSize(symbol="BTC", percentage_of_portfolio=100.0),
+    ]
+
+    @staticmethod
+    def _with_signal_columns(df):
+        df = df.copy()
+        df["short"] = df["Close"] == 120
+        df["buy"] = df["Close"] == 90
+        df["sell"] = False
+        df["cover"] = False
+        return df
+
+    def generate_signals(self, context, data):
+        df = self._with_signal_columns(data["BTC_EUR_OHLCV"])
+        yield from signals_from_column(
+            df, "short", side=SignalSide.OPEN_SHORT, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "buy", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+
+    def generate_signal_series(self, data):
+        df = self._with_signal_columns(data["BTC_EUR_OHLCV"])
+        yield signal_series_from_column(
+            df, "short", side=SignalSide.OPEN_SHORT, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "cover", side=SignalSide.CLOSE_SHORT, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "buy", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "sell", side=SignalSide.CLOSE_LONG, symbol="BTC",
         )
 
 
@@ -469,6 +555,89 @@ class TestEventVsVectorBacktestCombinedDynamicSizing(
             study=event_study,
         )
         cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
+
+
+class TestFlipOnOppositeSignal(TestCase):
+
+    def _run(self, strategy, engine, date_range):
+        app = _create_app(f"Flip{engine.value}{strategy.strategy_id}")
+        study = _build_study(date_range, engine=engine)
+        kwargs = {"dynamic_position_sizing": True} \
+            if engine is BacktestEngine.VECTOR else {}
+        backtests = app.run_backtest(
+            strategy=strategy, study=study, **kwargs,
+        )
+        return backtests[0].get_all_backtest_runs()[0]
+
+    def _assert_flip(self, run, expected_short):
+        self.assertEqual(len(run.orders), 3)
+        timestamps = Counter(order.created_at for order in run.orders)
+        self.assertEqual(sorted(timestamps.values()), [1, 2])
+        self.assertEqual(len(run.trades), 2)
+        trades = sorted(run.trades, key=lambda trade: trade.opened_at)
+        self.assertFalse(trades[0].is_short)
+        self.assertEqual(trades[1].is_short, expected_short)
+        self.assertGreater(trades[1].amount, 0)
+
+    def test_vector_flips_long_to_short_on_same_bar(self):
+        run = self._run(
+            FlipLongToShortStrategy(algorithm_id="vector_lts"),
+            BacktestEngine.VECTOR,
+            BacktestDateRange(
+                start_date=LONG_START_DATE,
+                end_date=datetime(
+                    2020, 12, 20, 18, 0, tzinfo=timezone.utc
+                ),
+            ),
+        )
+        self._assert_flip(run, expected_short=True)
+
+    def test_event_flips_long_to_short_on_same_tick(self):
+        run = self._run(
+            FlipLongToShortStrategy(algorithm_id="event_lts"),
+            BacktestEngine.EVENT_DRIVEN,
+            BacktestDateRange(
+                start_date=LONG_START_DATE,
+                end_date=datetime(
+                    2020, 12, 20, 18, 0, tzinfo=timezone.utc
+                ),
+            ),
+        )
+        self._assert_flip(run, expected_short=True)
+
+    def test_vector_flips_short_to_long_on_same_bar(self):
+        strategy = FlipShortToLongStrategy(
+            algorithm_id="vector_stl", flip_on_opposite_signal=True,
+        )
+        run = self._run(
+            strategy, BacktestEngine.VECTOR,
+            BacktestDateRange(
+                start_date=SHORT_START_DATE, end_date=SHORT_END_DATE,
+            ),
+        )
+        self._assert_short_to_long_flip(run)
+
+    def test_event_flips_short_to_long_on_same_tick(self):
+        strategy = FlipShortToLongStrategy(
+            algorithm_id="event_stl", flip_on_opposite_signal=True,
+        )
+        run = self._run(
+            strategy, BacktestEngine.EVENT_DRIVEN,
+            BacktestDateRange(
+                start_date=SHORT_START_DATE, end_date=SHORT_END_DATE,
+            ),
+        )
+        self._assert_short_to_long_flip(run)
+
+    def _assert_short_to_long_flip(self, run):
+        self.assertEqual(len(run.orders), 3)
+        timestamps = Counter(order.created_at for order in run.orders)
+        self.assertEqual(sorted(timestamps.values()), [1, 2])
+        self.assertEqual(len(run.trades), 2)
+        trades = sorted(run.trades, key=lambda trade: trade.opened_at)
+        self.assertTrue(trades[0].is_short)
+        self.assertFalse(trades[1].is_short)
+        self.assertGreater(trades[1].amount, 0)
 
 
 if __name__ == "__main__":

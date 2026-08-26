@@ -6,11 +6,18 @@ from investing_algorithm_framework.domain.exceptions import \
 class PositionSize:
     """
     Defines how much capital to allocate to a specific symbol.
+
+    Attributes:
+        symbol (str | None): The target symbol (e.g. "BTC"). When
+            ``None``, this is a **default** applied to every symbol
+            that doesn't have its own symbol-specific ``PositionSize``
+            — a symbol-specific entry always takes precedence over
+            the default.
     """
 
     def __init__(
         self,
-        symbol: str,
+        symbol: str = None,
         percentage_of_portfolio: Optional[float] = None,
         fixed_amount: Optional[float] = None
     ):

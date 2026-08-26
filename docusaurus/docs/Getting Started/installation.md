@@ -50,6 +50,20 @@ You can combine multiple extras:
 pip install investing-algorithm-framework[yahoo,polygon]
 ```
 
+### Cloud Deployment Extras
+
+If you plan to deploy your bot to AWS Lambda or Azure Functions (see [How to deploy a trading bot](deployment)), install the extra matching your target platform. These pull in the SDKs needed for the corresponding `StateHandler` (e.g. `AWSS3StorageStateHandler`, `AzureBlobStorageStateHandler`) and the `iaf deploy-*` CLI commands:
+
+```bash
+# AWS Lambda (S3-backed state storage)
+pip install investing-algorithm-framework[aws]
+
+# Azure Functions (Blob Storage-backed state storage)
+pip install investing-algorithm-framework[azure]
+```
+
+These can also be combined with data provider extras, e.g. `investing-algorithm-framework[aws,yahoo]`.
+
 ### Option 2: Install from Source
 
 For the latest development version, install directly from GitHub:

@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a7] — 2026-08-27
+
+### Added
+
+- **REST API migrated from Flask to FastAPI**: `create_app(web=True)` now serves a FastAPI
+  application (uvicorn) instead of Flask, with automatic Swagger docs at `/docs`. All controllers
+  (portfolio, orders, positions, trades, algorithm, backtest results, run reports) ported to
+  `APIRouter`. CORS, error handling, and response serialization all updated accordingly.
+- **`POST /api/algorithm/invoke`**: trigger an immediate, out-of-schedule strategy run on a live
+  algorithm via the REST API, with thread-safe queueing (`AlgorithmRunner.invoke_now`).
+- **`RunReport` / `App.get_last_run_report()` / `App.get_run_reports()`**: a first-class, persisted
+  snapshot of what a run did — portfolios (now including `net_size`, `realized`, `total_revenue`,
+  `total_cost`, `total_net_gain`, `total_trade_volume`), positions, orders, trades and per-tick
+  signal outcomes, plus a new `is_paper` flag (true only when every configured portfolio is
+  paper-traded). Generated automatically after every bounded run and after every live/paper
+  iteration, not just once at process exit — including the web/live mode, which previously never
+  produced one at all.
+- **`ScoreCard` / `ScoreCardEntry`**: a portable, versioned explanation object attachable to a
+  `Signal` (`Signal.with_score_card(...)`) or recorded independently of any signal via the new
+  `TradingStrategy.record_score_card(score_card, symbol=...)`, so a strategy can explain *why no
+  signal fired* on a given tick, not just why one did. Flows automatically into `RunReport.signals`.
+- **`ExposureRule`**: a new portfolio-wide risk rule capping total invested value across every
+  symbol combined (e.g. "never more than 80% invested"), enforced by `ApplyRiskBudgetPhase`
+  alongside the existing available-cash check. Complements the existing per-symbol
+  `PositionSize`/`ScalingRule`.
+- **`PositionSize`/`ScalingRule` default-with-override**: both now accept `symbol=None` as a
+  default entry applied to every symbol that doesn't have its own symbol-specific entry — a
+  symbol-specific entry always takes precedence.
+- **`App.run(run_immediately_on_start=True)`**: new flag controlling whether every strategy fires
+  on its very first tick regardless of schedule (default, unchanged behaviour) or instead waits for
+  its configured interval to elapse before the first run.
+- **`PaperTradingMode.LOCAL` / `.BROKER` / `.AUTO`**: explicit control over whether paper trading
+  always uses the framework's local, broker-agnostic simulator, always requires the broker's own
+  sandbox/testnet, or prefers the sandbox and falls back to the local simulator.
+- **`PositionMode.NETTING` / `.HEDGE`**: opt-in hedge position mode, allowing simultaneous long and
+  short positions on the same symbol instead of netting them into one.
+- Extensive startup/runtime logging narration: strategy registration, data source and
+  order-executor/portfolio-provider initialization counts, portfolio sync, next-scheduled-run
+  times per strategy, per-tick signal/order counts, and the web API/Swagger URLs on startup.
+
+### Fixed
+
+- **`AlgorithmRunner.stop(persist=True)`**: a plain process shutdown (e.g. Ctrl+C on a `web=True`
+  run) no longer persists a disabled control-file state — only an explicit
+  `POST /api/algorithm/stop` (or `stop()` without `persist=False`) disables future runs. Previously
+  every local Ctrl+C permanently disabled the next `python your_script.py` invocation.
+- **`Portfolio.to_dict()`**: was silently missing `net_size`, `realized`, `total_revenue`,
+  `total_cost`, `total_net_gain`, and `total_trade_volume` — all real attributes on the model, just
+  never serialized. Also fixed `SQLPortfolio.__init__` to accept them as optional kwargs so
+  portfolio creation from a full `to_dict()` payload doesn't raise.
+- **`TradingStrategy.strategy_id` class attribute** was silently ignored (always fell back to the
+  class name), inconsistent with how `algorithm_id` is resolved. Now matches `algorithm_id`'s
+  precedence: instance arg > class attribute > class name.
+- Two long-skipped `test_backtest_service.py` tests turned out to be test-authoring bugs, not
+  framework bugs (a wrong default value in `metadata.get('filtered_out', True)`, and a filter
+  threshold below the fixture strategy's actual trade count) — fixed and un-skipped.
+
 ## [9.0.0a6] — 2026-08-20
 
 ### Added

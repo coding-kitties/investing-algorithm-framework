@@ -1,14 +1,16 @@
 import os
 import tempfile
 import shutil
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
+from io import StringIO
 from unittest import TestCase
 
 from investing_algorithm_framework.app.reporting import BacktestReport
 from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
 from investing_algorithm_framework.domain import (
     Backtest, BacktestRun, BacktestMetrics, PortfolioSnapshot,
-    BacktestDateRange, OperationalException,
+    BacktestDateRange, OperationalException, PositionSnapshot,
 )
 
 
@@ -123,6 +125,58 @@ class TestBacktestReportInit(TestCase):
         report = BacktestReport()
         with self.assertRaises(OperationalException):
             report.show()
+
+
+class TestBacktestReportPrettyPrint(TestCase):
+
+    def test_omits_signal_rejections_when_empty(self):
+        output = StringIO()
+
+        with redirect_stdout(output):
+            BacktestReport(backtests=[_make_backtest()]).pretty_print()
+
+        self.assertEqual(output.getvalue(), "")
+
+    def test_prints_signal_rejection_summary(self):
+        backtest = _make_backtest(n_runs=2)
+        first_run, second_run = backtest.vector_runs
+        first_run.signal_events = [
+            {
+                "date": datetime(2023, 1, 2, tzinfo=timezone.utc),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "cooldown",
+            },
+            {
+                "date": datetime(2023, 1, 3, tzinfo=timezone.utc),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "already_in_position",
+            },
+        ]
+        second_run.signal_events = [
+            {
+                "date": datetime(2023, 2, 2, tzinfo=timezone.utc),
+                "symbol": "ETH",
+                "signal": "sell",
+                "executed": False,
+                "reason": "cooldown",
+            },
+        ]
+        output = StringIO()
+
+        with redirect_stdout(output):
+            BacktestReport(backtests=[backtest]).pretty_print()
+
+        self.assertEqual(
+            output.getvalue(),
+            "Signal rejections:\n"
+            "  already_in_position : 1\n"
+            "  cooldown            : 2\n"
+            "  Total rejected      : 3\n",
+        )
 
 
 class TestBacktestReportHtml(TestCase):
@@ -263,8 +317,66 @@ class TestBacktestReportDataTransform(TestCase):
         self.assertIn("YR", r)
         self.assertIn("MONTHLY_HEATMAP", r)
         self.assertIn("TRADES", r)
+        self.assertIn("SIGNAL_REJECTIONS", r)
         self.assertIn("metrics", r)
         self.assertIn("snapshot", r)
+
+    def test_run_data_includes_net_gross_and_side_exposure(self):
+        run = self.report.backtests[0].vector_runs[0]
+        run.portfolio_snapshots[-1].position_snapshots = [PositionSnapshot(
+            symbol="BTC/EUR",
+            amount=0.5,
+            cost=200.0,
+            long_amount=2.0,
+            short_amount=1.5,
+            long_cost=200.0,
+            short_cost=165.0,
+        )]
+
+        snapshot = self.report._build_run_data()["run-0-0"]["snapshot"]
+
+        self.assertEqual(200.0, snapshot["long_exposure"])
+        self.assertEqual(165.0, snapshot["short_exposure"])
+        self.assertEqual(35.0, snapshot["net_exposure"])
+        self.assertEqual(365.0, snapshot["gross_exposure"])
+
+    def test_run_data_includes_only_rejected_signal_events(self):
+        report = BacktestReport(backtests=[_make_backtest()])
+        run = report.backtests[0].vector_runs[0]
+        run.signal_events = [
+            {
+                "date": datetime(2023, 1, 2, tzinfo=timezone.utc),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "cooldown",
+            },
+            {
+                "date": datetime(2023, 1, 3, tzinfo=timezone.utc),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": True,
+                "reason": "executed",
+            },
+        ]
+
+        rejections = report._build_run_data()[
+            "run-0-0"
+        ]["SIGNAL_REJECTIONS"]
+
+        self.assertEqual(rejections, [{
+            "date": "2023-01-02",
+            "sym": "BTC",
+            "signal": "buy",
+            "reason": "cooldown",
+        }])
+
+    def test_html_renders_rejections_as_grey_x_markers(self):
+        html = self.report._build_html()
+
+        self.assertIn("p.series === 'rejected'", html)
+        self.assertIn("color: '#9ca3af', shape: 'x'", html)
+        self.assertIn("ctx.lineWidth = 1", html)
 
     def test_windows_meta(self):
         windows = self.report._build_windows_meta()

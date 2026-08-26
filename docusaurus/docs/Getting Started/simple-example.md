@@ -28,7 +28,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, PositionSize, create_app, RESOURCE_DIRECTORY, \
     BacktestDateRange, BacktestReport, TakeProfitRule, StopLossRule, \
-    SignalSide, signals_from_column, \
+    SignalSide, signals_from_column, ExposureRule, \
     DEFAULT_LOGGING_CONFIG
 
 
@@ -41,6 +41,9 @@ class RSIEMACrossoverStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
     symbols = ["BTC"]
+    # Portfolio-wide: never invest more than 80% of the portfolio at
+    # once, across every symbol combined.
+    exposure_rule = ExposureRule(max_portfolio_percentage=80.0)
     position_sizes = [
         PositionSize(
             symbol="BTC", percentage_of_portfolio=20.0
@@ -281,7 +284,7 @@ Let's break down each part of this example:
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, PositionSize, create_app, \
     BacktestDateRange, BacktestReport, TakeProfitRule, StopLossRule, \
-    SignalSide, signals_from_column, \
+    SignalSide, signals_from_column, ExposureRule, \
     DEFAULT_LOGGING_CONFIG
 ```
 
@@ -337,12 +340,16 @@ stop_losses = [
         sell_percentage=100
     )
 ]
+# Portfolio-wide: never invest more than 80% of the portfolio at
+# once, across every symbol combined.
+exposure_rule = ExposureRule(max_portfolio_percentage=80.0)
 ```
 
 **Risk Management Features:**
 - **Position Sizing**: Limits each position to 20% of portfolio
 - **Take Profit**: Automatically sells when 10% profit is reached (with trailing)
 - **Stop Loss**: Cuts losses at 5% drawdown to protect capital
+- **Exposure Rule**: Caps total invested value at 80% of the portfolio, across all symbols combined — a cash buffer regardless of how many symbols signal an entry at once
 
 ### 5. Data Sources
 
@@ -499,7 +506,7 @@ report.show(backtest_date_range=backtest_range, browser=True)
    ```bash
    # .env file - only needed for live trading
    BITVAVO_API_KEY=your_api_key_here
-   BITVAVO_API_SECRET=your_api_secret_here
+   BITVAVO_SECRET_KEY=your_api_secret_here
    ```
 
 3. **Run the strategy**:
@@ -584,26 +591,3 @@ the bottom-10") — see the [Pipelines](../Advanced%20Concepts/pipelines)
 guide. Pipelines also enable vectorised backtesting, which is
 significantly faster for large universes.
 
-## Troubleshooting
-
-### Common Issues
-
-**ImportError: No module named 'investing_algorithm_framework'**
-- Make sure you've installed the framework: `pip install investing-algorithm-framework`
-
-**Connection errors**
-- Check your internet connection
-- Bitvavo might be temporarily unavailable
-
-**No data received**
-- The exchange might not support the requested symbol
-- Try using a different timeframe or symbol
-
-### Getting Help
-
-If you encounter issues:
-1. Check the logs for detailed error messages
-2. Verify your Python version (3.10+ required)
-3. Ensure all dependencies are installed
-
-This example provides a solid foundation for building more sophisticated trading bots. Once you're comfortable with this advanced structure, you can explore the more advanced features covered in the rest of this documentation.

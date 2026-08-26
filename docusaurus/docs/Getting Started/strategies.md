@@ -10,6 +10,30 @@ Learn how to create and implement trading strategies using the Investing Algorit
 
 Trading strategies are the core logic that determines when to buy, sell, or hold assets. The framework provides a flexible `TradingStrategy` class that allows you to implement various trading approaches using signal-based trading with built-in support for position sizing, stop losses, and take profits.
 
+## Position Modes
+
+Markets use `PositionMode.NETTING` by default, where a symbol has one net
+direction. Backtests can opt into `PositionMode.HEDGE` to hold independent long
+and short legs for the same symbol:
+
+```python
+from investing_algorithm_framework import PositionMode
+
+app.add_market(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    initial_balance=10_000,
+    position_mode=PositionMode.HEDGE,
+)
+```
+
+Both event-driven and vector backtests support `OPEN_LONG`, `CLOSE_LONG`,
+`OPEN_SHORT`, and `CLOSE_SHORT` independently in HEDGE mode. Stop-loss,
+take-profit, and cooldown rules are evaluated per leg, and reports include net,
+gross, long, and short exposure. Live HEDGE execution is intentionally rejected
+until exchange position-mode verification and leg reconciliation are supported;
+use NETTING for live trading.
+
 ## TradingStrategy Attributes
 
 The `TradingStrategy` class has the following key attributes:
@@ -27,6 +51,8 @@ The `TradingStrategy` class has the following key attributes:
 | `stop_losses` | `List[StopLossRule]` | Stop loss rules for each symbol. |
 | `take_profits` | `List[TakeProfitRule]` | Take profit rules for each symbol. |
 | `scaling_rules` | `List[ScalingRule]` | Position scaling rules for pyramiding and partial closes. |
+| `exposure_rule` | `ExposureRule` | Caps total invested value across the whole portfolio (all symbols combined), e.g. never more than 80% invested. Singular, not a list — see [Risk Rules: ExposureRule](../Risk%20Rules/exposure-rule.md). |
+| `flip_on_opposite_signal` | `bool` | When `True`, an opposite open signal closes the current position and opens the new direction on the same bar or tick. Defaults to `False`. |
 | `metadata` | `Dict[str, Any]` | Dictionary for storing additional strategy information (author, version, params, etc.). |
 
 ## Creating Your First Strategy

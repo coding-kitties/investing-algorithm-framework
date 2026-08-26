@@ -179,7 +179,7 @@ Optimized version for single date range execution with batching.
 ## When to Tune These Parameters
 
 ### Defaults are fine for small runs
-- ✓ Small number of strategies (<100)
+- ✓ Small number of strategies (`<100`)
 - ✓ Testing/debugging
 - ✓ `use_checkpoints=False`, `n_workers=None` (sequential) is the proven, battle-tested default
 

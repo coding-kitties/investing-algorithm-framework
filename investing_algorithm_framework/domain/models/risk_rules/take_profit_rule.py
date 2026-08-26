@@ -48,8 +48,10 @@ class TakeProfitRule:
         sell_percentage: float,
         symbol: str,
         trailing: bool = False,
+        side: str = None,
     ):
         self.percentage_threshold = percentage_threshold
         self.trailing = trailing
         self.sell_percentage = sell_percentage
         self.symbol = symbol
+        self.side = side

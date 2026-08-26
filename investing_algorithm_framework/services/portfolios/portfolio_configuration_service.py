@@ -41,9 +41,21 @@ class PortfolioConfigurationService:
 
         return portfolio_configuration
 
+    def resolve_for_portfolio(self, portfolio):
+        configuration = self.get(portfolio.identifier)
+        if configuration is not None:
+            return configuration
+        return next(
+            (
+                item for item in self.portfolio_configurations
+                if item.market.upper() == portfolio.market.upper()
+            ),
+            None,
+        )
+
     def find(self, query_params):
         market = query_params.get("market", None)
-        identifier = query_params.get("market", None)
+        identifier = query_params.get("identifier", None)
 
         if market is not None:
             return next(

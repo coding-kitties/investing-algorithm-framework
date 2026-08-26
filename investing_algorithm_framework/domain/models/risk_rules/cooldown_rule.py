@@ -174,6 +174,7 @@ class CooldownTracker:
         symbol: str,
         order_side: "str | CooldownTrigger",
         bar_index: int,
+        position_side: Optional[str] = None,
     ) -> None:
         """Record that an order fired on ``symbol`` at ``bar_index``."""
         side = CooldownTrigger.coerce(order_side)
@@ -182,9 +183,10 @@ class CooldownTracker:
         # find it.
         for scope in (symbol, None):
             for trig in (side, CooldownTrigger.ANY):
-                prev = self._last_event.get((scope, trig))
+                key = (scope, trig, position_side)
+                prev = self._last_event.get(key)
                 if prev is None or prev < bar_index:
-                    self._last_event[(scope, trig)] = bar_index
+                    self._last_event[key] = bar_index
 
     def is_blocked(
         self,
@@ -193,6 +195,7 @@ class CooldownTracker:
         signal_side: str,
         symbol: str,
         bar_index: int,
+        position_side: Optional[str] = None,
     ) -> "tuple[bool, Optional[CooldownRule]]":
         """Return ``(blocked, vetoing_rule)`` for the given signal."""
         for rule in rules or ():
@@ -203,7 +206,9 @@ class CooldownTracker:
             if not rule.blocks_signal(signal_side):
                 continue
             scope = None if rule.is_portfolio_scoped else symbol
-            last = self._last_event.get((scope, rule.trigger))
+            last = self._last_event.get(
+                (scope, rule.trigger, position_side)
+            )
             if last is None:
                 continue
             # The trigger bar counts as bar 0 of the cooldown, so the

@@ -150,11 +150,13 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
 
             # SELL stop triggers when price drops to or below stop_price;
             # BUY stop triggers when price rises to or above stop_price.
-            if OrderSide.SELL.equals(order_side):
+            if OrderSide.SELL.equals(order_side) \
+                    or OrderSide.SHORT.equals(order_side):
                 trigger_candles = ohlcv_data_after_order.filter(
                     pl.col('Low') <= stop_price
                 )
-            elif OrderSide.BUY.equals(order_side):
+            elif OrderSide.BUY.equals(order_side) \
+                    or OrderSide.COVER.equals(order_side):
                 trigger_candles = ohlcv_data_after_order.filter(
                     pl.col('High') >= stop_price
                 )

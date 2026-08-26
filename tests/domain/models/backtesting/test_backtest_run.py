@@ -15,6 +15,89 @@ def _backtest_window(start_date, end_date):
     ))
 
 
+class TestBacktestRunRejectionSummary(TestCase):
+
+    def test_empty(self):
+        run = BacktestRun(
+            backtest_window=_backtest_window(
+                datetime(2024, 1, 1), datetime(2024, 1, 31)
+            ),
+            signal_events=[],
+        )
+
+        self.assertEqual(run.get_rejection_summary(), {})
+
+    def test_single_reason(self):
+        run = BacktestRun(
+            backtest_window=_backtest_window(
+                datetime(2024, 1, 1), datetime(2024, 1, 31)
+            ),
+            signal_events=[
+            {
+                "date": datetime(2024, 1, 1),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "insufficient_capital",
+            },
+            {
+                "date": datetime(2024, 1, 2),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "insufficient_capital",
+            },
+            ],
+        )
+
+        self.assertEqual(
+            run.get_rejection_summary(),
+            {"insufficient_capital": 2},
+        )
+
+    def test_multiple_reasons_excludes_executed_events(self):
+        run = BacktestRun(
+            backtest_window=_backtest_window(
+                datetime(2024, 1, 1), datetime(2024, 1, 31)
+            ),
+            signal_events=[
+            {
+                "date": datetime(2024, 1, 1),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "cooldown",
+            },
+            {
+                "date": datetime(2024, 1, 2),
+                "symbol": "ETH",
+                "signal": "sell",
+                "executed": False,
+                "reason": "already_in_position",
+            },
+            {
+                "date": datetime(2024, 1, 3),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "cooldown",
+            },
+            {
+                "date": datetime(2024, 1, 4),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": True,
+                "reason": "executed",
+            },
+            ],
+        )
+
+        self.assertEqual(
+            run.get_rejection_summary(),
+            {"cooldown": 2, "already_in_position": 1},
+        )
+
+
 class TestBacktestMetrics(TestCase):
 
     def setUp(self):

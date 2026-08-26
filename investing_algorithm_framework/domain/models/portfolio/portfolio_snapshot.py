@@ -4,6 +4,8 @@ from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.datetime_parsing import (
     parse_datetime as _parse_dt,
 )
+from investing_algorithm_framework.domain.models.position.position_snapshot \
+    import PositionSnapshot
 
 
 class PortfolioSnapshot(BaseModel):
@@ -118,6 +120,22 @@ class PortfolioSnapshot(BaseModel):
     def get_position_snapshots(self):
         return self.position_snapshots
 
+    @property
+    def long_exposure(self):
+        return sum(position.long_cost for position in self.position_snapshots)
+
+    @property
+    def short_exposure(self):
+        return sum(position.short_cost for position in self.position_snapshots)
+
+    @property
+    def net_exposure(self):
+        return self.long_exposure - self.short_exposure
+
+    @property
+    def gross_exposure(self):
+        return self.long_exposure + self.short_exposure
+
     def set_portfolio_snapshot_id(self, portfolio_snapshot_id):
         self.portfolio_snapshot_id = portfolio_snapshot_id
 
@@ -172,6 +190,13 @@ class PortfolioSnapshot(BaseModel):
             "net_size": self.net_size if self.net_size else 0.0,
             "created_at": created_at if created_at else "",
             "total_value": self.total_value if self.total_value else 0.0,
+            "long_exposure": self.long_exposure,
+            "short_exposure": self.short_exposure,
+            "net_exposure": self.net_exposure,
+            "gross_exposure": self.gross_exposure,
+            "position_snapshots": [
+                position.to_dict() for position in self.position_snapshots
+            ],
         }
 
     @staticmethod
@@ -205,5 +230,9 @@ class PortfolioSnapshot(BaseModel):
             total_revenue=data.get("total_revenue", 0.0),
             total_cost=data.get("total_cost", 0.0),
             cash_flow=data.get("cash_flow", 0.0),
-            metadata=data.get("metadata", {})
+            metadata=data.get("metadata", {}),
+            position_snapshots=[
+                PositionSnapshot.from_dict(position)
+                for position in data.get("position_snapshots", [])
+            ],
         )

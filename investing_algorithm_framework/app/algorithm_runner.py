@@ -30,6 +30,7 @@ class AlgorithmRunner:
         self._thread: Optional[threading.Thread] = None
         self._event_loop_service = None
         self._run_kwargs = {}
+        self._on_stop = None
         self._status = NOT_STARTED
         self._started_at = None
         self._stopped_at = None
@@ -112,16 +113,27 @@ class AlgorithmRunner:
         """Persists 'disabled', independent of any in-process thread."""
         self._persist_enabled(False, reason=reason)
 
-    def configure(self, event_loop_service, **run_kwargs) -> None:
+    def configure(
+        self, event_loop_service, on_stop=None, **run_kwargs
+    ) -> None:
         """
         Wires the event loop service (and any kwargs for its
         ``start()`` method) that ``start``/``stop`` will control.
         Safe to call again after a ``stop()`` to reconfigure before
         the next ``start()``.
+
+        Args:
+            on_stop: Optional; a zero-argument callable invoked (on
+                the loop's own background thread) each time the loop
+                actually exits, whether from ``stop()`` or an error —
+                used to build/persist a ``RunReport`` for the run that
+                just finished. Exceptions raised by it are logged, not
+                propagated.
         """
         with self._lock:
             self._event_loop_service = event_loop_service
             self._run_kwargs = run_kwargs
+            self._on_stop = on_stop
 
     @property
     def status(self) -> str:
@@ -175,6 +187,7 @@ class AlgorithmRunner:
             self._status = RUNNING
             event_loop_service = self._event_loop_service
             run_kwargs = self._run_kwargs
+            on_stop = self._on_stop
 
         def _run():
             try:
@@ -187,6 +200,14 @@ class AlgorithmRunner:
                 with self._lock:
                     self._status = STOPPED
                     self._stopped_at = datetime.now(timezone.utc)
+                if on_stop is not None:
+                    try:
+                        on_stop()
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to build run report after the "
+                            f"algorithm loop stopped: {e}"
+                        )
 
         self._thread = threading.Thread(
             name="Algorithm Loop", target=_run, daemon=True
@@ -195,18 +216,43 @@ class AlgorithmRunner:
         self.enable()
         return True
 
+    def invoke_now(self, strategy_ids: Optional[list] = None) -> None:
+        """
+        Forces the algorithm's strategies to run on the loop's very
+        next tick, ignoring their configured schedule. The algorithm
+        must already be running (see ``start()``) since strategies are
+        only ever executed from the loop's own background thread —
+        this just queues the request for it to pick up.
+
+        Args:
+            strategy_ids: Optional; specific strategy IDs to invoke.
+                When None, every registered strategy is invoked.
+
+        Raises:
+            OperationalException: If the algorithm is not currently
+                running.
+        """
+        with self._lock:
+            if self._status != RUNNING:
+                raise OperationalException(
+                    "The algorithm is not running. Start it first "
+                    "(e.g. POST /api/algorithm/start) before invoking "
+                    "a run."
+                )
+            event_loop_service = self._event_loop_service
+
+        event_loop_service.request_immediate_run(strategy_ids)
+
     def stop(
         self,
         wait: bool = False,
         timeout: float = 10,
         reason: Optional[str] = None,
+        persist: bool = True,
     ) -> bool:
         """
         Signals the running algorithm loop to stop after its current
-        iteration completes, and persists 'disabled' regardless of
-        whether a loop is currently running in-process (this is what a
-        stateless/serverless deployment, e.g. AWS Lambda or Azure
-        Functions, checks on its next scheduled invocation).
+        iteration completes.
 
         Args:
             wait: If True, blocks until the background thread has
@@ -214,14 +260,22 @@ class AlgorithmRunner:
             timeout: Max seconds to wait for the thread to exit when
                 ``wait`` is True.
             reason: Optional human-readable reason, persisted alongside
-                the disabled state.
+                the disabled state (only used when ``persist=True``).
+            persist: If True (default), also persists 'disabled' to
+                the control file, which a stateless/serverless
+                deployment (e.g. AWS Lambda or Azure Functions) checks
+                on its next scheduled invocation. Set to False for a
+                process-level shutdown (e.g. Ctrl+C / KeyboardInterrupt)
+                that should stop this run without disabling future
+                runs.
 
         Returns:
             bool: True if a running in-process loop was signaled to
                 stop, False if it was not running (the disabled state
-                is still persisted either way).
+                is still persisted either way, when ``persist=True``).
         """
-        self.disable(reason=reason)
+        if persist:
+            self.disable(reason=reason)
 
         with self._lock:
             if self._status != RUNNING:

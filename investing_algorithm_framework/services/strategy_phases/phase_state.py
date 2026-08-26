@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Tuple
 
+from investing_algorithm_framework.domain import PositionMode
 from investing_algorithm_framework.domain.models.signal import (
     Signal,
     SignalSide,
@@ -148,6 +149,23 @@ class PhaseState:
     traces: List[Tuple[str, Any]] = field(default_factory=list)
 
     # ---- convenience accessors ------------------------------------ #
+    @property
+    def position_mode(self) -> PositionMode:
+        try:
+            portfolio = self.context.get_portfolio()
+            configuration = (
+                self.context.portfolio_configuration_service
+                .resolve_for_portfolio(portfolio)
+            )
+        except (AttributeError, IndexError):
+            configuration = None
+        if configuration is None:
+            return PositionMode.NETTING
+        position_mode = getattr(configuration, "position_mode", None)
+        if not isinstance(position_mode, (PositionMode, str)):
+            return PositionMode.NETTING
+        return PositionMode(position_mode)
+
     def symbols_with_emitted_orders(self) -> List[str]:
         """Return the deduplicated list of symbols that had at least
         one order emitted this iteration."""
