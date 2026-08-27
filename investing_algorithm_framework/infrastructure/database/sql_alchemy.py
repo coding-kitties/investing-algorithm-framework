@@ -203,6 +203,17 @@ def teardown_sqlalchemy():
 
     Session.configure(bind=None)
 
+    # ORM objects/sessions can be kept alive by reference cycles (e.g.
+    # mapped instances <-> identity map <-> session), so plain
+    # refcounting doesn't always close the underlying sqlite3
+    # connection/file handle right away. On POSIX this is harmless
+    # (an unlinked-but-open file is still removable), but on Windows
+    # file locks are mandatory, so a stale handle blocks deletion of
+    # the database file by callers that rmtree the database directory
+    # right after calling this. Force a collection cycle to release it.
+    import gc
+    gc.collect()
+
 
 from sqlalchemy import event
 from sqlalchemy.orm import mapper
