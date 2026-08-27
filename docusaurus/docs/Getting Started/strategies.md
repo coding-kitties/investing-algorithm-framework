@@ -10,6 +10,110 @@ Learn how to create and implement trading strategies using the Investing Algorit
 
 Trading strategies are the core logic that determines when to buy, sell, or hold assets. The framework provides a flexible `TradingStrategy` class that allows you to implement various trading approaches using signal-based trading with built-in support for position sizing, stop losses, and take profits.
 
+## TradingStrategy Attributes
+
+The `TradingStrategy` class has the following key attributes:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `algorithm_id` | `str` | Unique identifier for your combined strategy instances. Used for backtesting results, logging, and monitoring. |
+| `strategy_id` | `str` | Optional identifier for the strategy. Defaults to the class name. |
+| `schedule` | `Schedule` | Defines when the strategy runs — see [Defining Schedules](#defining-schedules) below. **Required** (either this or `time_unit`/`interval`). |
+| `time_unit` | `TimeUnit` | Legacy alternative to `schedule`: the time unit that defines when the strategy should run (e.g., `HOUR`, `DAY`). |
+| `interval` | `int` | Legacy alternative to `schedule`: how often the strategy runs within `time_unit` (e.g., every 5 hours). |
+| `symbols` | `List[str]` | List of symbols to trade (e.g., `["BTC", "ETH"]`). |
+| `trading_symbol` | `str` | The quote currency for trading (e.g., `"EUR"`, `"USDT"`). |
+| `data_sources` | `List[DataSource]` | Data sources that provide market data to the strategy. |
+| `position_sizes` | `List[PositionSize]` | Position sizing rules for each symbol. |
+| `stop_losses` | `List[StopLossRule]` | Stop loss rules for each symbol. |
+| `take_profits` | `List[TakeProfitRule]` | Take profit rules for each symbol. |
+| `scaling_rules` | `List[ScalingRule]` | Position scaling rules for pyramiding and partial closes. |
+| `exposure_rule` | `ExposureRule` | Caps total invested value across the whole portfolio (all symbols combined), e.g. never more than 80% invested. Singular, not a list — see [Risk Rules: ExposureRule](../Risk%20Rules/exposure-rule.md). |
+| `flip_on_opposite_signal` | `bool` | When `True`, an opposite open signal closes the current position and opens the new direction on the same bar or tick. Defaults to `False`. |
+| `metadata` | `Dict[str, Any]` | Dictionary for storing additional strategy information (author, version, params, etc.). |
+
+## Defining Schedules
+
+A `Schedule` object decides *when* a strategy runs. It's the
+recommended replacement for the legacy `time_unit`/`interval` pair
+(still supported, but `Schedule` is more expressive) and is passed to
+`super().__init__(schedule=schedule, ...)` from your strategy's
+constructor, or set as a `schedule` class attribute.
+
+There are two ways to build one:
+
+### Interval schedules — `Schedule.every(...)`
+
+```python
+from investing_algorithm_framework import Schedule, TimeUnit
+
+# Fires every 2 hours
+schedule = Schedule.every(2, TimeUnit.HOUR)
+```
+
+`TimeUnit` supports `SECOND`, `MINUTE`, `HOUR`, and `DAY`. Fire times
+land on fixed, anchor-aligned clock boundaries rather than drifting
+relative to whenever the strategy happened to start or was last run —
+`Schedule.every(2, TimeUnit.HOUR)` fires at `00:00`, `02:00`, `04:00`,
+... `08:00`, `10:00`, `12:00` UTC, every day. A manually or
+force-triggered run (e.g. via `request_immediate_run()`) never shifts
+this grid: it only "claims" the slot it ran in, and the next fixed
+boundary still fires on time.
+
+Pass an explicit `anchor` (any reference datetime — only its offset
+modulo the step matters, not the date) to shift the grid, e.g. to
+align with a specific time of day:
+
+```python
+from datetime import datetime, timezone
+
+# Fires at 09:30, 11:30, 13:30, ... every day instead of on the hour
+schedule = Schedule.every(
+    2, TimeUnit.HOUR,
+    anchor=datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc),
+)
+```
+
+### Rule-based schedules — `Schedule.on(...)`
+
+For calendar-driven cadences (e.g. "the first trading day of every
+month at 09:30"), combine a `DateRule` (which days) with a `TimeRule`
+(what time on those days):
+
+```python
+from investing_algorithm_framework import Schedule, DateRule, TimeRule
+
+# Fires at 09:30 on the first trading day of every month
+schedule = Schedule.on(DateRule.month_start(), TimeRule.at(9, 30))
+```
+
+`DateRule` factories: `every_day()`, `week_start(days_offset=0)`,
+`week_end(days_offset=0)`, `month_start(days_offset=0)`,
+`month_end(days_offset=0)`. `TimeRule` factories: `at(hour, minute=0,
+second=0)`; `market_open(minutes=0)`, `market_close(minutes=0)`, and
+`every_minute()` additionally require a `TradingCalendar`. Without a
+calendar, every calendar day is treated as a trading day — the
+appropriate default for 24/7 crypto venues.
+
+### Using a schedule in your strategy
+
+```python
+class MyStrategy(TradingStrategy):
+    schedule = Schedule.every(1, TimeUnit.HOUR)
+    symbols = ["BTC"]
+    # ...
+```
+
+Or accept it via the constructor when the schedule should vary per
+instance (see the [Example Application](example-application) for a
+full example that does this):
+
+```python
+class MyStrategy(TradingStrategy):
+    def __init__(self, schedule, **kwargs):
+        super().__init__(schedule=schedule, **kwargs)
+```
+
 ## Position Modes
 
 Markets use `PositionMode.NETTING` by default, where a symbol has one net
@@ -30,30 +134,16 @@ app.add_market(
 Both event-driven and vector backtests support `OPEN_LONG`, `CLOSE_LONG`,
 `OPEN_SHORT`, and `CLOSE_SHORT` independently in HEDGE mode. Stop-loss,
 take-profit, and cooldown rules are evaluated per leg, and reports include net,
-gross, long, and short exposure. Live HEDGE execution is intentionally rejected
-until exchange position-mode verification and leg reconciliation are supported;
-use NETTING for live trading.
+gross, long, and short exposure.
 
-## TradingStrategy Attributes
-
-The `TradingStrategy` class has the following key attributes:
-
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `algorithm_id` | `str` | Unique identifier for your combined strategy instances. Used for backtesting results, logging, and monitoring. |
-| `strategy_id` | `str` | Optional identifier for the strategy. Defaults to the class name. |
-| `time_unit` | `TimeUnit` | The time unit that defines when the strategy should run (e.g., `HOUR`, `DAY`, `WEEK`, `MONTH`). **Required**. |
-| `interval` | `int` | How often the strategy runs within the time unit (e.g., every 5 hours). **Required**. |
-| `symbols` | `List[str]` | List of symbols to trade (e.g., `["BTC", "ETH"]`). |
-| `trading_symbol` | `str` | The quote currency for trading (e.g., `"EUR"`, `"USDT"`). |
-| `data_sources` | `List[DataSource]` | Data sources that provide market data to the strategy. |
-| `position_sizes` | `List[PositionSize]` | Position sizing rules for each symbol. |
-| `stop_losses` | `List[StopLossRule]` | Stop loss rules for each symbol. |
-| `take_profits` | `List[TakeProfitRule]` | Take profit rules for each symbol. |
-| `scaling_rules` | `List[ScalingRule]` | Position scaling rules for pyramiding and partial closes. |
-| `exposure_rule` | `ExposureRule` | Caps total invested value across the whole portfolio (all symbols combined), e.g. never more than 80% invested. Singular, not a list — see [Risk Rules: ExposureRule](../Risk%20Rules/exposure-rule.md). |
-| `flip_on_opposite_signal` | `bool` | When `True`, an opposite open signal closes the current position and opens the new direction on the same bar or tick. Defaults to `False`. |
-| `metadata` | `Dict[str, Any]` | Dictionary for storing additional strategy information (author, version, params, etc.). |
+Live HEDGE trading is validated at startup against whatever `OrderExecutor`/
+`PortfolioProvider` adapters are registered for the market
+(`supports_position_mode()`), not unconditionally rejected — but the
+built-in CCXT-based adapters only support `NETTING`, so a live app with
+`PositionMode.HEDGE` fails fast with a clear error unless you register your
+own HEDGE-capable adapters. Use `NETTING` for live trading with the default
+CCXT integration, run `HEDGE` in a backtest, or supply adapters that
+implement `supports_position_mode()` for `HEDGE`.
 
 ## Creating Your First Strategy
 

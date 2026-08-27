@@ -9,7 +9,8 @@ import polars as pl
 from investing_algorithm_framework.domain import Environment, ENVIRONMENT, \
     OrderStatus, DataSource, DataType, tqdm, \
     TradeStatus, SNAPSHOT_INTERVAL, SnapshotInterval, OperationalException, \
-    LAST_SNAPSHOT_DATETIME, INDEX_DATETIME, Signal
+    LAST_SNAPSHOT_DATETIME, INDEX_DATETIME, Signal, DATETIME_FORMAT, \
+    DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE
 from investing_algorithm_framework.services import TradeOrderEvaluator
 from .algorithm import Algorithm
 from .strategy import TradingStrategy
@@ -256,6 +257,38 @@ class EventLoopService:
             self._strategies_lookup[strategy_id]
             for strategy_id in strategy_ids
         ]
+
+    def _log_next_algorithm_run(self, current_datetime) -> None:
+        """
+        Logs the next time the algorithm as a whole is due to run,
+        i.e. the earliest next run time across every strategy
+        registered on it (not just the ones that ran this tick — a
+        strategy on a different schedule may fire sooner).
+        """
+        next_runs = []
+        for strategy in self.strategies:
+            last_run = self.next_run_times[strategy.strategy_id].get(
+                "last_run"
+            )
+            reference = last_run if last_run is not None \
+                else current_datetime
+            next_run = strategy.schedule.next_run_after(reference)
+            if next_run is not None:
+                next_runs.append(next_run)
+
+        if next_runs:
+            config = self._configuration_service.config
+            datetime_format = config.get(
+                DATETIME_FORMAT, DEFAULT_DATETIME_FORMAT
+            )
+            next_run_formatted = format_datetime_utc(
+                min(next_runs), datetime_format, config.get(TIMEZONE)
+            )
+            logger.info(
+                f"Next run for algorithm "
+                f"'{getattr(self._algorithm, 'algorithm_id', None)}' "
+                f"scheduled at {next_run_formatted}"
+            )
 
     def _get_due_strategies(self, current_datetime=None):
         """
@@ -1036,6 +1069,8 @@ class EventLoopService:
                 self.signal_log.append(_build_signal_report(strategy))
             finally:
                 self.context._current_strategy_id = None
+
+        self._log_next_algorithm_run(current_datetime)
 
         # Step 5c: dispatch any ScheduledFunction hooks due at this tick.
         # Each entry is either a (strategy, ScheduledFunction) tuple

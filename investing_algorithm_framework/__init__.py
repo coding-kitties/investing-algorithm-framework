@@ -30,7 +30,8 @@ from .domain import ApiException, combine_backtests, Study, \
     PortfolioConfiguration, PositionMode, PaperTradingMode, \
     RESOURCE_DIRECTORY, RunReport, \
     AWS_LAMBDA_LOGGING_CONFIG, \
-    Trade, APP_MODE, AppMode, DATETIME_FORMAT, load_backtests_from_directory, \
+    Trade, APP_MODE, AppMode, DATETIME_FORMAT, TIMEZONE, \
+    load_backtests_from_directory, \
     BacktestDateRange, convert_polars_to_pandas, BacktestRun, Universe, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, StopLossRule, \
     ScalingRule, TradingCost, ExposureRule, BacktestEngine, \
@@ -209,6 +210,7 @@ __all__ = [
     "APP_MODE",
     "AppMode",
     "DATETIME_FORMAT",
+    "TIMEZONE",
     "Backtest",
     "Universe",
     "BacktestDateRange",

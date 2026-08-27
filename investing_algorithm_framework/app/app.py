@@ -24,7 +24,8 @@ from investing_algorithm_framework.domain import DATABASE_NAME, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, TimeFrame, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestMonteCarloTest, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY, Schedule, \
-    Universe, PositionMode, RunReport, PaperTradingMode
+    Universe, PositionMode, RunReport, PaperTradingMode, DATETIME_FORMAT, \
+    DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE
 from investing_algorithm_framework.domain.backtesting.study import Study
 from investing_algorithm_framework.domain.backtesting.backtest_engine import \
     BacktestEngine
@@ -940,7 +941,12 @@ class App:
             self.initialize_services()
             self.initialize_portfolios()
             self._log_next_scheduled_runs(
-                algorithm, run_immediately_on_start=run_immediately_on_start
+                algorithm,
+                run_immediately_on_start=run_immediately_on_start,
+                datetime_format=self.config.get(
+                    DATETIME_FORMAT, DEFAULT_DATETIME_FORMAT
+                ),
+                tz_name=self.config.get(TIMEZONE),
             )
 
             is_live_web_run = AppMode.WEB.equals(self.config[APP_MODE]) \
@@ -2829,7 +2835,10 @@ class App:
 
     @staticmethod
     def _log_next_scheduled_runs(
-        algorithm, run_immediately_on_start: bool = True
+        algorithm,
+        run_immediately_on_start: bool = True,
+        datetime_format: str = DEFAULT_DATETIME_FORMAT,
+        tz_name: Optional[str] = None,
     ) -> None:
         """
         Log when each of the algorithm's strategies is next scheduled
@@ -2844,7 +2853,7 @@ class App:
         so this logs that future time instead.
         """
         now = datetime.now(timezone.utc)
-        formatted_now = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+        formatted_now = format_datetime_utc(now, datetime_format, tz_name)
 
         for strategy in algorithm.strategies:
             schedule = strategy.schedule
@@ -2861,8 +2870,9 @@ class App:
                         f"{formatted_now} (now)"
                     )
                 else:
-                    first_run = (now + schedule.step()).strftime(
-                        "%Y-%m-%d %H:%M:%S UTC"
+                    first_run = format_datetime_utc(
+                        schedule.next_run_after(now), datetime_format,
+                        tz_name
                     )
                     logger.info(
                         f"Strategy '{strategy.strategy_id}': runs every "

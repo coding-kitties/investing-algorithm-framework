@@ -189,6 +189,52 @@ class TestScheduleInterval(TestCase):
             )
         )
 
+    def test_default_anchor_aligns_to_epoch_utc_boundaries(self):
+        # Every 2 hours, no explicit anchor -> 00:00, 02:00, ...,
+        # 08:00, 10:00, 12:00 UTC, matching whole-clock expectations.
+        s = Schedule.every(2, TimeUnit.HOUR)
+        after = datetime(2025, 1, 1, 8, 30, tzinfo=timezone.utc)
+        self.assertEqual(
+            s.next_run_after(after),
+            datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc),
+        )
+
+    def test_custom_anchor_shifts_the_grid(self):
+        anchor = datetime(2025, 1, 1, 9, 30, tzinfo=timezone.utc)
+        s = Schedule.every(2, TimeUnit.HOUR, anchor=anchor)
+        after = datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc)
+        # Grid is 09:30, 11:30, 13:30, ... regardless of the date.
+        self.assertEqual(
+            s.next_run_after(after),
+            datetime(2025, 1, 1, 11, 30, tzinfo=timezone.utc),
+        )
+
+    def test_manual_run_mid_slot_does_not_shift_next_natural_run(self):
+        # A forced/manual run recorded partway through a slot must not
+        # push the next natural run later — the fixed grid boundary
+        # (10:00) stays due regardless of the manual run at 08:45.
+        s = Schedule.every(2, TimeUnit.HOUR)
+        manual_run_at = datetime(2025, 1, 1, 8, 45, tzinfo=timezone.utc)
+
+        # Immediately after the manual run, not yet due again.
+        self.assertFalse(
+            s.is_due(
+                manual_run_at + timedelta(minutes=1),
+                last_run=manual_run_at,
+            )
+        )
+        # At the next fixed slot boundary (10:00), due again.
+        self.assertTrue(
+            s.is_due(
+                datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc),
+                last_run=manual_run_at,
+            )
+        )
+        self.assertEqual(
+            s.next_run_after(manual_run_at),
+            datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc),
+        )
+
 
 class TestScheduleRuleBased(TestCase):
 

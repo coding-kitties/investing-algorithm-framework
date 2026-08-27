@@ -10,7 +10,7 @@ import polars as pl
 from dateutil import parser
 
 from investing_algorithm_framework.domain import OperationalException, \
-    DATETIME_FORMAT, DataProvider, convert_polars_to_pandas, \
+    DataProvider, convert_polars_to_pandas, \
     NetworkError, TimeFrame, MarketCredential, DataType, DataSource, \
     RESOURCE_DIRECTORY, CCXT_DATETIME_FORMAT, DATA_DIRECTORY
 
@@ -647,10 +647,14 @@ class CCXTOHLCVDataProvider(DataProvider):
                 "OHLCV data start date must be before end date"
             )
 
-        if self.config is not None and DATETIME_FORMAT in self.config:
-            datetime_format = self.config[DATETIME_FORMAT]
-        else:
-            datetime_format = CCXT_DATETIME_FORMAT
+        # Internal serialization format for the CCXT API request and the
+        # polars "Datetime" column parsing below — always fixed,
+        # independent of the app's user-facing DATETIME_FORMAT config
+        # (which only controls log/display formatting). CCXT's
+        # parse8601() requires ISO-8601-like input and silently returns
+        # None for anything else, so honoring an arbitrary display
+        # format here (e.g. "%d-%m-%Y %H:%M:%S") breaks the request.
+        datetime_format = CCXT_DATETIME_FORMAT
 
         if not exchange.has['fetchOHLCV']:
             raise OperationalException(

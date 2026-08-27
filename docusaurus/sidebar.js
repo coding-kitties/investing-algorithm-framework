@@ -11,11 +11,15 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
-                    id: 'Getting Started/simple-example',
+                    id: 'Getting Started/example-application',
                 },
                 {
                     type: 'doc',
                     id: 'Getting Started/application-setup',
+                },
+                {
+                  type: 'doc',
+                  id: 'Getting Started/strategies',
                 },
                 {
                     type: 'doc',
@@ -24,10 +28,6 @@ const sidebars = {
                 {
                     type: 'doc',
                     id: 'Getting Started/portfolio-configuration',
-                },
-                {
-                  type: 'doc',
-                  id: 'Getting Started/strategies',
                 },
                 {
                     type: 'doc',

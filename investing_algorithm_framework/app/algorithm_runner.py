@@ -193,7 +193,10 @@ class AlgorithmRunner:
             try:
                 event_loop_service.start(**run_kwargs)
             except Exception as e:
-                logger.error(f"Algorithm loop stopped with an error: {e}")
+                logger.error(
+                    f"Algorithm loop stopped with an error: {e}",
+                    exc_info=True,
+                )
                 with self._lock:
                     self._error = str(e)
             finally:

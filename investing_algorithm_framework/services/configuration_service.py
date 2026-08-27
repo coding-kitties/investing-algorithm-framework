@@ -21,6 +21,7 @@ DEFAULT_CONFIGURATION = {
     "BACKTEST_DATA_DIRECTORY_NAME": "backtest_data",
     "SYMBOLS": None,
     "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
+    "TIMEZONE": None,
     "DATABASE_DIRECTORY_PATH": None,
     "DATABASE_DIRECTORY_NAME": "databases",
     DATA_DIRECTORY: "data",

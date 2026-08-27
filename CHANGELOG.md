@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a9] — 2026-08-27
+
+### Added
+
+- **`Schedule.every(interval, time_unit, anchor=None)`**: interval schedules now fire on fixed,
+  anchor-aligned wall-clock slots (default anchor: UNIX epoch UTC) instead of `last_run + step()`.
+  A manually/force-triggered run (`request_immediate_run()`) no longer shifts the next natural
+  scheduled run — e.g. "every 2 hours" always fires at `00:00`, `02:00`, ... regardless of when the
+  app started or a manual run happened. `Schedule.is_due`, `next_run_after`, and `iter_run_times`
+  (backtest schedule generation) all derive from the same anchor-aligned slot logic, so live and
+  backtest cadences agree.
+- **`TIMEZONE` app config**: alongside the existing `DATETIME_FORMAT`, lets logs display timestamps
+  in a local IANA timezone (e.g. `"Europe/Amsterdam"`) via the new `format_datetime_utc()` helper.
+  Applied consistently to the algorithm-level "next run" log and the per-strategy startup log.
+- Event loop now logs the next scheduled run for the algorithm as a whole (the earliest next run
+  across every registered strategy), not just per-strategy.
+
+### Fixed
+
+- **Windows CI flakiness from stale SQLite state leaking between tests**: `teardown_sqlalchemy()`
+  now calls `gc.collect()` after disposing the engine, since ORM reference cycles could keep the
+  underlying `sqlite3` connection/file handle open after `close_all_sessions()`/`engine.dispose()`.
+  Harmless on POSIX (unlinked-but-open files are still removable) but Windows' mandatory file
+  locking then blocked `shutil.rmtree()` of the database directory in test teardown, leaking a
+  contaminated database into whichever test ran next (mismatched portfolio/balance errors, missing
+  data providers) — only reproducible on Windows runners.
+- **`DATETIME_FORMAT` leaking into CCXT internals**: `CCXTOHLCVDataProvider.get_ohlcv()` used to
+  honor the app's user-facing `DATETIME_FORMAT` config when building its own CCXT API request
+  timestamps, which must stay in a fixed internal format — a custom display format (e.g.
+  `"%d-%m-%Y %H:%M:%S"`) made `ccxt.parse8601()` silently return `None`, causing
+  `'<' not supported between instances of 'NoneType' and 'NoneType'`. `DATETIME_FORMAT` now only
+  affects logging/display; CCXT request serialization always uses the fixed internal format.
+- `AlgorithmRunner`'s background loop error log now includes the traceback (`exc_info=True`)
+  instead of only the exception message, to aid diagnosing live/paper-trading crashes.
+
 ## [9.0.0a8] — 2026-08-27
 
 ### Added
