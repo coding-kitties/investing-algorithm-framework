@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a10] — 2026-08-28
+
+### Added
+
+- **Market-scoped deployment overrides for `add_market()`**: `<MARKET>_OVERRIDE_API_KEY`,
+  `<MARKET>_OVERRIDE_SECRET_KEY`, `<MARKET>_OVERRIDE_PAPER_TRADING`, and
+  `<MARKET>_OVERRIDE_PAPER_TRADING_MODE` replace the corresponding `add_market()` argument
+  whenever set, regardless of what was explicitly passed — intended for hosting platforms that
+  need a guarantee that injected credentials/paper-mode settings take effect. The existing
+  `<MARKET>_API_KEY` and `<MARKET>_SECRET_KEY` variables keep their original, backward-compatible
+  fallback behavior (only used when the argument is `None`). `market` and `trading_symbol`
+  arguments are never affected by either mechanism.
+- **`GET /api/portfolios/order-costs`**: returns the effective order cost (fees and slippage) of
+  the connected portfolios, supporting the same query filters as `/api/portfolios`.
+- **`GET /api/portfolios/order-cost-specification`**: returns the order cost specification (the
+  fee/slippage that would apply to a *new* order) for the connected portfolios.
+
+### Removed
+
+- **`/api/backtest-results/*` endpoints and their schemas** removed in favor of the portfolio
+  order-cost endpoints above and the existing `/api/orders`, `/api/trades`, and `/api/positions`
+  endpoints, which already support backtest-scoped filtering.
+
+### Changed
+
+- `TradeOrderEvaluator` (and its backtest/default subclasses) and `PaperTradingOrderExecutor`
+  updated to support the new order cost overview/specification resolution used by the endpoints
+  above.
+
+### Docs
+
+- Corrected and restructured `Getting Started/portfolio-configuration.md` and
+  `Getting Started/credentials.md` to match current `add_market()`/`PortfolioConfiguration`
+  behavior: `.env` loading, credential/override precedence, initial balance semantics per trading
+  mode, market-level fees/slippage, HEDGE position-mode support, and local paper-trading fill
+  behavior.
+
 ## [9.0.0a9] — 2026-08-27
 
 ### Added
@@ -24,12 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Market-scoped deployment configuration is now authoritative in `add_market()`**:
-  `<MARKET>_OVERRIDE_API_KEY`, `<MARKET>_OVERRIDE_SECRET_KEY`,
-  `<MARKET>_OVERRIDE_PAPER_TRADING`, and `<MARKET>_OVERRIDE_PAPER_TRADING_MODE` replace
-  explicitly passed arguments. The standard `<MARKET>_API_KEY` and `<MARKET>_SECRET_KEY`
-  variables retain their backward-compatible fallback behavior. `market` and `trading_symbol`
-  arguments remain unchanged.
 - **Windows CI flakiness from stale SQLite state leaking between tests**: `teardown_sqlalchemy()`
   now calls `gc.collect()` after disposing the engine, since ORM reference cycles could keep the
   underlying `sqlite3` connection/file handle open after `close_all_sessions()`/`engine.dispose()`.
