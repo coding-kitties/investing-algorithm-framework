@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Market-scoped deployment configuration is now authoritative in `add_market()`**:
+  `<MARKET>_OVERRIDE_API_KEY`, `<MARKET>_OVERRIDE_SECRET_KEY`,
+  `<MARKET>_OVERRIDE_PAPER_TRADING`, and `<MARKET>_OVERRIDE_PAPER_TRADING_MODE` replace
+  explicitly passed arguments. The standard `<MARKET>_API_KEY` and `<MARKET>_SECRET_KEY`
+  variables retain their backward-compatible fallback behavior. `market` and `trading_symbol`
+  arguments remain unchanged.
 - **Windows CI flakiness from stale SQLite state leaking between tests**: `teardown_sqlalchemy()`
   now calls `gc.collect()` after disposing the engine, since ORM reference cycles could keep the
   underlying `sqlite3` connection/file handle open after `close_all_sessions()`/`engine.dispose()`.

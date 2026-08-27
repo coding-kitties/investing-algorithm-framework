@@ -27,6 +27,24 @@ class OpenLongOnceStrategy(TradingStrategy):
         yield Signal(symbol="BTC", side=SignalSide.OPEN_LONG)
 
 
+class FireOnceStrategy(TradingStrategy):
+    """Signals exactly once across the process lifetime, so a second
+    ``app.run()`` call doesn't place a second order for the same
+    symbol while the first is still pending confirmation."""
+    schedule = Schedule.every(2, TimeUnit.SECOND)
+    symbols = ["BTC"]
+    position_sizes = [
+        PositionSize(symbol="BTC", percentage_of_portfolio=50.0)
+    ]
+    _fired = False
+
+    def generate_signals(self, context, data):
+        if FireOnceStrategy._fired:
+            return
+        FireOnceStrategy._fired = True
+        yield Signal(symbol="BTC", side=SignalSide.OPEN_LONG)
+
+
 class TestPaperTradingComponents(TestCase):
     """Unit tests for the local paper-trading executor/provider,
     with no app involved."""
@@ -36,19 +54,33 @@ class TestPaperTradingComponents(TestCase):
         self.assertTrue(executor.supports_market("binance"))
         self.assertFalse(executor.supports_market("KRAKEN"))
 
-    def test_execute_order_fills_immediately(self):
+    def test_execute_order_leaves_order_open_pending_confirmation(self):
         executor = PaperTradingOrderExecutor(markets=["BINANCE"])
         order = Order(
             order_type="LIMIT", order_side="BUY", amount=1,
             target_symbol="BTC", trading_symbol="EUR", price=100,
         )
-        filled = executor.execute_order(
+        result = executor.execute_order(
             portfolio=None, order=order, market_credential=None
         )
-        self.assertEqual(1, filled.filled)
-        self.assertEqual(0, filled.remaining)
-        self.assertEqual("CLOSED", filled.status)
-        self.assertTrue(filled.external_id.startswith("paper-"))
+        self.assertEqual(0, result.filled)
+        self.assertEqual(1, result.remaining)
+        self.assertEqual("OPEN", result.status)
+        self.assertTrue(result.external_id.startswith("paper-"))
+
+    def test_cancel_order_while_open_succeeds(self):
+        executor = PaperTradingOrderExecutor(markets=["BINANCE"])
+        order = Order(
+            order_type="LIMIT", order_side="BUY", amount=1,
+            target_symbol="BTC", trading_symbol="EUR", price=100,
+        )
+        placed = executor.execute_order(
+            portfolio=None, order=order, market_credential=None
+        )
+        canceled = executor.cancel_order(
+            portfolio=None, order=placed, market_credential=None
+        )
+        self.assertEqual("CANCELED", canceled.status)
 
     def test_cancel_order_after_fill_raises(self):
         executor = PaperTradingOrderExecutor(markets=["BINANCE"])
@@ -59,6 +91,7 @@ class TestPaperTradingComponents(TestCase):
         filled = executor.execute_order(
             portfolio=None, order=order, market_credential=None
         )
+        filled.status = "CLOSED"
         with self.assertRaises(OperationalException):
             executor.cancel_order(
                 portfolio=None, order=filled, market_credential=None
@@ -118,7 +151,7 @@ class TestPaperTradingApp(TestCase):
         "DataProviderService.get_ticker_data",
         return_value={"symbol": "BTCEUR", "ask": 100, "bid": 90},
     )
-    def test_local_paper_trading_fills_orders_without_real_credentials(
+    def test_local_paper_trading_orders_left_open_without_real_credentials(
         self, _
     ):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
@@ -135,12 +168,68 @@ class TestPaperTradingApp(TestCase):
 
         orders = app.container.order_service().get_all()
         self.assertEqual(1, len(orders))
-        self.assertEqual("CLOSED", orders[0].status)
+        # Left OPEN — PaperTradingOrderExecutor no longer instant-fills;
+        # DefaultTradeOrderEvaluator only confirms the fill once an
+        # OHLCV bar for the order's symbol touches its price, which
+        # can't happen within the same iteration the order was placed.
+        self.assertEqual("OPEN", orders[0].status)
         self.assertTrue(orders[0].external_id.startswith("paper-"))
 
         portfolios = app.container.portfolio_service().get_all()
         self.assertEqual(1, len(portfolios))
         self.assertEqual("BINANCE", portfolios[0].market)
+
+    @patch(
+        "investing_algorithm_framework.services.data_providers."
+        "DataProviderService.get_ohlcv_data"
+    )
+    @patch(
+        "investing_algorithm_framework.services.data_providers."
+        "DataProviderService.get_ticker_data",
+        return_value={"symbol": "BTCEUR", "ask": 100, "bid": 90},
+    )
+    def test_local_paper_trading_confirms_fill_against_ohlcv(
+        self, _, mock_get_ohlcv
+    ):
+        import polars as pl
+        from datetime import timedelta
+
+        FireOnceStrategy._fired = False
+        app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+        app.add_market(
+            market="BINANCE",
+            trading_symbol="EUR",
+            initial_balance=1000,
+            paper_trading=True,
+            paper_trading_mode=PaperTradingMode.LOCAL,
+        )
+        app.add_strategy(FireOnceStrategy)
+        mock_get_ohlcv.return_value = None
+        app.run(number_of_iterations=1)
+
+        orders = app.container.order_service().get_all()
+        self.assertEqual(1, len(orders))
+        self.assertEqual("OPEN", orders[0].status)
+
+        # A bar after the order's updated_at whose Low touches (or
+        # goes below) the BUY order's price confirms the fill, exactly
+        # like BacktestTradeOrderEvaluator does for backtests.
+        bar_time = orders[0].updated_at + timedelta(seconds=1)
+        mock_get_ohlcv.return_value = pl.DataFrame({
+            "Datetime": [bar_time],
+            "Open": [95.0],
+            "High": [105.0],
+            "Low": [90.0],
+            "Close": [95.0],
+            "Volume": [1000.0],
+        })
+
+        app.run(number_of_iterations=1)
+
+        orders = app.container.order_service().get_all()
+        self.assertEqual(1, len(orders))
+        self.assertEqual("CLOSED", orders[0].status)
+        self.assertEqual(orders[0].amount, orders[0].filled)
 
     def test_broker_paper_trading_raises_when_sandbox_unsupported(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})

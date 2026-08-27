@@ -33,9 +33,21 @@ app.add_market(market="bitvavo", trading_symbol="EUR", initial_balance=1000)
 ```
 
 `app.add_market(...)` registers both the portfolio configuration and a
-`MarketCredential` for the market. If `api_key`/`secret_key` aren't passed
-explicitly, they're resolved from the environment variables above the first
-time the app initializes.
+`MarketCredential` for the market. The standard variables above are
+fallbacks: an explicitly passed `api_key` or `secret_key` takes precedence.
+
+For operator-controlled deployments that must replace values supplied by an
+entry script, use the explicit override variables:
+
+```bash
+BITVAVO_OVERRIDE_API_KEY=<authoritative_api_key>
+BITVAVO_OVERRIDE_SECRET_KEY=<authoritative_api_secret>
+```
+
+When set, these values override the corresponding `add_market()` arguments.
+
+The override is keyed by the market selected by the `market` argument; it
+does not change the configured market or trading symbol.
 
 ## Explicit Credentials
 

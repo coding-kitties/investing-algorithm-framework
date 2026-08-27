@@ -54,7 +54,7 @@ You don't have to check this yourself — passing `paper_trading_mode=PaperTradi
 
 **If your broker/exchange does not support it:**
 
-1. No sandbox credentials to obtain — the local simulator never makes a network call.
+1. No sandbox credentials to obtain — the local simulator never makes a network call to place, cancel, or query orders (resolving a fee estimate does make a one-time, unauthenticated `load_markets()` call per exchange — see below).
 2. Set `paper_trading_mode=PaperTradingMode.LOCAL` explicitly (or leave `AUTO`, which falls back here automatically):
 
    ```python
@@ -67,7 +67,7 @@ You don't have to check this yourself — passing `paper_trading_mode=PaperTradi
    )
    ```
 3. You can omit `api_key`/`secret_key` entirely — the framework fills in harmless placeholders so credential validation doesn't block startup.
-4. Be aware of the [limitations](#limitations) of the local simulator (no slippage/partial fills/order-book depth) before trusting its results too heavily.
+4. Be aware of the [limitations](#limitations) of the local simulator before trusting its results too heavily.
 
 ## Two ways execution gets simulated
 
@@ -81,11 +81,11 @@ This still requires **sandbox-issued credentials** — register them exactly lik
 
 ### 2. Local simulator (`PaperTradingMode.LOCAL`, or `AUTO` fallback)
 
-When the exchange has no sandbox (or you explicitly choose `LOCAL`), the framework simulates execution itself:
+When the exchange has no sandbox (or you explicitly choose `LOCAL`), the framework simulates execution itself, validated against real OHLCV data — the same way the event-backtest engine validates fills:
 
-- No network calls are ever made to place, cancel, or query orders.
-- Every order fills **immediately and completely** at its own `price` — for LIMIT orders this is the price your strategy set; for MARKET orders it's the latest price already resolved for sizing (see `Context.create_market_order`). There is no partial-fill or order-book simulation.
-- No real credentials are required — the executor and portfolio provider never touch the network. If you don't supply `api_key`/`secret_key`, the framework registers harmless placeholder values internally so market-credential validation doesn't block startup.
+- Orders are **not** instant-filled. `PaperTradingOrderExecutor` leaves every order `OPEN`; the event loop's `DefaultTradeOrderEvaluator` only confirms a fill once an OHLCV bar for the order's symbol actually trades through its price — a LIMIT/STOP order fills when the market touches its price, and a MARKET order fills at the open of the next available candle. No network calls are made to place, cancel, or query orders.
+- **Cost is estimated realistically by default.** If the strategy or market hasn't configured an explicit `TradingCost`, the executor resolves the exchange's real, publicly advertised taker fee via ccxt's `load_markets()` (cached per exchange) instead of assuming zero cost. Configure a `TradingCost` (with a `fee_percentage`/`slippage_percentage`/`slippage_model`) on the strategy or market to override this with your own assumptions, exactly like in a backtest.
+- No real credentials are required — the executor and portfolio provider never touch the network for order operations. If you don't supply `api_key`/`secret_key`, the framework registers harmless placeholder values internally so market-credential validation doesn't block startup.
 - The portfolio's cash balance is entirely local: `initial_balance` is the account's *only* funding source. There is no real exchange balance to reconcile against.
 
 ## `PaperTradingMode.AUTO` vs. `BROKER` vs. `LOCAL`
@@ -113,9 +113,10 @@ app.add_market(market="BINANCE", trading_symbol="EUR")  # live, unaffected
 
 ## Configuring market/trading_symbol/initial_balance from the environment
 
-All three of `market`, `trading_symbol`, and `initial_balance` can be set via environment variables instead of arguments — see [Portfolio Configuration](../Getting%20Started/portfolio-configuration#configuring-market-trading-symbol-and-initial-balance-from-environment-variables). This is particularly useful for paper trading: the same deployed code can be pointed at a different paper-traded market per environment purely through configuration.
+All three of `market`, `trading_symbol`, and `initial_balance` can be set via environment variables instead of arguments — see [Portfolio Configuration](../Getting%20Started/portfolio-configuration#general-fallbacks-market-trading_symbol-initial_balance). This is particularly useful for paper trading: the same deployed code can be pointed at a different paper-traded market per environment purely through configuration.
 
 ## Limitations
 
-- The local simulator has no notion of slippage, partial fills, order book depth, or rejection by the exchange for size/precision — it always fills the full requested amount at the requested price. If you need to model those effects for paper trading, prefer `PaperTradingMode.BROKER` against a real sandbox.
+- The local simulator has no order-book depth or rejection by the exchange for size/precision. Fills are validated against OHLCV bars (same mechanism as the event-backtest engine), so LIMIT/STOP orders can remain open for multiple iterations until the market actually trades through their price, and MARKET orders fill at the next candle's open rather than instantly.
+- The default cost estimate (when no `TradingCost` is configured) is the exchange's advertised **taker** fee only — it doesn't know whether your strategy would actually get maker pricing, and it applies no slippage unless you configure a `TradingCost`/`slippage_model` yourself. If the `load_markets()` lookup fails for any reason (unsupported exchange, no network access), the cost silently falls back to zero rather than raising.
 - `PositionMode.HEDGE` is independently backtest-only for the bundled CCXT adapters (see [Position Modes](position-modes)) — this is unrelated to, and not relaxed by, paper trading.

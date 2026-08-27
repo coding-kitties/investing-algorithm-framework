@@ -3,7 +3,8 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from investing_algorithm_framework import create_app, OperationalException, \
-    PositionMode, RESOURCE_DIRECTORY
+    PaperTradingMode, PositionMode, RESOURCE_DIRECTORY
+from investing_algorithm_framework.domain import ImproperlyConfigured
 from investing_algorithm_framework.domain import ENVIRONMENT, Environment
 from investing_algorithm_framework.infrastructure import CCXTOrderExecutor, \
     CCXTPortfolioProvider
@@ -53,6 +54,136 @@ class Test(TestCase):
         self.assertEqual(
             1500.0, portfolio_configurations[0].initial_balance
         )
+
+    def test_market_credential_overrides_replace_arguments(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "BINANCE_OVERRIDE_API_KEY": "environment-api-key",
+                "BINANCE_OVERRIDE_SECRET_KEY": "environment-secret-key",
+            },
+            clear=False,
+        ):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            app.add_market(
+                market="binance",
+                trading_symbol="EUR",
+                api_key="argument-api-key",
+                secret_key="argument-secret-key",
+            )
+
+        credential = app.get_market_credential("BINANCE")
+        self.assertEqual("environment-api-key", credential.api_key)
+        self.assertEqual("environment-secret-key", credential.secret_key)
+
+    def test_normal_credential_environment_variables_do_not_override(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "BINANCE_API_KEY": "environment-api-key",
+                "BINANCE_SECRET_KEY": "environment-secret-key",
+            },
+            clear=False,
+        ):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            app.add_market(
+                market="binance",
+                trading_symbol="EUR",
+                api_key="argument-api-key",
+                secret_key="argument-secret-key",
+            )
+
+        credential = app.get_market_credential("BINANCE")
+        credential.initialize()
+        self.assertEqual("argument-api-key", credential.api_key)
+        self.assertEqual("argument-secret-key", credential.secret_key)
+
+    def test_paper_trading_overrides_replace_arguments(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "BINANCE_OVERRIDE_PAPER_TRADING": "true",
+                "BINANCE_OVERRIDE_PAPER_TRADING_MODE": "LOCAL",
+            },
+            clear=False,
+        ):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            app.add_market(
+                market="binance",
+                trading_symbol="EUR",
+                initial_balance=1000,
+                paper_trading=False,
+                paper_trading_mode=PaperTradingMode.BROKER,
+            )
+
+        configuration = app.get_portfolio_configurations()[0]
+        self.assertTrue(configuration.paper_trading)
+        self.assertEqual(
+            PaperTradingMode.LOCAL, configuration.paper_trading_mode
+        )
+
+    def test_false_paper_trading_environment_overrides_true_argument(self):
+        with patch.dict(
+            "os.environ",
+            {"BINANCE_OVERRIDE_PAPER_TRADING": "false"},
+            clear=False,
+        ):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            app.add_market(
+                market="binance",
+                trading_symbol="EUR",
+                paper_trading=True,
+                paper_trading_mode=PaperTradingMode.LOCAL,
+            )
+
+        configuration = app.get_portfolio_configurations()[0]
+        self.assertFalse(configuration.paper_trading)
+
+    def test_market_and_trading_symbol_arguments_are_not_overridden(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "MARKET": "kraken",
+                "TRADING_SYMBOL": "USD",
+                "BINANCE_OVERRIDE_API_KEY": "environment-api-key",
+            },
+            clear=False,
+        ):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            app.add_market(market="binance", trading_symbol="EUR")
+
+        configuration = app.get_portfolio_configurations()[0]
+        self.assertEqual("BINANCE", configuration.market)
+        self.assertEqual("EUR", configuration.trading_symbol)
+        self.assertEqual(
+            "environment-api-key",
+            app.get_market_credential("BINANCE").api_key,
+        )
+
+    def test_invalid_paper_trading_environment_value_fails_fast(self):
+        with patch.dict(
+            "os.environ",
+            {"BINANCE_OVERRIDE_PAPER_TRADING": "sometimes"},
+            clear=False,
+        ):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            with self.assertRaisesRegex(
+                ImproperlyConfigured, "BINANCE_OVERRIDE_PAPER_TRADING"
+            ):
+                app.add_market(market="binance", trading_symbol="EUR")
+
+    def test_invalid_paper_trading_mode_override_fails_fast(self):
+        with patch.dict(
+            "os.environ",
+            {"BINANCE_OVERRIDE_PAPER_TRADING_MODE": "invalid"},
+            clear=False,
+        ):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            with self.assertRaisesRegex(
+                ImproperlyConfigured,
+                "BINANCE_OVERRIDE_PAPER_TRADING_MODE",
+            ):
+                app.add_market(market="binance", trading_symbol="EUR")
 
     def test_add(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})

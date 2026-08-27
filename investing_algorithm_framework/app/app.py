@@ -46,6 +46,24 @@ COLOR_GREEN = '\033[92m'
 COLOR_YELLOW = '\033[93m'
 
 
+def _parse_environment_boolean(variable_name, fallback):
+    value = os.getenv(variable_name)
+
+    if value is None:
+        return fallback
+
+    normalized = value.strip().lower()
+    if normalized in ("1", "true", "yes", "on"):
+        return True
+    if normalized in ("0", "false", "no", "off"):
+        return False
+
+    raise ImproperlyConfigured(
+        f"{variable_name} environment variable {value!r} is not a valid "
+        f"boolean; use true/false, yes/no, on/off, or 1/0"
+    )
+
+
 def _build_strategy_universe_map(strategies, universe):
     """Thin wrapper around the domain helper of the same name; kept for
     backwards compatibility with code paths inside ``app.py``."""
@@ -987,7 +1005,9 @@ class App:
                 .trade_take_profit_service(),
                 configuration_service=self.container.configuration_service(),
                 blotter=self._blotter,
-                context=self.context
+                context=self.context,
+                trading_costs=self._collect_trading_costs(algorithm),
+                portfolio_configuration=self._first_portfolio_configuration(),
             )
             event_loop_service = EventLoopService(
                 configuration_service=self.container.configuration_service(),
@@ -2475,8 +2495,14 @@ class App:
             trading_symbol: Trading symbol for the portfolio. Falls
                 back to the ``TRADING_SYMBOL`` environment variable
                 when not given.
-            api_key: API key for the market
-            secret_key: Secret key for the market
+            api_key: API key for the market. Overridden by
+                ``{MARKET}_OVERRIDE_API_KEY`` when set. If omitted,
+                ``{MARKET}_API_KEY`` remains a fallback during app
+                initialization.
+            secret_key: Secret key for the market. Overridden by
+                ``{MARKET}_OVERRIDE_SECRET_KEY`` when set. If omitted,
+                ``{MARKET}_SECRET_KEY`` remains a fallback during app
+                initialization.
             initial_balance: Initial balance for the market. Falls
                 back to the ``INITIAL_BALANCE`` environment variable
                 when not given.
@@ -2490,18 +2516,52 @@ class App:
                 HEDGE stores independent long and short legs.
             paper_trading: When True, no real orders are ever placed
                 for this market. See ``paper_trading_mode`` for how
-                execution is simulated.
+                execution is simulated. Overridden by
+                ``{MARKET}_OVERRIDE_PAPER_TRADING`` when set.
             paper_trading_mode: One of ``PaperTradingMode.AUTO``
                 (default; prefers the broker's own sandbox/testnet,
                 falls back to the local simulator),
                 ``PaperTradingMode.BROKER`` (require the broker's
                 sandbox; raises if unsupported), or
                 ``PaperTradingMode.LOCAL`` (always simulate locally,
-                no network calls to place orders).
+                no network calls to place orders). Overridden by
+                ``{MARKET}_OVERRIDE_PAPER_TRADING_MODE`` when set.
 
         Returns:
             None
         """
+
+        effective_market = market if market is not None else os.getenv(
+            "MARKET"
+        )
+        if effective_market is not None:
+            environment_prefix = effective_market.upper()
+            api_key = os.environ.get(
+                f"{environment_prefix}_OVERRIDE_API_KEY", api_key
+            )
+            secret_key = os.environ.get(
+                f"{environment_prefix}_OVERRIDE_SECRET_KEY", secret_key
+            )
+            paper_trading = _parse_environment_boolean(
+                f"{environment_prefix}_OVERRIDE_PAPER_TRADING",
+                paper_trading,
+            )
+
+            paper_trading_mode_override = os.getenv(
+                f"{environment_prefix}_OVERRIDE_PAPER_TRADING_MODE"
+            )
+            if paper_trading_mode_override is not None:
+                try:
+                    paper_trading_mode = PaperTradingMode(
+                        paper_trading_mode_override.strip().lower()
+                    )
+                except ValueError as error:
+                    raise ImproperlyConfigured(
+                        f"{environment_prefix}_OVERRIDE_PAPER_TRADING_MODE "
+                        f"environment variable "
+                        f"{paper_trading_mode_override!r} is not valid; "
+                        f"use auto, broker, or local"
+                    ) from error
 
         portfolio_configuration = PortfolioConfiguration(
             market=market,
@@ -2528,8 +2588,10 @@ class App:
             # MarketCredentialService without requiring the user to
             # configure API keys for a market that will never place a
             # real order.
-            api_key = api_key or "paper-trading"
-            secret_key = secret_key or "paper-trading"
+            if api_key is None:
+                api_key = "paper-trading"
+            if secret_key is None:
+                secret_key = "paper-trading"
 
         market_credential = MarketCredential(
             market=portfolio_configuration.market,
@@ -2834,6 +2896,32 @@ class App:
         )
 
     @staticmethod
+    def _collect_trading_costs(algorithm):
+        """
+        Gather every ``TradingCost`` declared on any registered
+        strategy's ``trading_costs`` attribute, for use by
+        ``DefaultTradeOrderEvaluator`` when resolving the cost of a
+        local paper-trading fill (mirrors how
+        ``BacktestTradeOrderEvaluator`` is assembled).
+        """
+        trading_costs = []
+        for strategy in algorithm.strategies:
+            trading_costs.extend(getattr(strategy, "trading_costs", []) or [])
+        return trading_costs
+
+    def _first_portfolio_configuration(self):
+        """
+        Returns the first configured ``PortfolioConfiguration``, used
+        as the market-level cost default for
+        ``DefaultTradeOrderEvaluator`` (mirrors
+        ``BacktestTradeOrderEvaluator``'s construction).
+        """
+        portfolio_configurations = self.container \
+            .portfolio_configuration_service().get_all()
+        return portfolio_configurations[0] if portfolio_configurations \
+            else None
+
+    @staticmethod
     def _log_next_scheduled_runs(
         algorithm,
         run_immediately_on_start: bool = True,
@@ -3025,6 +3113,8 @@ class App:
             portfolio_sync_service.sync_unallocated(portfolio)
             portfolio_sync_service.sync_orders(portfolio)
             logger.info(f"Portfolio synced: {portfolio.identifier}")
+
+        portfolio_service.get_order_cost_overview()
 
     def initialize_backtest_portfolios(self):
         """
