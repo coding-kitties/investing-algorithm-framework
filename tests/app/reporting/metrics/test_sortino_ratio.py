@@ -60,7 +60,10 @@ class TestGetSortinoRatio(unittest.TestCase):
         report.get_snapshots.return_value = snapshots
 
         ratio = get_sortino_ratio(report.get_snapshots(), risk_free_rate=0.027)
-        self.assertEqual(ratio, 0.0)
+        # The portfolio ends at 99 after -10% then +10%, so the ratio is
+        # negative. It read 0.0 because the downside deviation collapsed
+        # when a single losing period had no dispersion to measure.
+        self.assertAlmostEqual(ratio, -1.3743062, places=5)
 
     # def test_constant_returns(self):
     #     now = datetime.now()

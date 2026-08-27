@@ -14,7 +14,9 @@ symmetrically distributed.
 
 Formula:
 Sortino Ratio = (Mean Daily Return × Periods Per Year - Risk-Free Rate) /
-               (Downside Standard Deviation of Daily Returns × sqrt(Periods Per Year))
+               (Downside Deviation of Daily Returns × sqrt(Periods Per Year))
+
+where Downside Deviation = sqrt(mean(min(r, 0)**2)) over ALL periods.
 
 """
 
@@ -41,7 +43,9 @@ def get_sortino_ratio(
     Where:
         - Annualized Return is the CAGR of the investment
         - Risk-Free Rate is the return of a risk-free asset (e.g. treasury bills)
-        - Downside Standard Deviation is the standard deviation of negative returns
+        - Downside Standard Deviation is the root-mean-square shortfall
+          below the target, averaged over every period (not the standard
+          deviation of the negative returns alone)
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
