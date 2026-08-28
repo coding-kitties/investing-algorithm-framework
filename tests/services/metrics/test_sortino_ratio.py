@@ -52,6 +52,49 @@ class TestGetSortinoRatio(unittest.TestCase):
     # Basic Functionality Tests
     # ==========================================================
 
+    def test_sortino_ratio_finite_when_losses_are_uniform(self):
+        """Consistent losses must not send the ratio to infinity.
+
+        Downside deviation is the shortfall below the target, so a strategy that
+        loses the same amount on every losing day has a well-defined, non-zero
+        downside risk. Measuring the DISPERSION among those losses instead makes
+        the denominator collapse to floating-point noise and the ratio explode.
+        """
+        import random
+        random.seed(42)
+        values = [1000]
+        for _ in range(199):
+            change = 0.002 if random.random() > 0.3 else -0.003
+            values.append(values[-1] * (1 + change))
+
+        result = get_sortino_ratio(self._create_snapshots(values), risk_free_rate=0.03)
+
+        # The module docstring grades > 3 as "Excellent - rare"; anything past
+        # that scale is a broken denominator, not a good strategy.
+        self.assertLess(abs(result), 1000)
+
+    def test_downside_deviation_of_uniform_losses_is_the_loss_size(self):
+        """Three 10% losses have a downside deviation of 10%, not of zero."""
+        from investing_algorithm_framework.services.metrics.standard_deviation import (
+            get_downside_std_of_daily_returns,
+        )
+        snapshots = self._create_snapshots([100, 90, 81, 72.9])
+        self.assertAlmostEqual(
+            get_downside_std_of_daily_returns(snapshots), 0.1, places=6
+        )
+
+    def test_bigger_losses_mean_more_downside_risk(self):
+        """Bigger losses must produce a bigger downside deviation."""
+        from investing_algorithm_framework.services.metrics.standard_deviation import (
+            get_downside_std_of_daily_returns,
+        )
+        small = self._create_snapshots([100, 99, 98.01, 97.0299])     # -1% each
+        large = self._create_snapshots([100, 95, 90.25, 85.7375])     # -5% each
+        self.assertGreater(
+            get_downside_std_of_daily_returns(large),
+            get_downside_std_of_daily_returns(small),
+        )
+
     def test_sortino_ratio_positive(self):
         """Test Sortino ratio with positive returns and some downside."""
         import random

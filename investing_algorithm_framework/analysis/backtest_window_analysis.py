@@ -151,10 +151,14 @@ def analyze_backtest_windows(
             (mean_return * periods_per_year) / volatility
             if volatility > 0 else 0.0
         )
-        downside = pct[pct < 0]
-        downside_vol = (
-            float(downside.std() * np.sqrt(periods_per_year))
-            if not downside.empty else 0.0
+        # Downside deviation is the root-mean-square shortfall below the
+        # target over EVERY period, matching `volatility` above. Taking the
+        # standard deviation of the losing periods alone measures their spread
+        # around their own mean, so a window whose losses are a similar size
+        # drives this toward zero and sends `sortino` to ~1e14.
+        shortfall = pct.clip(upper=0.0)
+        downside_vol = float(
+            np.sqrt((shortfall ** 2).mean()) * np.sqrt(periods_per_year)
         )
         sortino = (
             (mean_return * periods_per_year) / downside_vol

@@ -46,9 +46,10 @@ class TestStandardDeviationDownside(unittest.TestCase):
         ]
         report = MagicMock()
         report.get_snapshots.return_value = snapshots
-        # Returns: -10%, -10%
-        expected_std = np.std([-0.1, -0.1], ddof=1)
-        self.assertAlmostEqual(get_standard_deviation_downside_returns(report.get_snapshots()), expected_std, places=6)
+        # Returns: -10%, -10%. Both periods are 10% shortfalls, so the
+        # downside deviation is 0.1, not the ~0 dispersion between them.
+        self.assertAlmostEqual(
+            get_standard_deviation_downside_returns(report.get_snapshots()), 0.1, places=6)
 
     def test_mixed_returns(self):
         now = datetime.now()
@@ -59,8 +60,9 @@ class TestStandardDeviationDownside(unittest.TestCase):
         ]
         report = MagicMock()
         report.get_snapshots.return_value = snapshots
-        # Downside returns: [-0.1] — only 1 element, std(ddof=1) is undefined
-        self.assertEqual(get_standard_deviation_downside_returns(report.get_snapshots()), 0.0)
+        # Shortfalls over the two periods: -0.1 and 0 -> sqrt(0.01 / 2) = 0.0707107
+        self.assertAlmostEqual(
+            get_standard_deviation_downside_returns(report.get_snapshots()), 0.0707107, places=6)
 
     def test_nan_handling(self):
         now = datetime.now()
