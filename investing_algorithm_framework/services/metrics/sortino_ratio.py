@@ -54,18 +54,26 @@ def get_sortino_ratio(
             (e.g., 0.047 for 4.7%).
 
     Returns:
-        float: The Sortino Ratio.
+        float: The Sortino Ratio. Returns ``0.0`` when there is not enough
+            data, and ``float('inf')`` when no period fell below the target
+            but the excess return is positive (mirrors the division-by-zero
+            convention used by ``get_profit_factor`` and ``get_omega_ratio``).
     """
     snapshots = sorted(snapshots, key=lambda s: s.created_at)
 
     if not snapshots:
-        return float('inf')
+        return 0.0
 
     mean_daily_return = get_mean_daily_return(snapshots)
     std_downside_daily_return = get_downside_std_of_daily_returns(snapshots)
 
     if std_downside_daily_return == 0:
-        return 0.0
+        # No period fell below the target, so there is no downside risk to
+        # divide by. This mirrors the division-by-zero convention already used
+        # by get_profit_factor and get_omega_ratio: unbounded when the excess
+        # return is positive, 0.0 when there is nothing to reward.
+        excess_return = mean_daily_return * 365 - risk_free_rate
+        return float('inf') if excess_return > 0 else 0.0
 
     # Formula: Sharpe Ratio = (Mean Daily Return × Periods Per Year - Risk-Free Rate) /
     # (Standard Deviation of Daily Returns × sqrt(Periods Per Year))
