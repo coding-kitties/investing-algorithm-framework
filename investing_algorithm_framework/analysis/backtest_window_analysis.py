@@ -162,7 +162,10 @@ def analyze_backtest_windows(
         )
         sortino = (
             (mean_return * periods_per_year) / downside_vol
-            if downside_vol > 0 else 0.0
+            if downside_vol > 0
+            # No period fell below the target. Same convention as
+            # get_sortino_ratio, get_profit_factor and get_omega_ratio.
+            else (float('inf') if mean_return > 0 else 0.0)
         )
 
         rolling_max = price.cummax()
