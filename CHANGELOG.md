@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a12] — 2026-08-28
+
+### Fixed
+
+- **Downside-deviation-based metrics returning misleading zero/near-infinite
+  values**: `get_sortino_ratio`, `get_calmar_ratio`, and their
+  `analyze_backtest_windows` equivalents now consistently return `inf` when
+  there is no downside risk to divide by but the return is positive, and
+  `0.0` otherwise — matching the convention already used by
+  `get_profit_factor`/`get_omega_ratio`. Previously:
+  - `get_downside_std_of_daily_returns` measured the *dispersion among the
+    losing periods* rather than the shortfall over every period, so a
+    strategy with similarly-sized losses could send `sortino_ratio` toward
+    `~1e14` instead of a bounded, realistic value.
+  - A run with **no losing periods at all** reported `sortino_ratio` /
+    `calmar_ratio` of a flat `0.0`, which the HTML report then painted as
+    "Suboptimal", even though a profitable run with zero downside/drawdown
+    is an excellent outcome, not a bad one.
+  
+  **Breaking**: `sortino_ratio` and `calmar_ratio` values in reports
+  generated before this release are not directly comparable to values
+  generated after it.
+
+### Added
+
+- **`<MARKET>_OVERRIDE_INITIAL_BALANCE`**: closes the same deployment-override
+  gap that `<MARKET>_OVERRIDE_API_KEY`/`_SECRET_KEY`/`_PAPER_TRADING`/
+  `_PAPER_TRADING_MODE` already covered — `initial_balance` passed to
+  `add_market()` (including a value hardcoded in an entry script) is now
+  replaced by this environment variable whenever it is set.
+
 ## [9.0.0a11] — 2026-08-28
 
 ### Fixed
