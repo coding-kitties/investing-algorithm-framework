@@ -64,6 +64,21 @@ def _parse_environment_boolean(variable_name, fallback):
     )
 
 
+def _parse_environment_float(variable_name, fallback):
+    value = os.getenv(variable_name)
+
+    if value is None:
+        return fallback
+
+    try:
+        return float(value)
+    except ValueError:
+        raise ImproperlyConfigured(
+            f"{variable_name} environment variable {value!r} is not a "
+            f"valid number"
+        )
+
+
 def _build_strategy_universe_map(strategies, universe):
     """Thin wrapper around the domain helper of the same name; kept for
     backwards compatibility with code paths inside ``app.py``."""
@@ -2505,7 +2520,8 @@ class App:
                 initialization.
             initial_balance: Initial balance for the market. Falls
                 back to the ``INITIAL_BALANCE`` environment variable
-                when not given.
+                when not given. Overridden by
+                ``{MARKET}_OVERRIDE_INITIAL_BALANCE`` when set.
             fee_percentage: Default fee percentage for all trades
                 on this market (e.g. 0.1 for 0.1%). Can be overridden
                 per-symbol via TradingCost on the strategy.
@@ -2545,6 +2561,10 @@ class App:
             paper_trading = _parse_environment_boolean(
                 f"{environment_prefix}_OVERRIDE_PAPER_TRADING",
                 paper_trading,
+            )
+            initial_balance = _parse_environment_float(
+                f"{environment_prefix}_OVERRIDE_INITIAL_BALANCE",
+                initial_balance,
             )
 
             paper_trading_mode_override = os.getenv(

@@ -177,7 +177,10 @@ def analyze_backtest_windows(
         ) * 100
         calmar = (
             annual_return / abs(max_drawdown)
-            if max_drawdown < 0 else 0.0
+            if max_drawdown < 0
+            # No drawdown at all. Same convention as get_calmar_ratio,
+            # get_sortino_ratio, get_profit_factor and get_omega_ratio.
+            else (float('inf') if annual_return > 0 else 0.0)
         )
 
         skew = float(pct.skew()) if len(pct) > 2 else float("nan")

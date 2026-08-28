@@ -118,21 +118,23 @@ BITVAVO_OVERRIDE_API_KEY=<sandbox-or-live-api-key>
 BITVAVO_OVERRIDE_SECRET_KEY=<sandbox-or-live-secret>
 BITVAVO_OVERRIDE_PAPER_TRADING=true
 BITVAVO_OVERRIDE_PAPER_TRADING_MODE=local
+BITVAVO_OVERRIDE_INITIAL_BALANCE=1000
 ```
 
 Unlike the fallback variables above, these **replace** the corresponding
 `add_market()` argument whenever set, regardless of what was passed:
 `<MARKET>_OVERRIDE_API_KEY` and `<MARKET>_OVERRIDE_SECRET_KEY` override
-`api_key`/`secret_key`, and `<MARKET>_OVERRIDE_PAPER_TRADING`/
+`api_key`/`secret_key`, `<MARKET>_OVERRIDE_PAPER_TRADING`/
 `<MARKET>_OVERRIDE_PAPER_TRADING_MODE` override `paper_trading`/
-`paper_trading_mode`. The prefix comes from the market already selected by
-the call — these variables never redirect `market` or `trading_symbol`
-themselves.
+`paper_trading_mode`, and `<MARKET>_OVERRIDE_INITIAL_BALANCE` overrides
+`initial_balance` — including a value hardcoded in an entry script. The
+prefix comes from the market already selected by the call — these
+variables never redirect `market` or `trading_symbol` themselves.
 
 Paper-trading booleans accept `true`/`false`, `yes`/`no`, `on`/`off`, and
 `1`/`0`, case-insensitively. Modes accept `auto`, `broker`, and `local`,
-also case-insensitively. Invalid values fail fast with
-`ImproperlyConfigured`.
+also case-insensitively. `INITIAL_BALANCE` must parse as a number.
+Invalid values fail fast with `ImproperlyConfigured`.
 
 These overrides apply only to `add_market()`. Directly constructed
 `PortfolioConfiguration` objects only read the general fallback variables

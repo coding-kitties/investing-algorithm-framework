@@ -139,6 +139,35 @@ class Test(TestCase):
         configuration = app.get_portfolio_configurations()[0]
         self.assertFalse(configuration.paper_trading)
 
+    def test_initial_balance_override_replaces_argument(self):
+        with patch.dict(
+            "os.environ",
+            {"BINANCE_OVERRIDE_INITIAL_BALANCE": "1000"},
+            clear=False,
+        ):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            app.add_market(
+                market="binance",
+                trading_symbol="EUR",
+                initial_balance=400,
+            )
+
+        configuration = app.get_portfolio_configurations()[0]
+        self.assertEqual(1000.0, configuration.initial_balance)
+
+    def test_invalid_initial_balance_override_fails_fast(self):
+        with patch.dict(
+            "os.environ",
+            {"BINANCE_OVERRIDE_INITIAL_BALANCE": "not-a-number"},
+            clear=False,
+        ):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            with self.assertRaisesRegex(
+                ImproperlyConfigured,
+                "BINANCE_OVERRIDE_INITIAL_BALANCE",
+            ):
+                app.add_market(market="binance", trading_symbol="EUR")
+
     def test_market_and_trading_symbol_arguments_are_not_overridden(self):
         with patch.dict(
             "os.environ",
