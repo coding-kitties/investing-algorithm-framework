@@ -161,8 +161,9 @@ class TestGetSortinoRatio(unittest.TestCase):
         """Test with empty snapshot list."""
         result = get_sortino_ratio([], risk_free_rate=0.03)
 
-        # Should return infinity as per current implementation
-        self.assertEqual(result, float('inf'))
+        # No data is not an unbounded result. Matches get_omega_ratio, which
+        # returns 0.0 when there are no returns to measure.
+        self.assertEqual(result, 0.0)
 
     def test_sortino_ratio_single_snapshot(self):
         """Test with single snapshot."""
@@ -195,7 +196,21 @@ class TestGetSortinoRatio(unittest.TestCase):
 
         result = get_sortino_ratio(snapshots, risk_free_rate=0.03)
 
-        # Zero downside deviation -> should return 0.0
+        # There is no downside risk to divide by and the excess return is
+        # positive, so the ratio is unbounded. This is the same convention
+        # get_profit_factor and get_omega_ratio use for a zero denominator.
+        self.assertEqual(result, float('inf'))
+
+    def test_sortino_ratio_no_downside_below_risk_free(self):
+        """No losing period, but the return does not beat the risk-free rate."""
+        # +0.0001% a day is positive every day, so downside deviation is zero,
+        # but the annualised excess return is negative.
+        values = [1000 * (1.000001 ** i) for i in range(100)]
+        snapshots = self._create_snapshots(values)
+
+        result = get_sortino_ratio(snapshots, risk_free_rate=0.03)
+
+        # Unbounded would be wrong here: there is nothing to reward.
         self.assertEqual(result, 0.0)
 
     def test_sortino_ratio_constant_values(self):

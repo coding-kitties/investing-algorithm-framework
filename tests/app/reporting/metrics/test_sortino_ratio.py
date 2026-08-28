@@ -29,7 +29,7 @@ class TestGetSortinoRatio(unittest.TestCase):
         report.get_snapshots.return_value = []
         self.assertEqual(
             get_sortino_ratio(report.get_snapshots(), risk_free_rate=0.027),
-            float("inf")
+            0.0
         )
 
     # def test_single_snapshot(self):
@@ -37,17 +37,17 @@ class TestGetSortinoRatio(unittest.TestCase):
     #     report.get_snapshots.return_value = [Snapshot(1000, datetime.now())]
     #     self.assertEqual(get_sortino_ratio(report.get_snapshots()), float("inf"))
 
-    # def test_all_returns_above_risk_free(self):
-    #     now = datetime.now()
-    #     snapshots = [
-    #         Snapshot(100, now),
-    #         Snapshot(110, now + timedelta(days=1)),
-    #         Snapshot(121, now + timedelta(days=2)),  # +10% twice
-    #     ]
-    #     report = MagicMock()
-    #     report.get_snapshots.return_value = snapshots
-    #     result = get_sortino_ratio(report.get_snapshots(), risk_free_rate=0.01)
-    #     self.assertEqual(result, float('inf'))
+    def test_all_returns_above_risk_free(self):
+        now = datetime.now()
+        snapshots = [
+            Snapshot(100, now),
+            Snapshot(110, now + timedelta(days=1)),
+            Snapshot(121, now + timedelta(days=2)),  # +10% twice
+        ]
+        report = MagicMock()
+        report.get_snapshots.return_value = snapshots
+        result = get_sortino_ratio(report.get_snapshots(), risk_free_rate=0.01)
+        self.assertEqual(result, float('inf'))
 
     def test_mixed_returns(self):
         now = datetime.now()
