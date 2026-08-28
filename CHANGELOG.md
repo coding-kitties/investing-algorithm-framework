@@ -5,7 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a11] — 2026-08-28
+
+### Fixed
+
+- **Missing `jinja2` runtime dependency**: the framework imports `jinja2`
+  directly (HTML backtest report generation) but did not declare it as a
+  dependency in `pyproject.toml`, causing
+  `ModuleNotFoundError: No module named 'jinja2'` in clean install
+  environments (e.g. serverless/Lambda deployments) that don't already have
+  it installed transitively. `jinja2` is now an explicit `>=3.1.6` runtime
+  dependency.
+
 ## [9.0.0a10] — 2026-08-28
+
 
 ### Added
 
