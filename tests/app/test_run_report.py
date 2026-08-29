@@ -344,3 +344,46 @@ class TestRunReport(TestCase):
         self.assertIsNotNone(updated_order)
         self.assertEqual("CLOSED", updated_order["status"])
 
+    @patch(
+        "investing_algorithm_framework.services.data_providers."
+        "DataProviderService.get_ohlcv_data"
+    )
+    @patch(
+        "investing_algorithm_framework.services.data_providers."
+        "DataProviderService.get_ticker_data"
+    )
+    def test_run_report_includes_still_open_untouched_order(
+        self, mock_get_ticker, mock_get_ohlcv
+    ):
+        mock_get_ticker.return_value = {
+            "symbol": "BTCEUR", "ask": 100, "bid": 90
+        }
+        mock_get_ohlcv.return_value = None
+        OpenLongOnceEverStrategy._fired = False
+        app = self._create_app(strategy_cls=OpenLongOnceEverStrategy)
+        app.run(number_of_iterations=1)
+
+        first_report = app.get_last_run_report()
+        self.assertEqual(1, len(first_report["orders"]))
+        order_id = first_report["orders"][0]["id"]
+        self.assertEqual("OPEN", first_report["orders"][0]["status"])
+
+        # Second run: no new signal, and the pending-order check is
+        # stubbed out so nothing touches the order at all — both
+        # created_at and updated_at fall before this run's window.
+        # It must still appear in the report solely because it is
+        # still OPEN at the venue, not because anything changed.
+        with patch(
+            "investing_algorithm_framework.services.order_service."
+            "order_service.OrderService.check_pending_orders"
+        ):
+            app.run(number_of_iterations=1)
+
+        second_report = app.get_last_run_report()
+        still_open_order = next(
+            (o for o in second_report["orders"] if o["id"] == order_id),
+            None,
+        )
+        self.assertIsNotNone(still_open_order)
+        self.assertEqual("OPEN", still_open_order["status"])
+

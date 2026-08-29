@@ -25,7 +25,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestMonteCarloTest, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY, Schedule, \
     Universe, PositionMode, RunReport, PaperTradingMode, DATETIME_FORMAT, \
-    DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE
+    DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE, OrderStatus
 from investing_algorithm_framework.domain.backtesting.study import Study
 from investing_algorithm_framework.domain.backtesting.backtest_engine import \
     BacktestEngine
@@ -3293,15 +3293,17 @@ class App:
         Assemble and persist a :class:`RunReport` for the run that
         just finished.
 
-        Orders are filtered to those created *or updated* at or after
-        ``run_started_at``, so an order placed in a previous run that
-        only got filled (or otherwise changed status) in this one is
-        still included — not just brand-new orders; positions,
-        portfolios, and trades reflect current state (there are
-        typically few enough of these live that a full snapshot is
-        more useful than a diff). Each order/trade dict already
-        carries its own ``strategy_id``, so a report covering several
-        strategies can be attributed per-order.
+        Orders are included if they are new, changed status this run
+        (e.g. got filled or canceled), or are still pending at the
+        venue regardless of when they were created — so a limit order
+        placed several runs ago and still waiting to fill keeps
+        showing up in every report until it finally resolves, instead
+        of only appearing in the run it was created and the run it
+        resolved. Positions, portfolios, and trades reflect current
+        state (there are typically few enough of these live that a
+        full snapshot is more useful than a diff). Each order/trade
+        dict already carries its own ``strategy_id``, so a report
+        covering several strategies can be attributed per-order.
         """
         order_service = self.container.order_service()
         trade_service = self.container.trade_service()
@@ -3325,10 +3327,20 @@ class App:
                 updated_at is not None and updated_at >= run_started_at
             )
 
+        def _in_report(order):
+            # New orders and orders that changed (e.g. got filled) this
+            # run, plus any order still pending at the venue regardless
+            # of when it was created — so a limit order placed several
+            # runs ago and still waiting to fill doesn't silently drop
+            # out of the report until it finally changes.
+            return _touched_this_run(order) or OrderStatus.is_pending(
+                order.status
+            )
+
         run_started_at = _aware(run_started_at)
         orders = [
             order.to_dict() for order in order_service.get_all()
-            if _touched_this_run(order)
+            if _in_report(order)
         ]
         positions = [
             position.to_dict() for position in position_service.get_all()

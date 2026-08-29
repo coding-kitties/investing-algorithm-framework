@@ -30,6 +30,11 @@ class RunReport(BaseModel):
         completed_at: When this invocation finished successfully.
         orders: Orders created during this run, most-recent last. Each
             order dict already carries its own ``strategy_id``.
+            Includes new orders, orders whose status changed this run
+            (e.g. filled/canceled), and any order still pending at the
+            venue regardless of when it was created — a still-open
+            limit order keeps appearing in every report until it
+            finally resolves.
         signals: Per-strategy, per-tick signal outcomes — every signal
             the strategy emitted this run, whether it turned into an
             order ("approved") or was dropped ("rejected", with the
