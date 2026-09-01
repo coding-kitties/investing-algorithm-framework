@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a13] — 2026-09-01
+
+### Fixed
+
+- **`App.run_backtest()` event-driven engine required a manually-registered
+  `PortfolioConfiguration`, unlike the vector engine**: calling
+  `run_backtest(..., study=study)` with `study.engines=[BacktestEngine.EVENT_DRIVEN]`
+  raised `OperationalException: No portfolios configured` even when
+  `study.universe` (market + trading_symbol) and `study.initial_capital`
+  fully specified a portfolio — the exact same `Study` worked fine with
+  `BacktestEngine.VECTOR`. The event-driven branch now builds a default
+  `PortfolioConfiguration` from the Study the same way the vector branch
+  already did, and raises a clearer, engine-specific error message if the
+  Study still doesn't specify enough to build one.
+- **`RunReport.orders` silently dropping still-open orders**: orders were
+  only included when created or updated within the current run's time
+  window. A pending order that `check_pending_orders` re-fetched as
+  identical (no field changes) issues no UPDATE, so `updated_at` never
+  bumps and the order silently disappeared from every subsequent report
+  until it finally changed. `orders` now also includes any order that is
+  still pending, regardless of when it was last touched.
+
+### Added
+
+- **`load_backtests()`**: recursively loads every `.obtf` bundle and/or
+  legacy backtest directory found anywhere under a directory tree (a
+  single `os.walk` pass, pruned as soon as a backtest is matched), for
+  storage layouts that group backtests into nested subfolders (e.g. one
+  per study/window). `load_backtests_from_directory()` gained a matching
+  `recursive=False` parameter — `load_backtests()` is a thin
+  `recursive=True` convenience wrapper around it.
+
 ## [9.0.0a12] — 2026-08-28
 
 ### Fixed
