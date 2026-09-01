@@ -88,6 +88,33 @@ def _build_strategy_universe_map(strategies, universe):
     return _domain_build(strategies, [universe] if universe else None)
 
 
+def _build_default_portfolio_configuration_from_study(study):
+    """Build a ``PortfolioConfiguration`` from ``study.universe`` /
+    ``study.initial_capital``, mirroring what a user would otherwise
+    have to configure manually via ``app.add_market()``. Returns
+    ``None`` when the Study doesn't fully specify a universe (market +
+    trading_symbol) and an initial capital, in which case callers
+    should fall back to any already-registered portfolio configuration.
+
+    Shared by both the vector and event-driven branches of
+    ``App.run_backtest()`` so a single ``Study`` behaves identically
+    regardless of which engine is selected.
+    """
+    universe = study.universe if study is not None else None
+    if (
+        universe is not None
+        and study.initial_capital is not None
+        and universe.market is not None
+        and universe.trading_symbol is not None
+    ):
+        return PortfolioConfiguration(
+            initial_balance=study.initial_capital,
+            market=universe.market,
+            trading_symbol=universe.trading_symbol,
+        )
+    return None
+
+
 def _apply_study_to_backtests(
     backtests,
     study,
@@ -1794,18 +1821,10 @@ class App:
                 )
 
             # Build portfolio configuration from universe when possible
-            if (
-                universe is not None
-                and study.initial_capital is not None
-                and universe.market is not None
-                and universe.trading_symbol is not None
-            ):
-                portfolio_configuration = PortfolioConfiguration(
-                    initial_balance=study.initial_capital,
-                    market=universe.market,
-                    trading_symbol=universe.trading_symbol,
-                )
-            else:
+            portfolio_configuration = (
+                _build_default_portfolio_configuration_from_study(study)
+            )
+            if portfolio_configuration is None:
                 portfolio_configurations = (
                     self.get_portfolio_configurations()
                 )
@@ -1867,6 +1886,34 @@ class App:
             )
             self.initialize_storage(remove_database_if_exists=True)
             self.initialize_backtest_services()
+
+            # Same as the vector branch: build a default portfolio
+            # configuration from study.universe/study.initial_capital
+            # when none has been registered yet, so a Study that fully
+            # specifies a universe works identically for both engines
+            # instead of requiring an explicit app.add_market() call
+            # only for the event-driven engine.
+            if not self.get_portfolio_configurations():
+                default_portfolio_configuration = (
+                    _build_default_portfolio_configuration_from_study(
+                        study
+                    )
+                )
+                if default_portfolio_configuration is not None:
+                    self.add_portfolio_configuration(
+                        default_portfolio_configuration
+                    )
+                else:
+                    raise OperationalException(
+                        "No portfolio configuration found for the "
+                        "event-driven backtest engine. Set "
+                        "study.initial_capital, universe.market and "
+                        "universe.trading_symbol on the Study, or add a "
+                        "portfolio configuration to the app (e.g. via "
+                        "app.add_market(...)) before calling "
+                        "run_backtest()."
+                    )
+
             self.initialize_backtest_portfolios()
 
             data_provider_service = self.container.data_provider_service()

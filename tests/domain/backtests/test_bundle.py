@@ -19,9 +19,13 @@ from investing_algorithm_framework.domain import (
     BUNDLE_FORMAT_VERSION,
     Position,
     PositionSnapshot,
+    load_backtests,
     load_backtests_from_directory,
     migrate_backtests,
     save_backtests_to_directory,
+)
+from investing_algorithm_framework.domain.backtesting.backtest_utils import (
+    iter_backtests_from_directory,
 )
 from investing_algorithm_framework.domain.backtesting.bundle import (
     _MAGIC,
@@ -353,6 +357,130 @@ class TestBackTestsDirectory(TestCase):
         )
         loaded = load_backtests_from_directory(bundle_dir, workers=2)
         self.assertEqual(len(loaded), 4)
+
+    def test_iter_backtests_from_directory_yields_all(self):
+        save_backtests_to_directory(self.backtests, self.tmp, workers=1)
+
+        results = list(iter_backtests_from_directory(self.tmp))
+        self.assertEqual(len(results), 4)
+        self.assertEqual(
+            sorted(b.algorithm_id for b in results),
+            ["algo_0", "algo_1", "algo_2", "algo_3"],
+        )
+
+    def test_iter_backtests_from_directory_respects_cap_and_filter(self):
+        save_backtests_to_directory(self.backtests, self.tmp, workers=1)
+
+        capped = list(
+            iter_backtests_from_directory(
+                self.tmp, number_of_backtests_to_load=2
+            )
+        )
+        self.assertEqual(len(capped), 2)
+
+        filtered = list(
+            iter_backtests_from_directory(
+                self.tmp,
+                filter_function=lambda b: b.algorithm_id == "algo_1",
+            )
+        )
+        self.assertEqual(
+            [b.algorithm_id for b in filtered], ["algo_1"]
+        )
+
+
+class TestLoadBacktestsRecursive(TestCase):
+    """Verify ``load_backtests`` finds bundles/legacy dirs nested in
+    subfolders, unlike the top-level-only ``load_backtests_from_directory``.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        base = Backtest.open(_FIXTURE)
+        cls.backtests = []
+        for i in range(4):
+            bt = Backtest.from_dict(base.to_dict())
+            bt.algorithm_id = f"algo_{i}"
+            bt.tag = "demo"
+            cls.backtests.append(bt)
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_finds_bundles_in_nested_subdirectories(self):
+        # Spread bundles across nested study/window subfolders, plus
+        # one legacy directory-format backtest, and some unrelated
+        # noise files that should be ignored.
+        save_backtests_to_directory(
+            self.backtests[:2],
+            os.path.join(self.tmp, "study_a", "window_1"),
+            workers=1,
+        )
+        save_backtests_to_directory(
+            self.backtests[2:3],
+            os.path.join(self.tmp, "study_b", "window_1"),
+            workers=1,
+        )
+        save_backtests_to_directory(
+            self.backtests[3:4],
+            os.path.join(self.tmp, "study_b", "window_2"),
+            format="directory",
+            workers=1,
+        )
+        with open(os.path.join(self.tmp, "notes.txt"), "w") as f:
+            f.write("not a backtest")
+
+        # Top-level scan doesn't find the real (nested) backtests —
+        # only recursive load_backtests() does.
+        top_level = load_backtests_from_directory(self.tmp)
+        self.assertNotIn(
+            "algo_0", [b.algorithm_id for b in top_level]
+        )
+
+        loaded = load_backtests(self.tmp, workers=2)
+        self.assertEqual(len(loaded), 4)
+        self.assertEqual(
+            sorted(b.algorithm_id for b in loaded),
+            ["algo_0", "algo_1", "algo_2", "algo_3"],
+        )
+
+    def test_does_not_descend_into_matched_legacy_directory(self):
+        save_backtests_to_directory(
+            self.backtests[:1],
+            os.path.join(self.tmp, "study_a"),
+            format="directory",
+            workers=1,
+        )
+        loaded = load_backtests(self.tmp, workers=1)
+        self.assertEqual(len(loaded), 1)
+        self.assertEqual(loaded[0].algorithm_id, "algo_0")
+
+    def test_filter_and_limit(self):
+        save_backtests_to_directory(
+            self.backtests,
+            os.path.join(self.tmp, "nested"),
+            workers=1,
+        )
+        loaded = load_backtests(
+            self.tmp,
+            filter_function=lambda b: b.algorithm_id != "algo_0",
+            workers=1,
+        )
+        self.assertEqual(len(loaded), 3)
+        self.assertNotIn("algo_0", [b.algorithm_id for b in loaded])
+
+        limited = load_backtests(
+            self.tmp, number_of_backtests_to_load=2, workers=1
+        )
+        self.assertEqual(len(limited), 2)
+
+    def test_nonexistent_directory_returns_empty_list(self):
+        self.assertEqual(
+            load_backtests(os.path.join(self.tmp, "missing")), []
+        )
 
 
 class TestBundleFormatV2(TestCase):

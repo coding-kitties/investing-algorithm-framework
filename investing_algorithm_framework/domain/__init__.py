@@ -55,6 +55,7 @@ from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BacktestMonteCarloTest, BacktestEvaluationFocus, \
     BacktestIndexRow, Universe, BacktestWindow, \
     generate_backtest_summary_metrics, load_backtests_from_directory, \
+    load_backtests, \
     save_backtests_to_directory, retag_backtests, migrate_backtests, \
     resolve_backtest_path, BUNDLE_EXT, BUNDLE_FORMAT_VERSION, \
     BacktestIndex, build_strategy_universe_map, stamp_backtest, \
@@ -198,6 +199,7 @@ __all__ = [
     'TradingCost',
     'ExposureRule',
     "load_backtests_from_directory",
+    "load_backtests",
     "save_backtests_to_directory",
     "retag_backtests",
     "migrate_backtests",

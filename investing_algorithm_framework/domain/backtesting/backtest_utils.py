@@ -334,62 +334,77 @@ def _retag_single(
     return True
 
 
-def load_backtests_from_directory(
-    directory_path: Union[str, Path],
-    filter_function: Callable[[Backtest], bool] = None,
-    number_of_backtests_to_load: int = None,
+def _discover_backtest_sources(
+    directory_path: Union[str, Path], recursive: bool = False
+) -> List[tuple]:
+    """Find ``.obtf`` bundle files and legacy backtest directories
+    under *directory_path*, returned as ``(path, kind)`` tuples.
+
+    When *recursive* is False, only entries directly inside
+    *directory_path* are considered (historical behaviour of
+    :func:`load_backtests_from_directory`). When True, the tree is
+    walked in a single ``os.walk`` pass, pruning recursion as soon as
+    a legacy backtest directory is matched — its internals (e.g. an
+    ``ohlcv/`` cache folder) are never additional backtests — so
+    large nested layouts (e.g. one subfolder per study/window) are
+    discovered without repeated ``os.listdir`` calls per subfolder.
+    """
+    sources: List[tuple] = []
+
+    if not recursive:
+        for entry in sorted(os.listdir(directory_path)):
+            if entry == "checkpoints.json" or entry.endswith(".py"):
+                continue
+            if entry == "index.parquet" or entry == "ohlcv":
+                continue
+            full = os.path.join(directory_path, entry)
+            if os.path.isfile(full):
+                if entry.endswith(BUNDLE_EXT) or is_bundle_file(full):
+                    sources.append((full, "bundle"))
+            elif os.path.isdir(full):
+                sources.append((full, "directory"))
+        return sources
+
+    for root, dirs, files in os.walk(directory_path):
+        dirs.sort()
+        if "ohlcv" in dirs:
+            dirs.remove("ohlcv")
+        for fname in sorted(files):
+            if fname == "checkpoints.json" or fname.endswith(".py"):
+                continue
+            if fname == "index.parquet":
+                continue
+            full = os.path.join(root, fname)
+            if fname.endswith(BUNDLE_EXT) or is_bundle_file(full):
+                sources.append((full, "bundle"))
+        # A legacy backtest directory is identified by algorithm_id.json
+        # plus at least one runs slot (v9.0: vector_runs/event_runs;
+        # legacy v8: a single runs/ dir).
+        for dname in list(dirs):
+            d = os.path.join(root, dname)
+            has_id = os.path.isfile(os.path.join(d, "algorithm_id.json"))
+            has_runs = (
+                os.path.isdir(os.path.join(d, "runs"))
+                or os.path.isdir(os.path.join(d, "vector_runs"))
+                or os.path.isdir(os.path.join(d, "event_runs"))
+            )
+            if has_id and has_runs:
+                sources.append((d, "directory"))
+                dirs.remove(dname)  # don't descend into a matched backtest
+
+    return sources
+
+
+def _load_backtests_from_sources(
+    sources: List[tuple],
     show_progress: bool = False,
     workers: Optional[int] = None,
 ) -> List[Backtest]:
-    """
-    Loads Backtest objects from the specified directory.
-
-    Auto-detects each entry: ``.obtf`` bundle files (issue #487) and
-    legacy backtest directories are both supported and may coexist in
-    the same parent directory.
-
-    Args:
-        directory_path (str): Path to the directory from which backtests
-            will be loaded.
-        filter_function (Callable[[Backtest], bool], optional): A function
-            that takes a Backtest object as input and returns True if the
-            backtest should be included in the result. Defaults to None.
-        number_of_backtests_to_load (int, optional): Maximum number of
-            backtests to load. If None, all backtests will be loaded.
-        show_progress (bool, optional): Whether to display a progress bar
-            while loading backtests. Defaults to False.
-        workers: Process pool size for parallel loads. Defaults to
-            ``min(8, os.cpu_count())``. Pass ``1`` to disable.
-
-    Returns:
-        List[Backtest]: List of loaded Backtest objects.
+    """Load every ``(path, kind)`` source, in parallel via a process
+    pool when there is more than one and *workers* != 1. Shared by
+    :func:`load_backtests_from_directory` and :func:`load_backtests`.
     """
     backtests: List[Backtest] = []
-
-    if not os.path.exists(directory_path):
-        logger.warning(
-            f"Directory {directory_path} does not exist. "
-            "No backtests loaded."
-        )
-        return backtests
-
-    # Build the load list: a list of (path, kind) tuples.
-    sources: List[tuple] = []
-    for entry in sorted(os.listdir(directory_path)):
-        if entry == "checkpoints.json" or entry.endswith(".py"):
-            continue
-        if entry == "index.parquet" or entry == "ohlcv":
-            continue
-        full = os.path.join(directory_path, entry)
-        if os.path.isfile(full):
-            if entry.endswith(BUNDLE_EXT) or is_bundle_file(full):
-                sources.append((full, "bundle"))
-        elif os.path.isdir(full):
-            sources.append((full, "directory"))
-
-    if number_of_backtests_to_load is not None:
-        sources = sources[: max(0, int(number_of_backtests_to_load))]
-
     n_workers = _resolve_workers(workers)
 
     pbar = None
@@ -455,6 +470,62 @@ def load_backtests_from_directory(
     if pbar is not None:
         pbar.close()
 
+    return backtests
+
+
+def load_backtests_from_directory(
+    directory_path: Union[str, Path],
+    filter_function: Callable[[Backtest], bool] = None,
+    number_of_backtests_to_load: int = None,
+    show_progress: bool = False,
+    workers: Optional[int] = None,
+    recursive: bool = False,
+) -> List[Backtest]:
+    """
+    Loads Backtest objects from the specified directory.
+
+    Auto-detects each entry: ``.obtf`` bundle files (issue #487) and
+    legacy backtest directories are both supported and may coexist in
+    the same parent directory.
+
+    Args:
+        directory_path (str): Path to the directory from which backtests
+            will be loaded.
+        filter_function (Callable[[Backtest], bool], optional): A function
+            that takes a Backtest object as input and returns True if the
+            backtest should be included in the result. Defaults to None.
+        number_of_backtests_to_load (int, optional): Maximum number of
+            backtests to load. If None, all backtests will be loaded.
+        show_progress (bool, optional): Whether to display a progress bar
+            while loading backtests. Defaults to False.
+        workers: Process pool size for parallel loads. Defaults to
+            ``min(8, os.cpu_count())``. Pass ``1`` to disable.
+        recursive (bool, optional): When True, also search
+            subdirectories (single ``os.walk`` pass, pruned as soon as
+            a backtest is matched) instead of only the top level of
+            *directory_path*. Defaults to False. See also
+            :func:`load_backtests`, a convenience wrapper with
+            ``recursive=True``.
+
+    Returns:
+        List[Backtest]: List of loaded Backtest objects.
+    """
+    if not os.path.exists(directory_path):
+        logger.warning(
+            f"Directory {directory_path} does not exist. "
+            "No backtests loaded."
+        )
+        return []
+
+    sources = _discover_backtest_sources(directory_path, recursive=recursive)
+
+    if number_of_backtests_to_load is not None:
+        sources = sources[: max(0, int(number_of_backtests_to_load))]
+
+    backtests = _load_backtests_from_sources(
+        sources, show_progress=show_progress, workers=workers
+    )
+
     if filter_function is not None:
         try:
             backtests = [bt for bt in backtests if filter_function(bt)]
@@ -462,6 +533,47 @@ def load_backtests_from_directory(
             logger.error(f"Error in filter_function: {fe}")
 
     return backtests
+
+
+def load_backtests(
+    directory_path: Union[str, Path],
+    filter_function: Callable[[Backtest], bool] = None,
+    number_of_backtests_to_load: int = None,
+    show_progress: bool = False,
+    workers: Optional[int] = None,
+) -> List[Backtest]:
+    """Recursively load every backtest found anywhere under
+    *directory_path*.
+
+    Convenience wrapper around
+    :func:`load_backtests_from_directory(..., recursive=True)
+    <load_backtests_from_directory>` — useful for storage layouts that
+    group ``.obtf`` bundles and/or legacy backtest directories into
+    nested subfolders (e.g. one per study or per backtest window).
+
+    Args:
+        directory_path: Root directory to scan recursively.
+        filter_function (Callable[[Backtest], bool], optional): A function
+            that takes a Backtest object as input and returns True if the
+            backtest should be included in the result. Defaults to None.
+        number_of_backtests_to_load (int, optional): Maximum number of
+            backtests to load (applied after discovery, before loading).
+        show_progress (bool, optional): Whether to display a progress bar
+            while loading backtests. Defaults to False.
+        workers: Process pool size for parallel loads. Defaults to
+            ``min(8, os.cpu_count())``. Pass ``1`` to disable.
+
+    Returns:
+        List[Backtest]: List of loaded Backtest objects.
+    """
+    return load_backtests_from_directory(
+        directory_path,
+        filter_function=filter_function,
+        number_of_backtests_to_load=number_of_backtests_to_load,
+        show_progress=show_progress,
+        workers=workers,
+        recursive=True,
+    )
 
 
 def iter_backtests_from_directory(
@@ -500,18 +612,9 @@ def iter_backtests_from_directory(
         )
         return
 
-    sources: List[tuple] = []
-    for entry in sorted(os.listdir(directory_path)):
-        if entry == "checkpoints.json" or entry.endswith(".py"):
-            continue
-        if entry == "index.parquet" or entry == "ohlcv":
-            continue
-        full = os.path.join(directory_path, entry)
-        if os.path.isfile(full):
-            if entry.endswith(BUNDLE_EXT) or is_bundle_file(full):
-                sources.append((full, "bundle"))
-        elif os.path.isdir(full):
-            sources.append((full, "directory"))
+    sources: List[tuple] = _discover_backtest_sources(
+        directory_path, recursive=False
+    )
 
     if number_of_backtests_to_load is not None:
         sources = sources[: max(0, int(number_of_backtests_to_load))]
