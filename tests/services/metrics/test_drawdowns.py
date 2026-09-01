@@ -387,3 +387,32 @@ class TestDrawdownConsistency(unittest.TestCase):
 
         for (_, ts), expected_ts in zip(drawdown_series, timestamps):
             self.assertEqual(ts, expected_ts)
+
+
+class TestMaxDrawdownReturnConvention(unittest.TestCase):
+    """Pin the documented return convention of ``get_max_drawdown``.
+
+    The docstring's own worked example is the thing that drifted: it promised
+    ``-12.5`` for a 12.5% drawdown while the function returns ``abs()`` of a
+    ``(equity - peak) / peak`` fraction. These assertions fail if either the
+    sign or the scale changes again.
+    """
+
+    def test_returns_a_positive_fraction_not_a_negative_percent(self):
+        snapshots = _make_snapshots(
+            [datetime(2024, 1, 1), datetime(2024, 1, 2)], [100.0, 87.5]
+        )
+        self.assertAlmostEqual(get_max_drawdown(snapshots), 0.125)
+
+    def test_scale_matches_get_twr_max_drawdown(self):
+        # Both are documented as fractions; a 30% decline is 0.3, not 30.0.
+        snapshots = _make_snapshots(
+            [datetime(2024, 1, 1), datetime(2024, 1, 2)], [200.0, 140.0]
+        )
+        self.assertAlmostEqual(get_max_drawdown(snapshots), 0.3)
+
+    def test_no_drawdown_is_zero(self):
+        snapshots = _make_snapshots(
+            [datetime(2024, 1, 1), datetime(2024, 1, 2)], [100.0, 110.0]
+        )
+        self.assertEqual(get_max_drawdown(snapshots), 0.0)
