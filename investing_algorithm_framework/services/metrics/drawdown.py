@@ -56,18 +56,20 @@ def get_drawdown_series(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
 
 def get_max_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
     """
-    Calculate the maximum drawdown of the portfolio as a percentage from the peak.
+    Calculate the maximum drawdown of the portfolio as a fraction of the peak.
 
     Max Drawdown is the maximum observed loss from a peak to a
     trough before a new peak is achieved.
 
-    It is expressed here as a negative percentage.
+    It is expressed here as a positive fraction, matching
+    :func:`get_twr_max_drawdown`.
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
 
     Returns:
-        float: The maximum drawdown as a negative percentage (e.g., -12.5 for a 12.5% drawdown).
+        float: The maximum drawdown as a positive fraction
+            (e.g., ``0.125`` for a 12.5% peak-to-trough decline).
     """
     equity_curve = get_equity_curve(snapshots)
 
