@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a14] — 2026-09-04
+
+### Added
+
+- **Broker-native mirror stop-loss/take-profit safety net**: `StopLossRule`/
+  `TakeProfitRule` gain `mirror_on_exchange` — when `True`, a resting
+  broker-native `STOP` order is placed on the exchange alongside the
+  client-side tracked rule as soon as a trade opens, so the rule keeps
+  working even if the bot is offline when the price crosses the trigger.
+  The client-side check remains the primary mechanism; the mirror order
+  is a safety net underneath it. Trade allocation/P&L accounting is
+  deferred until the mirror order is actually observed to fill, so a
+  merely-resting order never prematurely closes a trade. Whichever side
+  fires first (mirror or client-side) cancels the other's resting order
+  for that trade — including a sibling rule's mirror order, so a
+  mirrored stop-loss and a mirrored take-profit on the same trade can
+  never double-commit the same shares or leave one another orphaned on
+  the exchange. `OrderExecutor` gains a `supports_mirror_orders`
+  capability flag (the local paper-trading executor opts out); the
+  feature is a no-op in backtests. See the new
+  "Broker-Native Mirror Stop-Loss / Take-Profit" page under Advanced
+  Concepts in the docs.
+
+### Changed
+
+- `trading_costs` moved off `TradingStrategy` onto
+  `PortfolioConfiguration`/`Study.execution_config` — trading costs are
+  now a property of the venue/scenario, not the strategy's signal logic,
+  matching how they're actually resolved for live/paper trading and
+  backtests. `trading_symbol` removed from `TradingStrategy` (`symbols`
+  is unaffected); all examples and docs updated accordingly.
+
 ## [9.0.0a13] — 2026-09-01
 
 ### Fixed
