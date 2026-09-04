@@ -466,6 +466,7 @@ class Order(BaseModel):
 
     def add_pending_stop_loss(
         self, percentage, trailing=False, sell_percentage=100,
+        mirror_on_exchange=False,
     ):
         """Queue a stop-loss spec on this order. The rule will be
         materialized onto each trade created when the order fills."""
@@ -474,10 +475,12 @@ class Order(BaseModel):
             "percentage": percentage,
             "trailing": bool(trailing),
             "sell_percentage": sell_percentage,
+            "mirror_on_exchange": bool(mirror_on_exchange),
         })
 
     def add_pending_take_profit(
         self, percentage, trailing=False, sell_percentage=100,
+        mirror_on_exchange=False,
     ):
         """Queue a take-profit spec on this order. The rule will be
         materialized onto each trade created when the order fills."""
@@ -486,6 +489,7 @@ class Order(BaseModel):
             "percentage": percentage,
             "trailing": bool(trailing),
             "sell_percentage": sell_percentage,
+            "mirror_on_exchange": bool(mirror_on_exchange),
         })
 
     def get_size(self):

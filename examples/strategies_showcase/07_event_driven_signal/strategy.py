@@ -24,7 +24,6 @@ class VolatilityBreakoutStrategy(TradingStrategy):
     algorithm_id = "vol-breakout-event-driven"
     schedule = Schedule.every(1, TimeUnit.HOUR)
     market = "BITVAVO"
-    trading_symbol = "EUR"
     symbols = [BASE]
 
     data_sources = [

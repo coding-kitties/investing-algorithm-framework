@@ -20,13 +20,15 @@ a warning (see :meth:`SlippageModel.from_dict`).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
 class ExecutionConfig:
-    """Snapshot of the execution assumptions under which a study's
-    runs were produced.
+    """Cost/fill assumptions for a Study's runs — both an input
+    (per-symbol trading costs the user configures for a backtest) and
+    an output (a snapshot of the blotter models actually used, for
+    audit/reproducibility).
 
     Attributes:
         blotter_type: Class name of the :class:`Blotter` used
@@ -39,6 +41,14 @@ class ExecutionConfig:
         commission_model: Same shape as ``slippage_model`` for the
             blotter's :class:`CommissionModel`.
         fill_model: Same shape for the blotter's :class:`FillModel`.
+        trading_costs: Per-symbol :class:`TradingCost` overrides for
+            this Study's backtest runs (a ``TradingCost(symbol=None,
+            ...)`` entry applies as the default for any symbol
+            without its own entry) — the backtest-side replacement
+            for configuring costs on the strategy. Accepts either
+            ``TradingCost`` instances or their ``to_dict()`` form
+            (round-tripped bundles); use :meth:`get_trading_costs` to
+            read them back as ``TradingCost`` instances.
         metadata: Free-form extra metadata (e.g. blotter subclass
             module path for user-defined blotters, runtime flags like
             ``dynamic_position_sizing`` or ``fill_missing_data``).
@@ -48,6 +58,7 @@ class ExecutionConfig:
     slippage_model: Optional[Dict[str, Any]] = None
     commission_model: Optional[Dict[str, Any]] = None
     fill_model: Optional[Dict[str, Any]] = None
+    trading_costs: List[Any] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -59,6 +70,7 @@ class ExecutionConfig:
         cls,
         *,
         blotter=None,
+        trading_costs: Optional[List[Any]] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> "ExecutionConfig":
         """Build an :class:`ExecutionConfig` from live runtime objects.
@@ -69,6 +81,8 @@ class ExecutionConfig:
                 ``commission_model``, and ``fill_model`` are captured
                 via each model's ``to_dict()``. ``None`` leaves the
                 model fields unset.
+            trading_costs: Optional list of :class:`TradingCost`
+                instances used for this run.
             metadata: Optional extra dict merged into
                 :attr:`metadata`.
 
@@ -95,6 +109,7 @@ class ExecutionConfig:
             slippage_model=slip,
             commission_model=com,
             fill_model=fil,
+            trading_costs=list(trading_costs or []),
             metadata=dict(metadata or {}),
         )
 
@@ -109,8 +124,24 @@ class ExecutionConfig:
             and self.slippage_model is None
             and self.commission_model is None
             and self.fill_model is None
+            and not self.trading_costs
             and not self.metadata
         )
+
+    def get_trading_costs(self) -> List["TradingCost"]:  # noqa: F821
+        """Return :attr:`trading_costs` as ``TradingCost`` instances,
+        accepting either ``TradingCost`` objects or serialized dicts
+        (round-tripped from a bundle)."""
+        from investing_algorithm_framework.domain.models.risk_rules \
+            import TradingCost
+
+        result = []
+        for tc in self.trading_costs or []:
+            if isinstance(tc, TradingCost):
+                result.append(tc)
+            elif isinstance(tc, dict):
+                result.append(TradingCost.from_dict(tc))
+        return result
 
     def rehydrate_slippage_model(self):
         """Return the reconstructed :class:`SlippageModel` instance
@@ -143,6 +174,10 @@ class ExecutionConfig:
             "slippage_model": self.slippage_model,
             "commission_model": self.commission_model,
             "fill_model": self.fill_model,
+            "trading_costs": [
+                tc.to_dict() if hasattr(tc, "to_dict") else tc
+                for tc in (self.trading_costs or [])
+            ],
             "metadata": dict(self.metadata or {}),
         }
 
@@ -159,5 +194,6 @@ class ExecutionConfig:
             slippage_model=data.get("slippage_model"),
             commission_model=data.get("commission_model"),
             fill_model=data.get("fill_model"),
+            trading_costs=list(data.get("trading_costs") or []),
             metadata=dict(data.get("metadata") or {}),
         )

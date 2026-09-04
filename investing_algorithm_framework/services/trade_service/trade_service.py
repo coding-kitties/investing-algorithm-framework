@@ -191,6 +191,7 @@ class TradeService(RepositoryService):
                 trailing=spec.get("trailing", False),
                 sell_percentage=spec.get("sell_percentage", 100),
                 created_at=opened_at,
+                mirror_on_exchange=spec.get("mirror_on_exchange", False),
             )
 
         for spec in buy_order.pending_take_profits:
@@ -200,6 +201,7 @@ class TradeService(RepositoryService):
                 trailing=spec.get("trailing", False),
                 sell_percentage=spec.get("sell_percentage", 100),
                 created_at=opened_at,
+                mirror_on_exchange=spec.get("mirror_on_exchange", False),
             )
 
         self._dispatch_trade_hook("on_trade_created", trade)
@@ -281,6 +283,7 @@ class TradeService(RepositoryService):
                 trailing=spec.get("trailing", False),
                 sell_percentage=spec.get("sell_percentage", 100),
                 created_at=opened_at,
+                mirror_on_exchange=spec.get("mirror_on_exchange", False),
             )
 
         for spec in getattr(short_order, "pending_take_profits", []) or []:
@@ -290,6 +293,7 @@ class TradeService(RepositoryService):
                 trailing=spec.get("trailing", False),
                 sell_percentage=spec.get("sell_percentage", 100),
                 created_at=opened_at,
+                mirror_on_exchange=spec.get("mirror_on_exchange", False),
             )
 
         self._dispatch_trade_hook("on_trade_created", trade)
@@ -1032,6 +1036,7 @@ class TradeService(RepositoryService):
         sell_percentage: float = 100,
         created_at: datetime = None,
         order=None,
+        mirror_on_exchange: bool = False,
     ) -> TradeStopLoss:
         """
         Function to add a stop loss to a trade or a pending buy order.
@@ -1086,6 +1091,7 @@ class TradeService(RepositoryService):
                 percentage=percentage,
                 trailing=trailing,
                 sell_percentage=sell_percentage,
+                mirror_on_exchange=mirror_on_exchange,
             )
             # Keep persisted JSON column in sync with the in-memory
             # metadata dict — SQLAlchemy doesn't detect in-place dict
@@ -1133,6 +1139,7 @@ class TradeService(RepositoryService):
             "sell_percentage": sell_percentage,
             "active": True,
             "is_short": bool(getattr(trade, "is_short", False)),
+            "mirror_on_exchange": mirror_on_exchange,
             "created_at": created_at if created_at is not None
             else datetime.now(tz=timezone.utc)
         }
@@ -1152,6 +1159,7 @@ class TradeService(RepositoryService):
         sell_percentage: float = 100,
         created_at: datetime = None,
         order=None,
+        mirror_on_exchange: bool = False,
     ) -> TradeTakeProfit:
         """
         Function to add a take profit to a trade. This function will add a
@@ -1199,6 +1207,7 @@ class TradeService(RepositoryService):
                 percentage=percentage,
                 trailing=trailing,
                 sell_percentage=sell_percentage,
+                mirror_on_exchange=mirror_on_exchange,
             )
             if hasattr(order, "metadata_json"):
                 import json as _json
@@ -1239,6 +1248,7 @@ class TradeService(RepositoryService):
             "sell_percentage": sell_percentage,
             "active": True,
             "is_short": bool(getattr(trade, "is_short", False)),
+            "mirror_on_exchange": mirror_on_exchange,
             "created_at": created_at if created_at is not None
             else datetime.now(tz=timezone.utc)
         }

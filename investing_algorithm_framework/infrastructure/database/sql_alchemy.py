@@ -120,6 +120,25 @@ def _apply_forward_only_migrations(bind):
         # RunReport gained a top-level score_cards list after the
         # run_reports table already shipped in 9.0.0a7.
         "ALTER TABLE run_reports ADD COLUMN score_cards_json TEXT",
+        # Broker-native mirror stop-loss / take-profit safety net.
+        # ``mirror_on_exchange`` is the opt-in flag copied from the
+        # rule at attach time; the rest track the live exchange-side
+        # order that backs the rule, if any. NULL/0 for every rule
+        # created before this feature existed (no mirror order).
+        "ALTER TABLE trade_stop_losses ADD COLUMN mirror_on_exchange "
+        "BOOLEAN NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_stop_losses ADD COLUMN mirror_order_id VARCHAR",
+        "ALTER TABLE trade_stop_losses ADD COLUMN mirror_triggered "
+        "BOOLEAN NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_stop_losses ADD COLUMN mirror_triggered_at "
+        "DATETIME",
+        "ALTER TABLE trade_take_profits ADD COLUMN mirror_on_exchange "
+        "BOOLEAN NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_take_profits ADD COLUMN mirror_order_id VARCHAR",
+        "ALTER TABLE trade_take_profits ADD COLUMN mirror_triggered "
+        "BOOLEAN NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_take_profits ADD COLUMN mirror_triggered_at "
+        "DATETIME",
     ]
     for stmt in statements:
         try:

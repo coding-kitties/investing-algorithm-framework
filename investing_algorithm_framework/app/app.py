@@ -115,6 +115,26 @@ def _build_default_portfolio_configuration_from_study(study):
     return None
 
 
+def _apply_execution_config_trading_costs(portfolio_configurations, study):
+    """Attach ``study.execution_config.trading_costs`` (the backtest-
+    side replacement for the removed per-strategy ``trading_costs``)
+    onto every given ``PortfolioConfiguration``, so the event-driven
+    engine resolves per-symbol costs the same way the vector engine
+    does (which derives its own ``PortfolioConfiguration`` from
+    ``study`` directly inside ``BacktestService.run_vector_backtests``).
+    No-op when the Study doesn't specify any trading costs — an
+    already-registered ``PortfolioConfiguration``'s own
+    ``trading_costs`` (if any) is left untouched in that case.
+    """
+    if study is None or study.execution_config is None:
+        return
+    trading_costs = study.execution_config.get_trading_costs()
+    if not trading_costs:
+        return
+    for portfolio_configuration in portfolio_configurations:
+        portfolio_configuration.trading_costs = trading_costs
+
+
 def _apply_study_to_backtests(
     backtests,
     study,
@@ -1048,7 +1068,10 @@ class App:
                 configuration_service=self.container.configuration_service(),
                 blotter=self._blotter,
                 context=self.context,
-                trading_costs=self._collect_trading_costs(algorithm),
+                trading_costs=getattr(
+                    self._first_portfolio_configuration(),
+                    "trading_costs", None,
+                ),
                 portfolio_configuration=self._first_portfolio_configuration(),
             )
             event_loop_service = EventLoopService(
@@ -1841,6 +1864,12 @@ class App:
                     portfolio_configuration.initial_balance = (
                         study.initial_capital
                     )
+            # Note: study.execution_config.trading_costs is applied
+            # inside BacktestService.run_vector_backtests() itself,
+            # since it independently re-derives its own
+            # PortfolioConfiguration from study.universe rather than
+            # reusing the local variable above (only used for
+            # up-front validation here).
 
             backtest_service: BacktestService = (
                 self.container.backtest_service()
@@ -1915,6 +1944,10 @@ class App:
                     )
 
             self.initialize_backtest_portfolios()
+
+            _apply_execution_config_trading_costs(
+                self.get_portfolio_configurations(), study
+            )
 
             data_provider_service = self.container.data_provider_service()
             data_provider_service.reset()
@@ -2545,6 +2578,7 @@ class App:
         position_mode="netting",
         paper_trading=False,
         paper_trading_mode=PaperTradingMode.AUTO,
+        trading_costs=None,
     ):
         """
         Function to add a market to the app. This function is a utility
@@ -2571,10 +2605,10 @@ class App:
                 ``{MARKET}_OVERRIDE_INITIAL_BALANCE`` when set.
             fee_percentage: Default fee percentage for all trades
                 on this market (e.g. 0.1 for 0.1%). Can be overridden
-                per-symbol via TradingCost on the strategy.
+                per-symbol via ``trading_costs``.
             slippage_percentage: Default slippage percentage for all
                 trades on this market (e.g. 0.05 for 0.05%). Can be
-                overridden per-symbol via TradingCost on the strategy.
+                overridden per-symbol via ``trading_costs``.
             position_mode: Position accounting mode. Defaults to NETTING;
                 HEDGE stores independent long and short legs.
             paper_trading: When True, no real orders are ever placed
@@ -2589,6 +2623,13 @@ class App:
                 ``PaperTradingMode.LOCAL`` (always simulate locally,
                 no network calls to place orders). Overridden by
                 ``{MARKET}_OVERRIDE_PAPER_TRADING_MODE`` when set.
+            trading_costs: Optional list of per-symbol ``TradingCost``
+                overrides for this market (a ``TradingCost(symbol=
+                None, ...)`` entry applies as the default for any
+                symbol without its own entry). When not given, paper
+                trading falls back to the exchange's real, publicly
+                advertised taker fee (via ccxt) instead of a zero-cost
+                assumption.
 
         Returns:
             None
@@ -2639,6 +2680,7 @@ class App:
             position_mode=position_mode,
             paper_trading=paper_trading,
             paper_trading_mode=paper_trading_mode,
+            trading_costs=trading_costs,
         )
         self.add_portfolio_configuration(portfolio_configuration)
 
@@ -2961,20 +3003,6 @@ class App:
             f"Order executors initialized "
             f"({len(order_executor_lookup.get_all())}): {executors}"
         )
-
-    @staticmethod
-    def _collect_trading_costs(algorithm):
-        """
-        Gather every ``TradingCost`` declared on any registered
-        strategy's ``trading_costs`` attribute, for use by
-        ``DefaultTradeOrderEvaluator`` when resolving the cost of a
-        local paper-trading fill (mirrors how
-        ``BacktestTradeOrderEvaluator`` is assembled).
-        """
-        trading_costs = []
-        for strategy in algorithm.strategies:
-            trading_costs.extend(getattr(strategy, "trading_costs", []) or [])
-        return trading_costs
 
     def _first_portfolio_configuration(self):
         """

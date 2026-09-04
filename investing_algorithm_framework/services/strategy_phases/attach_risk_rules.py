@@ -74,6 +74,9 @@ class AttachRiskRulesPhase(StrategyPhase):
                         trailing=sl_rule.trailing,
                         sell_percentage=sl_rule.sell_percentage,
                         created_at=index_datetime,
+                        mirror_on_exchange=getattr(
+                            sl_rule, "mirror_on_exchange", False
+                        ),
                     )
                 except Exception as exc:  # pragma: no cover
                     logger.exception(
@@ -89,6 +92,9 @@ class AttachRiskRulesPhase(StrategyPhase):
                         trailing=tp_rule.trailing,
                         sell_percentage=tp_rule.sell_percentage,
                         created_at=index_datetime,
+                        mirror_on_exchange=getattr(
+                            tp_rule, "mirror_on_exchange", False
+                        ),
                     )
                 except Exception as exc:  # pragma: no cover
                     logger.exception(

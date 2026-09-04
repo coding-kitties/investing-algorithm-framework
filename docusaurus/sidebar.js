@@ -149,6 +149,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Advanced Concepts/mirror-stop-loss-take-profit',
+                },
+                {
+                    type: 'doc',
                     id: 'Advanced Concepts/pipelines',
                 },
                 {

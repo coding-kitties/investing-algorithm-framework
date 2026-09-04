@@ -15,7 +15,6 @@ from investing_algorithm_framework import (
     ScalingRule,
     ExposureRule,
     CooldownRule,
-    TradingCost,
 )
 
 
@@ -53,13 +52,9 @@ class MyStrategy(TradingStrategy):
         ),
         CooldownRule(trigger="any", blocks="any", bars=2),
     ]
-    trading_costs = [
-        TradingCost(
-            symbol="BTC", fee_percentage=0.1,
-            slippage_percentage=0.05,
-        ),
-    ]
 ```
+
+Fees and slippage ([`TradingCost`](./trading-cost.md)) are configured separately — on `PortfolioConfiguration`/`app.add_market(trading_costs=[...])` for live/paper trading, or on `Study.execution_config` for backtests — since they're a property of the venue/backtest scenario, not of the strategy's signal logic.
 
 ## The Rule Catalogue
 
@@ -71,7 +66,8 @@ class MyStrategy(TradingStrategy):
 | `scaling_rules` | [`ScalingRule`](./scaling-rule.md) | Per-symbol | Pyramid into winners and partially close — `max_entries`, `scale_in_percentage`, `scale_out_percentage`, optional `max_position_percentage` cap (caps *that symbol's* position size). |
 | `exposure_rule` | [`ExposureRule`](./exposure-rule.md) | Portfolio-wide | Caps total invested value *across every symbol combined* — e.g. "never more than 80% invested." Singular, not a list. |
 | `cooldowns` | [`CooldownRule`](./cooldown-rule.md) | Per-symbol or portfolio-wide | Side-aware signal throttling after fills. |
-| `trading_costs` | [`TradingCost`](./trading-cost.md) | Per-symbol | Fees and slippage applied during fill simulation. Supports [pluggable slippage models](./trading-cost.md#slippage-models) (volume-based, fixed spread, basis points). |
+
+[`TradingCost`](./trading-cost.md) (fees/slippage) is configured on `PortfolioConfiguration`/`app.add_market(trading_costs=[...])` (live/paper) or `Study.execution_config` (backtests) — not on the strategy. See [Trading Cost](./trading-cost.md).
 
 ### Position sizing vs. exposure: which one do I need?
 

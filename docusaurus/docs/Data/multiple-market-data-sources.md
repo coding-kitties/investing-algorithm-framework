@@ -20,7 +20,6 @@ class MultiAssetStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 4
     symbols = ["BTC", "ETH", "ADA", "DOT"]
-    trading_symbol = "EUR"
 
     data_sources = [
         DataSource(
@@ -85,7 +84,6 @@ class MultiTimeframeStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 1
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     data_sources = [
         # Daily for long-term trend
@@ -171,7 +169,6 @@ class MultiMarketStrategy(TradingStrategy):
     time_unit = TimeUnit.DAY
     interval = 1
     symbols = ["AAPL", "BTC"]
-    trading_symbol = "USD"
 
     data_sources = [
         # Stocks from Yahoo Finance
@@ -201,7 +198,6 @@ Create data sources programmatically for flexible strategies:
 class DynamicMultiAssetStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 4
-    trading_symbol = "EUR"
 
     def __init__(
         self,
@@ -280,7 +276,6 @@ class CorrelationStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 4
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     data_sources = [
         DataSource(identifier="btc", symbol="BTC/EUR", time_frame="4h", warmup_window=100, market="BITVAVO"),

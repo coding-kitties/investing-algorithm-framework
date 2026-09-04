@@ -56,7 +56,6 @@ class MyStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 1
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     data_sources = [
         DataSource(

@@ -40,7 +40,6 @@ class MultiFactorPortfolioStrategy(TradingStrategy):
     algorithm_id = "multi-factor-portfolio"
     schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
-    trading_symbol = TRADING_SYMBOL
     symbols = SYMBOLS
     pipelines = [FactorScreen]
 

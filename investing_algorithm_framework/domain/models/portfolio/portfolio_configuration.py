@@ -28,6 +28,12 @@ class PortfolioConfiguration(BaseModel):
       given.
     - paper_trading: When True, no real orders are ever placed. See
       ``PaperTradingMode`` for how execution is simulated.
+    - trading_costs: Optional per-symbol List[TradingCost] overriding
+      ``fee_percentage``/``slippage_percentage`` for specific symbols
+      (a ``TradingCost(symbol=None, ...)`` entry applies as the
+      default for any symbol without its own entry). Settable after
+      construction so ``App.run_backtest()`` can inject
+      ``Study.execution_config.trading_costs``.
 
     For backtesting, a portfolio configuration is used to create a
     portfolio that will be used to simulate the trading of the algorithm. if
@@ -49,6 +55,7 @@ class PortfolioConfiguration(BaseModel):
         position_mode=PositionMode.NETTING,
         paper_trading=False,
         paper_trading_mode=PaperTradingMode.AUTO,
+        trading_costs=None,
     ):
         if market is None:
             market = os.getenv("MARKET")
@@ -79,6 +86,7 @@ class PortfolioConfiguration(BaseModel):
         self._position_mode = PositionMode(position_mode)
         self._paper_trading = bool(paper_trading)
         self._paper_trading_mode = PaperTradingMode(paper_trading_mode)
+        self._trading_costs = list(trading_costs or [])
 
         if trading_symbol is None:
             raise ImproperlyConfigured(
@@ -172,6 +180,14 @@ class PortfolioConfiguration(BaseModel):
     def has_initial_balance(self):
         return self._initial_balance is not None
 
+    @property
+    def trading_costs(self):
+        return list(self._trading_costs)
+
+    @trading_costs.setter
+    def trading_costs(self, value):
+        self._trading_costs = list(value or [])
+
     def to_dict(self):
         return {
             "market": self.market,
@@ -186,10 +202,13 @@ class PortfolioConfiguration(BaseModel):
             "position_mode": self.position_mode.value,
             "paper_trading": self.paper_trading,
             "paper_trading_mode": self.paper_trading_mode.value,
+            "trading_costs": [tc.to_dict() for tc in self._trading_costs],
         }
 
     @staticmethod
     def from_dict(data):
+        from investing_algorithm_framework.domain.models.risk_rules \
+            import TradingCost
         return PortfolioConfiguration(
             market=data.get("market"),
             trading_symbol=data.get("trading_symbol"),
@@ -204,6 +223,10 @@ class PortfolioConfiguration(BaseModel):
             paper_trading_mode=data.get(
                 "paper_trading_mode", PaperTradingMode.AUTO
             ),
+            trading_costs=[
+                TradingCost.from_dict(tc)
+                for tc in data.get("trading_costs", []) or []
+            ],
         )
 
     def __eq__(self, other):

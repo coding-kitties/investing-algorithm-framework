@@ -2495,6 +2495,7 @@ class Context:
         sell_percentage: float = 100,
         created_at: datetime = None,
         order: Order = None,
+        mirror_on_exchange: bool = False,
     ) -> Union[TradeStopLoss, None]:
         """
         Function to add a stop loss to a trade or a pending buy order.
@@ -2569,6 +2570,7 @@ class Context:
                 percentage=percentage,
                 trailing=trailing,
                 sell_percentage=sell_percentage,
+                mirror_on_exchange=mirror_on_exchange,
             )
             # SQLAlchemy doesn't observe in-place mutations of the
             # JSON metadata dict — sync the persisted column manually
@@ -2588,6 +2590,7 @@ class Context:
             trailing=trailing,
             sell_percentage=sell_percentage,
             created_at=created_at,
+            mirror_on_exchange=mirror_on_exchange,
         )
 
     def add_take_profit(
@@ -2598,6 +2601,7 @@ class Context:
         sell_percentage: float = 100,
         created_at: datetime = None,
         order: Order = None,
+        mirror_on_exchange: bool = False,
     ) -> Union[TradeTakeProfit, None]:
         """
         Function to add a take profit to a trade or a pending buy order.
@@ -2668,6 +2672,7 @@ class Context:
                 percentage=percentage,
                 trailing=trailing,
                 sell_percentage=sell_percentage,
+                mirror_on_exchange=mirror_on_exchange,
             )
             if hasattr(stored, "metadata_json"):
                 import json as _json
@@ -2684,6 +2689,7 @@ class Context:
             trailing=trailing,
             sell_percentage=sell_percentage,
             created_at=created_at,
+            mirror_on_exchange=mirror_on_exchange,
         )
 
     def close_trade(self, trade, precision=None) -> None:
@@ -2707,6 +2713,8 @@ class Context:
 
         if trade.available_amount <= 0:
             raise OperationalException("Trade has no amount to close.")
+
+        self.order_service.cancel_mirror_orders_for_trade(trade.id)
 
         position_id = trade.orders[0].position_id
         portfolio = self.portfolio_service.find({"position": position_id})

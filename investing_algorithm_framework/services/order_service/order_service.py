@@ -3,7 +3,7 @@ from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
     OperationalException, OrderStatus, Order, PositionMode, random_number, \
-    INDEX_DATETIME
+    INDEX_DATETIME, Environment, ENVIRONMENT
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -64,7 +64,9 @@ class OrderService(RepositoryService):
         trade_service,
         portfolio_provider_lookup=None,
         order_executor_lookup=None,
-        market_credential_service=None
+        market_credential_service=None,
+        trade_stop_loss_service=None,
+        trade_take_profit_service=None,
     ):
         super(OrderService, self).__init__(order_repository)
         self.configuration_service = configuration_service
@@ -75,10 +77,15 @@ class OrderService(RepositoryService):
         self.portfolio_snapshot_service = portfolio_snapshot_service
         self.market_credential_service = market_credential_service
         self.trade_service = trade_service
+        self.trade_stop_loss_service = trade_stop_loss_service
+        self.trade_take_profit_service = trade_take_profit_service
         self._order_executor_lookup = order_executor_lookup
         self._portfolio_provider_lookup = portfolio_provider_lookup
 
-    def create(self, data, execute=True, validate=True, sync=True) -> Order:
+    def create(
+        self, data, execute=True, validate=True, sync=True,
+        create_allocations=True,
+    ) -> Order:
         """
         Function to create an order. The function will create the order and
         execute it if execute is set to True. The function will also validate
@@ -146,6 +153,14 @@ class OrderService(RepositoryService):
             execute: bool - if True the order will be executed
             validate: bool - if True the order will be validated
             sync: bool - if True the portfolio will be synced with the order
+            create_allocations: bool - if True (default) a SELL order
+                without explicit ``trades``/``stop_losses``/
+                ``take_profits`` falls back to FIFO trade matching at
+                creation time, same as before. Set False to place a
+                resting SELL order (e.g. a broker-native mirror stop)
+                that must NOT be matched against any trade, or reserve
+                the position, yet -- both are deferred until the
+                order is observed to actually fill.
 
         Returns:
             Order: Order object
@@ -264,13 +279,14 @@ class OrderService(RepositoryService):
         if OrderSide.SELL.equals(order_side):
             # Create order metadata if there is a key in the data
             # for trades, stop_losses or take_profits
-            self.trade_service.create_trade_allocations(
-                sell_order=order,
-                trades=trades,
-                stop_losses=stop_losses,
-                take_profits=take_profits,
-                position_mode=self._position_mode(portfolio),
-            )
+            if create_allocations:
+                self.trade_service.create_trade_allocations(
+                    sell_order=order,
+                    trades=trades,
+                    stop_losses=stop_losses,
+                    take_profits=take_profits,
+                    position_mode=self._position_mode(portfolio),
+                )
         elif OrderSide.COVER.equals(order_side) and trades:
             # #434 phase 3 — stash the SL/TP-triggered trade
             # allocation hint on the COVER order so the fill handler
@@ -332,7 +348,12 @@ class OrderService(RepositoryService):
                         synthetic_previous, order
                     )
             else:
-                self._sync_portfolio_with_created_sell_order(order)
+                # A resting order with deferred allocation (e.g. a
+                # broker-native mirror order) must not reserve the
+                # position either -- that happens once it actually
+                # fills, exactly like the deferred trade allocation.
+                if create_allocations:
+                    self._sync_portfolio_with_created_sell_order(order)
 
         order = self.get(order_id)
         return order
@@ -1366,6 +1387,61 @@ class OrderService(RepositoryService):
                     .cancel_order(portfolio, order, market_credential)
                 self.update(order.id, order.to_dict())
 
+    def cancel_mirror_orders_for_trade(self, trade_id):
+        """
+        Cancel any resting broker-native mirror order still attached
+        to this trade's stop-loss/take-profit rules.
+
+        Must be called right before a client-side close (a triggered
+        SL/TP or a manual ``close_trade``) creates its own close order
+        for the trade, so the resting mirror order and the client-side
+        close can never both end up executing for the same trade.
+        Best-effort -- a cancellation failure is logged, not raised,
+        since the client-side close must not be blocked by it.
+        """
+        if self.trade_stop_loss_service is None \
+                or self.trade_take_profit_service is None:
+            return
+
+        trade = self.trade_service.get(trade_id)
+
+        for stop_loss in trade.stop_losses:
+            self._cancel_mirror_order_for_rule(stop_loss)
+
+        for take_profit in trade.take_profits:
+            self._cancel_mirror_order_for_rule(take_profit)
+
+    def _cancel_mirror_order_for_rule(self, rule):
+        if rule.mirror_order_id is None or rule.mirror_triggered:
+            return
+
+        try:
+            order = self.order_repository.get(rule.mirror_order_id)
+            if order is None or not OrderStatus.OPEN.equals(order.status):
+                return
+
+            # Deliberately does NOT go through ``cancel_order`` -- that
+            # calls ``check_pending_orders`` first, re-syncing every
+            # OPEN order in the portfolio, which is unrelated overhead
+            # (and a needless race window) for cancelling one specific
+            # resting order we already know is open.
+            portfolio = self.portfolio_repository.find(
+                {"position": order.position_id}
+            )
+            market_credential = self.market_credential_service.get(
+                portfolio.market
+            )
+            order_executor = self._order_executor_lookup\
+                .get_order_executor(portfolio.market)
+            order = order_executor\
+                .cancel_order(portfolio, order, market_credential)
+            self.update(order.id, order.to_dict())
+        except Exception as exc:
+            logger.warning(
+                f"Failed to cancel mirror order {rule.mirror_order_id} "
+                f"for rule {rule.id}: {exc}"
+            )
+
     def _sync_with_buy_order_filled(self, previous_order, current_order):
         """
         Function to sync the portfolio, position and trades with the
@@ -1480,12 +1556,213 @@ class OrderService(RepositoryService):
             )
 
         # v9.0 (#431) — create the Trade row for this fill event.
-        self.trade_service.create_trade_at_fill(
+        trade = self.trade_service.create_trade_at_fill(
             current_order,
             filled_difference,
             fill_price,
             current_order.updated_at or current_order.created_at,
         )
+        self._place_mirror_orders_for_trade(trade)
+
+    def _place_mirror_orders_for_trade(self, trade):
+        """
+        Best-effort broker-native mirror order placement (safety net)
+        for any ``mirror_on_exchange`` rule on a freshly opened LONG
+        trade. Never raises — a placement failure must not block
+        trade creation. Short-trade mirroring is not yet supported
+        (COVER close accounting differs from the SELL/TradeAllocation
+        path this relies on).
+        """
+        if trade is None or getattr(trade, "is_short", False):
+            return
+
+        if self.trade_stop_loss_service is None \
+                or self.trade_take_profit_service is None:
+            return
+
+        config = self.configuration_service.config
+        if Environment.BACKTEST.equals(config.get(ENVIRONMENT)):
+            return
+
+        trade = self.trade_service.get(trade.id)
+        position = self.position_service.find(
+            {"order_id": trade.orders[0].id}
+        )
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        order_executor = None
+        if self._order_executor_lookup is not None:
+            order_executor = self._order_executor_lookup\
+                .get_order_executor(portfolio.market)
+
+        if order_executor is None \
+                or not order_executor.supports_mirror_orders:
+            return
+
+        # Mirror orders don't reserve the position at placement time
+        # (see ``_place_single_mirror_order``), so nothing else stops
+        # a mirrored stop-loss and a mirrored take-profit on the same
+        # trade from each resting for the *same* shares. Track what's
+        # already committed to a still-live mirror order so the two
+        # can never jointly promise more than the trade actually has.
+        committed = sum(
+            rule.get_sell_amount()
+            for rule in list(trade.stop_losses) + list(trade.take_profits)
+            if rule.mirror_order_id is not None and not rule.mirror_triggered
+        )
+
+        for stop_loss in trade.stop_losses:
+            if not stop_loss.mirror_on_exchange \
+                    or stop_loss.mirror_order_id is not None \
+                    or not stop_loss.active:
+                continue
+            amount = stop_loss.get_sell_amount()
+            if committed + amount > trade.available_amount:
+                logger.warning(
+                    f"Skipping broker-native mirror order for "
+                    f"stop_loss on trade {trade.id}: would commit "
+                    f"more than the trade's available amount "
+                    f"alongside an existing mirror order."
+                )
+                continue
+            self._place_single_mirror_order(
+                trade, portfolio, rule=stop_loss, rule_kind="stop_loss",
+                trigger_price=stop_loss.stop_loss_price,
+            )
+            committed += amount
+
+        for take_profit in trade.take_profits:
+            if not take_profit.mirror_on_exchange \
+                    or take_profit.mirror_order_id is not None \
+                    or not take_profit.active:
+                continue
+            amount = take_profit.get_sell_amount()
+            if committed + amount > trade.available_amount:
+                logger.warning(
+                    f"Skipping broker-native mirror order for "
+                    f"take_profit on trade {trade.id}: would commit "
+                    f"more than the trade's available amount "
+                    f"alongside an existing mirror order."
+                )
+                continue
+            self._place_single_mirror_order(
+                trade, portfolio, rule=take_profit, rule_kind="take_profit",
+                trigger_price=take_profit.take_profit_price,
+            )
+            committed += amount
+
+    def _place_single_mirror_order(
+        self, trade, portfolio, rule, rule_kind, trigger_price
+    ):
+        """
+        Place one resting STOP order on the exchange backing a single
+        ``mirror_on_exchange`` rule. Deliberately does NOT pass
+        ``trades``/``stop_losses``/``take_profits`` to ``create`` — the
+        order is not yet a decided close, so it must not touch trade
+        ``available_amount``/net_gain or trip the trade to CLOSED.
+        That accounting only happens once the mirror order is observed
+        to have actually filled (see ``_sync_with_sell_order_filled``).
+        """
+        if trigger_price is None:
+            return
+
+        try:
+            order = self.create(
+                {
+                    "target_symbol": trade.target_symbol,
+                    "trading_symbol": trade.trading_symbol,
+                    "amount": rule.get_sell_amount(),
+                    "order_type": OrderType.STOP.value,
+                    "stop_price": trigger_price,
+                    "order_side": OrderSide.SELL.value,
+                    "portfolio_id": portfolio.id,
+                    "metadata": {
+                        "order_reason": f"{rule_kind}_mirror",
+                        "_mirror_trade_id": trade.id,
+                        "_mirror_rule_id": rule.id,
+                        "_mirror_rule_kind": rule_kind,
+                    },
+                },
+                create_allocations=False,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"Failed to place broker-native mirror order for "
+                f"{rule_kind} on trade {trade.id}: {exc}"
+            )
+            return
+
+        service = (
+            self.trade_stop_loss_service if rule_kind == "stop_loss"
+            else self.trade_take_profit_service
+        )
+        service.update(rule.id, {"mirror_order_id": order.id})
+
+    def _materialize_mirror_fill_if_needed(self, current_order):
+        """
+        A mirror order carries no ``TradeAllocation`` at placement
+        time (see ``_place_single_mirror_order``) since it isn't yet
+        a decided close. Once it actually fills, build that allocation
+        now -- exactly like an already-decided client-side close would
+        have -- and mark the originating rule triggered (mirror=True).
+        Idempotent via the ``_mirror_allocated`` metadata flag.
+        """
+        metadata = current_order.metadata or {}
+        order_reason = metadata.get("order_reason")
+        if order_reason not in ("stop_loss_mirror", "take_profit_mirror"):
+            return
+        if metadata.get("_mirror_allocated"):
+            return
+
+        trade_id = metadata.get("_mirror_trade_id")
+        rule_id = metadata.get("_mirror_rule_id")
+        if trade_id is None or rule_id is None:
+            return
+
+        amount = current_order.amount
+        is_stop_loss = order_reason == "stop_loss_mirror"
+        service = (
+            self.trade_stop_loss_service if is_stop_loss
+            else self.trade_take_profit_service
+        )
+        rule = service.get(rule_id)
+
+        position = self.position_service.get(current_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+
+        self.trade_service.create_trade_allocations(
+            sell_order=current_order,
+            trades=[{"trade_id": trade_id, "amount": amount}],
+            stop_losses=[{"stop_loss_id": rule_id, "amount": amount}]
+            if is_stop_loss else None,
+            take_profits=[{"take_profit_id": rule_id, "amount": amount}]
+            if not is_stop_loss else None,
+            position_mode=self._position_mode(portfolio),
+        )
+        service.update(
+            rule_id,
+            {
+                "active": False,
+                "sold_amount": (rule.sold_amount or 0) + amount,
+            },
+        )
+        service.mark_triggered(
+            [rule_id], current_order.updated_at, mirror=True
+        )
+
+        # This mirror fill just closed (or partially closed) the
+        # trade -- any OTHER still-resting mirror order on the same
+        # trade (e.g. a mirrored take-profit sitting alongside the
+        # stop-loss that just fired) is now stale and must not be
+        # left resting on the exchange.
+        self.cancel_mirror_orders_for_trade(trade_id)
+
+        current_order.metadata["_mirror_allocated"] = True
+        if hasattr(current_order, "metadata_json"):
+            import json as _json
+            current_order.metadata_json = _json.dumps(
+                current_order.metadata
+            )
+        self.order_repository.save(current_order)
 
     def _sync_with_sell_order_filled(self, previous_order, current_order):
         """
@@ -1507,6 +1784,8 @@ class OrderService(RepositoryService):
 
         if filled_difference <= 0:
             return
+
+        self._materialize_mirror_fill_if_needed(current_order)
 
         logger.info(
             f"Syncing portfolio with filled sell "
@@ -1606,6 +1885,14 @@ class OrderService(RepositoryService):
     def _restore_sell_order_position(self, order):
         """Shared logic: restore locked position when a SELL order is
         cancelled, expired, rejected, or failed."""
+        metadata = order.metadata or {}
+        if metadata.get("order_reason") in (
+            "stop_loss_mirror", "take_profit_mirror"
+        ) and not metadata.get("_mirror_allocated"):
+            # Never reserved the position or a trade allocation (see
+            # ``_place_single_mirror_order``) -- nothing to restore.
+            return
+
         remaining = order.get_amount() - order.get_filled()
 
         position = self.position_service.get(order.position_id)

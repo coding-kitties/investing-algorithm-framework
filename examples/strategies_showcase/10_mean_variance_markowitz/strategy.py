@@ -28,7 +28,6 @@ class MarkowitzStrategy(TradingStrategy):
     algorithm_id = "mean-variance-markowitz"
     schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
-    trading_symbol = "EUR"
     symbols = [s.split("/")[0] for s in SYMBOLS]
 
     data_sources = [

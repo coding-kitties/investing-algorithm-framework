@@ -12,7 +12,8 @@ class TradeStopLossService(RepositoryService):
     def mark_triggered(
         self,
         stop_loss_ids,
-        trigger_date: datetime
+        trigger_date: datetime,
+        mirror: bool = False,
     ) -> None:
         """
         Mark stop losses as triggered.
@@ -22,15 +23,29 @@ class TradeStopLossService(RepositoryService):
                 mark as triggered.
             trigger_date (datetime): The date when the stop loss
                 was triggered.
+            mirror (bool): When True, records that the broker-native
+                mirror order (not the client-side price check) is
+                what closed the position, by setting
+                ``mirror_triggered``/``mirror_triggered_at`` instead
+                of ``triggered``/``triggered_at``. Default False.
 
         Returns:
             None
         """
-        update_data = {
-            "triggered": True,
-            "triggered_at": trigger_date,
-            "updated_at": trigger_date
-        }
+        if mirror:
+            update_data = {
+                "triggered": True,
+                "triggered_at": trigger_date,
+                "mirror_triggered": True,
+                "mirror_triggered_at": trigger_date,
+                "updated_at": trigger_date
+            }
+        else:
+            update_data = {
+                "triggered": True,
+                "triggered_at": trigger_date,
+                "updated_at": trigger_date
+            }
 
         for id in stop_loss_ids:
             try:

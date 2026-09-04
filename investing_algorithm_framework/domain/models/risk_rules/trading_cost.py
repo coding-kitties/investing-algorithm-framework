@@ -3,9 +3,16 @@ class TradingCost:
     A cost model for trading a specific symbol.
 
     Defines the fee and slippage that apply when buying or selling
-    an asset during backtests. Can be attached per-symbol on a
-    TradingStrategy (overrides market-level defaults) or set as
-    market-level defaults on PortfolioConfiguration / app.add_market().
+    an asset during backtests. Per-symbol overrides are configured on
+    ``PortfolioConfiguration.trading_costs`` (live/paper trading, via
+    ``app.add_market(trading_costs=[...])``) or on
+    ``Study.execution_config`` (backtests, via
+    ``ExecutionConfig(trading_costs=[...])``) — a ``TradingCost`` with
+    ``symbol=None`` in either list applies as the default for any
+    symbol without its own entry. Market-wide defaults (one flat
+    fee/slippage pair for every symbol) are set directly on
+    ``PortfolioConfiguration`` via ``fee_percentage``/
+    ``slippage_percentage``.
 
     Slippage can be specified either as a flat percentage
     (``slippage_percentage``) or via a pluggable ``slippage_model``
@@ -119,13 +126,21 @@ class TradingCost:
         Resolve the effective TradingCost for *symbol*.
 
         Priority:
-            1. Per-symbol TradingCost on the strategy
-            2. Market-level defaults from PortfolioConfiguration
-            3. Zero-cost fallback
+            1. Symbol-specific TradingCost in *trading_costs* (from
+               ``PortfolioConfiguration.trading_costs`` or
+               ``Study.execution_config.trading_costs``)
+            2. A ``TradingCost(symbol=None, ...)`` default entry in
+               *trading_costs*, if any (applies to any symbol without
+               its own entry)
+            3. Market-level fee/slippage defaults from
+               PortfolioConfiguration
+            4. Zero-cost fallback
 
         Args:
             symbol: Target symbol (e.g. "BTC").
-            trading_costs: List[TradingCost] from the strategy.
+            trading_costs: List[TradingCost] configured on the market
+                (``PortfolioConfiguration.trading_costs``) or on the
+                backtest Study (``Study.execution_config.trading_costs``).
             portfolio_configuration: Optional PortfolioConfiguration
                 with market-level fee/slippage defaults.
 
@@ -133,9 +148,15 @@ class TradingCost:
             TradingCost instance to use.
         """
         if trading_costs:
+            symbol_upper = symbol.upper() if symbol else symbol
+            default_tc = None
             for tc in trading_costs:
-                if tc.symbol and tc.symbol == symbol.upper():
+                if tc.symbol == symbol_upper:
                     return tc
+                if tc.symbol is None:
+                    default_tc = tc
+            if default_tc is not None:
+                return default_tc
 
         # Fall back to market-level defaults
         if portfolio_configuration is not None:

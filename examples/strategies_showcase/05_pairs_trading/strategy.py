@@ -29,7 +29,6 @@ class PairsTradingStrategy(TradingStrategy):
     algorithm_id = "pairs-trading-zscore"
     schedule = Schedule.every(1, TimeUnit.DAY)
     market = "BITVAVO"
-    trading_symbol = "EUR"
     symbols = [BASE_A, BASE_B]
 
     data_sources = [

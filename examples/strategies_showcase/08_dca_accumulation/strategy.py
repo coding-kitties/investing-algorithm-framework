@@ -36,7 +36,6 @@ class DCAStrategy(TradingStrategy):
     algorithm_id = "dca-weekly"
     schedule = Schedule.every(7, TimeUnit.DAY)
     market = MARKET
-    trading_symbol = "EUR"
     symbols = [BASE]
 
     data_sources = [

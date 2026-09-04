@@ -24,7 +24,6 @@ class SlowMarketMakingStrategy(TradingStrategy):
     algorithm_id = "slow-market-making"
     schedule = Schedule.every(1, TimeUnit.HOUR)
     market = "BITVAVO"
-    trading_symbol = "EUR"
     symbols = [SYMBOL.split("/")[0]]
 
     data_sources = [

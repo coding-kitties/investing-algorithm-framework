@@ -31,6 +31,7 @@ from investing_algorithm_framework import (
     BacktestWindow,
     DataSource,
     DataType,
+    ExecutionConfig,
     PositionSize,
     Schedule,
     SignalSeries,
@@ -78,15 +79,12 @@ class EmaRsiSweepStrategy(TradingStrategy):
         self,
         algorithm_id: str,
         symbols: list[str],
-        trading_symbol: str,
         ema_short: int,
         ema_long: int,
         rsi_period: int,
         rsi_oversold: float,
         rsi_overbought: float,
         market: str = "BITVAVO",
-        fee_pct: float = 0.1,
-        slippage_pct: float = 0.05,
     ) -> None:
         warmup = max(ema_short, ema_long, rsi_period) + 10
         data_sources = [
@@ -105,22 +103,12 @@ class EmaRsiSweepStrategy(TradingStrategy):
             PositionSize(symbol=s, percentage_of_portfolio=1 / len(symbols))
             for s in symbols
         ]
-        trading_costs = [
-            TradingCost(
-                symbol=s,
-                fee_percentage=fee_pct,
-                slippage_percentage=slippage_pct,
-            )
-            for s in symbols
-        ]
 
         super().__init__(
             algorithm_id=algorithm_id,
             symbols=symbols,
-            trading_symbol=trading_symbol,
             data_sources=data_sources,
             position_sizes=position_sizes,
-            trading_costs=trading_costs,
         )
         self.ema_short = ema_short
         self.ema_long = ema_long
@@ -288,10 +276,15 @@ def main() -> None:
         shutil.rmtree(BACKTEST_DIR)
 
     t0 = time.perf_counter()
+    trading_costs = [
+        TradingCost(symbol=s, fee_percentage=0.1, slippage_percentage=0.05)
+        for s in SYMBOLS
+    ]
     study = Study(
         universe=Universe(market=market, trading_symbol="USD"),
         backtest_windows=[BacktestWindow(train_range=date_range)],
         engines=[BacktestEngine.VECTOR],
+        execution_config=ExecutionConfig(trading_costs=trading_costs),
     )
     backtests = app.run_backtests(
         strategies=strategies,

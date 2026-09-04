@@ -41,6 +41,12 @@ class TakeProfitRule:
         - symbol (str): The symbol of the asset the take profit rule
             applies to. Symbol is defined as only the target symbol.
             So for example, 'BTC' in 'BTC-EUR' or 'META' in 'META-USD'.
+        - mirror_on_exchange (bool): When True, also places a real
+            broker-native TAKE_PROFIT/LIMIT order alongside the
+            client-side tracked take profit, as a safety net against
+            the bot being offline when the price crosses the trigger.
+            Live/broker-sandbox trading only — ignored in backtests.
+            Defaults to False.
     """
     def __init__(
         self,
@@ -49,9 +55,11 @@ class TakeProfitRule:
         symbol: str,
         trailing: bool = False,
         side: str = None,
+        mirror_on_exchange: bool = False,
     ):
         self.percentage_threshold = percentage_threshold
         self.trailing = trailing
         self.sell_percentage = sell_percentage
         self.symbol = symbol
         self.side = side
+        self.mirror_on_exchange = mirror_on_exchange

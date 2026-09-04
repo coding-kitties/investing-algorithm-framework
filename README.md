@@ -135,7 +135,8 @@ Risk and execution behaviour are expressed as **declarative rule lists** rather 
 - **`scaling_rules`**: [`ScalingRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/scaling-rule) for pyramiding (`scale_in_percentage=[…]`, `max_entries`, per-symbol `cooldown_in_bars`).
 - **`exposure_rule`**: [`ExposureRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/exposure-rule) caps total invested value across the whole portfolio (e.g. never more than 80% invested) — portfolio-wide, unlike the per-symbol rules above.
 - **`cooldowns`**: [`CooldownRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/cooldown-rule) to throttle whipsaw — per-symbol or portfolio-wide, side-aware (e.g. `trigger="sell", blocks="buy", bars=12`). Enforced bar-for-bar in both the vector and event-driven engines.
-- **`trading_costs`**: [`TradingCost`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/trading-cost) per symbol (fees, slippage, fixed costs).
+
+Fees and slippage ([`TradingCost`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/trading-cost) per symbol) are configured separately on `PortfolioConfiguration`/`app.add_market(trading_costs=[...])` (live/paper) or `Study.execution_config` (backtests), since they're a property of the venue/scenario, not of the strategy's signal logic.
 
 ```python
 from investing_algorithm_framework import (
@@ -146,7 +147,6 @@ from investing_algorithm_framework import (
     StopLossRule,
     TakeProfitRule,
     CooldownRule,
-    TradingCost,
     SignalSide,
 )
 
@@ -189,11 +189,6 @@ class MyStrategy(TradingStrategy):
     cooldowns = [
         CooldownRule(symbol="BTC", trigger="sell", blocks="buy", bars=12),
         CooldownRule(trigger="any", blocks="any", bars=2),
-    ]
-
-    trading_costs = [
-        TradingCost(symbol="BTC", fee_percentage=0.1),
-        TradingCost(symbol="ETH", fee_percentage=0.1),
     ]
 
     def generate_signals(self, context, data):

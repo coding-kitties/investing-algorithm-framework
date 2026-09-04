@@ -22,7 +22,6 @@ The `TradingStrategy` class has the following key attributes:
 | `time_unit` | `TimeUnit` | Legacy alternative to `schedule`: the time unit that defines when the strategy should run (e.g., `HOUR`, `DAY`). |
 | `interval` | `int` | Legacy alternative to `schedule`: how often the strategy runs within `time_unit` (e.g., every 5 hours). |
 | `symbols` | `List[str]` | List of symbols to trade (e.g., `["BTC", "ETH"]`). |
-| `trading_symbol` | `str` | The quote currency for trading (e.g., `"EUR"`, `"USDT"`). |
 | `data_sources` | `List[DataSource]` | Data sources that provide market data to the strategy. |
 | `position_sizes` | `List[PositionSize]` | Position sizing rules for each symbol. |
 | `stop_losses` | `List[StopLossRule]` | Stop loss rules for each symbol. |
@@ -166,7 +165,6 @@ class MySignalStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 1
     symbols = ["BTC", "ETH"]
-    trading_symbol = "EUR"
 
     data_sources = [
         DataSource(
@@ -317,7 +315,6 @@ class MovingAverageCrossover(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 1
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     data_sources = [
         DataSource(
@@ -376,7 +373,6 @@ class RSIStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 4
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     data_sources = [
         DataSource(

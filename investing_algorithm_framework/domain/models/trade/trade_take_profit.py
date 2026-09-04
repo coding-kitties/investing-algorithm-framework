@@ -76,6 +76,10 @@ class TradeTakeProfit(BaseModel):
         high_water_mark: float = None,
         high_water_mark_date: str = None,
         is_short: bool = False,
+        mirror_on_exchange: bool = False,
+        mirror_order_id: str = None,
+        mirror_triggered: bool = False,
+        mirror_triggered_at: datetime = None,
         created_at: datetime = None,
         updated_at: datetime = None
     ):
@@ -89,6 +93,15 @@ class TradeTakeProfit(BaseModel):
         self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
         self.is_short = is_short
+        # Broker-native mirror order safety net (opt-in). See
+        # ``TakeProfitRule.mirror_on_exchange``. ``mirror_order_id`` is
+        # the exchange order id of the currently-live mirror order, if
+        # any. ``mirror_triggered`` records that the mirror order
+        # (not the client-side check) closed the position.
+        self.mirror_on_exchange = mirror_on_exchange
+        self.mirror_order_id = mirror_order_id
+        self.mirror_triggered = mirror_triggered
+        self.mirror_triggered_at = mirror_triggered_at
         self.created_at = created_at
         self.updated_at = updated_at
 
@@ -369,6 +382,14 @@ class TradeTakeProfit(BaseModel):
             "sold_amount": self.sold_amount,
             "active": self.active,
             "is_short": getattr(self, "is_short", False),
+            "mirror_on_exchange": getattr(
+                self, "mirror_on_exchange", False
+            ),
+            "mirror_order_id": getattr(self, "mirror_order_id", None),
+            "mirror_triggered": getattr(self, "mirror_triggered", False),
+            "mirror_triggered_at": ensure_iso(
+                getattr(self, "mirror_triggered_at", None)
+            ),
             "triggered": self.triggered,
             "triggered_at": ensure_iso(self.triggered_at),
             "high_water_mark_date": self.high_water_mark_date,
@@ -387,6 +408,8 @@ class TradeTakeProfit(BaseModel):
             if data.get("triggered_at") is not None else None
         high_water_mark_date = _parse_dt(data.get("high_water_mark_date")) \
             if data.get("high_water_mark_date") is not None else None
+        mirror_triggered_at = _parse_dt(data["mirror_triggered_at"]) \
+            if data.get("mirror_triggered_at") is not None else None
 
         # Make sure all the dates are timezone utc aware
         if created_at and created_at.tzinfo is None:
@@ -397,6 +420,10 @@ class TradeTakeProfit(BaseModel):
             triggered_at = triggered_at.replace(tzinfo=timezone.utc)
         if high_water_mark_date and high_water_mark_date.tzinfo is None:
             high_water_mark_date = high_water_mark_date.replace(
+                tzinfo=timezone.utc
+            )
+        if mirror_triggered_at and mirror_triggered_at.tzinfo is None:
+            mirror_triggered_at = mirror_triggered_at.replace(
                 tzinfo=timezone.utc
             )
 
@@ -416,6 +443,10 @@ class TradeTakeProfit(BaseModel):
             high_water_mark=data.get("high_water_mark"),
             high_water_mark_date=high_water_mark_date,
             is_short=data.get("is_short", False),
+            mirror_on_exchange=data.get("mirror_on_exchange", False),
+            mirror_order_id=data.get("mirror_order_id"),
+            mirror_triggered=data.get("mirror_triggered", False),
+            mirror_triggered_at=mirror_triggered_at,
             created_at=created_at,
             updated_at=updated_at
         )

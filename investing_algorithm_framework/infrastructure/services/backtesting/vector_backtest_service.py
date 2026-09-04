@@ -285,7 +285,7 @@ class VectorBacktestService:
             # Resolve TradingCost for this symbol
             trading_cost = TradingCost.resolve(
                 symbol,
-                getattr(strategy, 'trading_costs', None),
+                getattr(portfolio_configuration, 'trading_costs', None),
                 portfolio_configuration,
             )
 

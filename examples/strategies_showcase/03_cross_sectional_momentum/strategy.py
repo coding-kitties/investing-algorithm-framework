@@ -34,7 +34,6 @@ class CrossSectionalMomentumStrategy(TradingStrategy):
     algorithm_id = "cross-sectional-momentum"
     schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
-    trading_symbol = TRADING_SYMBOL
     symbols = SYMBOLS
     pipelines = [MomentumScreener]
 

@@ -37,6 +37,12 @@ class StopLossRule:
             applies to. Symbol is defined as the target symbol
             (the asset being traded) combined with the trading symbol
             (the asset used to trade the target symbol), e.g., 'BTC-EUR'.
+        - mirror_on_exchange (bool): When True, also places a real
+            broker-native STOP order alongside the client-side
+            tracked stop loss, as a safety net against the bot being
+            offline when the price crosses the trigger. Live/
+            broker-sandbox trading only — ignored in backtests.
+            Defaults to False.
     """
     def __init__(
         self,
@@ -45,9 +51,11 @@ class StopLossRule:
         symbol: str,
         trailing: bool = False,
         side: str = None,
+        mirror_on_exchange: bool = False,
     ):
         self.percentage_threshold = percentage_threshold
         self.trailing = trailing
         self.sell_percentage = sell_percentage
         self.symbol = symbol
         self.side = side
+        self.mirror_on_exchange = mirror_on_exchange

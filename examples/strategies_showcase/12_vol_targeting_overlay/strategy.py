@@ -26,7 +26,6 @@ class VolTargetStrategy(TradingStrategy):
     algorithm_id = "vol-targeting-overlay"
     schedule = Schedule.every(1, TimeUnit.DAY)
     market = "BITVAVO"
-    trading_symbol = "EUR"
     symbols = [SYMBOL.split("/")[0]]
 
     data_sources = [

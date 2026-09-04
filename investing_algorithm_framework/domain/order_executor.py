@@ -44,6 +44,17 @@ class OrderExecutor(ABC):
         """
         self._config = config
 
+    @property
+    def supports_mirror_orders(self) -> bool:
+        """
+        Whether this executor can place a resting broker-native order
+        (e.g. a STOP order backing a ``mirror_on_exchange`` rule) that
+        sits on the venue independent of the bot's own event loop.
+        True by default; local simulators that have no real venue to
+        rest an order on should override this to False.
+        """
+        return True
+
     @abstractmethod
     def execute_order(self, portfolio, order, market_credential) -> Order:
         """

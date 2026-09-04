@@ -6,7 +6,7 @@ from pyindicators import ema, rsi, crossover, crossunder, supertrend, bollinger_
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     DataType, PositionSize, StopLossRule, TakeProfitRule, \
-    ScalingRule, TradingCost, CooldownRule, Schedule, TimeUnit, \
+    ScalingRule, CooldownRule, Schedule, TimeUnit, \
     Signal, SignalSeries, SignalSide, ScoreCard, ScoreCardEntry
 
 
@@ -49,7 +49,6 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
 
     def __init__(
         self,
-        algorithm_id: str,
         symbols: list,
         trading_symbol: str,
         rsi_timeframe: str,
@@ -60,6 +59,11 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
         ema_short_period,
         ema_long_period,
         ema_cross_lookback_window,
+        # algorithm_id is optional -- when omitted, the base class
+        # auto-derives it from the parameters passed to set_parameters()
+        # below, so re-instantiating with the same params reproduces
+        # the same id.
+        algorithm_id: str = None,
         ema_long_result_column="ema_long",
         ema_short_result_column="ema_short",
         ema_crossunder_result_column="ema_crossunder",
@@ -92,9 +96,6 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
         # breather after any order — set to 0 to disable.
         reentry_cooldown_bars: int = 0,
         portfolio_cooldown_bars: int = 0,
-        # Trading cost parameters
-        fee_percentage: float = 0.1,
-        slippage_percentage: float = 0.05,
         # Short-selling. Off by default so long-only behaviour
         # is unchanged. When enabled the strategy emits SHORT/COVER
         # signals that mirror the long-side hierarchy (SuperTrend +
@@ -164,7 +165,6 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
         stop_losses = []
         take_profits = []
         scaling_rules = []
-        trading_costs = []
         cooldowns = []
 
         for symbol in symbols:
@@ -220,13 +220,6 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                     cooldown_in_bars=cooldown_in_bars,
                 )
             )
-            trading_costs.append(
-                TradingCost(
-                    symbol=symbol,
-                    fee_percentage=fee_percentage,
-                    slippage_percentage=slippage_percentage,
-                )
-            )
             if reentry_cooldown_bars > 0:
                 cooldowns.append(
                     CooldownRule(
@@ -250,17 +243,21 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             symbols=symbols,
-            trading_symbol=trading_symbol,
             data_sources=data_sources,
             position_sizes=position_sizes,
             stop_losses=stop_losses,
             take_profits=take_profits,
             scaling_rules=scaling_rules,
-            trading_costs=trading_costs,
             cooldowns=cooldowns,
             schedule=schedule,
             metadata=metadata,
         )
+
+        # trading_symbol is a display-only unit label for ScoreCardEntry
+        # here (not a framework-recognized concept) -- the actual
+        # settlement currency comes from the registered Universe /
+        # PortfolioConfiguration.
+        self.trading_symbol = trading_symbol
 
         # Store parameters so they get saved to parameters.json
         self.set_parameters({
@@ -286,8 +283,6 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
             "cooldown_in_bars": cooldown_in_bars,
             "reentry_cooldown_bars": reentry_cooldown_bars,
             "portfolio_cooldown_bars": portfolio_cooldown_bars,
-            "fee_percentage": fee_percentage,
-            "slippage_percentage": slippage_percentage,
             "enable_shorting": enable_shorting,
             "cover_requires_current_trend": cover_requires_current_trend,
             "cover_min_confirmation_bars": cover_min_confirmation_bars,

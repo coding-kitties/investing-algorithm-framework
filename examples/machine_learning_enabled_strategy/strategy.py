@@ -65,7 +65,6 @@ class MachineLearningStrategy(TradingStrategy):
     algorithm_id = "ml-classifier"
     schedule = Schedule.every(24, TimeUnit.HOUR)
     market = "BITVAVO"
-    trading_symbol = "EUR"
 
     def __init__(
         self,
@@ -103,7 +102,6 @@ class MachineLearningStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=self.algorithm_id,
             symbols=symbols,
-            trading_symbol=self.trading_symbol,
             data_sources=data_sources,
         )
         self.set_parameters({

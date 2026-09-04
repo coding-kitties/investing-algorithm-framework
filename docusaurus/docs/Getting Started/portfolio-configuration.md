@@ -186,9 +186,11 @@ app.add_market(
 )
 ```
 
-A symbol-specific `TradingCost` on a strategy takes precedence over these
-market-level defaults. Fixed fees and custom slippage models are only
-available through `TradingCost`, not `add_market()`. See
+A symbol-specific `TradingCost` passed via `app.add_market(trading_costs=[...])`
+takes precedence over these market-level defaults (and `Study.execution_config`
+plays the same role for backtests). Fixed fees and custom slippage models are
+only available through `TradingCost`, not the flat `fee_percentage`/
+`slippage_percentage` fields. See
 [TradingCost](../Risk%20Rules/trading-cost) for the full calculation
 details and resolution order.
 

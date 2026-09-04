@@ -132,6 +132,8 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_configuration_service=portfolio_configuration_service,
         portfolio_snapshot_service=portfolio_snapshot_service,
         trade_service=trade_service,
+        trade_stop_loss_service=trade_stop_loss_service,
+        trade_take_profit_service=trade_take_profit_service,
         order_executor_lookup=order_executor_lookup,
         portfolio_provider_lookup=portfolio_provider_lookup
     )

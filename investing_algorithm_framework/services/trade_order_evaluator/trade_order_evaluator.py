@@ -75,6 +75,10 @@ class TradeOrderEvaluator(ABC):
             # "take_profits" from this dict in place (OrderService.
             # create), so capture the trade refs before calling it.
             trades = take_profit_order.get("trades", [])
+            for trade_ref in trades:
+                self.order_service.cancel_mirror_orders_for_trade(
+                    trade_ref["trade_id"]
+                )
             self._create_order(take_profit_order)
             self.trade_take_profit_service.mark_triggered(
                 [
@@ -96,6 +100,11 @@ class TradeOrderEvaluator(ABC):
             stop_losses = stop_loss_order["stop_losses"]
             # See note in _check_take_profits: capture before mutation.
             trades = stop_loss_order.get("trades", [])
+
+            for trade_ref in trades:
+                self.order_service.cancel_mirror_orders_for_trade(
+                    trade_ref["trade_id"]
+                )
 
             self._create_order(stop_loss_order)
             self.trade_stop_loss_service.mark_triggered(

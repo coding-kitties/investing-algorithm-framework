@@ -111,6 +111,11 @@ class PaperTradingOrderExecutor(OrderExecutor):
     def supports_market(self, market) -> bool:
         return market.upper() in self._markets
 
+    @property
+    def supports_mirror_orders(self) -> bool:
+        # No real venue to rest a broker-native order on.
+        return False
+
     def execute_order(self, portfolio, order, market_credential) -> Order:
         try:
             order.external_id = f"paper-{random_string(16)}"

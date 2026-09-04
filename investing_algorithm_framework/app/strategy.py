@@ -9,7 +9,7 @@ from investing_algorithm_framework.domain import (
     DataSource, DataType, ExposureRule, OperationalException, Order,
     Position, PositionSize, ScalingRule, Schedule, ScheduledFunction,
     ScoreCard, Signal, SignalSeries, StopLossRule, StrategyProfile,
-    TakeProfitRule, TradingCost, Trade,
+    TakeProfitRule, Trade,
 )
 from ..services.executors import Executor, LimitOrderExecutor
 from ..services.strategy_phases import (
@@ -94,10 +94,14 @@ class TradingStrategy:
             store additional information about the strategy, such as its
             author, version, description, params etc.
     """
+    # The unique identifier for the algorithm instance. Is set by the framework
+    # when the strategy s instantiated.
     algorithm_id: str
+    # The unique identifier for the strategy instance.
+    # Defaults to the class name if not set explicitly.
+    strategy_id: str = None
     schedule: Schedule = None
     scheduled_functions: List[ScheduledFunction] = []
-    strategy_id: str = None
     decorated = None
     data_sources: List[DataSource] = []
     pipelines: List[type] = []
@@ -110,10 +114,8 @@ class TradingStrategy:
     stop_losses: List[StopLossRule] = []
     take_profits: List[TakeProfitRule] = []
     scaling_rules: List[ScalingRule] = []
-    trading_costs: List[TradingCost] = []
     cooldowns: List[CooldownRule] = []
     symbols: List[str] = []
-    trading_symbol: str = None
     phases: List[StrategyPhase] = None
     conflict_policy: ConflictPolicy = None
     executor: Executor = None
@@ -132,10 +134,8 @@ class TradingStrategy:
         stop_losses=None,
         take_profits=None,
         scaling_rules=None,
-        trading_costs=None,
         cooldowns=None,
         symbols=None,
-        trading_symbol=None,
         phases: List[StrategyPhase] = None,
         conflict_policy: ConflictPolicy = None,
         executor: Executor = None,
@@ -240,9 +240,6 @@ class TradingStrategy:
         else:
             class_symbols = getattr(self.__class__, 'symbols', [])
             self.symbols = list(class_symbols) if class_symbols else []
-
-        if trading_symbol is not None:
-            self.trading_symbol = trading_symbol
 
         # Check if scheduling interval is faster than the smallest
         # OHLCV data source timeframe. Only meaningful for interval-mode
@@ -349,16 +346,6 @@ class TradingStrategy:
             )
             self.scaling_rules = list(class_scaling_rules) \
                 if class_scaling_rules else []
-
-        # Initialize trading_costs as a new list per instance
-        if trading_costs is not None:
-            self.trading_costs = list(trading_costs)
-        else:
-            class_trading_costs = getattr(
-                self.__class__, 'trading_costs', []
-            )
-            self.trading_costs = list(class_trading_costs) \
-                if class_trading_costs else []
 
         # Initialize cooldowns as a new list per instance
         if cooldowns is not None:

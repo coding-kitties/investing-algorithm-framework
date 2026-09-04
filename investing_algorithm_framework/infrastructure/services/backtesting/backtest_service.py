@@ -851,6 +851,14 @@ class BacktestService:
 
         # Portfolio configuration from study
         initial_capital = study.initial_capital
+        # Study.execution_config.trading_costs is the backtest-side
+        # replacement for the removed per-strategy trading_costs; falls
+        # back to a matching pre-registered configuration's own
+        # trading_costs (if any) when the Study doesn't specify any.
+        _study_trading_costs = (
+            study.execution_config.get_trading_costs()
+            if study.execution_config is not None else []
+        )
         if study.universe is not None:
             matching_configuration = next((
                 configuration
@@ -877,6 +885,9 @@ class BacktestService:
                 position_mode=getattr(
                     matching_configuration, "position_mode", "netting"
                 ),
+                trading_costs=_study_trading_costs or getattr(
+                    matching_configuration, "trading_costs", None
+                ),
             )
         else:
             _pcs = self._portfolio_configuration_service.get_all()
@@ -885,6 +896,10 @@ class BacktestService:
                 raise OperationalException(
                     "Study.universe must be set or a "
                     "PortfolioConfiguration must exist."
+                )
+            if _study_trading_costs:
+                portfolio_configuration.trading_costs = (
+                    _study_trading_costs
                 )
 
         # Date ranges from study windows, per study.window_part
@@ -2893,13 +2908,6 @@ class BacktestService:
                             )
 
                             # Create trade order evaluator
-                            # Collect trading costs from all strategies
-                            all_trading_costs = []
-                            for strat in algorithm.strategies:
-                                if hasattr(strat, 'trading_costs'):
-                                    all_trading_costs.extend(
-                                        strat.trading_costs
-                                    )
                             pc_list = (
                                 self._portfolio_configuration_service
                                 .get_all()
@@ -2918,7 +2926,9 @@ class BacktestService:
                                     configuration_service=(
                                         self._configuration_service
                                     ),
-                                    trading_costs=all_trading_costs,
+                                    trading_costs=getattr(
+                                        pc, 'trading_costs', None
+                                    ),
                                     portfolio_configuration=pc,
                                     blotter=blotter,
                                     context=context,

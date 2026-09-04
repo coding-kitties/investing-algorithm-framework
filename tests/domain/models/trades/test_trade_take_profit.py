@@ -1,6 +1,7 @@
 from unittest import TestCase
 from investing_algorithm_framework.domain import TradeTakeProfit
 
+
 class TestTradeStopLoss(TestCase):
 
     def test_model_creation(self):
@@ -33,6 +34,37 @@ class TestTradeStopLoss(TestCase):
         self.assertEqual(take_profit.sell_percentage, 50)
         self.assertEqual(take_profit.high_water_mark, None)
         self.assertEqual(take_profit.take_profit_price, None)
+
+    def test_mirror_fields_default(self):
+        take_profit = TradeTakeProfit(
+            trade_id=1,
+            percentage=10,
+            open_price=20,
+            sell_percentage=50,
+            total_amount_trade=100
+        )
+        self.assertFalse(take_profit.mirror_on_exchange)
+        self.assertIsNone(take_profit.mirror_order_id)
+        self.assertFalse(take_profit.mirror_triggered)
+        self.assertIsNone(take_profit.mirror_triggered_at)
+
+    def test_mirror_fields_round_trip_via_dict(self):
+        take_profit = TradeTakeProfit(
+            trade_id=1,
+            percentage=10,
+            open_price=20,
+            sell_percentage=50,
+            total_amount_trade=100,
+            mirror_on_exchange=True,
+            mirror_order_id="ext-456",
+            mirror_triggered=True,
+            mirror_triggered_at="2024-01-01T00:00:00+00:00",
+        )
+        restored = TradeTakeProfit.from_dict(take_profit.to_dict())
+        self.assertTrue(restored.mirror_on_exchange)
+        self.assertEqual("ext-456", restored.mirror_order_id)
+        self.assertTrue(restored.mirror_triggered)
+        self.assertIsNotNone(restored.mirror_triggered_at)
 
     def test_is_triggered_default(self):
         take_profit = TradeTakeProfit(

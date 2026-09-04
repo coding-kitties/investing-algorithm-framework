@@ -24,7 +24,6 @@ class TWAPExecutionStrategy(TradingStrategy):
     algorithm_id = "twap-bar-level"
     schedule = Schedule.every(1, TimeUnit.DAY)
     market = "BITVAVO"
-    trading_symbol = "EUR"
     symbols = [SYMBOL.split("/")[0]]
 
     data_sources = [

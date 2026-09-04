@@ -26,7 +26,6 @@ class RiskParityStrategy(TradingStrategy):
     algorithm_id = "risk-parity-inv-vol"
     schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
-    trading_symbol = "EUR"
     symbols = [s.split("/")[0] for s in SYMBOLS]
 
     data_sources = [

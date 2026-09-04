@@ -22,7 +22,6 @@ class MeanReversionStrategy(TradingStrategy):
     algorithm_id = "mean-reversion-bollinger-rsi"
     schedule = Schedule.every(24, TimeUnit.HOUR)
     market = "BITVAVO"
-    trading_symbol = "EUR"
 
     def __init__(
         self,
@@ -56,7 +55,6 @@ class MeanReversionStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=self.algorithm_id,
             symbols=symbols,
-            trading_symbol=self.trading_symbol,
             data_sources=data_sources,
         )
         self.set_parameters({

@@ -93,7 +93,6 @@ class CrossSectionalMomentumBot(TradingStrategy):
     algorithm_id = "pipeline-momentum-bot"
     schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
-    trading_symbol = TRADING_SYMBOL
     symbols = SYMBOLS
 
     data_sources = [

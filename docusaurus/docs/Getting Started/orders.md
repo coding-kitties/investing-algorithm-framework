@@ -64,12 +64,16 @@ self.create_market_sell_order(
 In backtesting, market orders fill at the **Open price of the next candle** after the order is placed. If you have configured `TradingCost` with a `slippage_percentage`, slippage is applied on top of the open price:
 
 ```python
-from investing_algorithm_framework import TradingCost
+from investing_algorithm_framework import TradingCost, ExecutionConfig
 
-class MyStrategy(TradingStrategy):
-    trading_costs = [
-        TradingCost(symbol="BTC", slippage_percentage=0.001),  # 0.1% slippage
-    ]
+study = Study(
+    ...,
+    execution_config=ExecutionConfig(
+        trading_costs=[
+            TradingCost(symbol="BTC", slippage_percentage=0.001),  # 0.1% slippage
+        ],
+    ),
+)
 ```
 
 ### Limit Orders
@@ -324,7 +328,6 @@ class DCAStrategy(TradingStrategy):
     time_unit = TimeUnit.DAY
     interval = 1
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     def apply_strategy(self, context, data):
         # Buy fixed amount regardless of price
@@ -341,7 +344,6 @@ class GridStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 1
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     def __init__(self, grid_levels=5, grid_spacing=0.02, **kwargs):
         super().__init__(**kwargs)
@@ -384,7 +386,6 @@ class TrailingStopStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 1
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     def __init__(self, trailing_percent=0.05, **kwargs):
         super().__init__(**kwargs)

@@ -438,14 +438,18 @@ else:
 ### For Backtesting
 1. **Conservative Assumptions**: Use realistic execution rules that account for market realities
 2. **Volume Constraints**: Consider whether your order size could realistically be filled
-3. **Slippage Modeling**: Include slippage, especially for larger orders or less liquid markets. Use `TradingCost` on your strategy to configure slippage per symbol:
+3. **Slippage Modeling**: Include slippage, especially for larger orders or less liquid markets. Configure `TradingCost` on the Study (backtests) or on `app.add_market()` (live/paper) to set slippage per symbol:
    ```python
-   from investing_algorithm_framework import TradingCost
+   from investing_algorithm_framework import TradingCost, ExecutionConfig
 
-   class MyStrategy(TradingStrategy):
-       trading_costs = [
-           TradingCost(symbol="BTC", slippage_percentage=0.001, fee_percentage=0.001),
-       ]
+   study = Study(
+       ...,
+       execution_config=ExecutionConfig(
+           trading_costs=[
+               TradingCost(symbol="BTC", slippage_percentage=0.001, fee_percentage=0.001),
+           ],
+       ),
+   )
    ```
 4. **Market vs Limit Orders**: Use market orders when you want immediate execution at the next candle's open price. Use limit orders when you want to target a specific price level
 5. **Latency Simulation**: Account for the time between signal generation and order placement
