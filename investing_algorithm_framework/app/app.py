@@ -1641,9 +1641,13 @@ class App:
         Raises:
             OperationalException: If study is missing, has no
                 backtest_windows, or no strategy can be resolved. Also
-                raised when ``algorithm=``/``algorithms=`` resolves to
-                the vector engine (not supported), or when more than one
-                of ``strategy=``/``strategies=``/``algorithm=``/
+                raised when the vector engine is used with
+                ``algorithm=``/``algorithms=`` in a way it can't
+                represent — more than one strategy combined onto a
+                single shared portfolio, or an Algorithm with
+                tasks/hooks registered (silently dropped by the vector
+                engine otherwise) — or when more than one of
+                ``strategy=``/``strategies=``/``algorithm=``/
                 ``algorithms=`` is provided at once.
         """
         _modes_given = sum(
@@ -1818,15 +1822,45 @@ class App:
             )
 
         if use_vector and independent_algorithms is not None:
-            raise OperationalException(
-                "algorithms= (independent Algorithms, each with its own "
-                "Tasks/hooks) is only supported by the event-driven "
-                "engine. Set study.engine=BacktestEngine.EVENT_DRIVEN, "
-                "implement generate_signals(...) instead of "
-                "generate_signal_series(...) on your strategies, or "
-                "backtest each strategy independently via strategy=/"
-                "strategies=."
-            )
+            # Each Algorithm gets its own portfolio (mirrors
+            # strategies=), so multiple single-strategy Algorithms are
+            # fine for the vector engine. What genuinely isn't
+            # supported is (a) any one Algorithm internally combining
+            # more than one strategy onto its own shared portfolio
+            # (same concern as `algorithm=` above), and (b) any
+            # Algorithm carrying tasks/hooks — the vector engine only
+            # ever consumes the flattened strategy list, so those
+            # would be silently dropped rather than executed.
+            _multi_strategy_algorithms = [
+                alg for alg in independent_algorithms
+                if len(alg.strategies) > 1
+            ]
+            _algorithms_with_extras = [
+                alg for alg in independent_algorithms
+                if alg.tasks or alg.on_strategy_run_hooks
+            ]
+            if _multi_strategy_algorithms or _algorithms_with_extras:
+                reasons = []
+                if _multi_strategy_algorithms:
+                    reasons.append(
+                        "one or more Algorithms combine more than one "
+                        "strategy onto a single shared portfolio"
+                    )
+                if _algorithms_with_extras:
+                    reasons.append(
+                        "one or more Algorithms have tasks/hooks "
+                        "registered, which the vector engine does not "
+                        "execute and would silently drop"
+                    )
+                raise OperationalException(
+                    "algorithms= is only supported by the event-driven "
+                    "engine when " + " and ".join(reasons) + ". Set "
+                    "study.engine=BacktestEngine.EVENT_DRIVEN, implement "
+                    "generate_signals(...) instead of "
+                    "generate_signal_series(...) on your strategies, or "
+                    "backtest each strategy independently via strategy=/"
+                    "strategies=."
+                )
 
         if use_vector:
             if not skip_data_sources_initialization:
