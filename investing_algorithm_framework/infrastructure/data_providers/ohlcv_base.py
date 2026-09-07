@@ -238,6 +238,10 @@ class OHLCVDataProviderBase(DataProvider):
             start = backtest_start_date
             end = backtest_index_date
 
+        if start is None:
+            # No explicit lower bound: fall back to the earliest data point.
+            start = self.data["Datetime"].min()
+
         if end is None:
             # No explicit upper bound: fall back to the latest data point.
             end = self.data["Datetime"].max()
