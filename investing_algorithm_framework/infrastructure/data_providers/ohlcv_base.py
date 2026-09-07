@@ -219,19 +219,32 @@ class OHLCVDataProviderBase(DataProvider):
         if self.data is None:
             return None
 
-        if self.window_size is not None:
+        if backtest_index_date is None:
+            # Vectorized backtests do not iterate over a moving index date.
+            # Fall back to the full requested range instead of applying a
+            # trailing window, which would previously crash with a
+            # TypeError (None - timedelta) / Polars comparison against None.
+            start = backtest_start_date
+            end = backtest_end_date
+        elif self.window_size is not None:
             n_minutes = TimeFrame.from_value(
                 self.time_frame
             ).amount_of_minutes
             start = backtest_index_date - timedelta(
                 minutes=n_minutes * self.window_size
             )
+            end = backtest_index_date
         else:
             start = backtest_start_date
+            end = backtest_index_date
+
+        if end is None:
+            # No explicit upper bound: fall back to the latest data point.
+            end = self.data["Datetime"].max()
 
         filtered = self.data.filter(
             (pl.col("Datetime") >= start)
-            & (pl.col("Datetime") <= backtest_index_date)
+            & (pl.col("Datetime") <= end)
         )
 
         if self.pandas:
