@@ -386,6 +386,23 @@ class Backtest:
             name = name.name
         return self.studies.get(name)
 
+    def get_study_definition(self, name=None) -> Optional["Study"]:
+        """Return a ``copy_definition()`` clone of the named study —
+        the singular counterpart of :meth:`get_study_definitions`.
+
+        ``engine_results`` is reset to empty on the returned copy;
+        every other field (universe, backtest_windows, engines,
+        execution_config, etc.) is carried over, so it's ready to
+        hand straight to ``App.run_backtest(study=...)`` for a fresh
+        run (e.g. replaying an in-sample study's exact universe and
+        windows on the event engine) without re-declaring it by hand.
+
+        Returns ``None`` when no matching study exists (same lookup
+        rules as :meth:`get_study`).
+        """
+        study = self.get_study(name)
+        return study.copy_definition() if study is not None else None
+
     def get_study_definitions(
         self,
         study_name: Optional[str] = None,

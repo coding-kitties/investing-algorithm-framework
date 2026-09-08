@@ -41,6 +41,7 @@ from .domain import ApiException, combine_backtests, Study, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
     save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY, \
     retag_backtests, migrate_backtests, \
+    resolve_backtest_path, get_backtest, get_backtests, \
     Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
     VolumeImpactSlippage, VolumeShareSlippage, FixedBasisPointsSlippage, \
@@ -331,6 +332,9 @@ __all__ = [
     "load_backtests",
     "save_backtests_to_directory",
     "retag_backtests",
+    "resolve_backtest_path",
+    "get_backtest",
+    "get_backtests",
     "migrate_backtests",
     "DataError",
     "create_backtest_metrics_for_backtest",

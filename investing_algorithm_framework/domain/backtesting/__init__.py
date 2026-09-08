@@ -19,6 +19,8 @@ from .backtest_utils import (
     retag_backtests,
     migrate_backtests,
     resolve_backtest_path,
+    get_backtest,
+    get_backtests,
     BacktestIndex,
 )
 from .bundle import (
@@ -89,6 +91,8 @@ __all__ = [
     "retag_backtests",
     "migrate_backtests",
     "resolve_backtest_path",
+    "get_backtest",
+    "get_backtests",
     "save_bundle",
     "open_bundle",
     "BUNDLE_EXT",

@@ -54,6 +54,59 @@ def resolve_backtest_path(
     return None
 
 
+def get_backtest(
+    storage_directory: Union[str, Path], algorithm_id: str,
+) -> Optional[Backtest]:
+    """Load a single previously-saved :class:`Backtest` by its
+    ``algorithm_id`` from *storage_directory*.
+
+    Companion to :func:`resolve_backtest_path`: resolves the on-disk
+    path (``.obtf`` bundle or legacy directory) and opens it. Returns
+    ``None`` (rather than raising) when no backtest exists for
+    ``algorithm_id`` in *storage_directory*, matching the
+    ``get_``-prefixed lookup convention used elsewhere (e.g.
+    ``Backtest.get_study``).
+    """
+    path = resolve_backtest_path(storage_directory, algorithm_id)
+    if path is None:
+        return None
+    return Backtest.open(path)
+
+
+def get_backtests(
+    storage_directory: Union[str, Path], algorithm_ids: List[str],
+) -> List[Backtest]:
+    """Load multiple previously-saved backtests by ``algorithm_id``
+    from *storage_directory*, e.g. the top-N winners of a prior
+    parameter sweep.
+
+    Args:
+        storage_directory: Directory the backtests were saved to
+            (the same ``backtest_storage_directory`` passed to
+            ``App.run_backtest``).
+        algorithm_ids: ``algorithm_id``s to load.
+
+    Returns:
+        List[Backtest]: One entry per ``algorithm_id`` that resolved
+            to an on-disk backtest, in the same order as
+            ``algorithm_ids``. Ids with no matching backtest are
+            skipped (with a warning) rather than raising, since a
+            partial storage directory shouldn't abort the whole
+            batch load.
+    """
+    backtests: List[Backtest] = []
+    for algorithm_id in algorithm_ids:
+        bt = get_backtest(storage_directory, algorithm_id)
+        if bt is None:
+            logger.warning(
+                "No backtest found for algorithm_id %r in %s; skipping.",
+                algorithm_id, storage_directory,
+            )
+            continue
+        backtests.append(bt)
+    return backtests
+
+
 # --- worker entry points (must be top-level so they pickle) -------------
 
 

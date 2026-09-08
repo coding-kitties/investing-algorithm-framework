@@ -57,7 +57,8 @@ from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     generate_backtest_summary_metrics, load_backtests_from_directory, \
     load_backtests, \
     save_backtests_to_directory, retag_backtests, migrate_backtests, \
-    resolve_backtest_path, BUNDLE_EXT, BUNDLE_FORMAT_VERSION, \
+    resolve_backtest_path, get_backtest, get_backtests, \
+    BUNDLE_EXT, BUNDLE_FORMAT_VERSION, \
     BacktestIndex, build_strategy_universe_map, stamp_backtest, \
     stamp_backtests, Study, EngineSlot, ExecutionConfig, StudySampleType, \
     WindowPart
@@ -228,6 +229,8 @@ __all__ = [
     "ScheduledDeposit",
     "PortfolioOutOfSyncError",
     "resolve_backtest_path",
+    "get_backtest",
+    "get_backtests",
     "BUNDLE_EXT",
     "BUNDLE_FORMAT_VERSION",
     "BacktestIndexRow",

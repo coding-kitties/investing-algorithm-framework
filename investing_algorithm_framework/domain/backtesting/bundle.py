@@ -844,6 +844,44 @@ def _load_existing_envelope_for_merge(
     return _build_v3_envelope(existing_bt)
 
 
+def _window_dedup_key(window: Dict[str, Any]) -> Tuple:
+    """Return a hashable identity for a serialised ``BacktestWindow``
+    dict, based on its train/test date-range boundaries (name and
+    other metadata are ignored for dedup purposes)."""
+    def _range_key(r: Optional[Dict[str, Any]]) -> Tuple:
+        if not r:
+            return (None, None)
+        return (r.get("start"), r.get("end"))
+
+    return (
+        _range_key(window.get("train_range")),
+        _range_key(window.get("test_range")),
+    )
+
+
+def _merge_backtest_windows(
+    new_windows: List[Dict[str, Any]], old_windows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Union two serialised ``backtest_windows`` lists, de-duplicated
+    by date-range identity, new-first.
+
+    Without this, re-running a study on a subset of its windows (e.g.
+    only the first window, for a follow-up event-driven validation
+    pass) would shrink the on-disk window catalogue to that subset,
+    even though runs for the dropped windows are still present under
+    ``engine_results`` (issue: window catalogue must stay a superset
+    of every window any engine has runs for).
+    """
+    merged = list(new_windows or [])
+    seen = {_window_dedup_key(w) for w in merged}
+    for w in (old_windows or []):
+        key = _window_dedup_key(w)
+        if key not in seen:
+            merged.append(w)
+            seen.add(key)
+    return merged
+
+
 def _merge_v5_envelopes(
     new_doc: Dict[str, Any], old_doc: Dict[str, Any]
 ) -> None:
@@ -859,6 +897,9 @@ def _merge_v5_envelopes(
        populated, otherwise the on-disk engine is preserved. This
        keeps the v3/v4 invariant that saving an event-only backtest
        over a vector-only bundle yields a bundle with both engines.
+       ``backtest_windows`` is unioned (de-duplicated by date-range
+       identity) rather than replaced, so the window catalogue never
+       loses windows that still have runs on disk from a prior save.
 
     This realises the "concurrent writers serialise on the header
     rewrite, otherwise touch disjoint study slots" semantics from
@@ -883,6 +924,10 @@ def _merge_v5_envelopes(
         # Rule 2: merge engine slots within the same-named study
         # (flat v9.0 format: vector_runs / event_runs / ... keys).
         new_study = new_studies[name]
+        new_study["backtest_windows"] = _merge_backtest_windows(
+            new_study.get("backtest_windows"),
+            old_study.get("backtest_windows"),
+        )
         for engine in ("vector", "event"):
             runs_key = f"{engine}_runs"
             summary_key = f"{engine}_summary"
