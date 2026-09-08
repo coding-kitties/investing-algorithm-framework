@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a15] — 2026-09-08
+
+### Added
+
+- **Reuse a study straight off a loaded/previously-saved `Backtest`**:
+  `Backtest.get_study_definition(name)` returns a single
+  `copy_definition()` clone of a named study (universe, windows,
+  execution assumptions carried over, `engine_results` reset) — the
+  singular counterpart of `get_study_definitions()`. Combined with the
+  new `get_backtest(storage_dir, algorithm_id)` /
+  `get_backtests(storage_dir, algorithm_ids)` (load specific saved
+  backtests by id, e.g. the top-N winners of a prior sweep), this
+  supports running a vector parameter sweep, picking winners, then
+  event-validating a window subset of the same study and merging the
+  results back into the same `.obtf` bundle — without rebuilding the
+  `Study` by hand.
+
+### Fixed
+
+- Bundle merge-on-save (`save_bundle(..., merge=True)`) now unions a
+  same-named study's `backtest_windows` catalogue across saves instead
+  of replacing it. Previously, saving a follow-up run over a subset of
+  windows (e.g. an event-engine validation pass on just the first
+  window of a study) silently shrunk the on-disk window catalogue to
+  that subset, even though older engine runs for the dropped windows
+  were still present.
+
 ## [9.0.0a14] — 2026-09-04
 
 ### Added
