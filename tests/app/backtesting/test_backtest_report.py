@@ -90,7 +90,7 @@ class Test(TestCase):
             algorithm=algorithm,
             study=study,
         )
-        backtest = backtests[0]
+        backtest = next(backtests.iter_backtests())
         self._tmpdir = tempfile.mkdtemp()
         path = os.path.join(
             self._tmpdir, "test_algorithm_backtest"

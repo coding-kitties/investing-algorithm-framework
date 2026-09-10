@@ -299,7 +299,7 @@ def _run_backtest(args, strategies):
         show_progress=args.show_progress,
         fill_missing_data=fill_missing,
     )
-    backtest = backtests[0]
+    backtest = next(backtests.iter_backtests())
 
     return backtest
 

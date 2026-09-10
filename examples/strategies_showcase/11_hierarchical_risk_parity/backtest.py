@@ -40,7 +40,7 @@ def main() -> None:
     app = create_app()
     app.add_strategy(HRPStrategy)
     backtests = app.run_backtest(strategy=HRPStrategy, study=study)
-    backtest = backtests[0]
+    backtest = next(backtests.iter_backtests())
     metrics = backtest.get_backtest_metrics(study_name=study.name)
     print(metrics)
 

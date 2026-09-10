@@ -286,7 +286,7 @@ class Test(TestCase):
                 backtest_storage_directory=checkpoint_dir,
                 use_checkpoints=True,
                 show_progress=False
-            )
+            ).load_backtests(workers=1)
 
             # There should be 2 backtests returned
             self.assertEqual(
@@ -396,7 +396,7 @@ class Test(TestCase):
                 backtest_storage_directory=checkpoint_dir,
                 use_checkpoints=True,
                 show_progress=False
-            )
+            ).load_backtests(workers=1)
             end_time = time.time()
             duration = end_time - start_time
 
@@ -509,7 +509,7 @@ class Test(TestCase):
                 backtest_storage_directory=checkpoint_dir,
                 use_checkpoints=True,
                 show_progress=False
-            )
+            ).load_backtests(workers=1)
 
             # There should be 2 backtests returned
             self.assertEqual(

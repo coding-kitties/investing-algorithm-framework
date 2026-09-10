@@ -148,7 +148,9 @@ class TestEventBacktestShortSelling(TestCase):
             ),
             study=study,
         )
-        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
+        cls.backtest_run = next(
+            backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
     def test_short_and_cover_orders_exist(self):
         orders = self.backtest_run.orders
@@ -208,7 +210,9 @@ class TestEventBacktestShortWithStopLoss(TestCase):
             ),
             study=study,
         )
-        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
+        cls.backtest_run = next(
+            backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
     def test_stop_loss_attached_to_short_trade_is_inverted(self):
         trades = self.backtest_run.trades

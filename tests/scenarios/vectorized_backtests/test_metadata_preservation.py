@@ -265,7 +265,7 @@ class Test(TestCase):
             use_checkpoints=False,
             backtest_storage_directory=self.backtest_storage_dir
         )
-        backtest = backtests[0]
+        backtest = next(backtests.iter_backtests())
 
         # Verify metadata is preserved
         self.assertIsNotNone(backtest.metadata)
@@ -394,7 +394,7 @@ class Test(TestCase):
             backtest_storage_directory=self.backtest_storage_dir
         )
 
-        for backtest in backtests:
+        for backtest in backtests.iter_backtests():
             # Verify metadata is preserved
             self.assertIsNotNone(backtest.metadata)
             self.assertEqual(backtest.metadata.get("author"), "Test User")

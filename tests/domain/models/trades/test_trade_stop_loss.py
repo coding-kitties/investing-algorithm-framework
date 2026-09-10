@@ -4,6 +4,18 @@ from investing_algorithm_framework.domain import TradeStopLoss
 
 class TestTradeStopLoss(TestCase):
 
+    def test_round_trip_preserves_fixed_trigger_and_filled_amount(self):
+        stop_loss = TradeStopLoss(
+            trade_id=1, percentage=5, open_price=120,
+            total_amount_trade=10, is_short=True,
+        )
+        stop_loss.high_water_mark = 90
+        stop_loss.sold_amount = 3
+        restored = TradeStopLoss.from_dict(stop_loss.to_dict())
+        self.assertEqual(restored.stop_loss_price, 126)
+        self.assertEqual(restored.high_water_mark, 90)
+        self.assertEqual(restored.sold_amount, 3)
+
     def test_model_creation(self):
         stop_loss = TradeStopLoss(
             trade_id=1,

@@ -196,7 +196,9 @@ class TestTrailingStopLossHooks(TestCase):
                 engines=[BacktestEngine.EVENT_DRIVEN],
             ),
         )
-        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
+        cls.backtest_run = next(
+            backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
     def test_one_trade_was_opened_and_closed(self):
         trades = self.backtest_run.get_trades()
@@ -298,7 +300,9 @@ class TestTakeProfitHooks(TestCase):
                 engines=[BacktestEngine.EVENT_DRIVEN],
             ),
         )
-        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
+        cls.backtest_run = next(
+            backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
     def test_one_trade_was_opened_and_closed(self):
         trades = self.backtest_run.get_trades()

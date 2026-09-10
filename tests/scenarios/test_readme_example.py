@@ -204,7 +204,7 @@ class TestReadmeExample(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             use_checkpoints=False,
         )
-        backtest = backtests[0]
+        backtest = next(backtests.iter_backtests())
 
         self.assertIsNotNone(backtest)
         self.assertEqual(len(backtest.get_all_backtest_runs()), 1)

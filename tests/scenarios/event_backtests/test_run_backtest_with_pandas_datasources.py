@@ -84,7 +84,7 @@ class Test(TestCase):
             algorithm=algorithm,
             study=study,
         )
-        backtest = backtests[0]
+        backtest = next(backtests.iter_backtests())
         elapsed_time = time.time() - start_time
         self.assertLess(
             elapsed_time, 30,

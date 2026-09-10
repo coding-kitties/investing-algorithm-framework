@@ -73,6 +73,13 @@ Most quant frameworks stop at "here's your backtest result." You get a number, m
 
 > **Want to see this in practice?** Check out the [`examples/tutorial/`](examples/tutorial/README.md): a series of runnable notebooks that walk you through every stage: defining a strategy, visualizing its signals, sweeping parameters across rolling windows, detecting overfitting with Monte Carlo permutation tests, filtering and ranking with the storage layer, and deploying the winner.
 
+Both backtesting engines always return a disk-backed `BacktestIndex`, including
+single-strategy runs. Full results are saved persistently and loaded explicitly
+with `index.iter_backtests()` or `index.load_backtests()`. For large sweeps,
+both engines support bounded parallel workers and optional soft memory budgets.
+See [memory-budgeted sweeps](docusaurus/docs/Advanced%20Concepts/vector-backtesting.md#memory-budgeted-sweeps)
+for progressive pruning, streaming result loading, and Windows/WSL safeguards.
+
 <details open>
 <summary>
   <strong>What's New in v9.0</strong>
@@ -287,7 +294,9 @@ event_study = Study(
     engines=[BacktestEngine.EVENT_DRIVEN],
 )
 backtests = app.run_backtest(strategy=strategy, study=event_study)
-BacktestReport(backtests=backtests).save("event_report.html")
+BacktestReport(
+    backtests=backtests.load_backtests(workers=1),
+).save("event_report.html")
 
 # --- A sweep of vector backtests (parameter grid / multi-window) ---
 sweep_study = Study(
@@ -306,7 +315,10 @@ backtests = app.run_backtests(
     backtest_storage_directory="./my-backtests/",  # persists .obtf bundles
     show_progress=True,
 )
-BacktestReport(backtests=backtests).save("sweep_report.html")
+# Only materialize a suitably small selection for the dashboard.
+BacktestReport(
+    backtests=backtests.load_backtests(workers=1),
+).save("sweep_report.html")
 
 # --- Or: load a folder of bundles back later (parallel decode) ---
 report = BacktestReport.open(

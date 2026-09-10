@@ -223,7 +223,7 @@ if __name__ == "__main__":
     backtests = app.run_backtest(
         study=study,
     )
-    backtest = backtests[0]
+    backtest = next(backtests.iter_backtests())
     # Inspect the result interactively with the BacktestReport dashboard:
     #     from investing_algorithm_framework import BacktestReport
     #     BacktestReport(backtest).show()

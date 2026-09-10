@@ -254,7 +254,7 @@ def _run_backtest(strategy_class, algorithm_id, end_date=None):
         strategy=strategy_class(algorithm_id=algorithm_id),
         study=study,
     )
-    return backtests[0], date_range
+    return next(backtests.iter_backtests()), date_range
 
 
 def _get_run(strategy_class, algorithm_id, end_date=None):

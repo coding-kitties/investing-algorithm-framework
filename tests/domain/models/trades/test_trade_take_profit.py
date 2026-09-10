@@ -4,6 +4,19 @@ from investing_algorithm_framework.domain import TradeTakeProfit
 
 class TestTradeStopLoss(TestCase):
 
+    def test_round_trip_preserves_trigger_and_filled_amount(self):
+        take_profit = TradeTakeProfit(
+            trade_id=1, percentage=5, open_price=120,
+            total_amount_trade=10, is_short=True,
+        )
+        take_profit.take_profit_price = 114
+        take_profit.high_water_mark = 90
+        take_profit.sold_amount = 3
+        restored = TradeTakeProfit.from_dict(take_profit.to_dict())
+        self.assertEqual(restored.take_profit_price, 114)
+        self.assertEqual(restored.high_water_mark, 90)
+        self.assertEqual(restored.sold_amount, 3)
+
     def test_model_creation(self):
         stop_loss = TradeTakeProfit(
             trade_id=1,

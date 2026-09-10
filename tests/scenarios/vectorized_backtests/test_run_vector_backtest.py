@@ -281,7 +281,7 @@ class Test(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             use_checkpoints=False,
         )
-        backtest = backtests[0]
+        backtest = next(backtests.iter_backtests())
         self.assertEqual(len(backtest.get_all_backtest_runs()), 2)
         self.assertEqual(len(backtest.get_all_backtest_metrics()), 2)
 
@@ -379,7 +379,7 @@ class Test(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             use_checkpoints=False,
         )
-        backtest = backtests[0]
+        backtest = next(backtests.iter_backtests())
 
         self.assertEqual(len(backtest.get_all_backtest_runs()), 1)
         self.assertEqual(len(backtest.get_all_backtest_metrics()), 1)

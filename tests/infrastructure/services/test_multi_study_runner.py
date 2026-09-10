@@ -107,8 +107,10 @@ class TestMultiStudyRunnerIntegration(unittest.TestCase):
             study_name="in_sample",
             study_description="IS window",
         )
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].get_study().name, "in_sample")
+        self.assertEqual(results.df["algorithm_id"].nunique(), 1)
+        self.assertEqual(
+            next(results.iter_backtests()).get_study().name, "in_sample",
+        )
 
         bundled = self._open()
         self.assertEqual(bundled.get_study().name, "in_sample")

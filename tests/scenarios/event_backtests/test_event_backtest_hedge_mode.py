@@ -112,7 +112,7 @@ def _run(strategy):
     backtests = app.run_backtest(
         strategy=strategy, study=study, use_checkpoints=False,
     )
-    return backtests[0].get_all_backtest_runs()[0]
+    return next(backtests.iter_backtests()).get_all_backtest_runs()[0]
 
 
 def _both_open_signals(extra=None):

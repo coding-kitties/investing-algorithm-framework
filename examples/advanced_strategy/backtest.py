@@ -58,7 +58,7 @@ def main() -> None:
         engines=[BacktestEngine.EVENT_DRIVEN],
     )
     backtests = app.run_backtest(strategy=strategy, study=study)
-    backtest = backtests[0]
+    backtest = next(backtests.iter_backtests())
     run = backtest.get_all_backtest_runs()[0]
 
     print(f"\nTrades: {len(run.get_trades())}")

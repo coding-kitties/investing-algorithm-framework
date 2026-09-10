@@ -77,8 +77,8 @@ class Test(TestCase):
             study=study, strategy=CrossOverStrategyV1
         )
 
-        self.assertEqual(1, len(backtests))
-        backtest = backtests[0]
+        self.assertEqual(1, backtests.df["algorithm_id"].nunique())
+        backtest = next(backtests.iter_backtests())
 
         run_a = backtest.get_backtest_run(window_a)
         run_b = backtest.get_backtest_run(window_b)

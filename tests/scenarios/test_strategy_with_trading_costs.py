@@ -180,7 +180,7 @@ def _run_backtest(
         execution_config=execution_config,
     )
     backtests = app.run_backtest(study=study)
-    runs = backtests[0].get_all_backtest_runs()
+    runs = next(backtests.iter_backtests()).get_all_backtest_runs()
     assert len(runs) == 1, f"Expected 1 run, got {len(runs)}"
     trades = runs[0].trades
     closed = [t for t in trades if t.status == "CLOSED"]

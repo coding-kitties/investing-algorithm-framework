@@ -77,7 +77,9 @@ class Test(TestCase):
             backtest_windows=[BacktestWindow(train_range=backtest_date_range)],
             engines=[BacktestEngine.EVENT_DRIVEN],
         )
-        backtests = app.run_backtest(algorithm=algorithm, study=study)
+        backtests = app.run_backtest(
+            algorithm=algorithm, study=study,
+        ).load_backtests(workers=1)
         backtest = backtests[0]
         backtest.save(self.backtest_report_save_directory)
         # Check if the backtest report exists
@@ -116,7 +118,9 @@ class Test(TestCase):
             ],
             engines=[BacktestEngine.EVENT_DRIVEN],
         )
-        backtests = app.run_backtest(algorithm=algorithm, study=study)
+        backtests = app.run_backtest(
+            algorithm=algorithm, study=study,
+        ).load_backtests(workers=1)
         self.assertEqual(1, len(backtests))
         self.assertEqual(
             1000, backtests[0].get_study().initial_capital
@@ -149,7 +153,9 @@ class Test(TestCase):
             backtest_windows=[BacktestWindow(train_range=backtest_date_range)],
             engines=[BacktestEngine.EVENT_DRIVEN],
         )
-        backtests = app.run_backtest(algorithm=algorithm, study=study)
+        backtests = app.run_backtest(
+            algorithm=algorithm, study=study,
+        ).load_backtests(workers=1)
         backtest = backtests[0]
 
         backtest.save(self.backtest_report_save_directory)

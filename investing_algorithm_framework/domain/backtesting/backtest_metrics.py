@@ -354,6 +354,8 @@ class BacktestMetrics:
             "calmar_ratio": self.calmar_ratio,
             "omega_ratio": self.omega_ratio,
             "profit_factor": self.profit_factor,
+            "gross_profit": self.gross_profit,
+            "gross_loss": self.gross_loss,
             "annual_volatility": self.annual_volatility,
             "ulcer_index": self.ulcer_index,
             "monthly_returns": [(value, ensure_iso(date))

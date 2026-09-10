@@ -311,7 +311,7 @@ class Test(TestCase):
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
             show_progress=False
-        )
+        ).load_backtests(workers=1)
         backtest = backtests[0]
 
         self.assertEqual(len(backtest.get_all_backtest_runs()), 2)
@@ -429,7 +429,7 @@ class Test(TestCase):
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=True,
             show_progress=False
-        )
+        ).load_backtests(workers=1)
         end_time = time.time()
         duration = end_time - start_time
 
@@ -570,7 +570,7 @@ class Test(TestCase):
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
             show_progress=False
-        )
+        ).load_backtests(workers=1)
 
         # Verify first run results
         self.assertEqual(len(first_backtests), 1)
@@ -654,7 +654,7 @@ class Test(TestCase):
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
             show_progress=False
-        )
+        ).load_backtests(workers=1)
 
         # ===== VERIFICATION =====
         # The second run should ONLY return backtests for the second strategies
@@ -792,7 +792,7 @@ class Test(TestCase):
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
             show_progress=False
-        )
+        ).load_backtests(workers=1)
 
         self.assertEqual(len(first_backtests), 2)
 
@@ -805,8 +805,9 @@ class Test(TestCase):
 
         def tracking_final_filter(backtests):
             """Filter that tracks which backtests it receives."""
-            for bt in backtests:
-                filter_seen_algorithm_ids.append(bt.algorithm_id)
+            filter_seen_algorithm_ids.extend(
+                backtests.df["algorithm_id"].unique()
+            )
             # Return all backtests (no actual filtering)
             return backtests
 
@@ -869,8 +870,8 @@ class Test(TestCase):
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
             show_progress=False,
-            final_filter_function=tracking_final_filter
-        )
+            final_metrics_filter_function=tracking_final_filter
+        ).load_backtests(workers=1)
 
         # ===== VERIFICATION =====
         # The filter should have ONLY seen the second strategies' backtests

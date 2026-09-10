@@ -176,15 +176,9 @@ class Test(TestCase):
         """
         Filter function that only keeps backtests with at least one closed trade.
         """
-        filtered = []
-
-        for backtest in backtests:
-            backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
-
-            if backtest_metrics.number_of_trades_closed > 0:
-                filtered.append(backtest)
-
-        return filtered
+        return backtests.filter(
+            lambda row: row["window_number_of_trades_closed"] > 0,
+        )
 
     def _verify_filtered_strategy_has_no_closed_trades(
         self, all_strategies, filtered_backtests, app, date_ranges
@@ -227,7 +221,7 @@ class Test(TestCase):
             study=multi_window_study,
             snapshot_interval=SnapshotInterval.DAILY,
             # No filter function - run it directly
-        )
+        ).load_backtests(workers=1)
 
         self.assertEqual(len(individual_backtests), 1, "Should have exactly one backtest result")
         at_least_one_run_without_closed_trades = False
@@ -246,7 +240,7 @@ class Test(TestCase):
                 snapshot_interval=SnapshotInterval.DAILY,
                 show_progress=False
                 # No filter function - run it directly
-            )[0]
+            ).load_backtests(workers=1)[0]
             backtest_metrics = individual_backtest\
                 .get_backtest_metrics(date_range)
 
@@ -344,8 +338,10 @@ class Test(TestCase):
             strategies=strategies,
             study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            window_filter_function=self.filter_function_with_closed_trades
-        )
+            window_metrics_filter_function=(
+                self.filter_function_with_closed_trades
+            ),
+        ).load_backtests(workers=1)
 
         # Should have fewer backtests than strategies if filter worked
         self.assertLessEqual(len(backtests), len(strategies))
@@ -474,11 +470,13 @@ class Test(TestCase):
             strategies=strategies,
             study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            window_filter_function=self.filter_function_with_closed_trades,
+            window_metrics_filter_function=(
+                self.filter_function_with_closed_trades
+            ),
             backtest_storage_directory=os.path.join(
                 resource_directory, "temp_backtest_storage"
             )
-        )
+        ).load_backtests(workers=1)
 
         # Should have fewer backtests than strategies if filter worked
         self.assertLessEqual(len(backtests), len(strategies))
@@ -595,8 +593,10 @@ class Test(TestCase):
             strategies=all_strategies,
             study=study,
             snapshot_interval=SnapshotInterval.DAILY,
-            window_filter_function=self.filter_function_with_closed_trades
-        )
+            window_metrics_filter_function=(
+                self.filter_function_with_closed_trades
+            ),
+        ).load_backtests(workers=1)
 
         # Verify that a filtered-out strategy has no closed trades
         self._verify_filtered_strategy_has_no_closed_trades(

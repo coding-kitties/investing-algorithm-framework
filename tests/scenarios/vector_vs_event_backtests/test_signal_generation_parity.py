@@ -334,7 +334,9 @@ class TestEngineLevelTradeParity(TestCase):
             study=vector_study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
-        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
+        cls.vector_run = next(
+            vector_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
         app_event = create_app(name="EventSignalParity", config=config)
         app_event.add_market(
@@ -359,7 +361,9 @@ class TestEngineLevelTradeParity(TestCase):
             study=event_study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
-        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
+        cls.event_run = next(
+            event_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
         cls.v_trades = sorted(
             cls.vector_run.get_trades(), key=lambda t: t.opened_at
@@ -516,7 +520,9 @@ class TestEngineParityWithRecommendedWarmup(TestCase):
             study=vector_study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
-        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
+        cls.vector_run = next(
+            vector_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
         app_event = create_app(name="EventRecommendedWarmup", config=config)
         app_event.add_market(
@@ -534,7 +540,9 @@ class TestEngineParityWithRecommendedWarmup(TestCase):
             study=event_study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
-        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
+        cls.event_run = next(
+            event_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
         cls.v_trades = sorted(
             cls.vector_run.get_trades(), key=lambda t: t.opened_at

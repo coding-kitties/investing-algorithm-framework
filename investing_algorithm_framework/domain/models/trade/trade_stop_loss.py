@@ -361,7 +361,7 @@ class TradeStopLoss(BaseModel):
                 tzinfo=timezone.utc
             )
 
-        return TradeStopLoss(
+        stop_loss = TradeStopLoss(
             trade_id=data.get("trade_id"),
             trailing=data.get("trailing"),
             percentage=data.get("percentage"),
@@ -385,6 +385,11 @@ class TradeStopLoss(BaseModel):
             created_at=created_at,
             updated_at=updated_at
         )
+        # Restore recorded execution state, not a newly calculated trigger.
+        if data.get("stop_loss_price") is not None:
+            stop_loss.stop_loss_price = data["stop_loss_price"]
+        stop_loss.sold_amount = data.get("sold_amount", 0)
+        return stop_loss
 
     def __repr__(self):
         return self.repr(

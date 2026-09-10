@@ -27,6 +27,7 @@ testing, and deploying algorithmic trading strategies. This tutorial showcases:
 - **Data Management** - Download, validate, and fill missing market data
 - **Strategy Visualization** - Visualize trading strategies
 - **In sample Parameter Sweeping** - Test thousands of parameter combinations with ease through a grid search and vector backtesting.
+- **In sample Event Validation** - Quick, cheap sanity check of the top 10 in-sample winners with the event-driven engine on just the first rolling window.
 - **Out sample Vector Backtesting** - Test thousand of strategies out-of-sample with a fast vectorized backtester.
 - **Out sample event based Backtesting** - Simulate realistic trade execution with an event-based backtester to validate top strategies from the vector backtest.
 - **Final analysis** - Generate reports, rank strategies, and export results for further analysis.
@@ -40,10 +41,11 @@ tutorial/
 │   ├── 01_data_exploration.ipynb      # Data download and validation
 │   ├── 02_strategy_visualization.ipynb # Strategy logic visualization
 │   ├── 03_in_sample_param_sweep.ipynb           # In-sample parameter optimization
-│   ├── 04_out_sample_vector_backtest.ipynb    # Out-of-sample vector backtesting
-│   ├── 05_event_backtest.ipynb        # Out-of-sample event-based backtesting
-│   ├── 06_robustness_analysis.ipynb   # Robustness and validation
-│   └── 07_final_analysis.ipynb        # Final results and reporting
+│   ├── 04_in_sample_event_validation.ipynb      # Quick in-sample event sanity check (top 10, first window)
+│   ├── 05_out_sample_vector_backtest.ipynb    # Out-of-sample vector backtesting
+│   ├── 06_event_backtest.ipynb        # Out-of-sample event-based backtesting
+│   ├── 07_robustness_analysis.ipynb   # Robustness and validation
+│   └── 08_final_analysis.ipynb        # Final results and reporting
 ├── strategies/                        # Strategy implementations
 │   └── supertrend_ema_confirmation/   # Example strategy (v9 signal API)
 ├── data/                              # Downloaded market data
@@ -129,160 +131,110 @@ Visualize and understand strategy logic:
 
 ---
 
-### 03 - Parameter Sweep
-**File**: `notebooks/03_param_sweep.ipynb`
+### 03 - In-Sample Parameter Sweep
+**File**: `notebooks/03_in_sample_param_sweep.ipynb`
 
-Run your first backtest and then scale up to thousands of parameter
-combinations:
+Define a grid of strategy variants and screen all of them with the fast vectorized engine over rolling walk-forward windows:
 
-- **`run_backtest()`** - Single strategy backtest (the baseline run)
-- **`run_backtests()`** - Batch backtesting across many strategies
-- **`Study`** - Bundles the universe, date range(s), and engine choice
-  (set `engines=[BacktestEngine.VECTOR]` for the fast vectorized engine)
-- **`BacktestReport`** - Generate HTML reports
-- **`rank_results()`** - Rank strategies by performance
-- **`create_weights()`** - Custom ranking weights
-- **Window filtering** - Filter after each date range
-- **Final filtering** - Filter combined results
+- **`Study`** - Bundles the universe, rolling `backtest_windows`, and engine choice (`engines=[BacktestEngine.VECTOR]`)
+- **`generate_rolling_backtest_windows()`** - Train/test rolling windows with a gap between them
+- **`app.run_backtest(strategies=..., study=...)`** - Batch vector backtest across the whole grid, with `window_filter_function` progressively pruning weak variants
+- **`build_index()` / `rank_index()`** - Rank thousands of on-disk bundles in milliseconds via the Tier-1 SQLite index
+- **`promote_backtests()`** - Copy just the top-N winners into a dedicated `top_selection/` folder for the next notebooks
 
 ```python
-from investing_algorithm_framework import Study, Universe, \
-    BacktestWindow, BacktestEngine
+from datetime import datetime, timezone
+from investing_algorithm_framework import (
+    generate_rolling_backtest_windows, Study, Universe, BacktestEngine,
+    WindowPart, StudySampleType,
+)
 
-study = Study(
-    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
-    initial_capital=1000,
-    risk_free_rate=0.027,
-    backtest_windows=[BacktestWindow(train_range=date_range)],
+rolling_windows = generate_rolling_backtest_windows(
+    start_date=datetime(2022, 1, 1, tzinfo=timezone.utc),
+    end_date=datetime(2025, 12, 30, tzinfo=timezone.utc),
+    train_days=365, test_days=180, gap_days=30, step_days=90,
+)
+
+in_sample_study = Study(
+    name="in_sample_param_sweep",
+    sample_type=StudySampleType.IN_SAMPLE,
+    universe=Universe(symbols=["BTC", "ETH", "ADA", "SOL", "DOT"], trading_symbol="EUR", market="BITVAVO"),
+    backtest_windows=rolling_windows,
+    window_part=WindowPart.TEST,
     engines=[BacktestEngine.VECTOR],
 )
 
-# Baseline run
-backtests = app.run_backtest(strategy=strategy, study=study)
-backtest = backtests[0]
-BacktestReport(backtest).show(browser=True)
-
-# Parameter grid
-params = {
-    'ema_short_period': [20, 50, 75],
-    'ema_long_period': [100, 150, 200],
-    'rsi_period': [14, 21],
-}
-strategies = [Strategy(**p) for p in generate_combinations(params)]
-
-sweep_study = Study(
-    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
-    initial_capital=1000,
-    backtest_windows=[
-        BacktestWindow(train_range=dr) for dr in date_ranges
-    ],
-    engines=[BacktestEngine.VECTOR],
-)
-backtests = app.run_backtests(
+backtests = app.run_backtest(
     strategies=strategies,
-    study=sweep_study,
-    window_filter_function=window_filter,
-    final_filter_function=final_filter,
-    show_progress=True
-)
-
-ranked = rank_results(
-    backtests,
-    focus=BacktestEvaluationFocus.BALANCED
+    study=in_sample_study,
+    backtest_storage_directory=backtest_results_dir,
+    show_progress=True,
 )
 ```
 
 ---
 
-### 04 - Backtest Optimized
-**File**: `notebooks/04_backtest_optimized.ipynb`
+### 04 - In-Sample Event Validation (Quick Sanity Check)
+**File**: `notebooks/04_in_sample_event_validation.ipynb`
 
-Advanced backtesting features:
-- **Parallel processing** - Use multiple CPU cores
-- **Checkpointing** - Save/resume long experiments
-- **Storage directories** - Persist results to disk
+Before spending the (slower) out-of-sample vector budget on the whole `top_selection/` folder, replay just the **top 10** in-sample winners with the **event-driven** engine on **only the first rolling window** — a cheap sanity check that the vector engine's numbers roughly hold up once orders are routed bar-by-bar. This is also the showcase for the newest study-reuse convenience API:
+
+- **`get_backtests(storage_dir, algorithm_ids)`** / **`get_backtest(storage_dir, algorithm_id)`** - Reload specific saved bundles by id, no need to rank/open the whole directory again
+- **`Backtest.get_study_definition(name)`** - Pull a study straight off a loaded bundle (universe, windows, execution assumptions carried over, `engine_results` reset) instead of re-declaring it by hand
+- Slice `study.backtest_windows` down to the windows you actually want to (re-)run, and swap `study.engines`
+- `app.run_backtest(..., backtest_storage_directory=<same dir>)` merges the new engine's results into the **same** `<algorithm_id>.obtf` bundle automatically
 
 ```python
-backtests = app.run_backtests(
-    strategies=strategies,
-    study=sweep_study,
-    n_workers=-1,  # Use all CPU cores
-    use_checkpoints=True,
-    backtest_storage_directory="./backtests/experiment_1",
-    show_progress=True
+from investing_algorithm_framework import BacktestEngine, get_backtest, get_backtests
+
+top_10_backtests = get_backtests(str(top_selection_path), top_10_ids)
+
+reference_backtest = get_backtest(str(top_selection_path), top_10_ids[0])
+event_study = reference_backtest.get_study_definition("in_sample_param_sweep")
+
+# Only the first window, only the event engine.
+event_study.backtest_windows = event_study.backtest_windows[:1]
+event_study.engines = [BacktestEngine.EVENT_DRIVEN]
+
+backtests = app.run_backtest(
+    strategies=top_10_strategies,
+    study=event_study,
+    backtest_storage_directory=str(top_selection_path),
 )
 ```
 
 ---
 
-### 05 - Event Backtest
-**File**: `notebooks/05_event_backtest.ipynb`
+### 05 - Out-of-Sample Vector Backtest
+**File**: `notebooks/05_out_sample_vector_backtest.ipynb`
 
-Realistic trade simulation:
-- **`run_backtest()`** - Event-based backtesting
-- **`run_backtests()`** - Batch event-based backtesting
-- Simulates real-time order execution
-- More accurate slippage and fill modeling
+Re-instantiate the in-sample winners on two out-of-sample regimes — a different time window (Type A) and a disjoint symbol universe (Type B) — still with the fast vector engine:
 
-```python
-event_study = Study(
-    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
-    initial_capital=1000,
-    backtest_windows=[BacktestWindow(train_range=date_range)],
-    engines=[BacktestEngine.EVENT_DRIVEN],
-)
-
-# Single event-based backtest
-backtests = app.run_backtest(strategy=strategy, study=event_study)
-backtest = backtests[0]
-
-# Batch event-based backtests
-sweep_event_study = Study(
-    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
-    initial_capital=1000,
-    backtest_windows=[
-        BacktestWindow(train_range=dr) for dr in date_ranges
-    ],
-    engines=[BacktestEngine.EVENT_DRIVEN],
-)
-backtests = app.run_backtests(
-    strategies=strategies,
-    study=sweep_event_study,
-    n_workers=4
-)
-```
+- **`Study`** per regime, each with its own `sample_type` (`OUT_SAMPLE_TIME` / `OUT_SAMPLE_UNIVERSE`) and `Universe`
+- Bundles saved to the same `top_selection/` folder as notebook 03, so each regime's results land as an extra study slot on the existing `<algorithm_id>.obtf` bundle
 
 ---
 
-### 06 - Robustness Analysis
-**File**: `notebooks/06_robustness_analysis.ipynb`
+### 06 - Out-of-Sample Event Backtest
+**File**: `notebooks/06_event_backtest.ipynb`
 
-Validate strategy robustness:
-- **Walk-forward analysis** - Rolling window validation
-- **`generate_rolling_backtest_windows()`** - Create train/test splits
-- Out-of-sample testing
-- Parameter stability analysis
+Full event-driven replay of both out-of-sample regimes (every rolling window, not just the first), scoped to whichever winners still look robust:
 
-```python
-from investing_algorithm_framework import generate_rolling_backtest_windows
-
-windows = generate_rolling_backtest_windows(
-    start_date=start_date,
-    end_date=end_date,
-    train_days=365,
-    step_days=90
-)
-
-for window in windows:
-    train_range = window["train_range"]
-    test_range = window["test_range"]
-    # Train on train_range, validate on test_range
-```
+- **`rank_by_cross_study_robustness()`** - Scores how much of the in-sample edge each bundle retained out-of-sample, so the (slow) event engine only runs on the most credible survivors
+- **`Backtest.get_study_definition(name)`** for both OOS studies, `engines=[BacktestEngine.EVENT_DRIVEN]`
+- `show_backtest_summaries()` / `show_backtest_runs()` side by side for `engine="vector"` vs `engine="event"`
 
 ---
 
-### 07 - Final Analysis
-**File**: `notebooks/07_final_analysis.ipynb`
+### 07 - Robustness Analysis
+**File**: `notebooks/07_robustness_analysis.ipynb`
+
+Cross-study robustness scoring and window-stability analysis across everything produced so far.
+
+---
+
+### 08 - Final Analysis
+**File**: `notebooks/08_final_analysis.ipynb`
 
 Generate final reports and analysis:
 - **`create_markdown_table()`** - Format results as markdown

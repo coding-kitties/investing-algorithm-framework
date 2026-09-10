@@ -427,7 +427,7 @@ class TradeTakeProfit(BaseModel):
                 tzinfo=timezone.utc
             )
 
-        return TradeTakeProfit(
+        take_profit = TradeTakeProfit(
             trade_id=data.get("trade_id"),
             trailing=data.get("trailing"),
             percentage=data.get("percentage"),
@@ -450,6 +450,10 @@ class TradeTakeProfit(BaseModel):
             created_at=created_at,
             updated_at=updated_at
         )
+        if data.get("take_profit_price") is not None:
+            take_profit.take_profit_price = data["take_profit_price"]
+        take_profit.sold_amount = data.get("sold_amount", 0)
+        return take_profit
 
     def __repr__(self):
         return self.repr(

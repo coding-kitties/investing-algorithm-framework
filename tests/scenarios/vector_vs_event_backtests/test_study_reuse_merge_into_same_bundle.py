@@ -132,7 +132,9 @@ class TestStudyReuseMergeIntoSameBundle(TestCase):
         bundle_path = self.storage_dir / f"{ALGORITHM_ID}.obtf"
         self.assertTrue(bundle_path.is_file())
 
-        vector_study = vector_backtests[0].get_study(STUDY_NAME)
+        vector_study = next(
+            vector_backtests.iter_backtests()
+        ).get_study(STUDY_NAME)
         self.assertEqual(2, len(vector_study.get_runs("vector")))
 
         # --- 2. Reload by id and pull the study definition straight off

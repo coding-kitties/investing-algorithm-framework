@@ -30,6 +30,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
+from investing_algorithm_framework.services.executors.base import Executor
+
 logger = logging.getLogger(__name__)
 
 # Attributes ignored when fingerprinting a strategy instance. These are
@@ -44,6 +46,12 @@ _IGNORED_STRATEGY_ATTRS = frozenset(
         "traces",
         "_orders",
         "_trades",
+        "last_signals",
+        "last_score_cards",
+        "_pending_score_cards",
+        "_cooldown_bar_index",
+        "_cooldown_remaining",
+        "_cooldown_tracker",
     }
 )
 
@@ -81,6 +89,14 @@ def _strategy_params_fingerprint(strategy: Any) -> Dict[str, str]:
             continue
         if callable(value):
             continue
+        if isinstance(value, Executor):
+            # Object reprs include process-specific addresses, not
+            # configuration.
+            value = {
+                "type": f"{type(value).__module__}.{type(value).__qualname__}",
+                "source": _strategy_source_fingerprint(value),
+                "params": _strategy_params_fingerprint(value),
+            }
         fingerprint[name] = _safe_repr(value)
 
     return dict(sorted(fingerprint.items()))

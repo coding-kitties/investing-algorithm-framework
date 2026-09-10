@@ -4,7 +4,8 @@ import os
 import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import List, Optional, Any, Dict, Tuple, Callable, Union
+from typing import List, Literal, Optional, Any, Dict, Tuple, Callable, Union
+from uuid import uuid4
 
 import uvicorn
 from fastapi import FastAPI
@@ -25,7 +26,8 @@ from investing_algorithm_framework.domain import DATABASE_NAME, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestMonteCarloTest, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY, Schedule, \
     Universe, PositionMode, RunReport, PaperTradingMode, DATETIME_FORMAT, \
-    DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE, OrderStatus
+    DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE, OrderStatus, \
+    BacktestIndex
 from investing_algorithm_framework.domain.backtesting.study import Study
 from investing_algorithm_framework.domain.backtesting.backtest_engine import \
     BacktestEngine
@@ -1573,7 +1575,17 @@ class App:
         iterative_summary_update: bool = False,
         anchor_algorithm_id: Optional[str] = None,
         algorithm=None,
-    ) -> List[Backtest]:
+        result_mode: Literal["index"] = "index",
+        memory_budget_mb: Optional[int] = None,
+        min_available_memory_mb: Optional[int] = None,
+        max_tasks_per_child: Optional[int] = 16,
+        window_metrics_filter_function: Optional[
+            Callable[[BacktestIndex, BacktestDateRange], BacktestIndex]
+        ] = None,
+        final_metrics_filter_function: Optional[
+            Callable[[BacktestIndex], BacktestIndex]
+        ] = None,
+    ) -> BacktestIndex:
         """
         Run a backtest for one or more strategies using a Study as
         configuration.
@@ -1619,24 +1631,41 @@ class App:
             show_progress: Show progress bars during execution.
             continue_on_error: If True, continue instead of raising on
                 individual backtest errors.
-            window_filter_function: Filter applied after each date range.
-            final_filter_function: Filter applied after all windows.
-            backtest_storage_directory: Directory for persisting backtest
-                files.
+            window_filter_function: Removed; use the scalar metrics callback.
+            final_filter_function: Removed; use the scalar metrics callback.
+            backtest_storage_directory: Persistent results directory.
+                When omitted, creates a unique run directory under
+                RESOURCE_DIRECTORY/backtests. The returned index exposes
+                the resolved directory; reuse it explicitly to resume.
             use_checkpoints: Resume interrupted runs from saved checkpoints.
-            batch_size: Strategies per batch when use_checkpoints=True.
-            checkpoint_batch_size: Backtests saved per checkpoint flush.
-            n_workers: Parallel workers (None=sequential, -1=all cores).
+            batch_size: Compatibility option; index results save individually.
+            checkpoint_batch_size: Compatibility option; each completed result
+                is checkpointed immediately.
+            n_workers: Parallel workers for either engine. None/0 runs
+                sequentially; -1 chooses min(cpu_count - 1, 8), at least 1.
             dynamic_position_sizing: Enable volatility-scaled position sizing.
             fill_missing_data: Auto-fill missing OHLCV rows.
             iterative_summary_update: Update summary after each window.
             anchor_algorithm_id: Reference algorithm for relative metrics.
+            result_mode: Compatibility keyword; only "index" is accepted.
+                Full objects must be loaded explicitly from the result.
+            memory_budget_mb: Optional soft RSS budget in MiB for the
+                coordinator and workers. Not an OS-enforced hard limit.
+            min_available_memory_mb: Optional available-memory reserve in
+                MiB. New work is restricted when memory is under pressure.
+            max_tasks_per_child: Recycle worker pools after this many tasks
+                in total; None disables recycling.
+            window_metrics_filter_function: Index-mode callback receiving
+                (index, date_range) and returning a subset BacktestIndex.
+                Rows include summary.* and current-window window_* scalars.
+            final_metrics_filter_function: Index-mode callback returning a
+                subset BacktestIndex after all windows.
 
         Returns:
-            List[Backtest]: One Backtest per strategy, ordered to match
-                the input strategies list, when ``strategy=``/
-                ``strategies=`` is used. When ``algorithm=`` is used,
-                a list with exactly one combined Backtest.
+            BacktestIndex: Scalar rows and persistent bundle paths for the
+                surviving strategies/algorithms, including single runs.
+                Use iter_backtests() or load_backtests() to explicitly
+                materialize full results.
 
         Raises:
             OperationalException: If study is missing, has no
@@ -1650,6 +1679,20 @@ class App:
                 ``strategy=``/``strategies=``/``algorithm=``/
                 ``algorithms=`` is provided at once.
         """
+        if result_mode != "index":
+            raise OperationalException(
+                "Backtesting always returns a BacktestIndex. Remove "
+                "result_mode='list' and explicitly load selected results "
+                "with index.iter_backtests() or index.load_backtests()."
+            )
+        if window_filter_function is not None \
+                or final_filter_function is not None:
+            raise OperationalException(
+                "Full-object backtest filters are no longer supported. "
+                "Use window_metrics_filter_function or "
+                "final_metrics_filter_function with BacktestIndex rows."
+            )
+
         _modes_given = sum(
             1 for v in (
                 strategy is not None,
@@ -1862,6 +1905,24 @@ class App:
                     "strategies=."
                 )
 
+        if backtest_storage_directory is None:
+            run_name = (
+                datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+                + "-" + uuid4().hex
+            )
+            backtest_storage_directory = (
+                Path(self.resource_directory_path) / "backtests" / run_name
+            )
+        backtest_storage_directory = Path(
+            backtest_storage_directory
+        ).resolve()
+        backtest_storage_directory.mkdir(parents=True, exist_ok=True)
+        logger.info("Backtest results: %s", backtest_storage_directory)
+        if show_progress:
+            print(
+                f"Backtest results: {backtest_storage_directory}", flush=True,
+            )
+
         if use_vector:
             if not skip_data_sources_initialization:
                 data_provider_service = (
@@ -1927,6 +1988,14 @@ class App:
                 dynamic_position_sizing=dynamic_position_sizing,
                 fill_missing_data=fill_missing_data,
                 iterative_summary_update=iterative_summary_update,
+                result_mode=result_mode,
+                memory_budget_mb=memory_budget_mb,
+                min_available_memory_mb=min_available_memory_mb,
+                max_tasks_per_child=max_tasks_per_child,
+                window_metrics_filter_function=(
+                    window_metrics_filter_function
+                ),
+                final_metrics_filter_function=final_metrics_filter_function,
             )
             # Note: unlike the event-driven branch below,
             # backtest_service.run_vector_backtests() is already
@@ -2020,40 +2089,58 @@ class App:
                     final_algorithms.append(alg)
 
             backtest_service = self.container.backtest_service()
-            backtests = backtest_service.run_backtests(
-                algorithms=final_algorithms,
-                context=self.context,
-                trade_stop_loss_service=(
-                    self.container.trade_stop_loss_service()
-                ),
-                trade_take_profit_service=(
-                    self.container.trade_take_profit_service()
-                ),
-                backtest_date_ranges=backtest_date_ranges,
-                risk_free_rate=risk_free_rate,
-                skip_data_sources_initialization=False,
-                show_progress=show_progress,
-                continue_on_error=continue_on_error,
-                window_filter_function=window_filter_function,
-                final_filter_function=final_filter_function,
-                backtest_storage_directory=backtest_storage_directory,
-                use_checkpoints=use_checkpoints,
-                batch_size=batch_size,
-                checkpoint_batch_size=checkpoint_batch_size,
-                fill_missing_data=fill_missing_data,
-                iterative_summary_update=iterative_summary_update,
-                blotter=self._blotter,
-            )
 
-            _apply_study_to_backtests(
-                backtests,
-                study,
-                [s for alg in final_algorithms for s in alg.strategies],
-                backtest_storage_directory,
-                anchor_algorithm_id=anchor_algorithm_id,
-            )
-            self.cleanup_backtest_resources()
+            def prepare_event_backtest(backtest):
+                _apply_study_to_backtests(
+                    [backtest], study,
+                    [s for alg in final_algorithms for s in alg.strategies],
+                    None,
+                    anchor_algorithm_id=anchor_algorithm_id,
+                )
 
+            try:
+                backtests = backtest_service.run_backtests(
+                    algorithms=final_algorithms,
+                    context=self.context,
+                    trade_stop_loss_service=(
+                        self.container.trade_stop_loss_service()
+                    ),
+                    trade_take_profit_service=(
+                        self.container.trade_take_profit_service()
+                    ),
+                    backtest_date_ranges=backtest_date_ranges,
+                    risk_free_rate=risk_free_rate,
+                    skip_data_sources_initialization=False,
+                    show_progress=show_progress,
+                    continue_on_error=continue_on_error,
+                    backtest_storage_directory=backtest_storage_directory,
+                    use_checkpoints=use_checkpoints,
+                    batch_size=batch_size,
+                    checkpoint_batch_size=checkpoint_batch_size,
+                    fill_missing_data=fill_missing_data,
+                    iterative_summary_update=iterative_summary_update,
+                    blotter=self._blotter,
+                    result_mode="index",
+                    n_workers=n_workers,
+                    max_tasks_per_child=max_tasks_per_child,
+                    study=study,
+                    prepare_backtest=prepare_event_backtest,
+                    memory_budget_mb=memory_budget_mb,
+                    min_available_memory_mb=min_available_memory_mb,
+                    window_metrics_filter_function=(
+                        window_metrics_filter_function
+                    ),
+                    final_metrics_filter_function=(
+                        final_metrics_filter_function
+                    ),
+                )
+            finally:
+                self.cleanup_backtest_resources()
+
+        if not isinstance(backtests, BacktestIndex):
+            raise OperationalException(
+                "The backtest engine did not produce a BacktestIndex."
+            )
         return backtests
 
     def run_backtests(
@@ -2079,7 +2166,17 @@ class App:
         dynamic_position_sizing: bool = False,
         fill_missing_data: bool = True,
         iterative_summary_update: bool = False,
-    ) -> List[Backtest]:
+        result_mode: Literal["index"] = "index",
+        memory_budget_mb: Optional[int] = None,
+        min_available_memory_mb: Optional[int] = None,
+        max_tasks_per_child: Optional[int] = 16,
+        window_metrics_filter_function: Optional[
+            Callable[[BacktestIndex, BacktestDateRange], BacktestIndex]
+        ] = None,
+        final_metrics_filter_function: Optional[
+            Callable[[BacktestIndex], BacktestIndex]
+        ] = None,
+    ) -> BacktestIndex:
         """
         Sweep multiple independent strategies (or algorithms) over a
         Study, comparing results. Each strategy/algorithm gets its own
@@ -2119,10 +2216,18 @@ class App:
             dynamic_position_sizing: Enable volatility-scaled position sizing.
             fill_missing_data: Auto-fill missing OHLCV rows.
             iterative_summary_update: Update summary after each window.
+            result_mode: Compatibility keyword; only "index" is accepted.
+            memory_budget_mb: Optional soft process-tree RSS budget in MiB.
+            min_available_memory_mb: Optional available-memory reserve in
+                MiB. These controls do not enforce an OS-level hard limit.
+            max_tasks_per_child: Vector worker recycling interval.
+            window_metrics_filter_function: Index-mode window filter; see
+                run_backtest for the callback contract.
+            final_metrics_filter_function: Index-mode final filter.
 
         Returns:
-            List[Backtest]: One Backtest per strategy/algorithm (per
-            surviving one, if filter functions are provided).
+            BacktestIndex: Persistent scalar results for either engine.
+                Full results are loaded explicitly through the index.
         """
         return self.run_backtest(
             strategies=strategies,
@@ -2142,6 +2247,12 @@ class App:
             dynamic_position_sizing=dynamic_position_sizing,
             fill_missing_data=fill_missing_data,
             iterative_summary_update=iterative_summary_update,
+            result_mode=result_mode,
+            memory_budget_mb=memory_budget_mb,
+            min_available_memory_mb=min_available_memory_mb,
+            max_tasks_per_child=max_tasks_per_child,
+            window_metrics_filter_function=window_metrics_filter_function,
+            final_metrics_filter_function=final_metrics_filter_function,
         )
 
     def run_monte_carlo_test(
@@ -2237,7 +2348,7 @@ class App:
             use_checkpoints=False,
             show_progress=show_progress,
         )
-        backtest = backtests[0]
+        backtest = next(backtests.iter_backtests())
         backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
 
         if backtest_metrics.number_of_trades == 0:
@@ -2321,7 +2432,7 @@ class App:
                 use_checkpoints=False,
                 show_progress=show_progress,
             )
-            permuted_backtest = permuted_backtests[0]
+            permuted_backtest = next(permuted_backtests.iter_backtests())
 
             # Add the results of the permuted backtest to the main backtest
             permuted_metrics.append(

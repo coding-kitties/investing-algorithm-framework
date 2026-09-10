@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a16] — 2026-09-10
+
+### Added
+
+- **Resource-bounded vector and event backtesting**: backtest sweeps can now
+  limit parallel workers, recycle worker pools, and apply soft process-tree
+  memory and system-headroom guards. Event backtests support isolated spawned
+  workers across independent algorithms, while both engines persist completed
+  work incrementally instead of retaining an entire sweep in memory.
+- **Persistent scalar backtest indexes**: public backtest runs return a
+  `BacktestIndex` backed by durable storage. Index rows expose summary metrics
+  for filtering and selection without loading full backtest bundles, and
+  `iter_backtests()` supports lazy, deduplicated loading when full results are
+  needed.
+- Scalar window and final filter callbacks for progressive pruning across
+  rolling backtest windows.
+
+### Changed
+
+- `App.run_backtest()` and `App.run_backtests()` now consistently return a
+  `BacktestIndex`. Legacy full-object filter callbacks must be migrated to
+  `window_metrics_filter_function` and `final_metrics_filter_function`.
+- Backtest storage is created automatically when no directory is supplied, so
+  index results remain available after a run completes.
+
+### Fixed
+
+- Event checkpoint fingerprints no longer change because of transient counters
+  or process-specific executor addresses.
+- Event and vector results sharing dates no longer replace one another during
+  bundle merges, and resumed indexes preserve deterministic algorithm order.
+- Serialized summaries now retain gross profit and gross loss, while restored
+  stop-loss and take-profit records preserve their trigger prices and filled
+  amounts.
+
 ## [9.0.0a15] — 2026-09-08
 
 ### Added

@@ -251,7 +251,7 @@ def _run_backtest(app, strategy, days=730, **kwargs):
         use_checkpoints=False,
         **kwargs,
     )
-    backtest = backtests[0]
+    backtest = next(backtests.iter_backtests())
     runs = backtest.get_all_backtest_runs()
     return runs[0] if runs else None
 
@@ -398,8 +398,7 @@ class TestRawSignalsExposed(TestCase):
 
     def test_signals_field_present_and_populated(self):
         """
-        After a vector backtest, BacktestRun.signals should be a dict
-        keyed by symbol, each containing 'buy' and 'sell' pd.Series.
+        Loaded runs expose persisted sparse buy/sell timestamp lists.
         """
         app = _make_app()
         strategy = _make_strategy(symbols=["BTC"])
@@ -414,23 +413,15 @@ class TestRawSignalsExposed(TestCase):
             signal_data = run.signals[symbol]
             self.assertIn("buy", signal_data)
             self.assertIn("sell", signal_data)
-            self.assertIsInstance(signal_data["buy"], pd.Series)
-            self.assertIsInstance(signal_data["sell"], pd.Series)
-            # Series should contain boolean values
-            self.assertTrue(
-                signal_data["buy"].dtype == bool,
-                f"Expected bool dtype for {symbol} buy signals, "
-                f"got {signal_data['buy'].dtype}"
-            )
-            self.assertTrue(
-                signal_data["sell"].dtype == bool,
-                f"Expected bool dtype for {symbol} sell signals, "
-                f"got {signal_data['sell'].dtype}"
-            )
+            self.assertIsInstance(signal_data["buy"], list)
+            self.assertIsInstance(signal_data["sell"], list)
+            for timestamp in signal_data["buy"] + signal_data["sell"]:
+                self.assertIsInstance(timestamp, str)
+                self.assertIsNotNone(pd.Timestamp(timestamp).tzinfo)
 
-    def test_signals_have_datetimeindex(self):
+    def test_persisted_signals_can_be_loaded_as_datetimeindex(self):
         """
-        Each signal Series should have a DatetimeIndex.
+        Sparse signal dates can be used directly as a DatetimeIndex.
         """
         app = _make_app()
         strategy = _make_strategy(symbols=["BTC"])
@@ -438,7 +429,7 @@ class TestRawSignalsExposed(TestCase):
         self.assertIsNotNone(run)
 
         btc_buy = run.signals["BTC"]["buy"]
-        self.assertIsInstance(btc_buy.index, pd.DatetimeIndex)
+        self.assertIsInstance(pd.to_datetime(btc_buy), pd.DatetimeIndex)
 
     def test_signals_contain_at_least_one_true(self):
         """
@@ -452,7 +443,7 @@ class TestRawSignalsExposed(TestCase):
 
         # At least one symbol should have at least one buy signal
         any_buy = any(
-            run.signals[sym]["buy"].any()
+            bool(run.signals[sym]["buy"])
             for sym in run.signals
         )
         self.assertTrue(

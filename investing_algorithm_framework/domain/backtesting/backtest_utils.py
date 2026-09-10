@@ -5,7 +5,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed, \
 from logging import getLogger
 from pathlib import Path
 from random import Random
-from typing import List, Union, Callable, Optional
+from typing import Iterator, List, Union, Callable, Optional
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
@@ -757,14 +757,20 @@ class BacktestIndex:
         self.df = dataframe
 
     @classmethod
-    def open(cls, directory: Union[str, Path]) -> "BacktestIndex":
+    def open(
+        cls,
+        directory: Union[str, Path],
+        *,
+        filename: str = "index.parquet",
+    ) -> "BacktestIndex":
+        """Open a global index or a named sweep-session index sidecar."""
         import pandas as pd
 
-        path = Path(directory) / "index.parquet"
+        path = Path(directory) / filename
         if not path.exists():
             raise FileNotFoundError(
-                f"No index.parquet at {directory}; pass write_index=True "
-                "to save_backtests_to_directory to generate one."
+                f"No backtest index at {path}; save an index before "
+                "opening it."
             )
         return cls(directory, pd.read_parquet(path))
 
@@ -775,8 +781,33 @@ class BacktestIndex:
         """Return a new index restricted to rows where *predicate(row)*
         is True.  ``predicate`` receives a pandas Series.
         """
+        if self.df.empty:
+            return BacktestIndex(self.directory, self.df.copy())
         mask = self.df.apply(predicate, axis=1).astype(bool)
         return BacktestIndex(self.directory, self.df.loc[mask].copy())
+
+    def iter_backtests(self) -> Iterator[Backtest]:
+        """Load one full backtest at a time, without retaining prior ones.
+
+        Multiple study/engine rows referencing the same bundle yield it
+        once. Loading errors propagate; callers decide whether to retry.
+        Collecting this iterator into a list defeats the memory benefit.
+        """
+        if "bundle_path" not in self.df.columns:
+            raise OperationalException(
+                "Backtest index must contain a bundle_path column."
+            )
+        seen = set()
+        for path in self.df["bundle_path"]:
+            if not isinstance(path, str) or not path:
+                raise OperationalException(
+                    "Backtest index contains an invalid bundle_path."
+                )
+            resolved = self.directory / path
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            yield Backtest.open(resolved)
 
     def load_backtests(
         self,
@@ -786,7 +817,8 @@ class BacktestIndex:
         """Load all backtest bundles referenced by the current rows."""
         n_workers = _resolve_workers(workers)
         paths = [
-            str(self.directory / p) for p in self.df["bundle_path"].tolist()
+            str(self.directory / p)
+            for p in self.df["bundle_path"].drop_duplicates().tolist()
             if isinstance(p, str)
         ]
         out: List[Backtest] = []

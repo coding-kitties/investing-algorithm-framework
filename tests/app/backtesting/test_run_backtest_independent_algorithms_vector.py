@@ -115,7 +115,7 @@ class TestIndependentAlgorithmsVectorEngine(TestCase):
             algorithms=[algorithm_one, algorithm_two], study=self._study()
         )
 
-        self.assertEqual(2, len(backtests))
+        self.assertEqual(2, backtests.df["algorithm_id"].nunique())
 
     def test_multi_strategy_algorithm_rejected_with_vector_engine(self):
         app = self._app()

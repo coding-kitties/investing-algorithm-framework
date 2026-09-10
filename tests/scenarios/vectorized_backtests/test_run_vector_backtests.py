@@ -296,7 +296,7 @@ class Test(TestCase):
             study=study,
             snapshot_interval=SnapshotInterval.DAILY,
             use_checkpoints=False,
-        )
+        ).load_backtests(workers=1)
 
         self.assertEqual(len(backtests), 4)
 
@@ -410,7 +410,7 @@ class Test(TestCase):
             study=study,
             snapshot_interval=SnapshotInterval.DAILY,
             use_checkpoints=False,
-        )
+        ).load_backtests(workers=1)
 
         self.assertEqual(len(backtests), 4)
 

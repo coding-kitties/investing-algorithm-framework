@@ -16,6 +16,18 @@ def _backtest_window(start_date, end_date):
 
 class TestBacktestMetrics(TestCase):
 
+    def test_gross_totals_survive_round_trip_for_summary_recalculation(self):
+        metrics = BacktestMetrics(
+            backtest_window=_backtest_window(
+                datetime(2024, 1, 1), datetime(2024, 1, 2),
+            ),
+            gross_profit=0.0,
+            gross_loss=-25.0,
+        )
+        restored = BacktestMetrics.from_dict(metrics.to_dict())
+        self.assertEqual(restored.gross_profit, 0.0)
+        self.assertEqual(restored.gross_loss, -25.0)
+
     def setUp(self):
         # Create a temporary directory for each test
         self.temp_dir = tempfile.TemporaryDirectory()

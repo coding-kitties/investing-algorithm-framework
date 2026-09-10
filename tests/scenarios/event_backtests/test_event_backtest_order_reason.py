@@ -159,7 +159,9 @@ class TestEventBacktestBuySellMetadata(TestCase):
             strategy=SimpleBuySellStrategy(algorithm_id="event_meta"),
             study=_build_study(BacktestEngine.EVENT_DRIVEN),
         )
-        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
+        cls.backtest_run = next(
+            backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
     def test_orders_exist(self):
         orders = self.backtest_run.orders
@@ -209,7 +211,9 @@ class TestEventBacktestScalingMetadata(TestCase):
             strategy=ScalingStrategy(algorithm_id="event_scale"),
             study=_build_study(BacktestEngine.EVENT_DRIVEN),
         )
-        cls.backtest_run = backtests[0].get_all_backtest_runs()[0]
+        cls.backtest_run = next(
+            backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
     def test_orders_exist(self):
         orders = self.backtest_run.orders
@@ -255,7 +259,7 @@ class TestEventVsVectorMetadataConsistency(TestCase):
             strategy=SimpleBuySellStrategy(algorithm_id="v_comp"),
             study=_build_study(BacktestEngine.VECTOR),
         )
-        cls.vector_run = vbts[0].get_all_backtest_runs()[0]
+        cls.vector_run = next(vbts.iter_backtests()).get_all_backtest_runs()[0]
 
         # Event
         app_e = _create_app("EventMetaComp")
@@ -263,7 +267,7 @@ class TestEventVsVectorMetadataConsistency(TestCase):
             strategy=SimpleBuySellStrategy(algorithm_id="e_comp"),
             study=_build_study(BacktestEngine.EVENT_DRIVEN),
         )
-        cls.event_run = ebts[0].get_all_backtest_runs()[0]
+        cls.event_run = next(ebts.iter_backtests()).get_all_backtest_runs()[0]
 
     def test_same_order_count(self):
         self.assertEqual(

@@ -2,6 +2,7 @@ import os
 import sys
 import unittest
 from io import StringIO
+from tempfile import TemporaryDirectory
 from itertools import product
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -12,8 +13,8 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, rank_results, \
-    BacktestEvaluationFocus, generate_algorithm_id, Schedule, Study, \
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, BacktestIndex, \
+    generate_algorithm_id, Schedule, Study, \
     Universe, BacktestWindow, BacktestEngine, SignalSide, \
     signal_series_from_column
 
@@ -188,16 +189,9 @@ class Test(TestCase):
         """
         Filter function that only keeps backtests with at least one closed trade.
         """
-        filtered = []
-
-        for backtest in backtests:
-            backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
-
-            if backtest_metrics is not None \
-                    and backtest_metrics.number_of_trades_closed > 0:
-                filtered.append(backtest)
-
-        return filtered
+        return backtests.filter(
+            lambda row: row["window_number_of_trades_closed"] > 0,
+        )
 
     @staticmethod
     def filter_function_with_ranking(
@@ -206,13 +200,20 @@ class Test(TestCase):
         """
         Filter function that only keeps backtests with at least one closed trade.
         """
-        return rank_results(backtests, focus=BacktestEvaluationFocus.BALANCED)
+        if backtests.df.empty:
+            return backtests
+        return BacktestIndex(
+            backtests.directory,
+            backtests.df.sort_values("summary.total_net_gain", ascending=False),
+        )
 
     def test_run_with_show_output(self):
         """
         Test run_vector_backtests with a filter_function that filters
         strategies based on whether they have closed trades.
         """
+        storage = TemporaryDirectory()
+        self.addCleanup(storage.cleanup)
         param_grid = {
             "rsi_time_frame": ["2h"],
             "rsi_period": [14],
@@ -301,13 +302,13 @@ class Test(TestCase):
                 study=study,
                 snapshot_interval=SnapshotInterval.DAILY,
                 use_checkpoints=True,
-                backtest_storage_directory=os.path.join(
-                    resource_directory, "backtest_reports_for_testing"
+                backtest_storage_directory=storage.name,
+                window_metrics_filter_function=(
+                    self.filter_function_with_closed_trades
                 ),
-                window_filter_function=self.filter_function_with_closed_trades,
-                final_filter_function=self.filter_function_with_ranking,
+                final_metrics_filter_function=self.filter_function_with_ranking,
                 show_progress=True,
-                n_workers=os.cpu_count() - 1,
+                n_workers=2,
                 batch_size=100,  # Process 100 strategies at a time
                 checkpoint_batch_size=50,  # Save checkpoint every 50 backtests
             )
@@ -336,9 +337,9 @@ class Test(TestCase):
         )
 
         self.assertTrue(
-            "Applying window filter function" in output
+            "Applying window metrics filter function" in output
         )
 
         self.assertTrue(
-            "Combining backtests across date ranges" in output
+            (backtests.directory / "backtest_session_index.parquet").is_file()
         )

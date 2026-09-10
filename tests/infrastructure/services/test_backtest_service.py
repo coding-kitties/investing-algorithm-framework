@@ -32,6 +32,7 @@ from investing_algorithm_framework import (
     RESOURCE_DIRECTORY,
     SnapshotInterval,
     Backtest,
+    BacktestIndex,
     OperationalException,
     Schedule,
     Study,
@@ -167,14 +168,14 @@ class TestFilteredOutMetadataUpdate(TestCase):
         With min_trades=100, most strategies will be filtered out.
         """
         def window_filter(
-            backtests: List[Backtest],
+            backtests: BacktestIndex,
             date_range: BacktestDateRange
-        ) -> List[Backtest]:
-            return [
-                b for b in backtests
-                if b.vector_summary is not None
-                and b.vector_summary.number_of_trades_closed >= min_trades
-            ]
+        ) -> BacktestIndex:
+            return backtests.filter(
+                lambda row: (
+                    row["summary.number_of_trades_closed"] >= min_trades
+                ),
+            )
         return window_filter
 
     def _create_lenient_filter(self, min_trades: int = 0):
@@ -183,9 +184,9 @@ class TestFilteredOutMetadataUpdate(TestCase):
         This filter passes everything regardless of trades.
         """
         def window_filter(
-            backtests: List[Backtest],
+            backtests: BacktestIndex,
             date_range: BacktestDateRange
-        ) -> List[Backtest]:
+        ) -> BacktestIndex:
             # Pass all backtests - this is a lenient filter
             return backtests
         return window_filter
@@ -239,11 +240,12 @@ class TestFilteredOutMetadataUpdate(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            window_filter_function=strict_filter,
+            window_metrics_filter_function=strict_filter,
         )
 
         # Verify the backtest was filtered out
-        # (should return empty list or strategy marked as filtered)
+        self.assertIsInstance(backtests_run1, BacktestIndex)
+        self.assertTrue(backtests_run1.df.empty)
         backtest_dir = os.path.join(storage_dir, algorithm_id + BUNDLE_EXT)
 
         if os.path.exists(backtest_dir):
@@ -270,7 +272,7 @@ class TestFilteredOutMetadataUpdate(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            window_filter_function=lenient_filter,
+            window_metrics_filter_function=lenient_filter,
         )
 
         # Verify the filtered_out flag is now cleared
@@ -333,7 +335,7 @@ class TestFilteredOutMetadataUpdate(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            window_filter_function=lenient_filter,
+            window_metrics_filter_function=lenient_filter,
         )
 
         # Verify backtest exists and is NOT filtered out
@@ -368,7 +370,7 @@ class TestFilteredOutMetadataUpdate(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            window_filter_function=strict_filter,
+            window_metrics_filter_function=strict_filter,
         )
 
         # Verify the filtered_out flag is now set
@@ -434,23 +436,19 @@ class TestFilteredOutMetadataUpdate(TestCase):
             study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            window_filter_function=strict_filter,
+            window_metrics_filter_function=strict_filter,
         )
 
         # Verify the backtest was filtered out
         backtest_dir = os.path.join(storage_dir, algorithm_id + BUNDLE_EXT)
 
-        if os.path.exists(backtest_dir):
-            try:
-                saved_backtest = Backtest.open(backtest_dir)
-                self.assertTrue(
-                    saved_backtest.metadata.get('filtered_out', False),
-                    "Event backtest should be marked as filtered_out after "
-                    "failing strict filter"
-                )
-            except Exception as e:
-                # If we can't load the backtest, skip the assertion
-                pass
+        self.assertTrue(backtests_run1.df.empty)
+        saved_backtest = Backtest.open(backtest_dir)
+        self.assertTrue(
+            saved_backtest.metadata.get('filtered_out', False),
+            "Event backtest should be marked as filtered_out after "
+            "failing strict filter",
+        )
 
         # Now run again with LENIENT filter
         algorithm2 = Algorithm(algorithm_id=algorithm_id)
@@ -463,7 +461,7 @@ class TestFilteredOutMetadataUpdate(TestCase):
             study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            window_filter_function=lenient_filter,
+            window_metrics_filter_function=lenient_filter,
         )
 
         # Verify the filtered_out flag is now cleared
@@ -532,27 +530,18 @@ class TestFilteredOutMetadataUpdate(TestCase):
             study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            window_filter_function=lenient_filter,
+            window_metrics_filter_function=lenient_filter,
         )
 
         # Verify backtest exists and is NOT filtered out
         backtest_dir = os.path.join(storage_dir, algorithm_id + BUNDLE_EXT)
 
-        if not os.path.exists(backtest_dir):
-            self.skipTest(
-                f"Backtest directory {backtest_dir} was not created. "
-                "This may indicate the backtest was not saved to storage."
-            )
-
-        try:
-            saved_backtest = Backtest.open(backtest_dir)
-            self.assertFalse(
-                saved_backtest.metadata.get('filtered_out', False),
-                "Event backtest should NOT be marked as filtered_out after "
-                "passing lenient filter"
-            )
-        except Exception as e:
-            self.skipTest(f"Could not load backtest: {e}")
+        saved_backtest = Backtest.open(backtest_dir)
+        self.assertFalse(
+            saved_backtest.metadata.get('filtered_out', False),
+            "Event backtest should NOT be marked as filtered_out after "
+            "passing lenient filter",
+        )
 
         # Now run again with STRICT filter
         algorithm2 = Algorithm(algorithm_id=algorithm_id)
@@ -565,23 +554,20 @@ class TestFilteredOutMetadataUpdate(TestCase):
             study=study,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            window_filter_function=strict_filter,
+            window_metrics_filter_function=strict_filter,
         )
 
         # Verify the filtered_out flag is now set
-        try:
-            saved_backtest = Backtest.open(backtest_dir)
-            self.assertTrue(
-                saved_backtest.metadata.get('filtered_out', False),
-                "filtered_out flag should be set after failing strict filter"
-            )
-            self.assertIn(
-                'filtered_out_at_date_range',
-                saved_backtest.metadata,
-                "filtered_out_at_date_range should be in metadata"
-            )
-        except Exception as e:
-            self.skipTest(f"Could not load backtest after second run: {e}")
+        saved_backtest = Backtest.open(backtest_dir)
+        self.assertTrue(
+            saved_backtest.metadata.get('filtered_out', False),
+            "filtered_out flag should be set after failing strict filter",
+        )
+        self.assertIn(
+            'filtered_out_at_date_range',
+            saved_backtest.metadata,
+            "filtered_out_at_date_range should be in metadata",
+        )
 
 
 class TestFilteredOutMetadataMultipleDateRanges(TestCase):
@@ -646,9 +632,9 @@ class TestFilteredOutMetadataMultipleDateRanges(TestCase):
         # Create a filter that returns all backtests
         # (we just want to verify the backtest runs and storage works)
         def pass_all_filter(
-            backtests: List[Backtest],
+            backtests: BacktestIndex,
             date_range: BacktestDateRange
-        ) -> List[Backtest]:
+        ) -> BacktestIndex:
             return backtests
 
         study = Study(
@@ -668,7 +654,7 @@ class TestFilteredOutMetadataMultipleDateRanges(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            window_filter_function=pass_all_filter,
+            window_metrics_filter_function=pass_all_filter,
         )
 
         # Verify the backtest was saved
@@ -761,11 +747,11 @@ class TestStorageDirectoryIsolation(TestCase):
 
         # Verify Strategy A was saved
         self.assertEqual(
-            len(backtests_run1), 1,
+            backtests_run1.df["algorithm_id"].nunique(), 1,
             "First run should return exactly 1 backtest"
         )
         self.assertEqual(
-            backtests_run1[0].algorithm_id, algorithm_id_a,
+            backtests_run1.df["algorithm_id"].iloc[0], algorithm_id_a,
             "First run should return Strategy A"
         )
 
@@ -794,16 +780,16 @@ class TestStorageDirectoryIsolation(TestCase):
 
         # Verify ONLY Strategy B is in results, NOT Strategy A
         self.assertEqual(
-            len(backtests_run2), 1,
+            backtests_run2.df["algorithm_id"].nunique(), 1,
             "Second run should return exactly 1 backtest (only Strategy B)"
         )
         self.assertEqual(
-            backtests_run2[0].algorithm_id, algorithm_id_b,
+            backtests_run2.df["algorithm_id"].iloc[0], algorithm_id_b,
             "Second run should return Strategy B, not Strategy A"
         )
 
         # Double-check that Strategy A is NOT in the results
-        result_algorithm_ids = [b.algorithm_id for b in backtests_run2]
+        result_algorithm_ids = backtests_run2.df["algorithm_id"].unique()
         self.assertNotIn(
             algorithm_id_a, result_algorithm_ids,
             "Strategy A from previous run should NOT be in current results"
@@ -867,9 +853,10 @@ class TestStorageDirectoryIsolation(TestCase):
         # Track what the final filter receives
         received_algorithm_ids = []
 
-        def tracking_final_filter(backtests: List[Backtest]) -> List[Backtest]:
-            for b in backtests:
-                received_algorithm_ids.append(b.algorithm_id)
+        def tracking_final_filter(backtests: BacktestIndex) -> BacktestIndex:
+            received_algorithm_ids.extend(
+                backtests.df["algorithm_id"].unique(),
+            )
             return backtests  # Pass all through
 
         backtests_run2 = app.run_backtests(
@@ -878,7 +865,7 @@ class TestStorageDirectoryIsolation(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            final_filter_function=tracking_final_filter,
+            final_metrics_filter_function=tracking_final_filter,
         )
 
         # Verify final filter only received Strategy B
@@ -944,7 +931,7 @@ class TestStorageDirectoryIsolation(TestCase):
         )
 
         self.assertEqual(
-            len(backtests_run1), 3,
+            backtests_run1.df["algorithm_id"].nunique(), 3,
             "First run should return 3 backtests"
         )
 
@@ -972,11 +959,11 @@ class TestStorageDirectoryIsolation(TestCase):
 
         # Verify only batch 2 strategies in results
         self.assertEqual(
-            len(backtests_run2), 2,
+            backtests_run2.df["algorithm_id"].nunique(), 2,
             "Second run should return exactly 2 backtests (only batch 2)"
         )
 
-        result_algorithm_ids = [b.algorithm_id for b in backtests_run2]
+        result_algorithm_ids = backtests_run2.df["algorithm_id"].unique()
 
         for alg_id in algorithm_ids_batch2:
             self.assertIn(
@@ -1036,7 +1023,7 @@ class TestStorageDirectoryIsolation(TestCase):
         )
 
         self.assertEqual(
-            len(backtests_run1), 1,
+            backtests_run1.df["algorithm_id"].nunique(), 1,
             "First run should return exactly 1 backtest"
         )
 
@@ -1054,15 +1041,15 @@ class TestStorageDirectoryIsolation(TestCase):
 
         # Verify ONLY Algorithm B is in results
         self.assertEqual(
-            len(backtests_run2), 1,
+            backtests_run2.df["algorithm_id"].nunique(), 1,
             "Second run should return exactly 1 backtest (only Algorithm B)"
         )
         self.assertEqual(
-            backtests_run2[0].algorithm_id, algorithm_id_b,
+            backtests_run2.df["algorithm_id"].iloc[0], algorithm_id_b,
             "Second run should return Algorithm B, not Algorithm A"
         )
 
-        result_algorithm_ids = [b.algorithm_id for b in backtests_run2]
+        result_algorithm_ids = backtests_run2.df["algorithm_id"].unique()
         self.assertNotIn(
             algorithm_id_a, result_algorithm_ids,
             "Algorithm A from previous run should NOT be in current results"
@@ -2220,6 +2207,17 @@ class TestSessionCacheIntegration(TestCase):
     current run are returned.
     """
 
+    def _assert_persisted_session_matches(self, index: BacktestIndex):
+        with (index.directory / "backtest_session.json").open() as handle:
+            session = json.load(handle)
+        self.assertEqual(
+            set(session["backtests"]), set(index.df["algorithm_id"]),
+        )
+        persisted = BacktestIndex.open(
+            index.directory, filename="backtest_session_index.parquet",
+        )
+        pd.testing.assert_frame_equal(index.df, persisted.df)
+
     def setUp(self) -> None:
         """Set up test fixtures."""
         self.resource_dir = os.path.abspath(
@@ -2283,18 +2281,16 @@ class TestSessionCacheIntegration(TestCase):
             use_checkpoints=True,
         )
 
-        self.assertEqual(len(backtests_run1), 1)
-        self.assertEqual(backtests_run1[0].algorithm_id, algorithm_id_a)
+        self.assertEqual(backtests_run1.df["algorithm_id"].nunique(), 1)
+        self.assertEqual(
+            backtests_run1.df["algorithm_id"].iloc[0], algorithm_id_a,
+        )
 
         # Verify Strategy A exists in storage (bundle format - issue #487)
         self.assertTrue(os.path.exists(os.path.join(storage_dir, algorithm_id_a + BUNDLE_EXT)))
 
-        # Verify session file was cleaned up
-        session_file = os.path.join(storage_dir, "backtest_session.json")
-        self.assertFalse(
-            os.path.exists(session_file),
-            "Session file should be cleaned up after backtest completes"
-        )
+        # Index runs persist session metadata and the scalar index.
+        self._assert_persisted_session_matches(backtests_run1)
 
         # --- Second run: Strategy B ---
         algorithm_id_b = "session_test_b_" + str(uuid.uuid4())[:4]
@@ -2313,22 +2309,20 @@ class TestSessionCacheIntegration(TestCase):
         )
 
         # Verify ONLY Strategy B is in results
-        self.assertEqual(len(backtests_run2), 1)
-        self.assertEqual(backtests_run2[0].algorithm_id, algorithm_id_b)
+        self.assertEqual(backtests_run2.df["algorithm_id"].nunique(), 1)
+        self.assertEqual(
+            backtests_run2.df["algorithm_id"].iloc[0], algorithm_id_b,
+        )
 
         # Strategy A should NOT be in results (session isolation)
-        result_ids = [b.algorithm_id for b in backtests_run2]
+        result_ids = backtests_run2.df["algorithm_id"].unique()
         self.assertNotIn(
             algorithm_id_a, result_ids,
             "Strategy A from previous run should NOT be in current results "
             "due to session isolation"
         )
 
-        # Verify session file was cleaned up
-        self.assertFalse(
-            os.path.exists(session_file),
-            "Session file should be cleaned up after second backtest completes"
-        )
+        self._assert_persisted_session_matches(backtests_run2)
 
     def test_event_backtest_session_isolation(self):
         """
@@ -2373,14 +2367,9 @@ class TestSessionCacheIntegration(TestCase):
             use_checkpoints=True,
         )
 
-        self.assertEqual(len(backtests_run1), 1)
+        self.assertEqual(backtests_run1.df["algorithm_id"].nunique(), 1)
 
-        # Verify session file was cleaned up
-        session_file = os.path.join(storage_dir, "backtest_session.json")
-        self.assertFalse(
-            os.path.exists(session_file),
-            "Session file should be cleaned up after event backtest completes"
-        )
+        self._assert_persisted_session_matches(backtests_run1)
 
         # --- Second run: Algorithm B ---
         algorithm_id_b = "event_session_b_" + str(uuid.uuid4())[:4]
@@ -2395,10 +2384,13 @@ class TestSessionCacheIntegration(TestCase):
         )
 
         # Verify ONLY Algorithm B is in results
-        self.assertEqual(len(backtests_run2), 1)
-        self.assertEqual(backtests_run2[0].algorithm_id, algorithm_id_b)
+        self.assertEqual(backtests_run2.df["algorithm_id"].nunique(), 1)
+        self.assertEqual(
+            backtests_run2.df["algorithm_id"].iloc[0], algorithm_id_b,
+        )
+        self._assert_persisted_session_matches(backtests_run2)
 
-        result_ids = [b.algorithm_id for b in backtests_run2]
+        result_ids = backtests_run2.df["algorithm_id"].unique()
         self.assertNotIn(
             algorithm_id_a, result_ids,
             "Algorithm A from previous run should NOT be in current results"
@@ -2456,9 +2448,8 @@ class TestSessionCacheIntegration(TestCase):
         # Track what the final filter receives
         received_ids = []
 
-        def tracking_filter(backtests: List[Backtest]) -> List[Backtest]:
-            for b in backtests:
-                received_ids.append(b.algorithm_id)
+        def tracking_filter(backtests: BacktestIndex) -> BacktestIndex:
+            received_ids.extend(backtests.df["algorithm_id"].unique())
             return backtests
 
         backtests_run2 = app.run_backtests(
@@ -2467,7 +2458,7 @@ class TestSessionCacheIntegration(TestCase):
             snapshot_interval=SnapshotInterval.DAILY,
             backtest_storage_directory=storage_dir,
             use_checkpoints=True,
-            final_filter_function=tracking_filter,
+            final_metrics_filter_function=tracking_filter,
         )
 
         # Final filter should only receive Strategy B

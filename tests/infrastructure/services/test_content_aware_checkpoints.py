@@ -52,6 +52,43 @@ def _date_range():
 
 class TestManifestHash(unittest.TestCase):
 
+    def test_executor_identity_is_stable_but_configuration_is_not_ignored(self):
+        from investing_algorithm_framework.services.executors.limit \
+            import LimitOrderExecutor
+        from investing_algorithm_framework.services.executors.market \
+            import MarketOrderExecutor
+
+        first = _FakeStrategy("same")
+        second = _FakeStrategy("same")
+        first.executor = LimitOrderExecutor()
+        second.executor = LimitOrderExecutor()
+        self.assertEqual(
+            compute_strategy_manifest_hash(first, _date_range()),
+            compute_strategy_manifest_hash(second, _date_range()),
+        )
+        second.executor = MarketOrderExecutor()
+        self.assertNotEqual(
+            compute_strategy_manifest_hash(first, _date_range()),
+            compute_strategy_manifest_hash(second, _date_range()),
+        )
+        second.executor = LimitOrderExecutor()
+        second.executor.price_offset = 0.01
+        self.assertNotEqual(
+            compute_strategy_manifest_hash(first, _date_range()),
+            compute_strategy_manifest_hash(second, _date_range()),
+        )
+
+    def test_event_runtime_state_does_not_invalidate_checkpoint(self):
+        strategy = _FakeStrategy("same")
+        before = compute_strategy_manifest_hash(strategy, _date_range())
+        strategy._cooldown_bar_index = 10
+        strategy._cooldown_remaining = {"BTC": 2}
+        strategy.last_signals = ["executed signal"]
+        strategy.last_score_cards = [{"score": 0.9}]
+        self.assertEqual(
+            before, compute_strategy_manifest_hash(strategy, _date_range()),
+        )
+
     def test_hash_is_deterministic(self):
         s = _FakeStrategy("abc", params={"rsi_period": 14, "ema": 200})
         dr = _date_range()

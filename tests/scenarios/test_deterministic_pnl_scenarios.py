@@ -379,7 +379,7 @@ def _run_event_backtest(strategy_cls, csv_filename, start, end, name):
         strategy=strategy_cls(algorithm_id=name),
         study=_build_study(start, end, BacktestEngine.EVENT_DRIVEN),
     )
-    return backtests[0].get_all_backtest_runs()[0]
+    return next(backtests.iter_backtests()).get_all_backtest_runs()[0]
 
 
 def _run_vector_backtest(strategy_cls, csv_filename, start, end, name):
@@ -389,7 +389,7 @@ def _run_vector_backtest(strategy_cls, csv_filename, start, end, name):
         study=_build_study(start, end, BacktestEngine.VECTOR),
         show_progress=False,
     )
-    return backtests[0].get_all_backtest_runs()[0]
+    return next(backtests.iter_backtests()).get_all_backtest_runs()[0]
 
 
 # ─────────────────────────────────────────────────────────────────────

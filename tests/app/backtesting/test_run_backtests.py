@@ -87,6 +87,6 @@ class Test(TestCase):
 
         for algorithm in (algorithm_one, algorithm_two, algorithm_three):
             backtests = app.run_backtest(algorithm=algorithm, study=study)
-            reports.append(backtests[0])
+            reports.append(next(backtests.iter_backtests()))
 
         self.assertEqual(3, len(reports))

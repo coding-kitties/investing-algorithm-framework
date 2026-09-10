@@ -127,7 +127,7 @@ class TestIssue602EndToEnd(TestCase):
         # 'NoneType' and 'datetime.timedelta'
         backtests = app.run_backtest(strategy=strategy, study=study)
 
-        self.assertEqual(1, len(backtests))
+        self.assertEqual(1, backtests.df["algorithm_id"].nunique())
 
 
 class TestStartDateFallbackAsymmetry(TestCase):

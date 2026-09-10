@@ -61,7 +61,7 @@ class Test(TestCase):
             study=study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
-        backtest = backtests[0]
+        backtest = next(backtests.iter_backtests())
         elapsed_time = time.time() - start_time
         # Guard against regressions that would blow up CI runtime.
         self.assertLess(

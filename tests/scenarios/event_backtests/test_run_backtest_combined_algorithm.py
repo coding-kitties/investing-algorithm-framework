@@ -103,11 +103,12 @@ class TestRunBacktestCombinedAlgorithm(TestCase):
 
         # One combined Backtest containing BOTH strategies, not two
         # independent ones.
+        backtest = next(backtests.iter_backtests())
         self.assertEqual(
-            {"crossover_btc", "crossover_dot"}, set(backtests[0].strategy_ids)
+            {"crossover_btc", "crossover_dot"}, set(backtest.strategy_ids)
         )
 
-        backtest_run = backtests[0].get_backtest_run(date_range)
+        backtest_run = backtest.get_backtest_run(date_range)
         # A single shared portfolio, capitalised once.
         self.assertEqual(backtest_run.initial_unallocated, 400)
         self.assertEqual(
@@ -159,7 +160,9 @@ class TestRunBacktestCombinedAlgorithm(TestCase):
             study=study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
-        backtest_run = backtests[0].get_backtest_run(date_range)
+        backtest_run = next(backtests.iter_backtests()).get_backtest_run(
+            date_range,
+        )
 
         self.assertGreater(len(backtest_run.orders), 0)
         self.assertGreater(len(backtest_run.trades), 0)

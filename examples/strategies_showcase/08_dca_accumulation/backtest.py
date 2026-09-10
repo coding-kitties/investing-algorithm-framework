@@ -54,7 +54,7 @@ def main() -> None:
         auto_sync=True,
     )
     backtests = app.run_backtest(strategy=DCAStrategy, study=study)
-    backtest = backtests[0]
+    backtest = next(backtests.iter_backtests())
     metrics = backtest.get_backtest_metrics(study_name=study.name)
     print(metrics)
 

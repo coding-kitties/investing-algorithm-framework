@@ -1,10 +1,8 @@
 from datetime import datetime, timezone
 from threading import Event, Lock
 from time import sleep
-from typing import List, Set, Dict
+from typing import Callable, List, Optional, Set, Dict
 from logging import getLogger
-
-import polars as pl
 
 from investing_algorithm_framework.domain import Environment, ENVIRONMENT, \
     OrderStatus, DataSource, DataType, tqdm, \
@@ -612,6 +610,7 @@ class EventLoopService:
             None
         """
         self._portfolio_snapshot_service.save_all(self._snapshots)
+        self._snapshots = []
         # Reset per-run live-envelope validation so a subsequent
         # run re-validates. Per-strategy pipeline universe caches
         # live on the strategy instances themselves now
@@ -622,8 +621,10 @@ class EventLoopService:
     def start(
         self,
         number_of_iterations=None,
-        schedule: pl.DataFrame = None,
-        show_progress: bool = False
+        schedule: Optional[Dict[datetime, dict]] = None,
+        show_progress: bool = False,
+        resource_check: Optional[Callable[[], None]] = None,
+        snapshot_batch_size: Optional[int] = None,
     ):
         """
         Runs the event loop for the trading algorithm. You can run the
@@ -641,53 +642,47 @@ class EventLoopService:
             schedule: Dict Optional; a schedule to run the event loop with.
             show_progress: Optional; whether to show progress bar for the
                 event loop. Defaults to False.
+            resource_check: Optional resource safeguard for scheduled
+                backtests. Exceptions propagate and abort the current run.
+            snapshot_batch_size: Flush scheduled backtest snapshots in
+                bounded batches instead of retaining the full window.
         Returns:
             None
         """
 
+        if snapshot_batch_size is not None and (
+            type(snapshot_batch_size) is not int or snapshot_batch_size <= 0
+        ):
+            raise OperationalException(
+                "snapshot_batch_size must be a positive integer."
+            )
         if schedule is not None:
             sorted_times = sorted(schedule.keys())
-
-            if show_progress:
-                for current_time in tqdm(
-                    sorted_times,
-                    total=len(sorted_times),
-                    colour="GREEN",
-                    desc="Running event backtest"
-                ):
-                    self._configuration_service.add_value(
-                        INDEX_DATETIME, current_time
-                    )
-                    strategy_ids = schedule[current_time]["strategy_ids"]
-                    strategies = self._get_strategies(strategy_ids)
-                    task_ids = schedule[current_time]["task_ids"]
-                    tasks = self._get_tasks_by_ids(task_ids)
-                    sf_calls = schedule[current_time].get(
-                        "scheduled_function_calls", []
-                    )
-                    self._run_iteration(
-                        strategies=strategies,
-                        tasks=tasks,
-                        scheduled_function_calls=sf_calls,
-                    )
-
-            else:
-                for current_time in sorted_times:
-                    self._configuration_service.add_value(
-                        INDEX_DATETIME, current_time
-                    )
-                    strategy_ids = schedule[current_time]["strategy_ids"]
-                    task_ids = schedule[current_time]["task_ids"]
-                    strategies = self._get_strategies(strategy_ids)
-                    tasks = self._get_tasks_by_ids(task_ids)
-                    sf_calls = schedule[current_time].get(
-                        "scheduled_function_calls", []
-                    )
-                    self._run_iteration(
-                        strategies=strategies,
-                        tasks=tasks,
-                        scheduled_function_calls=sf_calls,
-                    )
+            for current_time in tqdm(
+                sorted_times, total=len(sorted_times), colour="GREEN",
+                desc="Running event backtest", disable=not show_progress,
+            ):
+                if resource_check is not None:
+                    resource_check()
+                self._configuration_service.add_value(
+                    INDEX_DATETIME, current_time
+                )
+                strategy_ids = schedule[current_time]["strategy_ids"]
+                task_ids = schedule[current_time]["task_ids"]
+                sf_calls = schedule[current_time].get(
+                    "scheduled_function_calls", []
+                )
+                self._run_iteration(
+                    strategies=self._get_strategies(strategy_ids),
+                    tasks=self._get_tasks_by_ids(task_ids),
+                    scheduled_function_calls=sf_calls,
+                )
+                if snapshot_batch_size is not None \
+                        and len(self._snapshots) >= snapshot_batch_size:
+                    self._portfolio_snapshot_service.save_all(self._snapshots)
+                    self._snapshots = []
+                if resource_check is not None:
+                    resource_check()
         else:
             if number_of_iterations is None:
                 # Unbounded live loop: keeps iterating until a stop is

@@ -457,7 +457,9 @@ class TestEventVsVectorBacktestLong(_EventVsVectorParityAssertions, TestCase):
             strategy=LongCycleStrategy(algorithm_id="vector_long"),
             study=vector_study,
         )
-        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
+        cls.vector_run = next(
+            vector_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
         app_e = _create_app("EventLongTest")
         event_study = _build_study(
@@ -468,7 +470,9 @@ class TestEventVsVectorBacktestLong(_EventVsVectorParityAssertions, TestCase):
             strategy=LongCycleStrategy(algorithm_id="event_long"),
             study=event_study,
         )
-        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
+        cls.event_run = next(
+            event_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
 
 class TestEventVsVectorBacktestShort(_EventVsVectorParityAssertions, TestCase):
@@ -493,7 +497,9 @@ class TestEventVsVectorBacktestShort(_EventVsVectorParityAssertions, TestCase):
             strategy=ShortCycleStrategy(algorithm_id="vector_short"),
             study=vector_study,
         )
-        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
+        cls.vector_run = next(
+            vector_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
         app_e = _create_app("EventShortTest")
         event_study = _build_study(
@@ -504,7 +510,9 @@ class TestEventVsVectorBacktestShort(_EventVsVectorParityAssertions, TestCase):
             strategy=ShortCycleStrategy(algorithm_id="event_short"),
             study=event_study,
         )
-        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
+        cls.event_run = next(
+            event_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
 
 class TestEventVsVectorBacktestCombinedDynamicSizing(
@@ -543,7 +551,9 @@ class TestEventVsVectorBacktestCombinedDynamicSizing(
             study=vector_study,
             dynamic_position_sizing=True,
         )
-        cls.vector_run = vector_backtests[0].get_all_backtest_runs()[0]
+        cls.vector_run = next(
+            vector_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
         app_e = _create_app("EventCombinedDynamicTest")
         event_study = _build_study(
@@ -554,7 +564,9 @@ class TestEventVsVectorBacktestCombinedDynamicSizing(
             strategy=CombinedCycleStrategy(algorithm_id="event_combined"),
             study=event_study,
         )
-        cls.event_run = event_backtests[0].get_all_backtest_runs()[0]
+        cls.event_run = next(
+            event_backtests.iter_backtests()
+        ).get_all_backtest_runs()[0]
 
 
 class TestFlipOnOppositeSignal(TestCase):
@@ -567,7 +579,7 @@ class TestFlipOnOppositeSignal(TestCase):
         backtests = app.run_backtest(
             strategy=strategy, study=study, **kwargs,
         )
-        return backtests[0].get_all_backtest_runs()[0]
+        return next(backtests.iter_backtests()).get_all_backtest_runs()[0]
 
     def _assert_flip(self, run, expected_short):
         self.assertEqual(len(run.orders), 3)

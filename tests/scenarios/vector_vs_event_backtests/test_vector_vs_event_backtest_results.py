@@ -254,7 +254,7 @@ class Test(TestCase):
             study=study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
-        run = vector_backtests[0].get_all_backtest_runs()[0]
+        run = next(vector_backtests.iter_backtests()).get_all_backtest_runs()[0]
 
         vector_trade_count = len(run.get_trades())
         self.assertGreater(vector_trade_count, 0, "Should have at least 1 vector trade")
@@ -265,7 +265,7 @@ class Test(TestCase):
             study=study,
             snapshot_interval=SnapshotInterval.DAILY,
         )
-        run = event_backtests[0].get_all_backtest_runs()[0]
+        run = next(event_backtests.iter_backtests()).get_all_backtest_runs()[0]
         event_trade_count = len(run.get_trades())
         self.assertEqual(vector_trade_count, event_trade_count,
                          f"Vector and event trade counts should match: "

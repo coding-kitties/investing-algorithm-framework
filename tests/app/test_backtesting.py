@@ -102,7 +102,9 @@ class TestBacktestInitialConfig(BacktestTestBase):
             backtest_windows=[BacktestWindow(train_range=date_range)],
             engines=[BacktestEngine.EVENT_DRIVEN],
         )
-        backtest = app.run_backtest(algorithm=algorithm, study=study)[0]
+        backtest = next(app.run_backtest(
+            algorithm=algorithm, study=study,
+        ).iter_backtests())
         run = backtest.get_backtest_run(date_range)
         metrics = backtest.get_backtest_metrics(date_range)
         self.assertEqual(run.initial_unallocated, 1000)
@@ -138,7 +140,9 @@ class TestBacktestInitialConfig(BacktestTestBase):
             backtest_windows=[BacktestWindow(train_range=date_range)],
             engines=[BacktestEngine.EVENT_DRIVEN],
         )
-        backtest = app.run_backtest(algorithm=algorithm, study=study)[0]
+        backtest = next(app.run_backtest(
+            algorithm=algorithm, study=study,
+        ).iter_backtests())
         run = backtest.get_backtest_run(date_range)
         metrics = backtest.get_backtest_metrics(date_range)
         self.assertEqual(run.initial_unallocated, 500)
@@ -188,7 +192,9 @@ class TestBacktestReportCreation(BacktestTestBase):
             backtest_windows=[BacktestWindow(train_range=backtest_date_range)],
             engines=[BacktestEngine.EVENT_DRIVEN],
         )
-        return app.run_backtest(algorithm=algorithm, study=study)[0]
+        return next(app.run_backtest(
+            algorithm=algorithm, study=study,
+        ).iter_backtests())
 
     def test_report_json_creation(self):
         """Test that the backtest report is saved as JSON."""
@@ -263,6 +269,6 @@ class TestRunBacktests(BacktestTestBase):
 
         for algorithm in (algorithm_one, algorithm_two, algorithm_three):
             backtests = app.run_backtest(algorithm=algorithm, study=study)
-            reports.append(backtests[0])
+            reports.append(next(backtests.iter_backtests()))
 
         self.assertEqual(3, len(reports))

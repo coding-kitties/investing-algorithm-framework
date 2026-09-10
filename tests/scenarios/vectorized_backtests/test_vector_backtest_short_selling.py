@@ -191,7 +191,7 @@ def _run_backtest(app, strategy, start, end):
         snapshot_interval=SnapshotInterval.DAILY,
         use_checkpoints=False,
     )
-    backtest = backtests[0]
+    backtest = next(backtests.iter_backtests())
     runs = backtest.get_all_backtest_runs()
     return runs[0] if runs else None
 

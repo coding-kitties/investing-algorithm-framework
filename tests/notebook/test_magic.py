@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from investing_algorithm_framework import Schedule, TimeUnit
 from investing_algorithm_framework.notebook.magic import (
@@ -8,7 +8,27 @@ from investing_algorithm_framework.notebook.magic import (
     _find_strategy_classes,
     BacktestMagics,
     load_ipython_extension,
+    _run_backtest,
 )
+
+
+class TestIndexResultLoading(TestCase):
+    def test_magic_explicitly_loads_one_backtest(self):
+        args = _build_parser().parse_args([
+            "--start", "2024-01-01", "--end", "2024-01-02",
+        ])
+        backtest = object()
+        app = MagicMock()
+        app.run_backtest.return_value.iter_backtests.return_value = iter(
+            [backtest],
+        )
+        with patch(
+            "investing_algorithm_framework.create_app.create_app",
+            return_value=app,
+        ):
+            result = _run_backtest(args, [MagicMock])
+        self.assertIs(result, backtest)
+        app.run_backtest.return_value.iter_backtests.assert_called_once()
 
 
 class TestParseDate(TestCase):

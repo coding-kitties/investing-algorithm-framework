@@ -193,6 +193,6 @@ if __name__ == "__main__":
         strategy=CrossSectionalMomentumBotVector,
         study=study,
     )
-    backtest = backtests[0]
+    backtest = next(backtests.iter_backtests())
     metrics = backtest.get_backtest_metrics(study_name=study.name)
     print(metrics)
