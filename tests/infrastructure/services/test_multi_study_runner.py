@@ -15,6 +15,7 @@ the resulting bundle and assert that:
   range merges the new run into the same study slot (preserving the
   pre-Phase-3c multi-window aggregation behaviour).
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import shutil
 import tempfile
@@ -90,9 +91,11 @@ class TestMultiStudyRunnerIntegration(unittest.TestCase):
         return app.run_backtests(
             strategies=[SimpleVectorStrategy(algorithm_id=self.algo_id)],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=self.storage,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=self.storage,
+                use_checkpoints=True,
+            ),
         )
 
     def _open(self) -> Backtest:

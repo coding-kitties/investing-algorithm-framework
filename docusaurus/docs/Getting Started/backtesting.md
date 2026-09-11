@@ -41,6 +41,7 @@ matters: stop losses, take profits, intra-bar fills, and time-of-day
 position sizing all behave the same as in live trading.
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 from investing_algorithm_framework import (
     create_app, BacktestDateRange, BacktestWindow, Study, Universe,
     Algorithm, Task, Schedule, TimeUnit, TradingStrategy,
@@ -97,8 +98,10 @@ study = Study(
 backtests = app.run_backtest(
     algorithm=algorithm,
     study=study,
-    backtest_storage_directory="./my_backtests",
-    use_checkpoints=True,
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory="./my_backtests",
+        use_checkpoints=True,
+    ),
 )
 backtest = backtests[0]
 
@@ -119,6 +122,7 @@ which makes it dramatically faster but skips intra-bar simulation
 (no stop losses, take profits, signal cooldowns, order sizing etc). It is ideal for parameter sweeps, running hundreds of strategy variants, and large-scale optimization.
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 from investing_algorithm_framework import (
     create_app, BacktestDateRange, BacktestWindow, Study, Universe,
     Schedule, TimeUnit, TradingStrategy,
@@ -156,8 +160,10 @@ study = Study(
 backtests = app.run_backtest(
     strategy=MyStrategy(),
     study=study,
-    backtest_storage_directory="./my_backtests",
-    use_checkpoints=True,
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory="./my_backtests",
+        use_checkpoints=True,
+    ),
 )
 backtest = backtests[0]
 
@@ -172,7 +178,7 @@ print(f"Total Return: {metrics.total_return}%")
 > run faster and avoid any issues with long-running computations.
 
 See [Vector Backtesting](vector-backtesting) for the full guide,
-including checkpointing, content-aware reruns (`force_rerun`),
+including checkpointing, explicit reruns (`force_rerun=True`),
 strategy filtering, and parallel processing.
 
 ## Data preparation
@@ -250,7 +256,7 @@ Also this format allows developers to see the entire lineage of a backtest, incl
 - [Event-Driven Backtesting](event-backtesting) — realistic simulation
   with full order-execution semantics.
 - [Vector Backtesting](vector-backtesting) — fast parameter sweeps and
-  optimization, with content-aware checkpoints.
+  optimization, with window/algorithm checkpoints.
 - [Backtest Reports](/docs/Getting%20Started/backtest-reports) — explore
   results in the interactive dashboard.
 - [Performance Optimization](/docs/Advanced%20Concepts/OPTIMIZATION_GUIDE)

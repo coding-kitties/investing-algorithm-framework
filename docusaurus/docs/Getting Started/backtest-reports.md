@@ -204,6 +204,7 @@ Toggle between dark and light mode using the sun icon in the top-right corner.
 ## Example: Full Workflow
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 from datetime import datetime, timezone
 from investing_algorithm_framework import (
     create_app, BacktestDateRange, BacktestReport, Study, Universe,
@@ -236,7 +237,9 @@ study = Study(
 app.run_backtests(
     strategies=my_strategies,
     study=study,
-    backtest_storage_directory="./backtests"
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory="./backtests",
+    ),
 )
 
 # Optional: recalculate metrics with updated calculations (memory-safe, on disk)

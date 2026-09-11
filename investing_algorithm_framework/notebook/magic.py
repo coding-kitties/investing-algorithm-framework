@@ -30,6 +30,7 @@ Usage:
         --start 2023-01-01 --end 2023-12-31 -o results
 """
 
+from investing_algorithm_framework import BacktestRunConfiguration
 import argparse
 import os
 import shlex
@@ -295,9 +296,11 @@ def _run_backtest(args, strategies):
     backtests = app.run_backtest(
         strategy=strategy,
         study=study,
-        snapshot_interval=snapshot_interval,
-        show_progress=args.show_progress,
-        fill_missing_data=fill_missing,
+        run_configuration=BacktestRunConfiguration(
+            snapshot_interval=snapshot_interval,
+            show_progress=args.show_progress,
+            fill_missing_data=fill_missing,
+        ),
     )
     backtest = next(backtests.iter_backtests())
 

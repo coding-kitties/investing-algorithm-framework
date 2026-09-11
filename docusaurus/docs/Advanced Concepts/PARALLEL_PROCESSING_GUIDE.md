@@ -40,6 +40,7 @@ For **10,000 backtests**:
 ### Basic Usage
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 
 from investing_algorithm_framework import Study, Universe, \
@@ -57,10 +58,12 @@ study = Study(
 
 # Use all available cores
 backtests = app.run_backtests(
-    strategies=strategies,  # 10,000 strategies
+    strategies=strategies,
     study=study,
-    n_workers=-1,  # Use all CPU cores
-    show_progress=True,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=-1,
+        show_progress=True,
+    ),
 )
 ```
 
@@ -68,15 +71,16 @@ backtests = app.run_backtests(
 
 ```python
 # Leave one core free for system
+from investing_algorithm_framework import BacktestRunConfiguration
 n_cores = os.cpu_count() - 1
 
 backtests = app.run_backtests(
     strategies=strategies,
     study=study,
-    n_workers=n_cores,  # e.g., 7 cores on an 8-core machine
-    batch_size=100,
-    checkpoint_batch_size=50,
-    show_progress=True,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=n_cores,
+        show_progress=True,
+    ),
 )
 ```
 
@@ -84,13 +88,16 @@ backtests = app.run_backtests(
 
 ```python
 # Use half available cores (safer for shared systems)
+from investing_algorithm_framework import BacktestRunConfiguration
 n_cores = max(1, os.cpu_count() // 2)
 
 backtests = app.run_backtests(
     strategies=strategies,
     study=study,
-    n_workers=n_cores,
-    show_progress=True,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=n_cores,
+        show_progress=True,
+    ),
 )
 ```
 
@@ -223,6 +230,7 @@ print(f"Optimal config: {n_workers} workers, "
 ### Benchmark Your Setup
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 import time
 
 strategies_sample = strategies[:100]  # Test with 100 strategies
@@ -232,7 +240,9 @@ start = time.time()
 results_seq = app.run_backtests(
     strategies=strategies_sample,
     study=study,
-    n_workers=None,  # Sequential
+    run_configuration=BacktestRunConfiguration(
+        n_workers=None,
+    ),
 )
 seq_time = time.time() - start
 
@@ -241,7 +251,9 @@ start = time.time()
 results_par4 = app.run_backtests(
     strategies=strategies_sample,
     study=study,
-    n_workers=4,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=4,
+    ),
 )
 par4_time = time.time() - start
 
@@ -250,7 +262,9 @@ start = time.time()
 results_par_all = app.run_backtests(
     strategies=strategies_sample,
     study=study,
-    n_workers=-1,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=-1,
+    ),
 )
 par_all_time = time.time() - start
 
@@ -379,6 +393,7 @@ def _run_single_backtest_worker(args):
 ## Example: Complete Optimized Setup
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import psutil
 from investing_algorithm_framework import create_app, Study, Universe, \
@@ -428,12 +443,12 @@ study = Study(
 backtests = app.run_backtests(
     strategies=strategies,
     study=study,
-    use_checkpoints=True,
-    n_workers=n_workers,
-    batch_size=batch,
-    checkpoint_batch_size=checkpoint_batch,
-    show_progress=True,
-    continue_on_error=True,  # Don't stop on individual failures
+    run_configuration=BacktestRunConfiguration(
+        use_checkpoints=True,
+        n_workers=n_workers,
+        show_progress=True,
+        continue_on_error=True,
+    ),
 )
 
 print(f"\nCompleted {len(backtests)} backtests successfully!")

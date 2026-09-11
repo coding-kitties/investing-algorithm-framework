@@ -22,7 +22,7 @@ Vector backtesting is a high-performance backtesting approach that processes mar
 ```python
 from investing_algorithm_framework import (
     create_app, BacktestDateRange, SnapshotInterval, Study, Universe,
-    BacktestWindow, BacktestEngine,
+    BacktestWindow, BacktestEngine, BacktestRunConfiguration,
 )
 from datetime import datetime, timezone
 
@@ -52,6 +52,7 @@ backtest = backtests[0]
 Test many strategies simultaneously:
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 strategies = [
     MyStrategy(rsi_period=10),
     MyStrategy(rsi_period=14),
@@ -70,8 +71,10 @@ study = Study(
 
 backtests = app.run_backtests(
     strategies=strategies,
-    snapshot_interval=SnapshotInterval.DAILY,
     study=study,
+    run_configuration=BacktestRunConfiguration(
+        snapshot_interval=SnapshotInterval.DAILY,
+    ),
 )
 ```
 
@@ -80,6 +83,7 @@ backtests = app.run_backtests(
 ### Save to Directory
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 study = Study(
     universe=Universe(market="bitvavo", trading_symbol="EUR"),
     initial_capital=1000,
@@ -89,8 +93,10 @@ study = Study(
 
 backtests = app.run_backtests(
     strategies=strategies,
-    backtest_storage_directory="./my_backtests",
     study=study,
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory="./my_backtests",
+    ),
 )
 ```
 
@@ -116,24 +122,48 @@ study = Study(
 
 backtests = app.run_backtests(
     strategies=strategies,
-    backtest_storage_directory="./my_backtests",
-    use_checkpoints=True,
     study=study,
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory="./my_backtests",
+        n_workers=8,
+        memory_budget_mb=16_384,
+        min_available_memory_mb=4_096,
+    ),
 )
 ```
+
+`BacktestRunConfiguration` enables checkpoints, progress output and
+continue-on-error by default. Window summaries are always current. Use
+`BacktestRunConfiguration.from_env()` to read the same settings from
+`IAF_BACKTEST_*` environment variables.
+
+| Environment variable | Field |
+| --- | --- |
+| `IAF_BACKTEST_CONTINUE_ON_ERROR` | `continue_on_error` |
+| `IAF_BACKTEST_USE_CHECKPOINTS` | `use_checkpoints` |
+| `IAF_BACKTEST_STORAGE_DIRECTORY` | `backtest_storage_directory` |
+| `IAF_BACKTEST_SHOW_PROGRESS` | `show_progress` |
+| `IAF_BACKTEST_N_WORKERS` | `n_workers` |
+| `IAF_BACKTEST_MEMORY_BUDGET_MB` | `memory_budget_mb` |
+| `IAF_BACKTEST_MIN_AVAILABLE_MEMORY_MB` | `min_available_memory_mb` |
+| `IAF_BACKTEST_SNAPSHOT_INTERVAL` | `snapshot_interval` (`DAILY` or `STRATEGY_ITERATION`) |
+| `IAF_BACKTEST_SKIP_DATA_SOURCES_INITIALIZATION` | `skip_data_sources_initialization` |
+| `IAF_BACKTEST_DYNAMIC_POSITION_SIZING` | `dynamic_position_sizing` |
+| `IAF_BACKTEST_FILL_MISSING_DATA` | `fill_missing_data` |
+| `IAF_BACKTEST_MAX_TASKS_PER_CHILD` | `max_tasks_per_child` (`None` disables recycling) |
 
 ## Filtering Strategies
 
 Progressively eliminate underperforming strategies during backtesting:
 
 ```python
-def window_filter(backtest_run):
-    """Filter after each date range"""
-    return backtest_run.backtest_metrics.total_return > 0
+def window_filter(index, date_range):
+    """Keep algorithms with positive cumulative returns so far."""
+    return index.filter(lambda row: row["summary.total_return"] > 0)
 
-def final_filter(backtest):
-    """Filter at the end"""
-    return backtest.backtest_summary.sharpe_ratio > 1.0
+def final_filter(index):
+    """Select completed results."""
+    return index.filter(lambda row: row["summary.sharpe_ratio"] > 1.0)
 
 study = Study(
     universe=Universe(market="bitvavo", trading_symbol="EUR"),
@@ -144,8 +174,8 @@ study = Study(
 
 backtests = app.run_backtests(
     strategies=strategies,
-    window_filter_function=window_filter,
-    final_filter_function=final_filter,
+    window_metrics_filter_function=window_filter,
+    final_metrics_filter_function=final_filter,
     study=study,
 )
 ```
@@ -155,6 +185,7 @@ backtests = app.run_backtests(
 Utilize multiple CPU cores for faster backtesting:
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 
 study = Study(
@@ -166,8 +197,10 @@ study = Study(
 
 backtests = app.run_backtests(
     strategies=strategies,
-    n_workers=os.cpu_count() - 1,
     study=study,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=os.cpu_count() - 1,
+    ),
 )
 ```
 

@@ -11,6 +11,7 @@ Also verifies that the vector engine explicitly rejects a combined
 multi-strategy algorithm (not supported yet) instead of silently doing
 the wrong thing.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -93,7 +94,9 @@ class TestRunBacktestCombinedAlgorithm(TestCase):
         backtests = app.run_backtest(
             algorithm=algorithm,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         )
         elapsed_time = time.time() - start_time
         self.assertLess(
@@ -158,7 +161,9 @@ class TestRunBacktestCombinedAlgorithm(TestCase):
         backtests = app.run_backtest(
             algorithm=algorithm,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         )
         backtest_run = next(backtests.iter_backtests()).get_backtest_run(
             date_range,
@@ -214,5 +219,7 @@ class TestRunBacktestCombinedAlgorithm(TestCase):
             app.run_backtest(
                 algorithm=algorithm,
                 study=study,
-                snapshot_interval=SnapshotInterval.DAILY,
+                run_configuration=BacktestRunConfiguration(
+                    snapshot_interval=SnapshotInterval.DAILY,
+                ),
             )

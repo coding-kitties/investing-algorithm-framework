@@ -17,7 +17,8 @@ backtests are saved as `.obtf` bundles rather than accumulated in a list.
 ```python
 from datetime import datetime, timezone
 from investing_algorithm_framework import (
-    BacktestDateRange, BacktestEngine, BacktestWindow, Study, Universe,
+    BacktestDateRange, BacktestEngine, BacktestRunConfiguration,
+    BacktestWindow, Study, Universe,
 )
 
 study = Study(
@@ -84,8 +85,9 @@ Supply a directory explicitly to reuse results across calls:
 results = app.run_backtest(
     strategies=strategies,
     study=study,
-    backtest_storage_directory="./backtest_storage",
-    use_checkpoints=True,
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory="./backtest_storage",
+    ),
 )
 ```
 
@@ -116,11 +118,10 @@ Each completed result is saved and checkpointed by the coordinator. Set
 `use_checkpoints=True` to skip matching results on subsequent calls. To resume
 an automatically located run, reuse its `results.directory` explicitly.
 
-Checkpoints fingerprint strategy code, parameters, data sources, and date
-ranges. Changing those inputs causes stale entries to rerun. Framework event
-counters and cached signals are not strategy parameters; executor
-configuration is fingerprinted without process-specific object addresses.
-Legacy checkpoint entries without hashes still match by algorithm ID.
+V9 checkpoints map each window ID to its completed algorithm IDs. Resume uses
+only those two identifiers, so even large sweeps avoid strategy inspection
+before completed work is skipped. Set `force_rerun=True` to rerun every
+result. Pre-v9 manifest-hash checkpoint files are not supported.
 
 Checkpoint loading processes full bundles one at a time. Window summaries are
 restricted to windows evaluated so far, even when a saved bundle already
@@ -136,12 +137,16 @@ checkpoints remain available after interruption.
 Set `n_workers` for either engine:
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 results = app.run_backtest(
-    strategies=strategies, study=study,
-    n_workers=6,
-    max_tasks_per_child=16,
-    backtest_storage_directory="./backtest_storage",
-    use_checkpoints=True,
+    strategies=strategies,
+    study=study,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=6,
+        max_tasks_per_child=16,
+        backtest_storage_directory="./backtest_storage",
+        use_checkpoints=True,
+    ),
 )
 ```
 
@@ -163,17 +168,20 @@ put execution behind `if __name__ == "__main__":`.
 ### Parallel Event Backtests
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 event_study = study.copy_definition()
 event_study.engines = [BacktestEngine.EVENT_DRIVEN]
 
 validation = app.run_backtest(
     strategies=surviving_strategies,
     study=event_study,
-    n_workers=4,
-    memory_budget_mb=16_384,
-    min_available_memory_mb=4_096,
-    backtest_storage_directory="./backtest_storage",
-    use_checkpoints=True,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=4,
+        memory_budget_mb=16_384,
+        min_available_memory_mb=4_096,
+        backtest_storage_directory="./backtest_storage",
+        use_checkpoints=True,
+    ),
 )
 ```
 
@@ -199,16 +207,19 @@ Worker count alone does not bound memory. Each process has its own data and
 execution state; a few large workers can exhaust a machine.
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 results = app.run_backtest(
     strategies=strategies,
     study=study,
-    n_workers=6,
-    memory_budget_mb=16_384,
-    min_available_memory_mb=4_096,
-    max_tasks_per_child=16,
-    backtest_storage_directory="./backtest_storage",
-    use_checkpoints=True,
-    show_progress=True,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=6,
+        memory_budget_mb=16_384,
+        min_available_memory_mb=4_096,
+        max_tasks_per_child=16,
+        backtest_storage_directory="./backtest_storage",
+        use_checkpoints=True,
+        show_progress=True,
+    ),
 )
 ```
 
@@ -269,6 +280,7 @@ evaluated windows; `window_*` columns describe the current window.
 Callbacks should explicitly handle missing metric values.
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 import pandas as pd
 
 
@@ -291,11 +303,14 @@ def prune_window(index, date_range):
 
 
 results = app.run_backtest(
-    strategies=strategies, study=study,
+    strategies=strategies,
+    study=study,
     window_metrics_filter_function=prune_window,
-    n_workers=4,
-    backtest_storage_directory="./backtest_storage",
-    use_checkpoints=True,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=4,
+        backtest_storage_directory="./backtest_storage",
+        use_checkpoints=True,
+    ),
 )
 ```
 
@@ -325,12 +340,16 @@ results = app.run_backtest(
 
 ## Batching and API Migration
 
-`batch_size` and `checkpoint_batch_size` remain accepted for compatibility, but
-public index execution saves/checkpoints each result individually. They do not
-control parallel queue depth. Use worker, memory, and recycling controls instead.
+`batch_size` and `checkpoint_batch_size` have been removed from the public API.
+Index execution saves/checkpoints each result individually. Put worker, memory,
+and recycling controls in `BacktestRunConfiguration` instead.
 
-- Remove `result_mode="list"`: it is rejected. `result_mode="index"` remains
-  accepted but is redundant.
+- Remove `result_mode` entirely: both public methods always return an index.
+- Put all execution settings, including snapshot interval, missing-data handling,
+  position sizing and worker recycling, in `run_configuration`.
+- Remove `iterative_summary_update`: window summaries are always current.
+- Remove the public `anchor_algorithm_id` argument; stored lineage metadata is
+  unaffected.
 - Replace `results[0]` with `next(results.iter_backtests())`.
 - Replace full-object iteration with `results.iter_backtests()`, or explicitly
   load a small selection with `results.load_backtests(workers=1)`.

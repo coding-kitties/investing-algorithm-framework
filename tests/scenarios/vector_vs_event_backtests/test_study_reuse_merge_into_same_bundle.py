@@ -5,6 +5,7 @@ the SAME .obtf bundle" workflow, and the ``get_backtest()`` /
 ``get_backtests()`` / ``Backtest.get_study_definition()`` convenience
 API that supports it.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import shutil
 from datetime import datetime, timezone
@@ -126,7 +127,9 @@ class TestStudyReuseMergeIntoSameBundle(TestCase):
         vector_backtests = vector_app.run_backtest(
             strategy=SimpleBuySellStrategy(algorithm_id=ALGORITHM_ID),
             study=in_sample_study,
-            backtest_storage_directory=str(self.storage_dir),
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=str(self.storage_dir),
+            ),
         )
 
         bundle_path = self.storage_dir / f"{ALGORITHM_ID}.obtf"
@@ -155,7 +158,9 @@ class TestStudyReuseMergeIntoSameBundle(TestCase):
         event_app.run_backtest(
             strategy=SimpleBuySellStrategy(algorithm_id=ALGORITHM_ID),
             study=event_study,
-            backtest_storage_directory=str(self.storage_dir),
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=str(self.storage_dir),
+            ),
         )
 
         # Still exactly one bundle file for this algorithm_id -- the

@@ -1,3 +1,4 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -278,8 +279,10 @@ class Test(TestCase):
         backtests = app.run_backtest(
             strategy=strategy,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            use_checkpoints=False,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+            ),
         )
         backtest = next(backtests.iter_backtests())
         self.assertEqual(len(backtest.get_all_backtest_runs()), 2)
@@ -376,8 +379,10 @@ class Test(TestCase):
         backtests = app.run_backtest(
             strategy=strategy,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            use_checkpoints=False,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+            ),
         )
         backtest = next(backtests.iter_backtests())
 

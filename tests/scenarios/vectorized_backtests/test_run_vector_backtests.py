@@ -1,3 +1,4 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import time
 import shutil
@@ -294,8 +295,10 @@ class Test(TestCase):
         backtests = app.run_backtests(
             strategies=strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            use_checkpoints=False,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+            ),
         ).load_backtests(workers=1)
 
         self.assertEqual(len(backtests), 4)
@@ -408,8 +411,10 @@ class Test(TestCase):
         backtests = app.run_backtests(
             strategies=strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            use_checkpoints=False,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+            ),
         ).load_backtests(workers=1)
 
         self.assertEqual(len(backtests), 4)

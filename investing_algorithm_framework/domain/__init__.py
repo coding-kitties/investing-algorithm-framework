@@ -61,13 +61,25 @@ from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BUNDLE_EXT, BUNDLE_FORMAT_VERSION, \
     BacktestIndex, build_strategy_universe_map, stamp_backtest, \
     stamp_backtests, Study, EngineSlot, ExecutionConfig, StudySampleType, \
-    WindowPart
+    WindowPart, BacktestRunConfiguration
 from .pipeline import Pipeline, AverageDollarVolume, AverageTradedValue, \
     CrossSectionalMean, Neutralize, Returns, RollingBeta, RSI, SMA, \
     StaticPerSymbol, Volatility, Factor, CustomFactor, Filter
 from .algorithm_id import generate_algorithm_id
+from .optimization import (
+    CandidateProposal, FloatParameter, IntegerParameter,
+    OptimizationConfiguration, OptimizationSearchSpace,
+    StrategyOptimizer, TrialObservation,
+)
 
 __all__ = [
+    "CandidateProposal",
+    "FloatParameter",
+    "IntegerParameter",
+    "OptimizationConfiguration",
+    "OptimizationSearchSpace",
+    "StrategyOptimizer",
+    "TrialObservation",
     "OrderStatus",
     "OrderSide",
     "OrderType",
@@ -177,6 +189,7 @@ __all__ = [
     "DataType",
     "DataSource",
     "Backtest",
+    "BacktestRunConfiguration",
     "Universe",
     "BacktestMetrics",
     "BacktestSummaryMetrics",

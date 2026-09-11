@@ -1,6 +1,7 @@
 """
 Test that strategy metadata is preserved when running vector backtests.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import shutil
 import unittest
@@ -261,9 +262,11 @@ class Test(TestCase):
         backtests = app.run_backtest(
             strategy=strategy,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            use_checkpoints=False,
-            backtest_storage_directory=self.backtest_storage_dir
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+                backtest_storage_directory=self.backtest_storage_dir,
+            ),
         )
         backtest = next(backtests.iter_backtests())
 
@@ -389,9 +392,11 @@ class Test(TestCase):
         backtests = app.run_backtests(
             strategies=[strategy_one, strategy_two],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            use_checkpoints=False,
-            backtest_storage_directory=self.backtest_storage_dir
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+                backtest_storage_directory=self.backtest_storage_dir,
+            ),
         )
 
         for backtest in backtests.iter_backtests():

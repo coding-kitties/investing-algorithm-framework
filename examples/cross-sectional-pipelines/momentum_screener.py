@@ -21,6 +21,7 @@ See ``docs/Advanced Concepts/pipelines-event-backtest.md``.
 """
 from __future__ import annotations
 
+from investing_algorithm_framework import BacktestRunConfiguration
 import logging.config
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
@@ -118,9 +119,11 @@ if __name__ == "__main__":
         strategy=CrossSectionalMomentum,
         study=study,
         risk_free_rate=0.027,
-        continue_on_error=False,
-        n_workers=1,
-        dynamic_position_sizing=True,
+        run_configuration=BacktestRunConfiguration(
+            continue_on_error=False,
+            n_workers=1,
+            dynamic_position_sizing=True,
+        ),
     )
     metrics = backtest.get_backtest_metrics(study_name=study.name)
     print(metrics)

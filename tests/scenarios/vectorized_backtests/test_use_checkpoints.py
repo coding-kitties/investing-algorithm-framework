@@ -1,3 +1,4 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import shutil
 import tempfile
@@ -282,10 +283,12 @@ class Test(TestCase):
             backtests = app.run_backtests(
                 strategies=strategies,
                 study=study,
-                snapshot_interval=SnapshotInterval.DAILY,
-                backtest_storage_directory=checkpoint_dir,
-                use_checkpoints=True,
-                show_progress=False
+                run_configuration=BacktestRunConfiguration(
+                    snapshot_interval=SnapshotInterval.DAILY,
+                    backtest_storage_directory=checkpoint_dir,
+                    use_checkpoints=True,
+                    show_progress=False,
+                ),
             ).load_backtests(workers=1)
 
             # There should be 2 backtests returned
@@ -392,10 +395,12 @@ class Test(TestCase):
             backtests = app.run_backtests(
                 strategies=strategies,
                 study=study,
-                snapshot_interval=SnapshotInterval.DAILY,
-                backtest_storage_directory=checkpoint_dir,
-                use_checkpoints=True,
-                show_progress=False
+                run_configuration=BacktestRunConfiguration(
+                    snapshot_interval=SnapshotInterval.DAILY,
+                    backtest_storage_directory=checkpoint_dir,
+                    use_checkpoints=True,
+                    show_progress=False,
+                ),
             ).load_backtests(workers=1)
             end_time = time.time()
             duration = end_time - start_time
@@ -505,10 +510,12 @@ class Test(TestCase):
             backtests = app.run_backtests(
                 strategies=strategies,
                 study=study,
-                snapshot_interval=SnapshotInterval.DAILY,
-                backtest_storage_directory=checkpoint_dir,
-                use_checkpoints=True,
-                show_progress=False
+                run_configuration=BacktestRunConfiguration(
+                    snapshot_interval=SnapshotInterval.DAILY,
+                    backtest_storage_directory=checkpoint_dir,
+                    use_checkpoints=True,
+                    show_progress=False,
+                ),
             ).load_backtests(workers=1)
 
             # There should be 2 backtests returned

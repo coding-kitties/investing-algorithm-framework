@@ -67,6 +67,9 @@
 > ```
 > You can find the blog post here: [v9.0 Release](docusaurus/blog/2026-08-02-v9.0-release.md).
 
+The API examples and feature list below describe current v9 development.
+Older published alpha versions may not include every API shown.
+
 `Investing Algorithm Framework` is a Python framework that covers the entire quant workflow: define a strategy once, vector-backtest thousands of parameter variants to find promising signals, narrow down with a storage layer that ranks 10k+ results in milliseconds, validate the winners in a realistic event-driven simulation, compare everything in a single interactive HTML dashboard, and deploy the best performer live, all with the same `TradingStrategy` class, no code rewrites between stages.
 
 Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy variant is actually better, whether the result is robust across time windows, and how to go from research to production. This framework closes that gap.
@@ -89,6 +92,8 @@ Full details: [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md) �
 
 - **New Open Backtest Format (.OBTF)**: OBTF packs studies, universes, windows, vector/event runs, summaries, metrics, trades, orders, positions, snapshots, execution assumptions and Monte Carlo tests into a single versioned `.obtf` file per algorithm (zstd + MessagePack + Parquet under the hood), so your results are portable, future-proof, and never scattered across folders again.
 - **Dual engine native**: vector and event engines now run as first-class citizens of every backtest, so you can sweep thousands of signal ideas and validate the winners under realistic execution *in the same bundle*, with zero risk of one engine's save wiping out the other's results. Now a .obtf bundle is a complete record of your vector and event backtests of a single strategy.
+- **Configuration-based backtest API**: `BacktestRunConfiguration` centralizes execution settings, with checkpoints, continue-on-error and progress enabled by default, plus `.from_env()` support. Both app backtest methods return persistent `BacktestIndex` results and support scalar metrics filters.
+- **Pluggable backtest optimization**: search existing algorithm collections or generate parameterized strategies through `OptimizationConfiguration` and your own `StrategyOptimizer`. Reuse bounded workers, memory controls, ID/window checkpoints and durable optimizer-state resume. Base classes and orchestration are included; concrete optimizers are supplied by the user. See the [optimizer guide](docusaurus/docs/Advanced%20Concepts/backtest-optimization.md).
 - **Short and Long Signals support**: a couple of new methods (`generate_short_signals` / `generate_cover_signals`) are all it takes to unlock full short-selling: SHORT/COVER order routing, correct P&L and collateral handling, and fill-based trade creation across vector, event, and live trading.
 - **Enhanced Study definitions**: reusable `Study`, `Universe` and `BacktestWindow` building blocks give you rolling, anchored, holdout and walk-forward k-fold validation, cross-sectional pipelines, signal cooldowns, and Monte Carlo–backed ranking, so you can trust your edge before you trade it.
 - **Custom commision nd slippage models*: pluggable slippage and commission models (percentage, fixed, bps, volume-aware) snapshot every study's cost assumptions via `ExecutionConfig` and attribute fees down to the order and trade level, so your numbers hold up in the real world.
@@ -111,6 +116,7 @@ Full details: [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md) �
 - 🧮 **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)**: Rank, filter and score entire universes of symbols every iteration with a tidy factor table
 - ⚡ **[Vector Backtesting for Signal Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)**: Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
 - 🏃 **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting)**: Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management
+- **[Pluggable Optimization](docusaurus/docs/Advanced%20Concepts/backtest-optimization.md)**: Budget candidate evaluations, plug in an ask/tell search policy, and resume both search state and completed event/vector evaluations without implementing your own backtest scheduler.
 - 🔀 **[Permutation Testing / Monte Carlo Simulations](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Assess the statistical robustness of your strategies by running them across randomized market scenarios to see how often your results could occur by chance
 - 🚀 **[Deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)**: Once the best strategy is identified through backtesting and comparison, deploy it to production locally or in the cloud (AWS Lambda / Azure Functions) to start live trading
 - ⚔️ **[Multi-Strategy Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Rank, filter & compare strategies in a single interactive report
@@ -220,6 +226,56 @@ class MyStrategy(TradingStrategy):
   <strong>Backtesting Engines</strong>
 </summary> <br>
 
+### Backtesting API (v9)
+
+Use `Study` for the experiment and `BacktestRunConfiguration` for execution.
+With an app, data providers, strategies and training study already configured:
+
+```python
+from investing_algorithm_framework import BacktestRunConfiguration
+
+run_configuration = BacktestRunConfiguration(
+    backtest_storage_directory="./my-backtests",
+    continue_on_error=True,
+    use_checkpoints=True,
+    show_progress=True,
+    n_workers=8,
+    memory_budget_mb=16_384,          # Soft 16 GiB process-tree RSS budget
+    min_available_memory_mb=4_096,    # Keep 4 GiB of available headroom
+    max_tasks_per_child=16,
+)
+
+results = app.run_backtests(
+    strategies=strategies,
+    study=training_study,
+    run_configuration=run_configuration,
+)
+
+print(results.df)  # Scalar metrics; no full bundle loading
+print(results.directory)
+```
+
+- Use `strategy=` or `algorithm=` with `app.run_backtest()` for a single
+  candidate, or `strategies=` / `algorithms=` for independent candidates.
+- Both methods always return a disk-backed `BacktestIndex`, not a list of
+  `Backtest` objects. Load selected full results explicitly with
+  `results.iter_backtests()` or `results.load_backtests()`.
+- Checkpoints, continue-on-error and progress default to `True`.
+  `BacktestRunConfiguration.from_env()` reads `IAF_BACKTEST_*` settings.
+- Put worker, memory, snapshot and data-preparation settings inside the
+  configuration, not directly on the app call. `result_mode` and
+  `iterative_summary_update` are no longer public options.
+- Keep `window_metrics_filter_function` and `final_metrics_filter_function`
+  on the app call. They receive and return indexes; window summaries are
+  always current.
+- Reuse the same storage directory to resume. Checkpoints match only
+  algorithm IDs and window IDs, so use a different directory when the
+  experiment's data, strategy behavior or assumptions change.
+
+See [memory-budgeted sweeps](docusaurus/docs/Advanced%20Concepts/vector-backtesting.md#memory-budgeted-sweeps)
+for resource safeguards and filter examples. Memory limits are soft admission
+controls, not hard OS allocation limits.
+
 ### ⚡ Vector Backtesting — Test thousands of strategies, fast
 
 Polars-powered vectorized signal evaluation. Compare thousands of strategies side by side, sweep parameter grids, run multi-window robustness checks, rank by key metrics and surface your top candidates in seconds — all before committing to a full event-driven simulation.
@@ -243,6 +299,75 @@ Once you've narrowed down promising strategies, run them through a full event-dr
     <img src="static/features/event-backtest-dark.svg" alt="Event-driven backtest engine — bar-by-bar realism with order fills" style="max-width: 100%;">
   </picture>
 </p>
+
+</details>
+
+<details open>
+<summary>
+  <strong>Backtest Optimization</strong>
+</summary> <br>
+
+Add `optimization=` to either app backtest method to select from an existing
+candidate collection or generate new parameterized strategies. The optimizer
+chooses what to evaluate; the framework runs and scores the candidates using
+the same event/vector engines and resource controls.
+
+For an existing collection with unique algorithm IDs, supply your own optimizer
+instance supporting `"finite"` search spaces:
+
+```python
+import math
+from investing_algorithm_framework import OptimizationConfiguration
+
+
+def score_candidate(index):
+    pooled = index.df.loc[index.df["universe_key"].isna()]
+    if len(pooled) != 1:
+        raise ValueError("Expected one pooled candidate row")
+    score = float(pooled["summary.sharpe_ratio"].iloc[0])
+    if not math.isfinite(score):
+        raise ValueError("Candidate has no finite Sharpe ratio")
+    return score
+
+
+results = app.run_backtests(
+    algorithms=my_algorithms,
+    study=training_study,
+    run_configuration=run_configuration,
+    optimization=OptimizationConfiguration(
+        search_id="algorithm-search-v1",
+        optimizer=my_optimizer,
+        objective=score_candidate,
+        direction="maximize",
+        max_evaluations=100,
+        max_proposals=1_000,
+        proposal_batch_size=16,
+    ),
+)
+```
+
+`my_algorithms` and `my_optimizer` are user-supplied; no concrete search algorithm
+is selected automatically. To generate candidates instead, omit the collection
+and configure `strategy_factory`, `IntegerParameter` / `FloatParameter`
+definitions and optional constraints with a parameter-capable optimizer.
+
+Implement the `StrategyOptimizer` lifecycle: `initialize`, `ask`, `tell`,
+`is_finished`, `state_dict` and `load_state_dict`. No random, grid, CryStAl or
+Bayesian optimizer implementation is bundled.
+
+The result remains a search-wide `BacktestIndex`. Trials and optimizer snapshots
+are saved under `<storage-root>/optimizations/<search_id>/`. Resume with the same
+configured storage root, search ID and unchanged experiment inputs; worker and
+memory settings may change. The returned index directory is the nested search
+directory, not the storage root.
+
+`proposal_batch_size` controls search admission, not worker count. An optimizer
+can save time by evaluating fewer candidates, but does not make an individual
+backtest faster or guarantee better out-of-sample performance. Distributed
+execution is not included in this API.
+
+See [Backtest Optimization](docusaurus/docs/Advanced%20Concepts/backtest-optimization.md)
+for both candidate modes, the plugin contract, filters and recovery details.
 
 </details>
 
@@ -279,11 +404,14 @@ Every backtest produces a **self-contained HTML dashboard** — open it in any b
   </a>
 </p>
 
-Every backtest API — vector or event-driven — returns the same `Backtest` object, which the `BacktestReport` consumes directly. So whether you're iterating over an in-memory list or a folder of persisted `.obtf` bundles, the path to the dashboard is the same:
+Every app backtest API, vector or event-driven, returns a disk-backed
+`BacktestIndex`. Select candidates using its scalar rows, then explicitly load
+the full `Backtest` objects that `BacktestReport` consumes:
 
 ```python
 from investing_algorithm_framework import (
-    BacktestReport, Study, Universe, BacktestWindow, BacktestEngine,
+    BacktestReport, BacktestRunConfiguration, Study, Universe,
+    BacktestWindow, BacktestEngine,
 )
 
 # --- Single event-driven backtest ---
@@ -293,7 +421,13 @@ event_study = Study(
     backtest_windows=[BacktestWindow(train_range=date_range)],
     engines=[BacktestEngine.EVENT_DRIVEN],
 )
-backtests = app.run_backtest(strategy=strategy, study=event_study)
+backtests = app.run_backtest(
+    strategy=strategy,
+    study=event_study,
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory="./event-backtests",
+    ),
+)
 BacktestReport(
     backtests=backtests.load_backtests(workers=1),
 ).save("event_report.html")
@@ -311,9 +445,12 @@ sweep_study = Study(
 backtests = app.run_backtests(
     strategies=[StrategyA(), StrategyB(), StrategyC()],
     study=sweep_study,
-    n_workers=-1,
-    backtest_storage_directory="./my-backtests/",  # persists .obtf bundles
-    show_progress=True,
+    run_configuration=BacktestRunConfiguration(
+        n_workers=8,
+        backtest_storage_directory="./my-backtests/",
+        memory_budget_mb=16_384,
+        min_available_memory_mb=4_096,
+    ),
 )
 # Only materialize a suitably small selection for the dashboard.
 BacktestReport(

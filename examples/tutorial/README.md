@@ -143,6 +143,7 @@ Define a grid of strategy variants and screen all of them with the fast vectoriz
 - **`promote_backtests()`** - Copy just the top-N winners into a dedicated `top_selection/` folder for the next notebooks
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 from datetime import datetime, timezone
 from investing_algorithm_framework import (
     generate_rolling_backtest_windows, Study, Universe, BacktestEngine,
@@ -167,8 +168,10 @@ in_sample_study = Study(
 backtests = app.run_backtest(
     strategies=strategies,
     study=in_sample_study,
-    backtest_storage_directory=backtest_results_dir,
-    show_progress=True,
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory=backtest_results_dir,
+        show_progress=True,
+    ),
 )
 ```
 
@@ -185,6 +188,7 @@ Before spending the (slower) out-of-sample vector budget on the whole `top_selec
 - `app.run_backtest(..., backtest_storage_directory=<same dir>)` merges the new engine's results into the **same** `<algorithm_id>.obtf` bundle automatically
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 from investing_algorithm_framework import BacktestEngine, get_backtest, get_backtests
 
 top_10_backtests = get_backtests(str(top_selection_path), top_10_ids)
@@ -199,7 +203,9 @@ event_study.engines = [BacktestEngine.EVENT_DRIVEN]
 backtests = app.run_backtest(
     strategies=top_10_strategies,
     study=event_study,
-    backtest_storage_directory=str(top_selection_path),
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory=str(top_selection_path),
+    ),
 )
 ```
 

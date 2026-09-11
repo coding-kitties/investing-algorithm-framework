@@ -5,6 +5,7 @@ These tests verify that when a checkpoint is loaded and the backtest
 passes (or fails) the window filter function, the filtered_out metadata
 is correctly updated.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import json
 import os
 import shutil
@@ -237,10 +238,12 @@ class TestFilteredOutMetadataUpdate(TestCase):
         backtests_run1 = app.run_backtests(
             strategies=[strategy],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             window_metrics_filter_function=strict_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the backtest was filtered out
@@ -269,10 +272,12 @@ class TestFilteredOutMetadataUpdate(TestCase):
         backtests_run2 = app.run_backtests(
             strategies=[strategy2],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             window_metrics_filter_function=lenient_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the filtered_out flag is now cleared
@@ -332,10 +337,12 @@ class TestFilteredOutMetadataUpdate(TestCase):
         backtests_run1 = app.run_backtests(
             strategies=[strategy],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             window_metrics_filter_function=lenient_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify backtest exists and is NOT filtered out
@@ -367,10 +374,12 @@ class TestFilteredOutMetadataUpdate(TestCase):
         backtests_run2 = app.run_backtests(
             strategies=[strategy2],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             window_metrics_filter_function=strict_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the filtered_out flag is now set
@@ -434,9 +443,11 @@ class TestFilteredOutMetadataUpdate(TestCase):
         backtests_run1 = app.run_backtest(
             algorithm=algorithm,
             study=study,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             window_metrics_filter_function=strict_filter,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the backtest was filtered out
@@ -459,9 +470,11 @@ class TestFilteredOutMetadataUpdate(TestCase):
         backtests_run2 = app.run_backtest(
             algorithm=algorithm2,
             study=study,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             window_metrics_filter_function=lenient_filter,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the filtered_out flag is now cleared
@@ -528,9 +541,11 @@ class TestFilteredOutMetadataUpdate(TestCase):
         backtests_run1 = app.run_backtest(
             algorithm=algorithm,
             study=study,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             window_metrics_filter_function=lenient_filter,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify backtest exists and is NOT filtered out
@@ -552,9 +567,11 @@ class TestFilteredOutMetadataUpdate(TestCase):
         backtests_run2 = app.run_backtest(
             algorithm=algorithm2,
             study=study,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             window_metrics_filter_function=strict_filter,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the filtered_out flag is now set
@@ -651,10 +668,12 @@ class TestFilteredOutMetadataMultipleDateRanges(TestCase):
         backtests = app.run_backtests(
             strategies=[strategy],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             window_metrics_filter_function=pass_all_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the backtest was saved
@@ -740,9 +759,11 @@ class TestStorageDirectoryIsolation(TestCase):
         backtests_run1 = app.run_backtests(
             strategies=[strategy_a],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify Strategy A was saved
@@ -773,9 +794,11 @@ class TestStorageDirectoryIsolation(TestCase):
         backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify ONLY Strategy B is in results, NOT Strategy A
@@ -837,9 +860,11 @@ class TestStorageDirectoryIsolation(TestCase):
         app.run_backtests(
             strategies=[strategy_a],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # --- Second run: Strategy B with final filter that tracks what it receives ---
@@ -862,10 +887,12 @@ class TestStorageDirectoryIsolation(TestCase):
         backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             final_metrics_filter_function=tracking_final_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify final filter only received Strategy B
@@ -925,9 +952,11 @@ class TestStorageDirectoryIsolation(TestCase):
         backtests_run1 = app.run_backtests(
             strategies=strategies_batch1,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         self.assertEqual(
@@ -952,9 +981,11 @@ class TestStorageDirectoryIsolation(TestCase):
         backtests_run2 = app.run_backtests(
             strategies=strategies_batch2,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify only batch 2 strategies in results
@@ -1018,8 +1049,10 @@ class TestStorageDirectoryIsolation(TestCase):
         backtests_run1 = app.run_backtest(
             algorithm=algorithm_a,
             study=study,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         self.assertEqual(
@@ -1035,8 +1068,10 @@ class TestStorageDirectoryIsolation(TestCase):
         backtests_run2 = app.run_backtest(
             algorithm=algorithm_b,
             study=study,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify ONLY Algorithm B is in results
@@ -2276,9 +2311,11 @@ class TestSessionCacheIntegration(TestCase):
         backtests_run1 = app.run_backtests(
             strategies=[strategy_a],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         self.assertEqual(backtests_run1.df["algorithm_id"].nunique(), 1)
@@ -2303,9 +2340,11 @@ class TestSessionCacheIntegration(TestCase):
         backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify ONLY Strategy B is in results
@@ -2363,8 +2402,10 @@ class TestSessionCacheIntegration(TestCase):
         backtests_run1 = app.run_backtest(
             algorithm=algorithm_a,
             study=study,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         self.assertEqual(backtests_run1.df["algorithm_id"].nunique(), 1)
@@ -2379,8 +2420,10 @@ class TestSessionCacheIntegration(TestCase):
         backtests_run2 = app.run_backtest(
             algorithm=algorithm_b,
             study=study,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify ONLY Algorithm B is in results
@@ -2432,9 +2475,11 @@ class TestSessionCacheIntegration(TestCase):
         app.run_backtests(
             strategies=[strategy_a],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # --- Second run: Strategy B with final filter ---
@@ -2455,10 +2500,12 @@ class TestSessionCacheIntegration(TestCase):
         backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
             final_metrics_filter_function=tracking_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Final filter should only receive Strategy B

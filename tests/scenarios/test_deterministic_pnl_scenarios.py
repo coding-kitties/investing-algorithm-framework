@@ -35,6 +35,7 @@ TP / SL rules. Trailing TP / SL is intentionally not yet supported by
 the vector engine; strategies that need trailing rules should run in
 event mode.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -387,7 +388,9 @@ def _run_vector_backtest(strategy_cls, csv_filename, start, end, name):
     backtests = app.run_backtest(
         strategy=strategy_cls(algorithm_id=name),
         study=_build_study(start, end, BacktestEngine.VECTOR),
-        show_progress=False,
+        run_configuration=BacktestRunConfiguration(
+            show_progress=False,
+        ),
     )
     return next(backtests.iter_backtests()).get_all_backtest_runs()[0]
 

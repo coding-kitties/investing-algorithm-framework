@@ -175,4 +175,7 @@ examples/advanced_strategy/data/
 # Investing Algorithm Framework backtest bundles
 *.obtf
 *.iafbt
+checkpoints.json
+backtest_session.json
+*.parquet
 iaf-storage-demo/

@@ -1,3 +1,4 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import time
 import unittest
@@ -252,7 +253,9 @@ class Test(TestCase):
         vector_backtests = app.run_backtest(
             strategy=strategy,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         )
         run = next(vector_backtests.iter_backtests()).get_all_backtest_runs()[0]
 
@@ -263,7 +266,9 @@ class Test(TestCase):
         event_backtests = app.run_backtest(
             strategy=strategy,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         )
         run = next(event_backtests.iter_backtests()).get_all_backtest_runs()[0]
         event_trade_count = len(run.get_trades())

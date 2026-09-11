@@ -5,6 +5,7 @@ This test dynamically extracts the Python code from README.md and executes it
 to verify that the documented examples actually work. This ensures the README
 stays in sync with the actual codebase.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import re
 import unittest
@@ -201,8 +202,10 @@ class TestReadmeExample(TestCase):
         backtests = app.run_backtest(
             strategy=strategy,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            use_checkpoints=False,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+            ),
         )
         backtest = next(backtests.iter_backtests())
 

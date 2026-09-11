@@ -117,6 +117,10 @@ const sidebars = {
             items: [
                 {
                     type: 'doc',
+                    id: 'Advanced Concepts/backtest-optimization',
+                },
+                {
+                    type: 'doc',
                     id: 'Advanced Concepts/blotter',
                 },
                 {

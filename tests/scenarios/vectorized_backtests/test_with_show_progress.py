@@ -1,3 +1,4 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import sys
 import unittest
@@ -300,17 +301,17 @@ class Test(TestCase):
             backtests = app.run_backtests(
                 strategies=strategies,
                 study=study,
-                snapshot_interval=SnapshotInterval.DAILY,
-                use_checkpoints=True,
-                backtest_storage_directory=storage.name,
                 window_metrics_filter_function=(
                     self.filter_function_with_closed_trades
                 ),
                 final_metrics_filter_function=self.filter_function_with_ranking,
-                show_progress=True,
-                n_workers=2,
-                batch_size=100,  # Process 100 strategies at a time
-                checkpoint_batch_size=50,  # Save checkpoint every 50 backtests
+                run_configuration=BacktestRunConfiguration(
+                    snapshot_interval=SnapshotInterval.DAILY,
+                    use_checkpoints=True,
+                    backtest_storage_directory=storage.name,
+                    show_progress=True,
+                    n_workers=2,
+                ),
             )
         finally:
             # Restore stdout

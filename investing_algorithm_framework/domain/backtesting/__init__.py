@@ -38,6 +38,7 @@ from .study import (
 )
 from .backtest_engine import BacktestEngine
 from .execution_config import ExecutionConfig
+from .backtest_run_configuration import BacktestRunConfiguration
 from .study import (
     StudySampleType,
     SAMPLE_TYPE_IN_SAMPLE,
@@ -59,6 +60,7 @@ __all__ = [
     "EngineSlot",
     "BacktestEngine",
     "ExecutionConfig",
+    "BacktestRunConfiguration",
     "StudySampleType",
     "SAMPLE_TYPE_IN_SAMPLE",
     "SAMPLE_TYPE_OUT_SAMPLE_TIME",

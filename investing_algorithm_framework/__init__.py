@@ -1,3 +1,8 @@
+from .domain.optimization import (
+    CandidateProposal, FloatParameter, IntegerParameter,
+    OptimizationConfiguration, OptimizationSearchSpace,
+    StrategyOptimizer, TrialObservation,
+)
 from .analysis import generate_rolling_backtest_windows, \
     generate_anchored_backtest_windows, \
     generate_k_fold_backtest_windows, \
@@ -58,7 +63,8 @@ from .domain import Pipeline, Factor, CustomFactor, Filter, \
     AverageDollarVolume, AverageTradedValue, CrossSectionalMean, \
     Neutralize, Returns, RollingBeta, RSI, SMA, StaticPerSymbol, \
     Volatility, BacktestIndex, BUNDLE_FORMAT_VERSION, \
-    ExecutionConfig, StudySampleType, WindowPart  # noqa: F401
+    ExecutionConfig, BacktestRunConfiguration, StudySampleType, \
+    WindowPart  # noqa: F401
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -162,6 +168,13 @@ except ImportError:
 
 
 __all__ = [
+    "CandidateProposal",
+    "FloatParameter",
+    "IntegerParameter",
+    "OptimizationConfiguration",
+    "OptimizationSearchSpace",
+    "StrategyOptimizer",
+    "TrialObservation",
     "Algorithm",
     "RESOURCE_DIRECTORY",
     "App",
@@ -213,6 +226,7 @@ __all__ = [
     "DATETIME_FORMAT",
     "TIMEZONE",
     "Backtest",
+    "BacktestRunConfiguration",
     "Universe",
     "BacktestDateRange",
     "convert_polars_to_pandas",

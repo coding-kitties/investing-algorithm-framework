@@ -1,3 +1,4 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import unittest
 from itertools import product
@@ -219,8 +220,9 @@ class Test(TestCase):
         individual_backtests = app.run_backtests(
             strategies=[filtered_out_strategy],
             study=multi_window_study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            # No filter function - run it directly
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         ).load_backtests(workers=1)
 
         self.assertEqual(len(individual_backtests), 1, "Should have exactly one backtest result")
@@ -237,9 +239,10 @@ class Test(TestCase):
             individual_backtest = app.run_backtest(
                 strategy=filtered_out_strategy,
                 study=single_window_study,
-                snapshot_interval=SnapshotInterval.DAILY,
-                show_progress=False
-                # No filter function - run it directly
+                run_configuration=BacktestRunConfiguration(
+                    snapshot_interval=SnapshotInterval.DAILY,
+                    show_progress=False,
+                ),
             ).load_backtests(workers=1)[0]
             backtest_metrics = individual_backtest\
                 .get_backtest_metrics(date_range)
@@ -337,9 +340,11 @@ class Test(TestCase):
         backtests = app.run_backtests(
             strategies=strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
             window_metrics_filter_function=(
                 self.filter_function_with_closed_trades
+            ),
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
             ),
         ).load_backtests(workers=1)
 
@@ -469,13 +474,15 @@ class Test(TestCase):
         backtests = app.run_backtests(
             strategies=strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
             window_metrics_filter_function=(
                 self.filter_function_with_closed_trades
             ),
-            backtest_storage_directory=os.path.join(
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=os.path.join(
                 resource_directory, "temp_backtest_storage"
-            )
+            ),
+            ),
         ).load_backtests(workers=1)
 
         # Should have fewer backtests than strategies if filter worked
@@ -592,9 +599,11 @@ class Test(TestCase):
         filtered_backtests = app.run_backtests(
             strategies=all_strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
             window_metrics_filter_function=(
                 self.filter_function_with_closed_trades
+            ),
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
             ),
         ).load_backtests(workers=1)
 

@@ -1,12 +1,11 @@
 import gc
-import hashlib
 import json
 import logging
 import multiprocessing
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import Callable, Dict, List, Literal, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -27,10 +26,6 @@ from investing_algorithm_framework.services.metrics import \
     create_backtest_metrics
 from investing_algorithm_framework.services.portfolios import \
     PortfolioConfigurationService
-from .checkpoint_manifest import (
-    compute_strategy_manifest_hash,
-    normalize_checkpoint_entry,
-)
 from .schedule_generation import generate_backtest_schedule
 from .event_workers import initialize_event_worker, run_event_worker
 from .vector_backtest_service import VectorBacktestService
@@ -277,6 +272,26 @@ class BacktestService:
                 algorithm_ids.add(strategy.algorithm_id)
 
     @staticmethod
+    def _validate_v9_checkpoints(checkpoints: object) -> None:
+        if not isinstance(checkpoints, dict):
+            raise OperationalException(
+                "Invalid v9 checkpoints.json: expected a window mapping."
+            )
+        for window_id, algorithm_ids in checkpoints.items():
+            if (
+                not isinstance(window_id, str)
+                or not isinstance(algorithm_ids, list)
+                or not all(
+                    isinstance(algorithm_id, str)
+                    for algorithm_id in algorithm_ids
+                )
+            ):
+                raise OperationalException(
+                    "Invalid v9 checkpoints.json: each window must map "
+                    "to a list of algorithm IDs."
+                )
+
+    @staticmethod
     def create_checkpoint(
         backtests,
         backtest_date_range,
@@ -322,6 +337,7 @@ class BacktestService:
             # Load existing checkpoint file
             with open(checkpoint_file, "r") as f:
                 checkpoints = json.load(f)
+            BacktestService._validate_v9_checkpoints(checkpoints)
 
         backtest_range_key = (f"{backtest_date_range.start_date.isoformat()}_"
                               f"{backtest_date_range.end_date.isoformat()}")
@@ -330,17 +346,9 @@ class BacktestService:
         algorithm_ids = [bt.algorithm_id for bt in backtests]
 
         if mode == "append" and backtest_range_key in checkpoints:
-            existing_entry = checkpoints[backtest_range_key]
-            if isinstance(existing_entry, dict):
-                # Preserve dict format; new ids get None hash
-                for algo_id in algorithm_ids:
-                    existing_entry.setdefault(algo_id, None)
-                checkpoints[backtest_range_key] = existing_entry
-            else:
-                existing_ids = set(existing_entry)
-                new_ids = set(algorithm_ids)
-                combined_ids = list(existing_ids.union(new_ids))
-                checkpoints[backtest_range_key] = combined_ids
+            existing_ids = set(checkpoints[backtest_range_key])
+            existing_ids.update(algorithm_ids)
+            checkpoints[backtest_range_key] = sorted(existing_ids)
         else:
             checkpoints[backtest_range_key] = algorithm_ids
 
@@ -404,14 +412,10 @@ class BacktestService:
 
         with open(checkpoint_file, "r") as f:
             checkpoints = json.load(f)
+        BacktestService._validate_v9_checkpoints(checkpoints)
 
         backtest_range_key = f"{start_date_key}_{end_date_key}"
-        raw_entry = checkpoints.get(backtest_range_key, [])
-        # Support both legacy (list) and content-aware (dict) formats.
-        if isinstance(raw_entry, dict):
-            checkpointed = list(raw_entry.keys())
-        else:
-            checkpointed = list(raw_entry)
+        checkpointed = list(checkpoints.get(backtest_range_key, []))
 
         # Determine which algorithms are missing, by comparing witch
         # algorithm id's are present in the checkpoints and which are not
@@ -753,7 +757,7 @@ class BacktestService:
         ] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = True,
-        force_rerun: Union[bool, Literal["stale"]] = False,
+        force_rerun: bool = False,
         on_checkpoint_match: Literal["skip", "rerun", "warn"] = "skip",
         batch_size: int = 50,
         checkpoint_batch_size: int = 25,
@@ -1079,16 +1083,6 @@ class BacktestService:
             end_date = backtest_date_range.end_date.strftime('%Y-%m-%d')
             active_algorithm_ids = [s.algorithm_id for s in active_strategies]
 
-            # Compute content-aware manifest hashes for the active
-            # strategies. These fingerprint the strategy code, parameters,
-            # data sources and date range so checkpoints can detect when a
-            # strategy has actually changed since its last run.
-            manifest_hashes: Dict[str, str] = {}
-            if backtest_storage_directory is not None:
-                manifest_hashes = self._compute_manifest_hashes(
-                    active_strategies, backtest_date_range
-                )
-
             # Only check for checkpoints if use_checkpoints is True
             matched_ids = []
             if use_checkpoints and force_rerun is not True:
@@ -1096,11 +1090,10 @@ class BacktestService:
                     "Using checkpoints to skip completed backtests ...",
                     show_progress
                 )
-                strategies_to_run, matched_ids, stale_ids = \
+                strategies_to_run, matched_ids = \
                     self._select_items_to_rerun(
                         active_strategies,
                         active_algorithm_ids,
-                        manifest_hashes,
                         checkpoint_cache,
                         backtest_date_range,
                         force_rerun=force_rerun,
@@ -1122,12 +1115,6 @@ class BacktestService:
                             )
                         session_cache["backtests"][algo_id] = backtest_path
 
-                if stale_ids and on_checkpoint_match != "skip":
-                    logger.info(
-                        "Detected %d stale checkpoint(s) for "
-                        "%s to %s; rerunning due to content change.",
-                        len(stale_ids), start_date, end_date,
-                    )
                 if matched_ids and on_checkpoint_match == "warn":
                     logger.info(
                         "Skipping %d strategies with matching checkpoint "
@@ -1139,7 +1126,6 @@ class BacktestService:
                     _print_progress(
                         f"Active strategies: {len(active_algorithm_ids)}, "
                         f"matched: {len(matched_ids)}, "
-                        f"stale: {len(stale_ids)}, "
                         f"running {len(strategies_to_run)} backtests",
                         show_progress
                     )
@@ -1174,7 +1160,6 @@ class BacktestService:
                         batch_result, backtest_date_range,
                         backtest_storage_directory, checkpoint_cache,
                         session_cache=session_cache,
-                        manifest_hashes=manifest_hashes,
                         write_index=False,
                     )
                     for backtest in batch_result:
@@ -1194,7 +1179,6 @@ class BacktestService:
                         batch_buffer, checkpoint_batch_size,
                         backtest_date_range, backtest_storage_directory,
                         checkpoint_cache, session_cache,
-                        manifest_hashes=manifest_hashes,
                     )
                 completed_algorithm_ids.update(
                     backtest.algorithm_id for backtest in batch_result
@@ -1245,7 +1229,7 @@ class BacktestService:
                     self._save_remaining_batch(
                         batch_buffer, backtest_date_range,
                         backtest_storage_directory, checkpoint_cache,
-                        session_cache, manifest_hashes=manifest_hashes,
+                        session_cache,
                     )
                 pbar.update(len(strategies_to_run) - pbar.n)
             del consume
@@ -1605,31 +1589,32 @@ class BacktestService:
 
         return all_backtests
 
-    def _load_checkpoint_cache(self, storage_directory: str) -> Dict:
-        """Load checkpoint file into memory cache once."""
+    def _load_checkpoint_cache(
+        self, storage_directory: str
+    ) -> Dict[str, Set[str]]:
+        """Load the v9 checkpoint file into an O(1) membership cache."""
         checkpoint_file = os.path.join(storage_directory, "checkpoints.json")
-        if os.path.exists(checkpoint_file):
-            with open(checkpoint_file, "r") as f:
-                return json.load(f)
-        return {}
+        if not os.path.exists(checkpoint_file):
+            return {}
+
+        with open(checkpoint_file, "r") as f:
+            persisted = json.load(f)
+        self._validate_v9_checkpoints(persisted)
+
+        cache: Dict[str, Set[str]] = {}
+        for window_id, algorithm_ids in persisted.items():
+            cache[window_id] = set(algorithm_ids)
+        return cache
 
     def _get_checkpointed_from_cache(
         self,
         cache: Dict,
         date_range: BacktestDateRange
     ) -> List[str]:
-        """Get checkpointed algorithm IDs from cache.
-
-        Supports both legacy (list) and content-aware (dict) entries.
-        """
+        """Get checkpointed algorithm IDs from the in-memory v9 cache."""
         key = (f"{date_range.start_date.isoformat()}_"
                f"{date_range.end_date.isoformat()}")
-        entry = cache.get(key)
-        if entry is None:
-            return []
-        if isinstance(entry, dict):
-            return list(entry.keys())
-        return list(entry)
+        return list(cache.get(key, set()))
 
     @staticmethod
     def _checkpoint_key_for(date_range: BacktestDateRange) -> str:
@@ -1637,77 +1622,31 @@ class BacktestService:
                 f"{date_range.end_date.isoformat()}")
 
     @staticmethod
-    def _compute_manifest_hashes(
-        items: List,
-        date_range: BacktestDateRange,
-    ) -> Dict[str, str]:
-        """
-        Compute content-aware manifest hashes for a list of strategies
-        or algorithms.
-
-        For an ``Algorithm``, the hash is computed over its underlying
-        strategies; this keeps the result deterministic regardless of
-        whether the caller passed strategies or algorithms.
-        """
-        hashes: Dict[str, str] = {}
-        for item in items:
-            algo_id = (
-                item.algorithm_id if hasattr(item, "algorithm_id")
-                else getattr(item, "id", None)
-            )
-            if algo_id is None:
-                continue
-
-            strategies = getattr(item, "strategies", None)
-            if strategies:
-                # Algorithm: aggregate hashes of contained strategies
-                parts = [
-                    compute_strategy_manifest_hash(s, date_range)
-                    for s in strategies
-                ]
-                payload = "|".join(parts)
-                hashes[algo_id] = hashlib.sha256(
-                    payload.encode("utf-8")
-                ).hexdigest()[:16]
-            else:
-                hashes[algo_id] = compute_strategy_manifest_hash(
-                    item, date_range
-                )
-        return hashes
-
-    @staticmethod
     def _select_items_to_rerun(
         active_items: List,
         active_algorithm_ids: List[str],
-        manifest_hashes: Dict[str, str],
         checkpoint_cache: Dict,
         date_range: BacktestDateRange,
-        force_rerun: Union[bool, Literal["stale"]] = False,
+        force_rerun: bool = False,
         on_checkpoint_match: Literal["skip", "rerun", "warn"] = "skip",
-    ) -> Tuple[List, List[str], List[str]]:
+    ) -> Tuple[List, List[str]]:
         """
         Decide which strategies/algorithms to (re)run for ``date_range``.
 
-        Returns a tuple ``(items_to_run, matched_ids, stale_ids)``:
+        Returns a tuple ``(items_to_run, matched_ids)``:
 
         - ``items_to_run`` is the filtered list of strategies/algorithms
           the engine should actually execute.
-        - ``matched_ids`` are algorithm_ids whose checkpoint matches the
-          current manifest hash (or any checkpoint, when no hash is
-          stored).
-        - ``stale_ids`` are algorithm_ids that have a checkpoint with a
-          mismatching manifest hash. They will be rerun unless
-          ``force_rerun=False`` AND ``on_checkpoint_match='skip'`` AND
-          no stored hash exists (legacy behaviour).
+        - ``matched_ids`` are algorithm_ids with a checkpoint for the
+          requested date range.
         """
-        if force_rerun is True:
-            return list(active_items), [], []
+        if force_rerun:
+            return list(active_items), []
 
         key = BacktestService._checkpoint_key_for(date_range)
-        entry = normalize_checkpoint_entry(checkpoint_cache.get(key))
+        checkpointed_ids = checkpoint_cache.get(key, set())
 
         matched_ids: List[str] = []
-        stale_ids: List[str] = []
         items_to_run: List = []
 
         # zip-by-id mapping
@@ -1717,33 +1656,16 @@ class BacktestService:
         }
 
         for algo_id, item in active_by_id.items():
-            if algo_id not in entry:
+            if algo_id not in checkpointed_ids:
                 items_to_run.append(item)
                 continue
 
-            stored_hash = entry[algo_id]
-            current_hash = manifest_hashes.get(algo_id)
-
-            # Determine whether the checkpoint matches the current run.
-            # - No stored hash (legacy): treat as a content-blind match.
-            # - Stored hash matches current hash: content match.
-            # - Stored hash differs: stale.
-            if stored_hash is None or stored_hash == current_hash:
-                # match
-                matched_ids.append(algo_id)
-                if on_checkpoint_match == "rerun":
-                    items_to_run.append(item)
-                # "skip" and "warn" both don't rerun on match
-            else:
-                stale_ids.append(algo_id)
-                # Stale checkpoints rerun unless caller explicitly
-                # opted out via force_rerun=False AND on_checkpoint_match
-                # behaviour is "skip" — the issue specifies that stale
-                # entries should rerun automatically (the whole point
-                # of the content-aware key), so we always rerun here.
+            matched_ids.append(algo_id)
+            if on_checkpoint_match == "rerun":
                 items_to_run.append(item)
+            # "skip" and "warn" both don't rerun on match
 
-        return items_to_run, matched_ids, stale_ids
+        return items_to_run, matched_ids
 
     def _batch_save_and_checkpoint(
         self,
@@ -1753,16 +1675,9 @@ class BacktestService:
         checkpoint_cache: Dict,
         show_progress: bool = False,
         session_cache: Dict = None,
-        manifest_hashes: Optional[Dict[str, str]] = None,
         write_index: bool = True,
     ):
-        """Save a batch of backtests and update checkpoint cache.
-
-        ``manifest_hashes`` maps ``algorithm_id`` to its content-aware
-        manifest hash for the current run. When provided, the on-disk
-        checkpoint entry for ``date_range`` is migrated from a list to
-        a dict so future runs can detect strategy/parameter changes.
-        """
+        """Save a batch and checkpoint algorithm IDs for the window."""
         if len(backtests) == 0:
             return
 
@@ -1858,45 +1773,21 @@ class BacktestService:
 
         # Update checkpoint cache
         key = self._checkpoint_key_for(date_range)
-        existing = checkpoint_cache.get(key)
-
-        # If we have manifest hashes, store as dict. Otherwise preserve
-        # the existing shape (legacy list) for backward compatibility.
-        if manifest_hashes:
-            if isinstance(existing, dict):
-                entry = existing
-            elif isinstance(existing, list):
-                # migrate: legacy entries have no hash
-                entry = {alg_id: None for alg_id in existing}
-            else:
-                entry = {}
-
-            for backtest in backtests:
-                algo_id = backtest.algorithm_id
-                entry[algo_id] = manifest_hashes.get(algo_id)
-            checkpoint_cache[key] = entry
-        else:
-            if isinstance(existing, dict):
-                # don't downgrade an existing dict to a list
-                entry = existing
-                for backtest in backtests:
-                    entry.setdefault(backtest.algorithm_id, None)
-                checkpoint_cache[key] = entry
-            else:
-                entry_list = list(existing) if isinstance(
-                    existing, list
-                ) else []
-                for backtest in backtests:
-                    if backtest.algorithm_id not in entry_list:
-                        entry_list.append(backtest.algorithm_id)
-                checkpoint_cache[key] = entry_list
+        checkpointed_ids = checkpoint_cache.setdefault(key, set())
+        checkpointed_ids.update(
+            backtest.algorithm_id for backtest in backtests
+        )
 
         # Write checkpoint file with forced flush to disk
         checkpoint_file = os.path.join(storage_directory, "checkpoints.json")
         staging_file = checkpoint_file + ".pending"
+        persisted = {
+            window_id: sorted(algorithm_ids)
+            for window_id, algorithm_ids in checkpoint_cache.items()
+        }
         try:
             with open(staging_file, "w") as f:
-                json.dump(checkpoint_cache, f, indent=4)
+                json.dump(persisted, f, indent=4)
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(staging_file, checkpoint_file)
@@ -2143,7 +2034,6 @@ class BacktestService:
         backtest_storage_directory: str,
         checkpoint_cache: Dict,
         session_cache: Dict = None,
-        manifest_hashes: Optional[Dict[str, str]] = None,
     ) -> bool:
         """
         Save batch if buffer is full and clear memory.
@@ -2155,9 +2045,6 @@ class BacktestService:
             backtest_storage_directory: Directory to save to.
             checkpoint_cache: Checkpoint cache to update.
             session_cache: Session cache to track backtests from this run.
-            manifest_hashes: Optional mapping of algorithm_id -> hash to
-                persist content-aware checkpoints.
-
         Returns:
             True if batch was saved, False otherwise
         """
@@ -2169,7 +2056,6 @@ class BacktestService:
                 checkpoint_cache,
                 show_progress=False,
                 session_cache=session_cache,
-                manifest_hashes=manifest_hashes,
             )
             batch_buffer.clear()
             gc.collect()
@@ -2183,7 +2069,6 @@ class BacktestService:
         backtest_storage_directory: str,
         checkpoint_cache: Dict,
         session_cache: Dict = None,
-        manifest_hashes: Optional[Dict[str, str]] = None,
     ):
         """
         Save any remaining backtests in the buffer.
@@ -2194,8 +2079,6 @@ class BacktestService:
             backtest_storage_directory: Directory to save to.
             checkpoint_cache: Checkpoint cache to update.
             session_cache: Session cache to track backtests from this run.
-            manifest_hashes: Optional mapping of algorithm_id -> hash to
-                persist content-aware checkpoints.
         """
         if len(batch_buffer) > 0:
             self._batch_save_and_checkpoint(
@@ -2205,7 +2088,6 @@ class BacktestService:
                 checkpoint_cache,
                 show_progress=False,
                 session_cache=session_cache,
-                manifest_hashes=manifest_hashes,
             )
             batch_buffer.clear()
             gc.collect()
@@ -2595,7 +2477,7 @@ class BacktestService:
         ] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = False,
-        force_rerun: Union[bool, Literal["stale"]] = False,
+        force_rerun: bool = False,
         on_checkpoint_match: Literal["skip", "rerun", "warn"] = "skip",
         batch_size: int = 50,
         checkpoint_batch_size: int = 25,
@@ -2845,13 +2727,6 @@ class BacktestService:
                 ) else alg.id
                 active_algorithm_ids.append(alg_id)
 
-            # Compute content-aware manifest hashes for active algorithms.
-            manifest_hashes: Dict[str, str] = {}
-            if backtest_storage_directory is not None:
-                manifest_hashes = self._compute_manifest_hashes(
-                    active_algorithms, backtest_date_range
-                )
-
             start_date = backtest_date_range.start_date.strftime('%Y-%m-%d')
             end_date = backtest_date_range.end_date.strftime('%Y-%m-%d')
 
@@ -2863,11 +2738,10 @@ class BacktestService:
                     "skip completed backtests ...",
                     show_progress
                 )
-                algorithms_to_run, matched_ids, stale_ids = \
+                algorithms_to_run, matched_ids = \
                     self._select_items_to_rerun(
                         active_algorithms,
                         active_algorithm_ids,
-                        manifest_hashes,
                         checkpoint_cache,
                         backtest_date_range,
                         force_rerun=force_rerun,
@@ -2887,12 +2761,6 @@ class BacktestService:
                             )
                         session_cache["backtests"][algo_id] = backtest_path
 
-                if stale_ids and on_checkpoint_match != "skip":
-                    logger.info(
-                        "Detected %d stale checkpoint(s) for "
-                        "%s to %s; rerunning due to content change.",
-                        len(stale_ids), start_date, end_date,
-                    )
                 if matched_ids and on_checkpoint_match == "warn":
                     logger.info(
                         "Skipping %d algorithms with matching checkpoint "
@@ -2904,7 +2772,6 @@ class BacktestService:
                     _print_progress(
                         f"Active algorithms: {len(active_algorithm_ids)}, "
                         f"matched: {len(matched_ids)}, "
-                        f"stale: {len(stale_ids)}, "
                         f"running {len(algorithms_to_run)} backtests",
                         show_progress
                     )
@@ -2923,7 +2790,6 @@ class BacktestService:
                     [backtest], backtest_date_range,
                     backtest_storage_directory, checkpoint_cache,
                     session_cache=session_cache,
-                    manifest_hashes=manifest_hashes,
                     write_index=False,
                 )
                 index_rows_by_algorithm[algorithm_id] = compact_rows(
@@ -3158,7 +3024,6 @@ class BacktestService:
                                     backtest_date_range,
                                     backtest_storage_directory,
                                     checkpoint_cache, session_cache,
-                                    manifest_hashes=manifest_hashes,
                                 )
                         memory_guard.require()
 
@@ -3174,7 +3039,6 @@ class BacktestService:
                         backtest_storage_directory,
                         checkpoint_cache,
                         session_cache,
-                        manifest_hashes=manifest_hashes,
                     )
 
             if result_mode == "index":

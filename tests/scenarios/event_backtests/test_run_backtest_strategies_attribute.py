@@ -8,6 +8,7 @@ picked up automatically when ``app.run_backtest`` is called without a
 Uses a short (30-day) date range so this test runs well under 30s on CI,
 with all data sourced from ``tests/resources/test_data/``.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -57,7 +58,9 @@ class Test(TestCase):
         )
         backtests = app.run_backtest(
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         )
         backtest = next(backtests.iter_backtests())
         elapsed_time = time.time() - start_time

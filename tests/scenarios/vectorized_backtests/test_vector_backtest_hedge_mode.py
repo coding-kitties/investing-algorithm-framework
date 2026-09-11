@@ -1,3 +1,4 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest import TestCase
@@ -106,7 +107,11 @@ def _run(strategy):
         engines=[BacktestEngine.VECTOR],
     )
     backtests = app.run_backtest(
-        strategy=strategy, study=study, use_checkpoints=False,
+        strategy=strategy,
+        study=study,
+        run_configuration=BacktestRunConfiguration(
+            use_checkpoints=False,
+        ),
     )
     return next(backtests.iter_backtests()).get_all_backtest_runs()[0]
 

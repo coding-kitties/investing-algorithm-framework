@@ -14,6 +14,7 @@ and the API additions that make it convenient:
 
 Run directly: `.venv/bin/python test.py`
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -203,7 +204,9 @@ def main():
     vector_backtests = app.run_backtest(
         strategies=strategies,
         study=in_sample_study,
-        backtest_storage_directory=str(STORAGE_DIR),
+        run_configuration=BacktestRunConfiguration(
+            backtest_storage_directory=str(STORAGE_DIR),
+        ),
     )
     print(
         f"Vector sweep produced {len(vector_backtests)} backtests, "
@@ -262,7 +265,9 @@ def main():
     event_backtests = app2.run_backtest(
         strategies=top_10_strategies,
         study=event_study,
-        backtest_storage_directory=str(STORAGE_DIR),
+        run_configuration=BacktestRunConfiguration(
+            backtest_storage_directory=str(STORAGE_DIR),
+        ),
     )
     print(f"Event validation produced {len(event_backtests)} backtests.")
 

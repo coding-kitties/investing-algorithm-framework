@@ -13,6 +13,7 @@ These tests verify the fixes applied to the vector backtest engine:
     7. (Removed — SL/TP does not belong in vectorized backtests.)
     8. Raw signals exposed on BacktestRun.signals.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -247,9 +248,11 @@ def _run_backtest(app, strategy, days=730, **kwargs):
     backtests = app.run_backtest(
         strategy=strategy,
         study=study,
-        snapshot_interval=SnapshotInterval.DAILY,
-        use_checkpoints=False,
         **kwargs,
+        run_configuration=BacktestRunConfiguration(
+            snapshot_interval=SnapshotInterval.DAILY,
+            use_checkpoints=False,
+        ),
     )
     backtest = next(backtests.iter_backtests())
     runs = backtest.get_all_backtest_runs()

@@ -15,6 +15,7 @@ Usage::
 """
 from __future__ import annotations
 
+from investing_algorithm_framework import BacktestRunConfiguration
 import argparse
 import json
 import time
@@ -289,9 +290,11 @@ def main() -> None:
     backtests = app.run_backtests(
         strategies=strategies,
         study=study,
-        n_workers=args.workers,
-        backtest_storage_directory=str(BACKTEST_DIR),
-        show_progress=True,
+        run_configuration=BacktestRunConfiguration(
+            n_workers=args.workers,
+            backtest_storage_directory=str(BACKTEST_DIR),
+            show_progress=True,
+        ),
     )
     elapsed = time.perf_counter() - t0
 

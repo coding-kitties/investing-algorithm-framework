@@ -1,3 +1,4 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import time
 import shutil
@@ -307,10 +308,12 @@ class Test(TestCase):
         backtests = app.run_backtest(
             strategy=strategy,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=backtest_storage_dir,
-            use_checkpoints=False,
-            show_progress=False
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=backtest_storage_dir,
+                use_checkpoints=False,
+                show_progress=False,
+            ),
         ).load_backtests(workers=1)
         backtest = backtests[0]
 
@@ -425,10 +428,12 @@ class Test(TestCase):
         backtests = app.run_backtests(
             strategies=strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=backtest_storage_dir,
-            use_checkpoints=True,
-            show_progress=False
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=backtest_storage_dir,
+                use_checkpoints=True,
+                show_progress=False,
+            ),
         ).load_backtests(workers=1)
         end_time = time.time()
         duration = end_time - start_time
@@ -566,10 +571,12 @@ class Test(TestCase):
         first_backtests = app1.run_backtests(
             strategies=first_strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=backtest_storage_dir,
-            use_checkpoints=False,
-            show_progress=False
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=backtest_storage_dir,
+                use_checkpoints=False,
+                show_progress=False,
+            ),
         ).load_backtests(workers=1)
 
         # Verify first run results
@@ -650,10 +657,12 @@ class Test(TestCase):
         second_backtests = app2.run_backtests(
             strategies=second_strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=backtest_storage_dir,
-            use_checkpoints=False,
-            show_progress=False
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=backtest_storage_dir,
+                use_checkpoints=False,
+                show_progress=False,
+            ),
         ).load_backtests(workers=1)
 
         # ===== VERIFICATION =====
@@ -788,10 +797,12 @@ class Test(TestCase):
         first_backtests = app1.run_backtests(
             strategies=first_strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=backtest_storage_dir,
-            use_checkpoints=False,
-            show_progress=False
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=backtest_storage_dir,
+                use_checkpoints=False,
+                show_progress=False,
+            ),
         ).load_backtests(workers=1)
 
         self.assertEqual(len(first_backtests), 2)
@@ -866,11 +877,13 @@ class Test(TestCase):
         second_backtests = app2.run_backtests(
             strategies=second_strategies,
             study=study,
-            snapshot_interval=SnapshotInterval.DAILY,
-            backtest_storage_directory=backtest_storage_dir,
-            use_checkpoints=False,
-            show_progress=False,
-            final_metrics_filter_function=tracking_final_filter
+            final_metrics_filter_function=tracking_final_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=backtest_storage_dir,
+                use_checkpoints=False,
+                show_progress=False,
+            ),
         ).load_backtests(workers=1)
 
         # ===== VERIFICATION =====

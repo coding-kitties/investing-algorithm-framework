@@ -87,6 +87,7 @@ These optimizations are always available as keyword arguments on
 parameters to tune.
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 from investing_algorithm_framework import Study, Universe, \
     BacktestWindow, BacktestEngine, SnapshotInterval
 
@@ -103,32 +104,32 @@ study = Study(
 backtests = app.run_backtests(
     strategies=strategies,
     study=study,
-    snapshot_interval=SnapshotInterval.DAILY,
-    show_progress=True,
-    # Performance-tuning parameters:
-    use_checkpoints=True,
-    batch_size=100,  # Number of strategies per batch
-    checkpoint_batch_size=50,  # Backtests before disk write
-    n_workers=None,  # None = sequential, -1 = all cores, N = N cores
+    run_configuration=BacktestRunConfiguration(
+        snapshot_interval=SnapshotInterval.DAILY,
+        show_progress=True,
+        use_checkpoints=True,
+        n_workers=None,
+    ),
 )
 ```
 
 ### With Parallel Processing (Recommended for 1000+ backtests)
 
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 
 # Use all but one CPU core (recommended)
 n_workers = os.cpu_count() - 1
 
 backtests = app.run_backtests(
-    strategies=strategies,  # Can handle 10,000+ strategies
+    strategies=strategies,
     study=study,
-    use_checkpoints=True,
-    n_workers=n_workers,  # Enable parallel processing!
-    batch_size=100,
-    checkpoint_batch_size=50,
-    show_progress=True,
+    run_configuration=BacktestRunConfiguration(
+        use_checkpoints=True,
+        n_workers=n_workers,
+        show_progress=True,
+    ),
 )
 
 # Expected speedup: 5-10x depending on CPU cores
@@ -203,6 +204,7 @@ the semantics of `run_backtests()`:
 
 ### Benchmark Test
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import time
 
@@ -218,11 +220,12 @@ original_time = time.time() - start
 # Tuned (parallel, larger batches)
 start = time.time()
 results2 = app.run_backtests(
-    strategies=strategies, study=study,
-    use_checkpoints=True,
-    n_workers=os.cpu_count() - 1,
-    batch_size=100,
-    checkpoint_batch_size=50,
+    strategies=strategies,
+    study=study,
+    run_configuration=BacktestRunConfiguration(
+        use_checkpoints=True,
+        n_workers=os.cpu_count() - 1,
+    ),
 )
 optimized_time = time.time() - start
 
@@ -233,6 +236,7 @@ print(f"Speedup: {original_time/optimized_time:.1f}x")
 
 ### Memory Monitoring
 ```python
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import tracemalloc
 
@@ -240,11 +244,12 @@ tracemalloc.start()
 
 # Run your backtests
 results = app.run_backtests(
-    strategies=strategies, study=study,
-    use_checkpoints=True,
-    n_workers=os.cpu_count() - 1,
-    batch_size=100,
-    checkpoint_batch_size=50,
+    strategies=strategies,
+    study=study,
+    run_configuration=BacktestRunConfiguration(
+        use_checkpoints=True,
+        n_workers=os.cpu_count() - 1,
+    ),
 )
 
 current, peak = tracemalloc.get_traced_memory()

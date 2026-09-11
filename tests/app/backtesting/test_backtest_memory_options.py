@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 import gc
+import inspect
 import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Callable, Literal, Optional, TypedDict
 from unittest import TestCase
 from unittest.mock import patch
 from uuid import uuid4
@@ -14,8 +14,9 @@ import pandas as pd
 
 from investing_algorithm_framework import (
     Algorithm, BacktestDateRange, BacktestEngine, BacktestIndex,
-    BacktestWindow,
-    CSVOHLCVDataProvider, OperationalException, RESOURCE_DIRECTORY, Schedule,
+    BacktestRunConfiguration,
+    BacktestWindow, SnapshotInterval,
+    CSVOHLCVDataProvider, RESOURCE_DIRECTORY, Schedule,
     Study, Task, TimeUnit, TradingStrategy, Universe, create_app,
 )
 from investing_algorithm_framework.app.app import App
@@ -29,17 +30,6 @@ from tests.app.backtesting \
     .test_run_backtest_independent_algorithms_vector import VectorTestStrategy
 from tests.scenarios.vector_vs_event_backtests.test_event_vs_vector_backtest \
     import LongCycleStrategy
-
-
-class MemoryOptions(TypedDict, total=False):
-    result_mode: Literal["index"]
-    memory_budget_mb: Optional[int]
-    min_available_memory_mb: Optional[int]
-    max_tasks_per_child: Optional[int]
-    window_metrics_filter_function: Callable[
-        [BacktestIndex, BacktestDateRange], BacktestIndex
-    ]
-    final_metrics_filter_function: Callable[[BacktestIndex], BacktestIndex]
 
 
 class MemoryOptionsStrategy(TradingStrategy):
@@ -125,43 +115,51 @@ class TestBacktestMemoryOptions(TestCase):
         def final_filter(index):
             return index
 
-        options: MemoryOptions = {
-            "result_mode": "index",
-            "memory_budget_mb": 2048,
-            "min_available_memory_mb": 1024,
-            "max_tasks_per_child": 3,
+        options = {
             "window_metrics_filter_function": window_filter,
             "final_metrics_filter_function": final_filter,
         }
+        configuration = BacktestRunConfiguration(
+            backtest_storage_directory=Path(self.storage.name),
+            n_workers=2, memory_budget_mb=2048, min_available_memory_mb=1024,
+            max_tasks_per_child=3, show_progress=False,
+            continue_on_error=False, use_checkpoints=False,
+            snapshot_interval=SnapshotInterval.STRATEGY_ITERATION,
+            skip_data_sources_initialization=True,
+            dynamic_position_sizing=True, fill_missing_data=False,
+        )
         with patch.object(
             BacktestService, "run_vector_backtests", return_value=result,
         ) as run:
             actual = self.app.run_backtest(
                 strategy=self.strategy,
                 study=self.study,
-                backtest_storage_directory=Path(self.storage.name),
-                n_workers=2,
                 **options,
+                run_configuration=configuration,
             )
 
         self.assertIs(actual, result)
-        self.assertEqual(run.call_args.kwargs["n_workers"], 2)
+        self.assertEqual(run.call_args.kwargs["result_mode"], "index")
+        for name, value in vars(configuration).items():
+            self.assertEqual(run.call_args.kwargs[name], value)
         for key, value in options.items():
             self.assertEqual(run.call_args.kwargs[key], value)
 
     def test_run_backtests_wrapper_forwards_controls(self):
-        options: MemoryOptions = {
-            "result_mode": "index",
-            "memory_budget_mb": 2048,
-            "min_available_memory_mb": 1024,
-            "max_tasks_per_child": None,
+        options = {
             "window_metrics_filter_function": lambda index, window: index,
             "final_metrics_filter_function": lambda index: index,
         }
         with patch.object(App, "run_backtest") as run:
+            configuration = BacktestRunConfiguration(
+                memory_budget_mb=2048, min_available_memory_mb=1024,
+                max_tasks_per_child=None,
+            )
             self.app.run_backtests(
                 strategies=[self.strategy], study=self.study, **options,
+                run_configuration=configuration,
             )
+        self.assertIs(run.call_args.kwargs["run_configuration"], configuration)
         for key, value in options.items():
             self.assertEqual(run.call_args.kwargs[key], value)
 
@@ -218,16 +216,23 @@ class TestBacktestMemoryOptions(TestCase):
             VectorTestStrategy(algorithm_id=f"real-{i}") for i in range(2)
         ]
         baseline = self.app.run_backtest(
-            strategies=strategies, study=self.study,
-            backtest_storage_directory=Path(self.storage.name) / "baseline",
+            strategies=strategies,
+            study=self.study,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=Path(self.storage.name) / "baseline",
+            ),
         )
         assert isinstance(baseline, BacktestIndex)
         output_path = Path(self.storage.name) / "parallel"
         index = self.app.run_backtest(
-            strategies=strategies, study=self.study,
-            backtest_storage_directory=output_path,
-            n_workers=2, max_tasks_per_child=2,
-            use_checkpoints=True, result_mode="index",
+            strategies=strategies,
+            study=self.study,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=output_path,
+                n_workers=2,
+                max_tasks_per_child=2,
+                use_checkpoints=True,
+            ),
         )
         assert isinstance(index, BacktestIndex)
         for backtest in baseline.iter_backtests():
@@ -246,10 +251,14 @@ class TestBacktestMemoryOptions(TestCase):
             side_effect=AssertionError("checkpointed strategy was rerun"),
         ):
             resumed = self.app.run_backtest(
-                strategies=strategies, study=self.study,
-                backtest_storage_directory=output_path,
-                n_workers=2, max_tasks_per_child=2,
-                use_checkpoints=True, result_mode="index",
+                strategies=strategies,
+                study=self.study,
+                run_configuration=BacktestRunConfiguration(
+                    backtest_storage_directory=output_path,
+                    n_workers=2,
+                    max_tasks_per_child=2,
+                    use_checkpoints=True,
+                ),
             )
         assert isinstance(resumed, BacktestIndex)
         pd.testing.assert_frame_equal(index.df, resumed.df)
@@ -263,8 +272,11 @@ class TestBacktestMemoryOptions(TestCase):
             side_effect=AssertionError("event must not bulk reload"),
         ):
             result = self.app.run_backtest(
-                strategy=strategy, study=self.study,
-                min_available_memory_mb=1,
+                strategy=strategy,
+                study=self.study,
+                run_configuration=BacktestRunConfiguration(
+                    min_available_memory_mb=1,
+                ),
             )
         self.assertIsInstance(result, BacktestIndex)
         self.assertEqual(set(result.df["engine_type"]), {"event"})
@@ -309,7 +321,12 @@ class TestBacktestMemoryOptions(TestCase):
             strategies=[
                 LongCycleStrategy(algorithm_id=f"trading-{i}")
                 for i in range(2)
-            ], study=self.study, n_workers=2, max_tasks_per_child=2,
+            ],
+            study=self.study,
+            run_configuration=BacktestRunConfiguration(
+                n_workers=2,
+                max_tasks_per_child=2,
+            ),
         )
         for expected, actual in zip(
             sequential.iter_backtests(), parallel.iter_backtests(),
@@ -335,8 +352,13 @@ class TestBacktestMemoryOptions(TestCase):
                 strategies=[
                     LongCycleStrategy(algorithm_id=f"trading-{i}")
                     for i in range(2)
-                ], study=self.study, n_workers=2, use_checkpoints=True,
-                backtest_storage_directory=parallel.directory,
+                ],
+                study=self.study,
+                run_configuration=BacktestRunConfiguration(
+                    n_workers=2,
+                    use_checkpoints=True,
+                    backtest_storage_directory=parallel.directory,
+                ),
             )
         pd.testing.assert_frame_equal(parallel.df, resumed.df)
 
@@ -349,7 +371,12 @@ class TestBacktestMemoryOptions(TestCase):
                 EventWorkerProbeStrategy(
                     algorithm_id=f"isolated-{i}", probe_directory=str(probes),
                 ) for i in range(2)
-            ], study=self.study, n_workers=2, max_tasks_per_child=1,
+            ],
+            study=self.study,
+            run_configuration=BacktestRunConfiguration(
+                n_workers=2,
+                max_tasks_per_child=1,
+            ),
         )
         self.assertEqual(result.df["algorithm_id"].nunique(), 2)
         recorded = [json.loads(path.read_text()) for path in probes.iterdir()]
@@ -374,17 +401,26 @@ class TestBacktestMemoryOptions(TestCase):
         directory = Path(self.storage.name) / "failed-parallel"
         with self.assertRaisesRegex(RuntimeError, "intentional event"):
             self.app.run_backtest(
-                strategies=strategies, study=self.study, n_workers=2,
-                max_tasks_per_child=1,
-                backtest_storage_directory=directory,
+                strategies=strategies,
+                study=self.study,
+                run_configuration=BacktestRunConfiguration(
+                    continue_on_error=False,
+                    backtest_storage_directory=directory,
+                    n_workers=2,
+                    max_tasks_per_child=1,
+                ),
             )
         self.assertTrue((directory / "failure-0.obtf").exists())
         self.assertFalse((directory / "failure-1.obtf").exists())
         strategies[1].fail = False
         result = self.app.run_backtest(
-            strategies=strategies, study=self.study, n_workers=2,
-            max_tasks_per_child=1, use_checkpoints=True,
-            backtest_storage_directory=directory,
+            strategies=strategies,
+            study=self.study,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=directory,
+                n_workers=2,
+                max_tasks_per_child=1,
+            ),
         )
         self.assertEqual(result.df["algorithm_id"].nunique(), 2)
         self.assertEqual(len(list(probes.glob("failure-0-*.json"))), 1)
@@ -408,8 +444,13 @@ class TestBacktestMemoryOptions(TestCase):
             strategies=[
                 EventIndexStrategy(algorithm_id=f"event-{i}")
                 for i in range(2)
-            ], study=self.study, n_workers=2, max_tasks_per_child=2,
+            ],
+            study=self.study,
             window_metrics_filter_function=prune,
+            run_configuration=BacktestRunConfiguration(
+                n_workers=2,
+                max_tasks_per_child=2,
+            ),
         )
         self.assertEqual(len(observed), 2)
         self.assertEqual(
@@ -441,8 +482,12 @@ class TestBacktestMemoryOptions(TestCase):
                 tasks=[task],
             ))
         result = self.app.run_backtest(
-            algorithms=algorithms, study=self.study,
-            n_workers=2, max_tasks_per_child=1,
+            algorithms=algorithms,
+            study=self.study,
+            run_configuration=BacktestRunConfiguration(
+                n_workers=2,
+                max_tasks_per_child=1,
+            ),
         )
         self.assertEqual(
             set(result.df["algorithm_id"]), {"combined-0", "combined-1"},
@@ -465,19 +510,44 @@ class TestBacktestMemoryOptions(TestCase):
         ):
             self.app.run_backtest(
                 strategy=EventWorkerResourceFailure(algorithm_id="pressure"),
-                study=self.study, n_workers=2, continue_on_error=True,
-                min_available_memory_mb=1,
+                study=self.study,
+                run_configuration=BacktestRunConfiguration(
+                    n_workers=2,
+                    continue_on_error=True,
+                    min_available_memory_mb=1,
+                ),
             )
 
-    def test_old_list_mode_and_full_object_filters_are_rejected(self):
-        with self.assertRaisesRegex(
-            OperationalException, "always returns a BacktestIndex",
-        ):
-            self.app.run_backtest(result_mode="list")
-        with self.assertRaisesRegex(
-            OperationalException, "window_metrics_filter_function",
-        ):
-            self.app.run_backtest(window_filter_function=lambda *args: [])
+    def test_public_signatures_expose_inputs_config_filters_and_search(self):
+        common = {
+            "self", "strategies", "algorithms", "study", "run_configuration",
+            "window_metrics_filter_function", "final_metrics_filter_function",
+            "optimization",
+        }
+        self.assertEqual(
+            set(inspect.signature(App.run_backtests).parameters), common,
+        )
+        self.assertEqual(
+            set(inspect.signature(App.run_backtest).parameters),
+            common | {"strategy", "algorithm"},
+        )
+
+    def test_removed_and_individual_run_settings_are_rejected(self):
+        removed = {
+            "result_mode": "index",
+            "window_filter_function": lambda *args: [],
+            "final_filter_function": lambda *args: [],
+            "batch_size": 50,
+            "checkpoint_batch_size": 25,
+            "iterative_summary_update": True,
+            "anchor_algorithm_id": "anchor",
+        }
+        removed.update(vars(BacktestRunConfiguration()))
+        for method in (self.app.run_backtest, self.app.run_backtests):
+            for name, value in removed.items():
+                with self.subTest(method=method.__name__, parameter=name):
+                    with self.assertRaisesRegex(TypeError, name):
+                        method(**{name: value})
 
     def test_event_results_are_released_and_resume_pruning_is_window_scoped(
         self,
@@ -523,12 +593,15 @@ class TestBacktestMemoryOptions(TestCase):
             side_effect=AssertionError("completed events must not rerun"),
         ):
             resumed = self.app.run_backtest(
-                strategies=strategies, study=self.study,
-                backtest_storage_directory=result.directory,
-                use_checkpoints=True,
+                strategies=strategies,
+                study=self.study,
                 window_metrics_filter_function=prune,
                 final_metrics_filter_function=lambda index: index.filter(
                     lambda row: False,
+                ),
+                run_configuration=BacktestRunConfiguration(
+                    backtest_storage_directory=result.directory,
+                    use_checkpoints=True,
                 ),
             )
         self.assertEqual(len(observed), 2)
@@ -569,9 +642,13 @@ class TestBacktestMemoryOptions(TestCase):
             EventBacktestService, "create_backtest", new=tracked_create,
         ), self.assertRaisesRegex(BacktestResourceError, "event pressure"):
             self.app.run_backtest(
-                strategies=strategies, study=self.study,
-                backtest_storage_directory=storage,
-                min_available_memory_mb=1, continue_on_error=True,
+                strategies=strategies,
+                study=self.study,
+                run_configuration=BacktestRunConfiguration(
+                    backtest_storage_directory=storage,
+                    min_available_memory_mb=1,
+                    continue_on_error=True,
+                ),
             )
         self.assertEqual(completed, ["event-0"])
         self.assertTrue((storage / "event-0.obtf").is_file())
@@ -580,9 +657,12 @@ class TestBacktestMemoryOptions(TestCase):
             EventBacktestService, "create_backtest", new=tracked_create,
         ):
             resumed = self.app.run_backtest(
-                strategies=strategies, study=self.study,
-                backtest_storage_directory=storage,
-                use_checkpoints=True,
+                strategies=strategies,
+                study=self.study,
+                run_configuration=BacktestRunConfiguration(
+                    backtest_storage_directory=storage,
+                    use_checkpoints=True,
+                ),
             )
         self.assertEqual(completed, ["event-0", "event-1"])
         self.assertEqual(resumed.df["algorithm_id"].nunique(), 2)

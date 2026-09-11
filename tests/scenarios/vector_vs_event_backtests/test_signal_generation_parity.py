@@ -42,6 +42,7 @@ Both classes use the same fixed, real BTC/EUR (BITVAVO, 2h) CSV file
 already used by the rest of the event-backtest test suite, so results
 are reproducible and require no network access.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import dataclasses
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -332,7 +333,9 @@ class TestEngineLevelTradeParity(TestCase):
         vector_backtests = app_vector.run_backtest(
             strategy=CrossOverStrategyV1(algorithm_id="vector_parity"),
             study=vector_study,
-            snapshot_interval=SnapshotInterval.DAILY,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         )
         cls.vector_run = next(
             vector_backtests.iter_backtests()
@@ -359,7 +362,9 @@ class TestEngineLevelTradeParity(TestCase):
         event_backtests = app_event.run_backtest(
             strategy=CrossOverStrategyV1(algorithm_id="event_parity"),
             study=event_study,
-            snapshot_interval=SnapshotInterval.DAILY,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         )
         cls.event_run = next(
             event_backtests.iter_backtests()
@@ -518,7 +523,9 @@ class TestEngineParityWithRecommendedWarmup(TestCase):
         vector_backtests = app_vector.run_backtest(
             strategy=_make_strategy("vector_warmup2x"),
             study=vector_study,
-            snapshot_interval=SnapshotInterval.DAILY,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         )
         cls.vector_run = next(
             vector_backtests.iter_backtests()
@@ -538,7 +545,9 @@ class TestEngineParityWithRecommendedWarmup(TestCase):
         event_backtests = app_event.run_backtest(
             strategy=_make_strategy("event_warmup2x"),
             study=event_study,
-            snapshot_interval=SnapshotInterval.DAILY,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
         )
         cls.event_run = next(
             event_backtests.iter_backtests()

@@ -1,3 +1,4 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 import unittest
 from collections import Counter
 from datetime import datetime, timezone
@@ -549,7 +550,9 @@ class TestEventVsVectorBacktestCombinedDynamicSizing(
         vector_backtests = app_v.run_backtest(
             strategy=CombinedCycleStrategy(algorithm_id="vector_combined"),
             study=vector_study,
-            dynamic_position_sizing=True,
+            run_configuration=BacktestRunConfiguration(
+                dynamic_position_sizing=True,
+            ),
         )
         cls.vector_run = next(
             vector_backtests.iter_backtests()
