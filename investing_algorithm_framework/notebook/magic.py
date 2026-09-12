@@ -42,8 +42,7 @@ try:
     from IPython.core.magic import (
         Magics,
         magics_class,
-        cell_magic,
-        line_magic,
+        line_cell_magic,
     )
 except ImportError:
     # IPython is an optional dependency (install with
@@ -58,10 +57,7 @@ except ImportError:
     def magics_class(cls):
         return cls
 
-    def cell_magic(func):
-        return func
-
-    def line_magic(func):
+    def line_cell_magic(func):
         return func
 
 
@@ -311,8 +307,20 @@ def _run_backtest(args, strategies):
 class BacktestMagics(Magics):
     """IPython magic commands for the investing-algorithm-framework."""
 
-    @cell_magic
-    def backtest(self, line, cell):
+    @line_cell_magic
+    def backtest(self, line, cell=None):
+        """
+        Run a backtest, either from an inline cell or from a strategy file.
+
+        ``%%backtest`` (cell magic) defines the strategy inline;
+        ``%backtest`` (line magic) loads it from an existing file.
+        See :meth:`_backtest_cell` and :meth:`_backtest_line`.
+        """
+        if cell is None:
+            return self._backtest_line(line)
+        return self._backtest_cell(line, cell)
+
+    def _backtest_cell(self, line, cell):
         """
         %%backtest — define a strategy inline and run a backtest.
 
@@ -364,8 +372,7 @@ class BacktestMagics(Magics):
         else:
             return backtest
 
-    @line_magic
-    def backtest(self, line):  # noqa: F811
+    def _backtest_line(self, line):
         """
         %backtest — run a backtest from an existing strategy file.
 
