@@ -523,6 +523,8 @@ class Context:
 
         order_metadata = metadata if metadata is not None else {}
         order_metadata["estimated_price"] = estimated_price
+        if precision is not None:
+            order_metadata["amount_precision"] = precision
 
         order_data = {
             "target_symbol": target_symbol,
@@ -546,10 +548,11 @@ class Context:
         order_data["_validate"] = validate
         order_data["_sync"] = sync
 
+        cash_budget = portfolio.get_unallocated()
         order = self._blotter.place_order(order_data, self)
         if fill_at_current_open:
             order = self._trade_order_evaluator.fill_at_current_open(
-                order, current_open_data
+                order, current_open_data, cash_budget=cash_budget
             )
         return order
 

@@ -56,7 +56,7 @@ class TradeOrderEvaluator(ABC):
         """
         pass
 
-    def fill_at_current_open(self, order, candle):
+    def fill_at_current_open(self, order, candle, *, cash_budget):
         """Settle a current-open market order through native fill models.
 
         The caller supplies only the current session candle. No historical
@@ -75,7 +75,11 @@ class TradeOrderEvaluator(ABC):
                 "Current-open execution requires a new market order "
                 "at this tick"
             )
-        self._check_has_executed(order, candle)
+        self._apply_fill(
+            order, candle["Open"][0], order.order_side,
+            candle["Volume"][0] if "Volume" in candle.columns else None,
+            is_market_order=True, cash_budget=cash_budget,
+        )
         settled = self.order_service.get(order.id)
         if OrderStatus.OPEN.equals(settled.status):
             settled = self.order_service.update(
@@ -347,7 +351,7 @@ class TradeOrderEvaluator(ABC):
 
     def _apply_fill(
         self, order, base_price, order_side, volume,
-        is_market_order=False
+        is_market_order=False, cash_budget=None
     ):
         """
         Apply a fill to an order, using blotter methods when available
@@ -377,6 +381,46 @@ class TradeOrderEvaluator(ABC):
             fill_amount = RoundingService.round_down(fill_amount, precision)
         if fill_amount <= 0:
             return
+
+        if cash_budget is not None:
+            def cash_required(amount):
+                if self._blotter is not None:
+                    price = self._blotter.get_fill_price(
+                        base_price, order_side, amount, volume
+                    )
+                    commission = self._blotter.get_fill_commission(
+                        price, amount, order_side
+                    )
+                else:
+                    price = (
+                        tc.get_buy_fill_price(base_price, amount, volume)
+                        if OrderSide.BUY.equals(order_side)
+                        else tc.get_sell_fill_price(base_price, amount, volume)
+                    )
+                    commission = tc.get_fee(price * amount)
+                notional = price * amount
+                return commission + (
+                    notional if OrderSide.BUY.equals(order_side) else -notional
+                )
+
+            if cash_required(fill_amount) > cash_budget:
+                if not OrderSide.BUY.equals(order_side) or precision is None:
+                    # The caller cancels unfilled current-open orders and
+                    # releases reservations. Never leave a pending fill.
+                    return
+                # Native cost models have monotone buy costs. Search whole
+                # precision units before recording a transaction or a fee.
+                scale = 10 ** precision
+                lower, upper = 0, int(round(fill_amount * scale)) + 1
+                while lower + 1 < upper:
+                    middle = (lower + upper) // 2
+                    if cash_required(middle / scale) <= cash_budget:
+                        lower = middle
+                    else:
+                        upper = middle
+                fill_amount = lower / scale
+                if fill_amount <= 0:
+                    return
 
         if self._blotter is not None:
             fill_price = self._blotter.get_fill_price(

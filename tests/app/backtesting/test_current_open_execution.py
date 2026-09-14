@@ -82,6 +82,9 @@ def run_example(
     costs=False,
     volume_limited=False,
     partial=False,
+    allocation=10,
+    precision=0,
+    direct=False,
 ):
     frame = pd.DataFrame(
         [
@@ -114,9 +117,11 @@ def run_example(
                         time_frame="1d",
                     )
                 ],
-                position_sizes=[PositionSize(percentage_of_portfolio=10)],
+                position_sizes=[
+                    PositionSize(percentage_of_portfolio=allocation)
+                ],
                 executor=MarketOrderExecutor(
-                    precision=0,
+                    precision=precision,
                     fill_at_current_open=current_open,
                 ),
             )
@@ -124,7 +129,14 @@ def run_example(
         def generate_signals(self, context, data):
             now = context.get_config()[INDEX_DATETIME]
             if now.day == 8:
-                yield Signal("AAA", SignalSide.OPEN_LONG)
+                if direct:
+                    context.create_market_order(
+                        target_symbol="AAA", order_side="BUY",
+                        percentage_of_portfolio=allocation,
+                        precision=precision, fill_at_current_open=True,
+                    )
+                else:
+                    yield Signal("AAA", SignalSide.OPEN_LONG)
             if now.day == 10 and context.get_open_trades():
                 yield Signal("AAA", SignalSide.CLOSE_LONG)
 
@@ -256,3 +268,27 @@ class TestCurrentOpenExecution(TestCase):
         positions = {p.symbol: p.amount for p in run.positions}
         assert positions["AAA"] == 17
         assert positions["DKK"] == 9644
+
+    def test_current_open_whole_share_fill_fits_cash_after_costs(self):
+        run = run_example(self.tmp_path, initial_capital=96,
+                          allocation=100, costs=True)
+        buy, sell = sorted(run.orders, key=lambda order: order.created_at)
+        assert buy.filled == sell.filled == 5
+        assert buy.status == "CANCELED"
+        self.assertAlmostEqual(run.backtest_metrics.final_value, 67)
+
+    def test_unaffordable_fill_without_precision_is_canceled(self):
+        run = run_example(self.tmp_path, initial_capital=96,
+                          allocation=100, costs=True, precision=None)
+        assert len(run.orders) == 1
+        assert run.orders[0].status == "CANCELED"
+        assert run.orders[0].filled == 0
+        assert run.trades == []
+        self.assertAlmostEqual(run.backtest_metrics.final_value, 96)
+
+    def test_direct_current_open_order_preserves_precision(self):
+        run = run_example(self.tmp_path, initial_capital=96,
+                          allocation=100, costs=True, direct=True)
+        buy, sell = sorted(run.orders, key=lambda order: order.created_at)
+        assert buy.filled == sell.filled == 5
+        self.assertAlmostEqual(run.backtest_metrics.final_value, 67)

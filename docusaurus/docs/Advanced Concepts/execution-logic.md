@@ -112,10 +112,13 @@ need an extra artificial event to complete. The ordinary market executor still
 uses its pending-order path when this option is false.
 
 `precision=0` rounds an already sized order and each partial fill down to whole
-units. An order amount below one unit emits no order. This option does not implement a fee-aware allocation
-or a multi-currency funding policy; those constraints remain the sizing and risk
-configuration's responsibility. Native backtest fill fees reduce portfolio cash and
-the cash position by the change in the recorded fee.
+units. An order amount below one unit emits no order. Current-open fills use
+native slippage and commission estimates to stay within available cash. When
+precision is set, an unaffordable buy fills only the affordable quantity and
+cancels the remainder. Without precision, an unaffordable order is canceled without a fill.
+Cost estimates must be deterministic and monotone in buy quantity. This option
+does not implement a multi-currency funding policy. Native backtest fill fees
+reduce portfolio cash and the cash position by the change in the recorded fee.
 
 The six-session native acceptance example buys 66 shares at 15 and sells at 12,
 leaving 9802 from 10000 before costs. With fixed slippage of 1 price unit on each

@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Limit explicit current-open buy fills to available cash after native
+  slippage and commission, using the selected amount precision.
 - Preserve explicit order timestamps on same-tick database updates.
 - Settle changes in recorded backtest order fees against portfolio cash and
   the cash position, including fixed commissions.
