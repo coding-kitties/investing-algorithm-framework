@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Union
 
 from investing_algorithm_framework import Position, Order, OrderStatus
@@ -24,6 +25,9 @@ class PortfolioProviderTest(PortfolioProvider):
         if self.return_none_for_order:
             return None
 
+        previous_state = (
+            order.amount, order.filled, order.status, order.remaining
+        )
         if self.order_amount is not None:
             order.amount = self.order_amount
 
@@ -34,6 +38,10 @@ class PortfolioProviderTest(PortfolioProvider):
 
         order.status = self.status
         order.remaining = 0
+        if previous_state != (
+            order.amount, order.filled, order.status, order.remaining
+        ):
+            order.updated_at = datetime.now(timezone.utc)
         return order
 
     def get_position(
