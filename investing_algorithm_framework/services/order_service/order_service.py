@@ -3,7 +3,7 @@ from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
     OperationalException, OrderStatus, Order, PositionMode, random_number, \
-    INDEX_DATETIME, Environment, ENVIRONMENT
+    INDEX_DATETIME, Environment, ENVIRONMENT, BACKTESTING_FLAG
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -385,6 +385,26 @@ class OrderService(RepositoryService):
         new_order = self.order_repository.update(object_id, data)
         filled_difference = new_order.get_filled() \
             - previous_order.get_filled()
+
+        fee_difference = (
+            (new_order.order_fee or 0) - (previous_order.order_fee or 0)
+        )
+        if fee_difference and self.configuration_service.config.get(
+            BACKTESTING_FLAG
+        ):
+            position = self.position_service.get(new_order.position_id)
+            portfolio = self.portfolio_repository.get(position.portfolio_id)
+            self.portfolio_repository.update(
+                portfolio.id,
+                {"unallocated": portfolio.get_unallocated() - fee_difference},
+            )
+            cash_position = self.position_service.find(
+                {"symbol": portfolio.trading_symbol, "portfolio": portfolio.id}
+            )
+            self.position_service.update(
+                cash_position.id,
+                {"amount": cash_position.get_amount() - fee_difference},
+            )
 
         new_side = new_order.get_order_side()
 

@@ -559,6 +559,7 @@ class EventLoopService:
             )
 
         self._trade_order_evaluator = trade_order_evaluator
+        self.context._trade_order_evaluator = trade_order_evaluator
 
         dispatcher = getattr(
             self._trade_service, "trade_hook_dispatcher", None

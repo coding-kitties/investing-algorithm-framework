@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from typing import List, Dict
 import polars as pl
 from investing_algorithm_framework.domain import Trade, Order, \
-    INDEX_DATETIME, OrderSide, OrderStatus, OrderType, TradingCost
+    INDEX_DATETIME, OrderSide, OrderStatus, OrderType, TradingCost, \
+    OperationalException, BACKTESTING_FLAG, RoundingService
 
 
 class TradeOrderEvaluator(ABC):
@@ -54,6 +55,34 @@ class TradeOrderEvaluator(ABC):
             List[dict]: Updated trades with latest prices and execution status.
         """
         pass
+
+    def fill_at_current_open(self, order, candle):
+        """Settle a current-open market order through native fill models.
+
+        The caller supplies only the current session candle. No historical
+        candle can be selected and the engine clock is never changed.
+        """
+        now = self.configuration_service.config[INDEX_DATETIME]
+        if (
+            not self.configuration_service.config.get(BACKTESTING_FLAG)
+            or not OrderType.MARKET.equals(order.order_type)
+            or not OrderStatus.OPEN.equals(order.status)
+            or order.created_at != now
+            or len(candle) != 1
+            or candle["Datetime"][0] != now
+        ):
+            raise OperationalException(
+                "Current-open execution requires a new market order "
+                "at this tick"
+            )
+        self._check_has_executed(order, candle)
+        settled = self.order_service.get(order.id)
+        if OrderStatus.OPEN.equals(settled.status):
+            settled = self.order_service.update(
+                order.id,
+                {"status": OrderStatus.CANCELED.value, "remaining": 0},
+            )
+        return settled
 
     def _create_order(self, order_data):
         """
@@ -334,12 +363,24 @@ class TradeOrderEvaluator(ABC):
         )
 
         if self._blotter is not None:
-            fill_price = self._blotter.get_fill_price(
-                base_price, order_side, remaining, volume
-            )
             fill_amount = min(
-                self._blotter.get_fill_amount(remaining, volume),
-                remaining
+                self._blotter.get_fill_amount(remaining, volume), remaining
+            )
+        else:
+            tc = self._resolve_trading_cost(order.symbol, order=order)
+            fill_amount = min(
+                tc.get_max_fill_amount(remaining, volume), remaining,
+            )
+
+        precision = order.metadata.get("amount_precision")
+        if precision is not None:
+            fill_amount = RoundingService.round_down(fill_amount, precision)
+        if fill_amount <= 0:
+            return
+
+        if self._blotter is not None:
+            fill_price = self._blotter.get_fill_price(
+                base_price, order_side, fill_amount, volume
             )
             if OrderSide.BUY.equals(order_side) \
                     or OrderSide.COVER.equals(order_side):
@@ -352,10 +393,6 @@ class TradeOrderEvaluator(ABC):
             )
             fee_rate = self._blotter.get_commission_rate()
         else:
-            tc = self._resolve_trading_cost(order.symbol, order=order)
-            fill_amount = min(
-                tc.get_max_fill_amount(remaining, volume), remaining,
-            )
             if OrderSide.BUY.equals(order_side) \
                     or OrderSide.COVER.equals(order_side):
                 fill_price = tc.get_buy_fill_price(
@@ -372,9 +409,6 @@ class TradeOrderEvaluator(ABC):
                 tc.fee_percentage / 100 if tc.fee_percentage else None
             )
 
-        if fill_amount <= 0:
-            return
-
         new_filled = (order.filled or 0) + fill_amount
         new_remaining = order.amount - new_filled
         accumulated_fee = (order.order_fee or 0) + fee
@@ -389,8 +423,6 @@ class TradeOrderEvaluator(ABC):
                 'order_fee': accumulated_fee,
                 'slippage': slippage,
             }
-            if fee_rate is not None:
-                update_data['order_fee_rate'] = fee_rate
         else:
             # Partial fill — order stays open for next evaluation
             update_data = {
@@ -398,6 +430,12 @@ class TradeOrderEvaluator(ABC):
                 'remaining': new_remaining,
                 'order_fee': accumulated_fee,
             }
+            # Pending limit orders must retain their working limit price.
+            if OrderType.MARKET.equals(order.order_type):
+                update_data['price'] = fill_price
+                update_data['slippage'] = slippage
+        if fee_rate is not None:
+            update_data['order_fee_rate'] = fee_rate
 
         # Persist trigger timestamp for stop / stop-limit orders so
         # subsequent evaluations don't re-trigger.

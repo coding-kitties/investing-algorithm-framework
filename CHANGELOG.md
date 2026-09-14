@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Native current-open market execution for long-only event backtests via
+  `MarketOrderExecutor(fill_at_current_open=True)`. Fills use the current
+  open and the native cost models; unfilled remainders are canceled.
+- Optional market-executor amount precision. `precision=0` rounds down to
+  whole units, applies the precision to partial fills, and skips allocations
+  below one unit.
+
+### Fixed
+
+- Preserve explicit order timestamps on same-tick database updates.
+- Settle changes in recorded backtest order fees against portfolio cash and
+  the cash position, including fixed commissions.
+- Preserve execution prices for partial market fills without changing the
+  working price of pending limit orders.
+
 ## [9.0.0a16] — 2026-09-10
 
 ### Added

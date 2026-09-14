@@ -91,6 +91,36 @@ algorithm.create_buy_order(
 
 During backtesting, the framework simulates order execution using historical OHLCV data to determine when orders would have been filled.
 
+### Explicit current-open execution
+
+For a strategy evaluated at the session open, select:
+
+```python
+executor = MarketOrderExecutor(precision=0, fill_at_current_open=True)
+```
+
+This option applies to long-only native event backtests. The strategy must
+receive completed history and only the current session open. The provider must
+hide that session's future high, low, close and volume from signals and sizing.
+The current open must have the same timestamp as the engine tick; a previous
+or future candle is not a substitute.
+
+The framework settles each order before returning from order creation. It uses
+its normal fill, slippage, commission, position and cash services. Any unfilled
+remainder is canceled on that tick. A final-session order therefore does not
+need an extra artificial event to complete. The ordinary market executor still
+uses its pending-order path when this option is false.
+
+`precision=0` rounds an already sized order and each partial fill down to whole
+units. An order amount below one unit emits no order. This option does not implement a fee-aware allocation
+or a multi-currency funding policy; those constraints remain the sizing and risk
+configuration's responsibility. Native backtest fill fees reduce portfolio cash and
+the cash position by the change in the recorded fee.
+
+The six-session native acceptance example buys 66 shares at 15 and sells at 12,
+leaving 9802 from 10000 before costs. With fixed slippage of 1 price unit on each
+side and a commission of 2 per order, it fills at 16 and 11 and leaves 9666.
+
 ### Default Backtesting Logic
 
 The framework includes a default `BacktestTradeOrderEvaluator` that implements realistic order execution rules:

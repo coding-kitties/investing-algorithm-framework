@@ -87,6 +87,12 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             data["status"] = OrderStatus.from_value(data["status"]).value
 
         super().update(data)
+        if "updated_at" in data:
+            # Include an explicit simulated timestamp even when it equals
+            # the stored value (e.g. creation and fill on the same tick).
+            # Otherwise SQLAlchemy replaces it with onupdate=utcnow.
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(self, "updated_at")
 
     @staticmethod
     def from_order(order):

@@ -61,6 +61,7 @@ class Context:
         self.broker_balance_tracker: BrokerBalanceTracker = \
             broker_balance_tracker
         self._blotter = None
+        self._trade_order_evaluator = None
         self._fx_rate_provider = None
         self._base_currency = None
         self._recorded_values = {}  # key -> list of (datetime, value)
@@ -394,7 +395,8 @@ class Context:
         execute=True,
         validate=True,
         sync=True,
-        metadata=None
+        metadata=None,
+        fill_at_current_open=False,
     ) -> Order:
         """
         Function to create a market order. Market orders execute at
@@ -428,13 +430,41 @@ class Context:
               the created order will be synced with the
                 portfolio of the algorithm
             metadata (optional): Additional metadata for the order
+            fill_at_current_open: Event backtests only. Fill at this tick's
+                open using native models and cancel any unfilled remainder.
+                The provider must expose only information known at the open.
 
         Returns:
             Order: Instance of the order created
         """
+        if fill_at_current_open and (
+            not self.config.get(BACKTESTING_FLAG)
+            or self._trade_order_evaluator is None
+            or not execute or not sync
+        ):
+            raise OperationalException(
+                "Current-open execution requires a native event backtest"
+            )
         portfolio = self.portfolio_service.find({"market": market})
         full_symbol = (f"{target_symbol}/{portfolio.trading_symbol}")
         estimated_price = self.get_latest_price(full_symbol, market=market)
+        current_open_data = None
+        if fill_at_current_open:
+            import polars as pl
+            now = self.config[INDEX_DATETIME]
+            ohlcv = self.data_provider_service.get_ohlcv_data(
+                symbol=full_symbol, market=market, date=now
+            )
+            if ohlcv is None:
+                raise OperationalException(
+                    "No current session open is available"
+                )
+            current_open_data = ohlcv.filter(pl.col("Datetime") == now)
+            if len(current_open_data) != 1:
+                raise OperationalException(
+                    "Exactly one current session open is required"
+                )
+            estimated_price = current_open_data["Open"][0]
 
         if estimated_price is None:
             raise OperationalException(
@@ -516,7 +546,12 @@ class Context:
         order_data["_validate"] = validate
         order_data["_sync"] = sync
 
-        return self._blotter.place_order(order_data, self)
+        order = self._blotter.place_order(order_data, self)
+        if fill_at_current_open:
+            order = self._trade_order_evaluator.fill_at_current_open(
+                order, current_open_data
+            )
+        return order
 
     # ------------------------------------------------------------------
     # Short-selling order creation (#434 phase 1).
