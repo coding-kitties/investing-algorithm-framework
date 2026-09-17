@@ -67,7 +67,7 @@ def get_time_frame_from_file_name(file_name: str) -> TimeFrame:
         return TimeFrame.from_string(time_frame_str)
     except ValueError:
         raise ValueError(
-            f"Could not extract time frame from file name: {file_path}. "
+            f"Could not extract time frame from file name: {file_name}. "
             f"Expected format 'OHLCV_<SYMBOL>_<MARKET>_<TIME_FRAME>_<START_DATE>_<END_DATE>.csv', "
             f"got '{time_frame_str}'."
         )
