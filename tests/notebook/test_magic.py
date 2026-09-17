@@ -1,5 +1,7 @@
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, sentinel
+
+from IPython.core.interactiveshell import InteractiveShell
 
 from investing_algorithm_framework import Schedule, TimeUnit
 from investing_algorithm_framework.notebook.magic import (
@@ -164,3 +166,37 @@ class TestLoadExtension(TestCase):
         mock_ipython = MagicMock()
         top_load(mock_ipython)
         mock_ipython.register_magics.assert_called_once()
+
+
+class TestBacktestMagicDispatch(TestCase):
+
+    def setUp(self):
+        self.shell = InteractiveShell()
+        self.shell.register_magics(BacktestMagics)
+
+    def test_line_magic_dispatches_to_strategy_file_handler(self):
+        line = "strategy.py --start 2026-01-01"
+
+        with patch.object(
+            BacktestMagics,
+            "_backtest_line",
+            return_value=sentinel.backtest,
+        ) as backtest_line:
+            result = self.shell.run_line_magic("backtest", line)
+
+        self.assertIs(result, sentinel.backtest)
+        backtest_line.assert_called_once_with(line)
+
+    def test_cell_magic_dispatches_to_inline_handler(self):
+        line = "--start 2026-01-01"
+        cell = "class Strategy: pass"
+
+        with patch.object(
+            BacktestMagics,
+            "_backtest_cell",
+            return_value=sentinel.backtest,
+        ) as backtest_cell:
+            result = self.shell.run_cell_magic("backtest", line, cell)
+
+        self.assertIs(result, sentinel.backtest)
+        backtest_cell.assert_called_once_with(line, cell)
