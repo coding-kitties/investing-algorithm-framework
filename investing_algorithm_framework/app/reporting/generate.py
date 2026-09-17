@@ -57,7 +57,7 @@ def get_time_frame_from_file_name(file_name: str) -> TimeFrame:
     """
     parts = file_name.split('_')
 
-    if len(parts) < 3:
+    if len(parts) < 4:
         raise ValueError(
             "File name does not contain a valid time frame."
         )
