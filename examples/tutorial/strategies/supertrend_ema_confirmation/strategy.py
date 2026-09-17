@@ -7,7 +7,7 @@ from pyindicators import ema, rsi, crossover, crossunder, supertrend, bollinger_
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     DataType, PositionSize, StopLossRule, TakeProfitRule, \
     ScalingRule, CooldownRule, Schedule, TimeUnit, \
-    Signal, SignalSeries, SignalSide, ScoreCard, ScoreCardEntry
+    Signal, SignalSeries, SignalSide, DecisionTrace, DecisionTraceEntry
 
 
 def _schedule_from_timeframe(timeframe: str) -> Schedule:
@@ -253,7 +253,7 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
             metadata=metadata,
         )
 
-        # trading_symbol is a display-only unit label for ScoreCardEntry
+        # trading_symbol is a display-only unit label for DecisionTraceEntry
         # here (not a framework-recognized concept) -- the actual
         # settlement currency comes from the registered Universe /
         # PortfolioConfiguration.
@@ -404,8 +404,10 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                     symbol=symbol,
                     side=SignalSide.OPEN_LONG,
                     source="supertrend_ema",
-                ).with_score_card(
-                    self._build_score_card(symbol, SignalSide.OPEN_LONG, data)
+                ).with_decision_trace(
+                    self._build_decision_trace(
+                        symbol, SignalSide.OPEN_LONG, data,
+                    )
                 )
         for symbol, series in self._compute_sell_signals(data).items():
             if _latest(series):
@@ -413,8 +415,10 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                     symbol=symbol,
                     side=SignalSide.CLOSE_LONG,
                     source="supertrend_ema",
-                ).with_score_card(
-                    self._build_score_card(symbol, SignalSide.CLOSE_LONG, data)
+                ).with_decision_trace(
+                    self._build_decision_trace(
+                        symbol, SignalSide.CLOSE_LONG, data,
+                    )
                 )
         if self.enable_shorting:
             for symbol, series in (self._compute_short_signals(data)
@@ -424,8 +428,8 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                         symbol=symbol,
                         side=SignalSide.OPEN_SHORT,
                         source="supertrend_ema",
-                    ).with_score_card(
-                        self._build_score_card(
+                    ).with_decision_trace(
+                        self._build_decision_trace(
                             symbol, SignalSide.OPEN_SHORT, data
                         )
                     )
@@ -436,8 +440,8 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                         symbol=symbol,
                         side=SignalSide.CLOSE_SHORT,
                         source="supertrend_ema",
-                    ).with_score_card(
-                        self._build_score_card(
+                    ).with_decision_trace(
+                        self._build_decision_trace(
                             symbol, SignalSide.CLOSE_SHORT, data
                         )
                     )
@@ -445,7 +449,7 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
     @staticmethod
     def _scalar(value):
         """Coerce a pandas/numpy scalar to a plain JSON-safe Python
-        scalar (``ScoreCardEntry`` rejects numpy dtypes and NaN)."""
+        scalar (``DecisionTraceEntry`` rejects numpy dtypes and NaN)."""
         if value is None:
             return None
         if hasattr(value, "item"):
@@ -456,9 +460,9 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
             return round(value, 6)
         return value
 
-    def _build_score_card(
+    def _build_decision_trace(
         self, symbol: str, side: SignalSide, data: Dict[str, Any]
-    ) -> ScoreCard:
+    ) -> DecisionTrace:
         """Explain a signal with the exact indicator readings (and
         guardrail outcomes) that produced it at the latest bar, so
         anyone looking at ``RunReport.signals`` (or the metadata of
@@ -485,52 +489,52 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
             and rsi_value <= self.rsi_oversold_threshold
 
         entries = [
-            ScoreCardEntry(
+            DecisionTraceEntry(
                 "supertrend_signal", supertrend_signal, group="trend",
                 description="1 = fresh bullish flip, -1 = fresh bearish "
                             "flip, 0 = no flip this bar",
             ),
-            ScoreCardEntry(
+            DecisionTraceEntry(
                 "supertrend_trend", supertrend_trend, group="trend",
                 description="1 = currently bullish, 0 = currently bearish",
             ),
-            ScoreCardEntry("close", close, unit=self.trading_symbol,
-                           group="price"),
-            ScoreCardEntry(
+            DecisionTraceEntry("close", close, unit=self.trading_symbol,
+                               group="price"),
+            DecisionTraceEntry(
                 self.ema_short_result_column, ema_short,
                 unit=self.trading_symbol, group="trend",
             ),
-            ScoreCardEntry(
+            DecisionTraceEntry(
                 self.ema_long_result_column, ema_long,
                 unit=self.trading_symbol, group="trend",
             ),
-            ScoreCardEntry(
+            DecisionTraceEntry(
                 self.ema_crossover_result_column,
                 self._scalar(latest.get(self.ema_crossover_result_column)),
                 group="trend",
             ),
-            ScoreCardEntry(
+            DecisionTraceEntry(
                 self.ema_crossunder_result_column,
                 self._scalar(latest.get(self.ema_crossunder_result_column)),
                 group="trend",
             ),
-            ScoreCardEntry("rsi", rsi_value, group="momentum"),
-            ScoreCardEntry(
+            DecisionTraceEntry("rsi", rsi_value, group="momentum"),
+            DecisionTraceEntry(
                 "rsi_overbought_threshold", self.rsi_overbought_threshold,
                 group="momentum",
             ),
-            ScoreCardEntry(
+            DecisionTraceEntry(
                 "rsi_oversold_threshold", self.rsi_oversold_threshold,
                 group="momentum",
             ),
         ]
 
         if self.use_bollinger_filter:
-            entries.append(ScoreCardEntry(
+            entries.append(DecisionTraceEntry(
                 "bollinger_upper", self._scalar(latest.get("bollinger_upper")),
                 unit=self.trading_symbol, group="volatility",
             ))
-            entries.append(ScoreCardEntry(
+            entries.append(DecisionTraceEntry(
                 "bollinger_lower", self._scalar(latest.get("bollinger_lower")),
                 unit=self.trading_symbol, group="volatility",
             ))
@@ -559,7 +563,7 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
                      "window",
         }
 
-        return ScoreCard(entries=entries, summary=summaries.get(side))
+        return DecisionTrace(entries=entries, summary=summaries.get(side))
 
     def _compute_buy_signals(
         self, data: Dict[str, Any]

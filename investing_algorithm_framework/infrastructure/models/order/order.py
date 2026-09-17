@@ -7,6 +7,8 @@ from sqlalchemy.orm import relationship, reconstructor
 
 from investing_algorithm_framework.domain import OrderType, \
     OrderSide, Order, OrderStatus
+from investing_algorithm_framework.domain.models.decision_trace import \
+    normalize_trace_metadata
 from investing_algorithm_framework.infrastructure.database import (
     SQLBaseModel, SqliteDecimal
 )
@@ -71,7 +73,9 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     def init_on_load(self):
         """Deserialize metadata from JSON when loaded from DB."""
         if self.metadata_json:
-            self.metadata = json.loads(self.metadata_json)
+            self.metadata = normalize_trace_metadata(
+                json.loads(self.metadata_json)
+            )
         else:
             self.metadata = {}
 
@@ -79,7 +83,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
 
         if "metadata" in data:
             metadata_val = data.pop("metadata")
-            self.metadata = metadata_val if metadata_val else {}
+            self.metadata = normalize_trace_metadata(metadata_val or {})
             self.metadata_json = json.dumps(self.metadata) \
                 if self.metadata else None
 

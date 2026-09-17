@@ -1,7 +1,11 @@
 from unittest import TestCase
+from unittest.mock import Mock
+import pandas as pd
 from investing_algorithm_framework import Algorithm, TradingStrategy, \
     DataSource, DataType, OperationalException, TimeUnit, Schedule, \
-    create_app, PositionSize, ScalingRule
+    create_app, PositionSize, ScalingRule, ConfluenceCard, PrimaryGroup, \
+    Condition, ConditionExpression, Operator, EvaluationContext, SignalSide, \
+    DECISION_TRACE_METADATA_KEY
 
 
 class StrategyForTesting(TradingStrategy):
@@ -49,6 +53,191 @@ class TestStrategy(TestCase):
             OperationalException, "Schedule not set"
         ):
             Algorithm().add_strategy(StrategyWithoutSchedule())
+
+
+class TestSignalCards(TestCase):
+
+    def test_default_hooks_prepare_once_and_match_for_each_symbol(self):
+        class PreparedStrategy(TradingStrategy):
+            schedule = Schedule.every(1, TimeUnit.HOUR)
+            signal_cards = {
+                SignalSide.OPEN_LONG: self.card("entry"),
+                SignalSide.CLOSE_LONG: self.card("exit"),
+            }
+
+            def prepare_signal_data(self, data):
+                return data
+
+        frame = pd.DataFrame({
+            "entry": [True, False, pd.NA, True],
+            "exit": [False, True, True, False],
+        }, index=pd.date_range("2026-01-01", periods=4, tz="UTC"))
+        strategy = PreparedStrategy()
+        strategy.prepare_signal_data = Mock(wraps=strategy.prepare_signal_data)
+        batches = list(strategy.generate_signal_series({"BTC": frame,
+                                                       "ETH": frame}))
+        strategy.prepare_signal_data.assert_called_once()
+        self.assertEqual(4, len(batches))
+        for index in range(len(frame)):
+            strategy.prepare_signal_data.reset_mock()
+            events = list(strategy.generate_signals(None, {
+                "BTC": frame.iloc[:index + 1], "ETH": frame.iloc[:index + 1],
+            }))
+            strategy.prepare_signal_data.assert_called_once()
+            expected = {(item.symbol, item.side) for item in batches
+                        if item.series.iloc[index]}
+            self.assertEqual(expected, {(item.symbol, item.side)
+                                        for item in events})
+        self.assertTrue(all(not batch.metadata for batch in batches))
+        from investing_algorithm_framework.infrastructure.services \
+            .backtesting.backtest_service import BacktestService
+        BacktestService.validate_strategy_for_vector_backtest(strategy)
+
+    def test_default_hooks_reject_missing_preparation_and_bad_index(self):
+        strategy = self.strategy({SignalSide.OPEN_LONG: self.card("entry")})
+        with self.assertRaisesRegex(
+            NotImplementedError, "prepare_signal_data"
+        ):
+            list(strategy.generate_signals(None, {}))
+        strategy.prepare_signal_data = Mock(return_value={
+            "BTC": pd.DataFrame({"entry": [True]}),
+        })
+        with self.assertRaisesRegex(ValueError, "DatetimeIndex"):
+            list(strategy.generate_signal_series({}))
+        empty = self.strategy({})
+        self.assertEqual([], list(empty.generate_signals(None, {})))
+        self.assertEqual([], list(empty.generate_signal_series({})))
+
+    def test_default_vector_admission_and_existing_override(self):
+        from investing_algorithm_framework.infrastructure.services \
+            .backtesting.backtest_service import BacktestService
+
+        for strategy in (self.strategy({}), self.strategy({
+            SignalSide.OPEN_LONG: self.card("entry"),
+        })):
+            with self.assertRaises(OperationalException):
+                BacktestService.validate_strategy_for_vector_backtest(strategy)
+
+        class CustomStrategy(TradingStrategy):
+            schedule = Schedule.every(1, TimeUnit.HOUR)
+
+            def generate_signal_series(self, data):
+                return iter(())
+
+        BacktestService.validate_strategy_for_vector_backtest(CustomStrategy())
+        self.assertEqual([], list(CustomStrategy().generate_signal_series({})))
+
+    def test_default_vector_rejects_unsorted_or_duplicate_timestamps(self):
+        strategy = self.strategy({SignalSide.OPEN_LONG: self.card("entry")})
+        for index in (
+            pd.to_datetime(["2026-01-02", "2026-01-01"]),
+            pd.to_datetime(["2026-01-01", "2026-01-01"]),
+        ):
+            with self.subTest(index=index):
+                strategy.prepare_signal_data = Mock(return_value={
+                    "BTC": pd.DataFrame({"entry": [True, False]}, index=index),
+                })
+                with self.assertRaisesRegex(ValueError, "unique and sorted"):
+                    list(strategy.generate_signal_series({}))
+
+    @staticmethod
+    def card(name):
+        return ConfluenceCard(
+            name=name,
+            primary=PrimaryGroup(ConditionExpression(
+                Condition(name, Operator.EQ, True)
+            )),
+        )
+
+    def strategy(self, cards):
+        return TradingStrategy(
+            schedule=Schedule.every(1, TimeUnit.HOUR), signal_cards=cards,
+        )
+
+    def test_entry_and_exit_are_independent_and_traced(self):
+        strategy = self.strategy({
+            SignalSide.OPEN_LONG: self.card("entry"),
+            SignalSide.CLOSE_LONG: self.card("exit"),
+        })
+        strategy.record_decision_trace = Mock()
+        signals = list(strategy.generate_signals_from_cards(
+            EvaluationContext({"entry": False, "exit": True}), symbol="BTC"
+        ))
+        self.assertEqual(
+            [SignalSide.CLOSE_LONG], [item.side for item in signals]
+        )
+        self.assertEqual("exit", signals[0].source)
+        trace = signals[0].metadata[DECISION_TRACE_METADATA_KEY]
+        self.assertIn({
+            "name": "signal_side", "value": SignalSide.CLOSE_LONG.value,
+            "unit": None, "description": None, "group": "decision",
+        }, trace["entries"])
+        strategy.record_decision_trace.assert_called_once()
+        rejected = strategy.record_decision_trace.call_args.args[0]
+        self.assertIn("REJECTED", rejected.summary)
+        self.assertEqual(
+            "BTC", strategy.record_decision_trace.call_args.kwargs["symbol"]
+        )
+
+    def test_all_signal_sides_can_be_mapped_without_combining_decisions(self):
+        strategy = self.strategy({
+            side: self.card(side.value) for side in SignalSide
+        })
+        signals = list(strategy.generate_signals_from_cards(
+            EvaluationContext({side.value: True for side in SignalSide}),
+            symbol="ETH",
+        ))
+        self.assertEqual(set(SignalSide), {signal.side for signal in signals})
+        self.assertTrue(all(signal.symbol == "ETH" for signal in signals))
+
+    def test_class_mapping_is_copied_and_constructor_can_override(self):
+        class CardStrategy(TradingStrategy):
+            schedule = Schedule.every(1, TimeUnit.HOUR)
+            signal_cards = {SignalSide.OPEN_LONG: self.card("entry")}
+
+        first = CardStrategy()
+        second = CardStrategy()
+        first.signal_cards.clear()
+        self.assertEqual(1, len(second.signal_cards))
+        self.assertEqual(1, len(CardStrategy.signal_cards))
+        self.assertEqual({}, CardStrategy(signal_cards={}).signal_cards)
+
+    def test_invalid_mapping_and_unconfigured_strategy(self):
+        for cards in ({"entry": self.card("entry")},
+                      {SignalSide.OPEN_LONG: True}):
+            with self.subTest(cards=cards), self.assertRaises(ValueError):
+                self.strategy(cards)
+        signals = self.strategy({}).generate_signals_from_cards(
+            EvaluationContext({}), symbol="BTC"
+        )
+        self.assertEqual([], list(signals))
+
+    def test_rejected_card_traces_reset_between_strategy_ticks(self):
+        from investing_algorithm_framework.domain import INDEX_DATETIME
+
+        phase = Mock()
+
+        def collect(state):
+            signals = state.strategy.generate_signals_from_cards(
+                EvaluationContext(state.data), symbol="BTC"
+            )
+            state.raw_signals = list(signals)
+
+        phase.run.side_effect = collect
+        strategy = TradingStrategy(
+            schedule=Schedule.every(1, TimeUnit.HOUR), phases=[phase],
+            signal_cards={
+                SignalSide.OPEN_LONG: self.card("entry"),
+                SignalSide.CLOSE_LONG: self.card("exit"),
+            },
+        )
+        context = Mock(config={INDEX_DATETIME: None})
+        strategy.run_strategy(context, {"entry": False, "exit": False})
+        self.assertEqual(2, len(strategy.last_score_cards))
+        self.assertEqual([], strategy.last_signals)
+        strategy.run_strategy(context, {"entry": True, "exit": True})
+        self.assertEqual([], strategy.last_score_cards)
+        self.assertEqual(2, len(strategy.last_signals))
 
 
 class TestPositionSizeAndScalingRuleDefaults(TestCase):

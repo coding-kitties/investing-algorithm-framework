@@ -141,6 +141,8 @@ class TestBacktestMemoryOptions(TestCase):
         self.assertIs(actual, result)
         self.assertEqual(run.call_args.kwargs["result_mode"], "index")
         for name, value in vars(configuration).items():
+            if name == "backtest_storage_directory":
+                value = value.resolve()
             self.assertEqual(run.call_args.kwargs[name], value)
         for key, value in options.items():
             self.assertEqual(run.call_args.kwargs[key], value)

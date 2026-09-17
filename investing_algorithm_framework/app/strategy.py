@@ -6,9 +6,10 @@ import pandas as pd
 
 from investing_algorithm_framework.domain import (
     INDEX_DATETIME, ConflictPolicy, CooldownRule, CooldownTracker,
-    DataSource, DataType, ExposureRule, OperationalException, Order,
+    ConfluenceCard, DataSource, DataType, DecisionTrace, DecisionTraceEntry,
+    EvaluationContext, ExposureRule, OperationalException, Order,
     Position, PositionSize, ScalingRule, Schedule, ScheduledFunction,
-    ScoreCard, Signal, SignalSeries, StopLossRule, StrategyProfile,
+    Signal, SignalSide, SignalSeries, StopLossRule, StrategyProfile,
     TakeProfitRule, Trade,
 )
 from ..services.executors import Executor, LimitOrderExecutor
@@ -107,7 +108,8 @@ class TradingStrategy:
     pipelines: List[type] = []
     traces = None
     last_signals: List[Signal] = []
-    last_score_cards: List[Dict[str, Any]] = []
+    last_decision_traces: List[Dict[str, Any]] = []
+    signal_cards: Dict[SignalSide, ConfluenceCard] = None
     context: Context = None
     metadata: Dict[str, Any] = None
     position_sizes: List[PositionSize] = []
@@ -141,8 +143,21 @@ class TradingStrategy:
         executor: Executor = None,
         flip_on_opposite_signal: bool = None,
         exposure_rule: ExposureRule = None,
-        decorated=None
+        decorated=None,
+        signal_cards: Dict[SignalSide, ConfluenceCard] = None,
     ):
+        configured_cards = (
+            signal_cards if signal_cards is not None else self.signal_cards
+        )
+        self.signal_cards = dict(configured_cards or {})
+        for side, card in self.signal_cards.items():
+            if not isinstance(side, SignalSide):
+                raise ValueError("signal_cards keys must be SignalSide values")
+            if not isinstance(card, ConfluenceCard):
+                raise ValueError("signal_cards values must be ConfluenceCard")
+        self._pending_decision_traces = []
+        self.last_decision_traces = []
+
         if metadata is None:
             metadata = {}
 
@@ -485,6 +500,42 @@ class TradingStrategy:
         """
         return dict(self._parameters)
 
+    def prepare_signal_data(self, data) -> Dict[str, pd.DataFrame]:
+        """Prepare symbol-keyed pandas frames for default card evaluation.
+
+        Override to compute indicators and custom boolean columns. Both
+        signal hooks call this once. Use only current/past data per row.
+        Vector mode requires unique, ascending DatetimeIndex values.
+        """
+        raise NotImplementedError(
+            "Strategies using default signal_cards hooks must implement "
+            "prepare_signal_data(data) returning {symbol: pandas.DataFrame}"
+        )
+
+    def _prepared_signal_frames(self, data, *, vector=False):
+        frames = self.prepare_signal_data(data)
+        if not isinstance(frames, dict):
+            raise TypeError("prepare_signal_data must return a symbol mapping")
+        for symbol, frame in frames.items():
+            if not isinstance(symbol, str) or not symbol:
+                raise ValueError("Prepared signal symbols must be non-empty")
+            if not isinstance(frame, pd.DataFrame):
+                raise TypeError(
+                    "Prepared signal data must be pandas DataFrames"
+                )
+            if not frame.columns.is_unique:
+                raise ValueError("Prepared signal columns must be unique")
+            if vector and not isinstance(frame.index, pd.DatetimeIndex):
+                raise ValueError(
+                    "Vector signal frames require a DatetimeIndex"
+                )
+            if (not frame.index.is_unique
+                    or not frame.index.is_monotonic_increasing):
+                raise ValueError(
+                    "Signal frame indices must be unique and sorted"
+                )
+            yield symbol, frame
+
     def generate_signals(
         self, context: Context, data: Dict[str, Any]
     ) -> Iterable[Signal]:
@@ -545,17 +596,58 @@ class TradingStrategy:
             Signal: Zero or more signals.
 
         Notes:
-            The default implementation yields nothing. This is the
-            correct behaviour for strategies that drive trading
-            through other mechanisms (overriding :py:meth:`run_strategy`,
-            using ``@app.strategy`` decorators with ``apply_strategy``,
-            or test fixtures that exercise scheduling alone). Override
-            to emit signals from indicator columns; the helpers in
-            :mod:`investing_algorithm_framework.domain.models.signal_helpers`
-            (``signals_from_column``, ``signals_from_panel``) are the
-            canonical bridge from a pandas/polars frame.
+            With signal_cards configured, the default calls
+            prepare_signal_data and evaluates the final row of each frame.
+            Unavailable cards (null inputs or missing crossing history) are
+            skipped. Without cards it yields nothing. Existing overrides
+            remain responsible for their own signal behavior.
         """
-        return iter(())
+        if not self.signal_cards:
+            return
+        for symbol, frame in self._prepared_signal_frames(data):
+            recent = frame.iloc[-2:]
+            if recent.empty:
+                continue
+            evaluation_context = EvaluationContext(
+                recent.iloc[-1].to_dict(),
+                recent.iloc[-2].to_dict() if len(recent) > 1 else {},
+            )
+            for side, card in self.signal_cards.items():
+                availability = card.evaluate_series(recent)["available"]
+                if availability.iloc[-1]:
+                    yield from self._signals_from_card(
+                        evaluation_context, symbol, side, card
+                    )
+
+    def generate_signals_from_cards(
+        self, evaluation_context: EvaluationContext, *, symbol: str
+    ) -> Iterable[Signal]:
+        """Evaluate each configured card independently for one symbol.
+
+        Call from generate_signals after computing indicators. Qualified
+        cards yield traced signals; rejected cards are recorded for the tick.
+        Position eligibility and conflicts remain the strategy phases' job.
+        This helper emits event signals, not vector SignalSeries.
+        """
+        for side, card in self.signal_cards.items():
+            yield from self._signals_from_card(
+                evaluation_context, symbol, side, card
+            )
+
+    def _signals_from_card(self, evaluation_context, symbol, side, card):
+        result = card.evaluate(evaluation_context)
+        trace = DecisionTrace.from_confluence_result(
+            result, indicator_snapshot=evaluation_context
+        )
+        trace.entries.append(DecisionTraceEntry(
+            name="signal_side", value=side.value, group="decision"
+        ))
+        if result.qualified:
+            yield Signal(
+                symbol=symbol, side=side, source=card.name,
+            ).with_decision_trace(trace)
+        else:
+            self.record_decision_trace(trace, symbol=symbol)
 
     def generate_signal_series(
         self, data: Dict[str, Any]
@@ -574,12 +666,12 @@ class TradingStrategy:
         master timeline and fires the corresponding side wherever the
         series is truthy.
 
-        Implementing this method is **only required if the strategy
-        will be run through the vector backtest engine**. Live
+        Override this method for custom vector signal generation, or
+        configure signal_cards and implement prepare_signal_data. Live
         trading, paper trading, and event-driven backtests all use
         :py:meth:`generate_signals` exclusively and will never call
         this method. Strategies that never see the vector engine can
-        leave the default ``NotImplementedError`` in place.
+        leave the default implementation in place.
 
         Example (single-symbol, pandas)::
 
@@ -614,13 +706,20 @@ class TradingStrategy:
             ``(symbol, side)`` pair the strategy wants to express.
 
         Notes:
-            The default implementation yields nothing. Vector-mode
-            strategies must override; :func:`VectorBacktestService`
-            verifies that the method has been overridden before
-            running and raises a clear ``OperationalException`` if
-            not.
+            With signal_cards, the default evaluates whole columns and
+            yields one boolean SignalSeries per symbol and side. It does
+            not construct per-row decision traces. Without cards it yields
+            nothing; vector validation requires an override or card setup.
         """
-        return iter(())
+        if not self.signal_cards:
+            return
+        for symbol, frame in self._prepared_signal_frames(data, vector=True):
+            for side, card in self.signal_cards.items():
+                result = card.evaluate_series(frame)
+                yield SignalSeries(
+                    symbol=symbol, side=side, series=result["qualified"],
+                    source=card.name,
+                )
 
     def run_strategy(self, context: Context, data: Dict[str, Any]):
         """
@@ -655,7 +754,7 @@ class TradingStrategy:
             None
         """
         self.context = context
-        self._pending_score_cards = []
+        self._pending_decision_traces = []
         state = PhaseState(
             strategy=self,
             context=context,
@@ -669,32 +768,49 @@ class TradingStrategy:
         # turned into an order.
         self.traces = state.traces
         self.last_signals = list(state.raw_signals)
-        self.last_score_cards = list(self._pending_score_cards)
+        self.last_decision_traces = list(self._pending_decision_traces)
 
-    def record_score_card(
-        self, score_card: ScoreCard, symbol: str = None
+    def record_decision_trace(
+        self, decision_trace: DecisionTrace, symbol: str | None = None
     ) -> None:
-        """Record a :class:`ScoreCard` for this tick, independent of
+        """Record a :class:`DecisionTrace` for this tick, independent of
         whether :py:meth:`generate_signals` yields a ``Signal``.
 
         Use this to explain a *non-decision* — e.g. "RSI is neutral,
         no crossover" — so ``RunReport`` shows why nothing happened,
-        not just why something did. A score card attached to an
-        actual ``Signal`` (via :py:meth:`Signal.with_score_card`)
+        not just why something did. A decision trace attached to an
+        actual ``Signal`` (via :py:meth:`Signal.with_decision_trace`)
         does not need this; call it only for symbols/ticks that
         produced no signal.
 
         Args:
-            score_card (ScoreCard): The explanation to record.
+            decision_trace (DecisionTrace): The explanation to record.
             symbol (str, optional): The symbol this explains, if any.
 
         Returns:
             None
         """
-        self._pending_score_cards.append({
+        payload = decision_trace.to_dict()
+        self._pending_decision_traces.append({
             "symbol": symbol,
-            "score_card": score_card.to_dict(),
+            "decision_trace": payload,
+            "score_card": payload,
         })
+
+    def record_score_card(
+        self, score_card: DecisionTrace, symbol: str | None = None
+    ) -> None:
+        """Compatibility alias for :meth:`record_decision_trace`."""
+        self.record_decision_trace(score_card, symbol=symbol)
+
+    @property
+    def last_score_cards(self):
+        """Compatibility alias for the most recent recorded traces."""
+        return self.last_decision_traces
+
+    @last_score_cards.setter
+    def last_score_cards(self, value):
+        self.last_decision_traces = value
 
     def apply_strategy(self, context, data):
         if self.decorated:
@@ -1276,6 +1392,22 @@ class TradingStrategy:
             int: The number of positions
         """
         return self.context.get_number_of_positions()
+
+    @property
+    def long_entry_card(self):
+        return self.signal_cards[SignalSide.OPEN_LONG]
+
+    @property
+    def short_entry_card(self):
+        return self.signal_cards[SignalSide.OPEN_SHORT]
+
+    @property
+    def short_exit_card(self):
+        return self.signal_cards[SignalSide.CLOSE_SHORT]
+
+    @property
+    def long_exit_card(self):
+        return self.signal_cards[SignalSide.CLOSE_LONG]
 
     def get_position(
         self, symbol, market=None, identifier=None

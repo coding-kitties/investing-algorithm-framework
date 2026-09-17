@@ -1,928 +1,601 @@
 <h1 align="center">
-    Investing Algorithm Framework
+  Investing Algorithm Framework
 </h1>
 
 <p align="center">
-  <i align="center">The full quant workflow in one framework: build strategies, vector & event-driven backtest at scale, compare in a single dashboard, and deploy the winner 🚀</i>
+  <i>Build strategies, backtest at scale, compare results, and deploy the winner without rewriting your strategy.</i>
 </p>
 
 <h4 align="center">
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=linux&style=flat-square&logo=linux&logoColor=white" alt="linux main" style="height: 20px;">
-  </a>
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=macos&style=flat-square&logo=apple&logoColor=white" alt="macos main" style="height: 20px;">
-  </a>
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=windows&style=flat-square&logo=windows&logoColor=white" alt="windows main" style="height: 20px;">
-  </a>
-  <a href="https://pypi.org/project/investing-algorithm-framework/">
-    <img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg?style=flat-square" alt="pypi" style="height: 20px;">
-  </a>
-  <a href="https://pepy.tech/project/investing-algorithm-framework">
-    <img src="https://pepy.tech/badge/investing-algorithm-framework/month?style=flat-square" alt="downloads" style="height: 20px;">
-  </a>
-  <a href="https://opensource.org/licenses/Apache-2.0">
-    <img src="https://img.shields.io/badge/apache%202.0-blue.svg?style=flat-square&label=license" alt="license" style="height: 20px;">
-  </a>
-  <br>
-  <a href="https://discord.gg/jQsnnYZgzR">
-    <img src="https://img.shields.io/badge/discord-7289da.svg?style=flat-square&logo=discord" alt="discord" style="height: 20px;">
-  </a>
-  <a href="https://www.reddit.com/r/InvestingBots/">
-    <img src="https://img.shields.io/badge/reddit-FF4500.svg?style=flat-square&logo=reddit&logoColor=white" alt="reddit" style="height: 20px;">
-  </a>
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers">
-    <img src="https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework?style=flat-square" alt="stars" style="height: 20px;">
-  </a>
+  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=linux&style=flat-square&logo=linux&logoColor=white" alt="Linux build"></a>
+  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=macos&style=flat-square&logo=apple&logoColor=white" alt="macOS build"></a>
+  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=windows&style=flat-square&logo=windows&logoColor=white" alt="Windows build"></a>
+  <a href="https://pypi.org/project/investing-algorithm-framework/"><img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg?style=flat-square" alt="PyPI version"></a>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/apache%202.0-blue.svg?style=flat-square&label=license" alt="Apache 2.0 license"></a>
 </h4>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="static/features/hero-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="static/features/hero-light.svg">
-    <img src="static/features/hero-dark.svg" alt="Investing Algorithm Framework — features overview" style="max-width: 100%;">
+    <img src="static/features/hero-dark.svg" alt="Investing Algorithm Framework features overview" style="max-width: 100%;">
   </picture>
 </p>
 
-<p align="center">
-  <a href="https://discord.gg/jQsnnYZgzR">
-    <img src="https://img.shields.io/badge/Join%20our%20Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord">
-  </a>
-</p>
+Investing Algorithm Framework is a Python framework for the complete quantitative
+trading workflow. Define a strategy once, explore it with vector backtests,
+validate it in an event-driven simulation, inspect the results in an interactive
+dashboard, and run the same strategy in paper or live trading.
 
-<p align="center">
-  <sub>Proudly sponsored by</sub>
-  <br>
-  <a href="https://www.finterion.com/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png"><source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png"><img src="static/sponsors/finterion-light.png" alt="Finterion" width="180"></picture></a>
-</p>
-
-## Introduction
-
-> **v9.0.0 alpha is out!** The pre-release of v9.0 is now available on
-> PyPI as an alpha pre-release. Since pip doesn't install pre-releases by
-> default, pin the version explicitly or pass `--pre`:
+> **v9.0.0 alpha is available.** Install the prerelease explicitly:
+>
 > ```bash
-> pip install investing-algorithm-framework==9.0.0a12
+> pip install investing-algorithm-framework==9.0.0a17
 > ```
-> You can find the blog post here: [v9.0 Release](docusaurus/blog/2026-08-02-v9.0-release.md).
+>
+> See the [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md)
+> and [changelog](CHANGELOG.md). The APIs below describe current v9 development.
 
-The API examples and feature list below describe current v9 development.
-Older published alpha versions may not include every API shown.
+### Feature Highlights
 
-`Investing Algorithm Framework` is a Python framework that covers the entire quant workflow: define a strategy once, vector-backtest thousands of parameter variants to find promising signals, narrow down with a storage layer that ranks 10k+ results in milliseconds, validate the winners in a realistic event-driven simulation, compare everything in a single interactive HTML dashboard, and deploy the best performer live, all with the same `TradingStrategy` class, no code rewrites between stages.
+- 🔁 **[Long and short trading](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/orders):** Define entry and exit signals once and run the same strategy in vector backtests, event-driven backtests, paper trading, and live trading.
+- ⚡ **[Vector backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting):** Evaluate signals and sweep thousands of strategy variants quickly with Polars-powered execution.
+- 🏃 **[Event-driven backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting):** Validate candidates bar by bar with realistic orders, fills, costs, and portfolio management.
+- 🪟 **[Studies, universes, and backtest windows](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/studies):** Define the assets, assumptions, and rolling, anchored, holdout, walk-forward, time-OOS, or universe-OOS periods for each experiment.
+- 🗂️ **[Open Backtest Format](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/open-backtest-format):** Keep complete vector and event results in portable, versioned `.obtf` bundles.
+- 🗄️ **[Tiered storage and indexing](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-storage):** Rank and filter 10,000+ backtests through SQLite without decoding full result bundles.
+- 📊 **[80+ performance metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics):** Analyze CAGR, Sharpe, Sortino, Calmar, VaR/CVaR, drawdown, recovery, and benchmark-relative returns.
+- 📈 **[Interactive dashboard](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports):** Compare strategies, inspect trades and charts, review window coverage, and save a self-contained HTML report.
+- 🔀 **[Monte Carlo testing](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/permutation-testing):** Measure how often randomized market paths match or outperform a strategy's observed results.
+- 🧮 **[Cross-sectional pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines):** Rank, filter, and score entire universes of symbols during each strategy iteration.
+- 🧠 **[Confluence scoring cards](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/confluence-cards):** Build explainable decisions from requirements, weighted evidence, vetoes, and score thresholds.
+- 🛡️ **[Declarative risk rules](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/overview):** Configure sizing, exposure limits, scaling, stop losses, take profits, and signal cooldowns.
+- 💸 **[Execution cost models](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/trading-cost):** Apply percentage, fixed, basis-point, or volume-aware commission and slippage assumptions.
+- 🔐 **[Portfolio and credentials management](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/portfolio-configuration):** Configure markets, balances, fees, paper trading, and environment-based credentials without hardcoding secrets.
+- 🚀 **[Flexible deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment):** Run locally, self-host, deploy to AWS Lambda or Azure Functions, or publish through Finterion.
+- 🌐 **[Extensible integrations](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-data-providers):** Add custom data providers, order executors, storage adapters, metrics, strategies, and optimizers.
+- 🤖 **[Built-in MCP server](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server):** Let compatible AI tools query backtests, compare strategies, inspect trades, and manage research notes.
+- ↔️ **[Position modes: NETTING vs. HEDGE](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/position-modes):** Choose one net direction per symbol or maintain independent long and short legs with separate risk controls and P&L.
 
-Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy variant is actually better, whether the result is robust across time windows, and how to go from research to production. This framework closes that gap.
+<a id="strategy-definition"></a>
+<details>
+<summary><strong>Strategy Definition</strong></summary>
+<br>
 
-> **Want to see this in practice?** Check out the [`examples/tutorial/`](examples/tutorial/README.md): a series of runnable notebooks that walk you through every stage: defining a strategy, visualizing its signals, sweeping parameters across rolling windows, detecting overfitting with Monte Carlo permutation tests, filtering and ranking with the storage layer, and deploying the winner.
-
-Both backtesting engines always return a disk-backed `BacktestIndex`, including
-single-strategy runs. Full results are saved persistently and loaded explicitly
-with `index.iter_backtests()` or `index.load_backtests()`. For large sweeps,
-both engines support bounded parallel workers and optional soft memory budgets.
-See [memory-budgeted sweeps](docusaurus/docs/Advanced%20Concepts/vector-backtesting.md#memory-budgeted-sweeps)
-for progressive pruning, streaming result loading, and Windows/WSL safeguards.
-
-<details open>
-<summary>
-  <strong>What's New in v9.0</strong>
-</summary> <br>
-
-Full details: [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md) · [CHANGELOG](CHANGELOG.md) · [OBTF spec](https://github.com/Quant-Commons/Open-Backtest-Format)
-
-- **New Open Backtest Format (.OBTF)**: OBTF packs studies, universes, windows, vector/event runs, summaries, metrics, trades, orders, positions, snapshots, execution assumptions and Monte Carlo tests into a single versioned `.obtf` file per algorithm (zstd + MessagePack + Parquet under the hood), so your results are portable, future-proof, and never scattered across folders again.
-- **Dual engine native**: vector and event engines now run as first-class citizens of every backtest, so you can sweep thousands of signal ideas and validate the winners under realistic execution *in the same bundle*, with zero risk of one engine's save wiping out the other's results. Now a .obtf bundle is a complete record of your vector and event backtests of a single strategy.
-- **Configuration-based backtest API**: `BacktestRunConfiguration` centralizes execution settings, with checkpoints, continue-on-error and progress enabled by default, plus `.from_env()` support. Both app backtest methods return persistent `BacktestIndex` results and support scalar metrics filters.
-- **Pluggable backtest optimization**: search existing algorithm collections or generate parameterized strategies through `OptimizationConfiguration` and your own `StrategyOptimizer`. Reuse bounded workers, memory controls, ID/window checkpoints and durable optimizer-state resume. Base classes and orchestration are included; concrete optimizers are supplied by the user. See the [optimizer guide](docusaurus/docs/Advanced%20Concepts/backtest-optimization.md).
-- **Short and Long Signals support**: a couple of new methods (`generate_short_signals` / `generate_cover_signals`) are all it takes to unlock full short-selling: SHORT/COVER order routing, correct P&L and collateral handling, and fill-based trade creation across vector, event, and live trading.
-- **Enhanced Study definitions**: reusable `Study`, `Universe` and `BacktestWindow` building blocks give you rolling, anchored, holdout and walk-forward k-fold validation, cross-sectional pipelines, signal cooldowns, and Monte Carlo–backed ranking, so you can trust your edge before you trade it.
-- **Custom commision nd slippage models*: pluggable slippage and commission models (percentage, fixed, bps, volume-aware) snapshot every study's cost assumptions via `ExecutionConfig` and attribute fees down to the order and trade level, so your numbers hold up in the real world.
-- **State of the art backtest storage and indexings**: a swappable `BacktestStore`, SQLite indexing across engines, studies, universes and lineage, content-addressed OHLCV deduplication, and a full `iaf` CLI for migrating, indexing, ranking and pruning results, so a growing research pipeline never becomes a mess.
-- **See more, faster**: an expanded metrics suite (CAGR, Sharpe, Sortino, Calmar, VaR/CVaR, drawdown/recovery, benchmark comparisons) paired with per-engine, per-study HTML reports and pooled or per-universe summaries, so you spot the winning strategy at a glance.
-- **Portfolio sync operations**: recurring or one-off per-market deposit schedules, environment-based credential resolution make it easier to manage live portfolios.
-
-> ⚠️ **v9.0 is an alpha release** with breaking API and persisted-data changes from v8. Legacy readers and selected compatibility properties remain available to assist migration, but new output is written in the v9 OBTF model — validate strategy behavior, execution assumptions and stored backtests before adopting in production.
-
-</details>
-
-<details open>
-<summary>
-  <strong>Features</strong>
-</summary> <br>
-
-- 🔁 **Long & Short signals support for Live trading & Backtesting**: Build strategies as a pipeline of entry/exit signals, position sizing, and order generation, each independently overridable. Long-only by default; opt into shorts by overriding two methods. The same strategy class runs unchanged in vector backtests, event-driven backtests, and live.
-- 🗂️ **Open Backtest Format storage** — One `{algorithm_id}.ofbt` per algorithm holds every study (in-sample sweep, time-OOS, universe-OOS, walk-forward, stress test) as a first-class slot with its own universe, windows, engine runs and summary. See [Open-Backtest-Format](https://github.com/Quant-Commons/Open-Backtest-Format) for the reference spec.
-- 📊 **[30+ Metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics)**: CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
-- 🧮 **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)**: Rank, filter and score entire universes of symbols every iteration with a tidy factor table
-- ⚡ **[Vector Backtesting for Signal Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)**: Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
-- 🏃 **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting)**: Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management
-- **[Pluggable Optimization](docusaurus/docs/Advanced%20Concepts/backtest-optimization.md)**: Budget candidate evaluations, plug in an ask/tell search policy, and resume both search state and completed event/vector evaluations without implementing your own backtest scheduler.
-- 🔀 **[Permutation Testing / Monte Carlo Simulations](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Assess the statistical robustness of your strategies by running them across randomized market scenarios to see how often your results could occur by chance
-- 🚀 **[Deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)**: Once the best strategy is identified through backtesting and comparison, deploy it to production locally or in the cloud (AWS Lambda / Azure Functions) to start live trading
-- ⚔️ **[Multi-Strategy Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Rank, filter & compare strategies in a single interactive report
-- 🪟 **[Multi-Window Robustness](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Test across different time periods with window coverage analysis
-- 📈 **[Charts & Performance Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Equity curves, rolling Sharpe, drawdown & return distributions, monthly heatmaps, yearly returns, and good/average/bad/very-bad return scenario projections — all rendered side-by-side per strategy
-- 📉 **[Benchmark Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
-- 📄 **[One-Click HTML Report](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)**: Self-contained file, no server, dark & light theme, shareable
-- 🗄️ **[Tiered Backtest Storage Layer](examples/storage_layer_demo/README.md)**: Manage thousands of `.obtf` bundles with a Tier-1 SQLite index (sub-100 ms ranks/filters over 10k+ backtests), a swappable `BacktestStore` protocol (`LocalDirStore`, `LocalTieredStore`), content-addressed Tier-3 OHLCV deduplication, and a CLI (`iaf index` / `iaf list` / `iaf rank` / `iaf migrate-store`) that plugs straight into the HTML dashboard.
-- 🌐 **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)**: Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
-- 🪙 **[Per-Market Deposit Schedules & Portfolio Sync](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/portfolio-sync)**: Declare recurring or one-shot external cash flows on a market with `deposit_schedule=` / `auto_sync=True`. Backtests simulate the deposits; live mode reconciles with the broker — same `context.sync_portfolio()` API in both modes.
-- 📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
-- ⏱️ **Signal Cooldowns**: Throttle whipsaw with declarative `CooldownRule`s: per-symbol or portfolio-wide, side-aware (`trigger="sell"`, `blocks="buy"`), enforced identically by the vector and event-driven engines
-
-</details>
-
-<details open>
-<summary>
-  <strong>Strategy Definition</strong>
-</summary> <br>
-
-Declare **what data** your strategy needs and **when to buy or sell** as a `TradingStrategy` subclass — the framework wires up data loading, signal evaluation, order execution, position management, and reporting around it. The same class runs unchanged in vector backtests, event-driven backtests, paper trading and live.
-
-> **Want strategy ideas to start from?** Check out [`examples/strategies_showcase/`](examples/strategies_showcase/README.md): a collection of runnable strategy templates (trend following, mean reversion, cross-sectional momentum, multi-factor, pairs trading, and more).
-
-Risk and execution behaviour are expressed as **declarative rule lists** rather than ad-hoc code paths, so the engines can enforce them identically across modes:
-
-- **`position_sizes`**: [`PositionSize`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/position-size) per symbol (fixed amount or percentage of portfolio).
-- **`stop_losses`** / **`take_profits`**: [`StopLossRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/stop-loss-rule) / [`TakeProfitRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/take-profit-rule) with fixed or trailing thresholds and partial-exit `sell_percentage`.
-- **`scaling_rules`**: [`ScalingRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/scaling-rule) for pyramiding (`scale_in_percentage=[…]`, `max_entries`, per-symbol `cooldown_in_bars`).
-- **`exposure_rule`**: [`ExposureRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/exposure-rule) caps total invested value across the whole portfolio (e.g. never more than 80% invested) — portfolio-wide, unlike the per-symbol rules above.
-- **`cooldowns`**: [`CooldownRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/cooldown-rule) to throttle whipsaw — per-symbol or portfolio-wide, side-aware (e.g. `trigger="sell", blocks="buy", bars=12`). Enforced bar-for-bar in both the vector and event-driven engines.
-
-Fees and slippage ([`TradingCost`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/trading-cost) per symbol) are configured separately on `PortfolioConfiguration`/`app.add_market(trading_costs=[...])` (live/paper) or `Study.execution_config` (backtests), since they're a property of the venue/scenario, not of the strategy's signal logic.
+Strategies are `TradingStrategy` subclasses that declare their data, schedule,
+signal logic, and risk rules. The framework handles data loading, order execution,
+position management, persistence, and reporting around them.
 
 ```python
-from investing_algorithm_framework import (
-    TradingStrategy,
-    PositionSize,
-    ScalingRule,
-    ExposureRule,
-    StopLossRule,
-    TakeProfitRule,
-    CooldownRule,
-    SignalSide,
-)
+from pyindicators import crossover, crossunder, ema, rsi
+
+from investing_algorithm_framework import ConfluenceCard, CooldownRule, \
+    DataSource, DataType, EvidenceGroup, ExposureRule, Operator, \
+    PrimaryGroup, ScalingRule, Schedule, ScoreRule, SignalSide, \
+    StopLossRule, TakeProfitRule, TimeUnit, TradingStrategy, \
+    condition, PositionSize
 
 
-class MyStrategy(TradingStrategy):
-    symbols = ["BTC", "ETH"]
+def create_confluence_card(name, rsi_operator, rsi_value, cross_column):
+  return ConfluenceCard(
+    name=name,
+    primary=PrimaryGroup(name="RSI reversal", rules=(ScoreRule(
+      name=f"RSI {rsi_operator.value} {rsi_value}",
+      expression=condition("rsi", rsi_operator, value=rsi_value), points=3,
+    ),), minimum_matches=1),
+    secondary=(EvidenceGroup(name="EMA confirmation", rules=(ScoreRule(
+      name="Recent EMA cross",
+      expression=condition(cross_column, Operator.GT, value=0), points=2,
+    ),), minimum_score=2),),
+    minimum_score=5,
+  )
 
-    # Portfolio-wide: never invest more than 80% of the portfolio at
-    # once, across every symbol combined.
-    exposure_rule = ExposureRule(max_portfolio_percentage=80.0)
 
-    position_sizes = [
-        PositionSize(symbol="BTC", percentage_of_portfolio=20),
-        PositionSize(symbol="ETH", percentage_of_portfolio=20),
-    ]
+class RSIEMACrossoverStrategy(TradingStrategy):
+  schedule = Schedule.every(2, TimeUnit.HOUR)
+  symbols = ["BTC"]
+  data_sources = [DataSource(
+    identifier="BTC_ohlcv", symbol="BTC/EUR", data_type=DataType.OHLCV,
+    time_frame="2h", market="BITVAVO", pandas=True, warmup_window=100,
+  )]
 
-    stop_losses = [
-        StopLossRule(symbol="BTC", percentage_threshold=5, trailing=True),
-        StopLossRule(symbol="ETH", percentage_threshold=5, trailing=True),
-    ]
+  # Portfolio and position risk controls.
+  exposure_rule = ExposureRule(max_portfolio_percentage=80)
+  position_sizes = [PositionSize(symbol="BTC", percentage_of_portfolio=20)]
+  scaling_rules = [ScalingRule(
+    symbol="BTC", max_entries=3, scale_in_percentage=[50, 25],
+    cooldown_in_bars=5,
+  )]
+  stop_losses = [StopLossRule(
+    symbol="BTC", percentage_threshold=5, sell_percentage=100, trailing=True,
+  )]
+  take_profits = [TakeProfitRule(
+    symbol="BTC", percentage_threshold=10, sell_percentage=50,
+  )]
+  cooldowns = [
+    CooldownRule(symbol="BTC", trigger="sell", blocks="buy", bars=12),
+    CooldownRule(trigger="any", blocks="any", bars=2),
+  ]
 
-    take_profits = [
-        TakeProfitRule(
-            symbol="BTC", percentage_threshold=10, sell_percentage=50,
-        ),
-        TakeProfitRule(
-            symbol="ETH", percentage_threshold=10, sell_percentage=50,
-        ),
-    ]
+  # Weighted, explainable entry and exit decisions.
+  signal_cards = {
+    SignalSide.OPEN_LONG: create_confluence_card(
+      "Open long", Operator.LT, 30, "recent_crossover"),
+    SignalSide.CLOSE_LONG: create_confluence_card(
+      "Close long", Operator.GTE, 70, "recent_crossunder"),
+    SignalSide.OPEN_SHORT: create_confluence_card(
+      "Open short", Operator.GTE, 70, "recent_crossunder"),
+    SignalSide.CLOSE_SHORT: create_confluence_card(
+      "Close short", Operator.LT, 30, "recent_crossover"),
+  }
 
-    scaling_rules = [
-        ScalingRule(
-            symbol="BTC", max_entries=3, scale_in_percentage=[50, 25],
-        ),
-        ScalingRule(
-            symbol="ETH", max_entries=3, scale_in_percentage=[50, 25],
-        ),
-    ]
-
-    cooldowns = [
-        CooldownRule(symbol="BTC", trigger="sell", blocks="buy", bars=12),
-        CooldownRule(trigger="any", blocks="any", bars=2),
-    ]
-
-    def generate_signals(self, context, data):
-        """Event-mode entry point — live, paper trading, event backtests."""
-        ...
-        # yield Signal(symbol="BTC", side=SignalSide.OPEN_LONG, source="my_rule")
-        # yield Signal(symbol="BTC", side=SignalSide.CLOSE_LONG, source="my_rule")
-        # Optional — short selling is opt-in: also yield OPEN_SHORT / CLOSE_SHORT.
-
-    def generate_signal_series(self, data):
-        """Vector-mode entry point — only needed for vector backtests."""
-        ...
-        # yield SignalSeries(symbol="BTC", side=SignalSide.OPEN_LONG, series=entry_series)
+  def prepare_signal_data(self, data):
+    """Prepare the same card inputs for every execution mode."""
+    frame = data["BTC_ohlcv"].copy()
+    frame = ema(frame, "Close", 12, "ema_short")
+    frame = ema(frame, "Close", 26, "ema_long")
+    frame = crossover(frame, "ema_short", "ema_long", "ema_crossover")
+    frame = crossunder(frame, "ema_short", "ema_long", "ema_crossunder")
+    frame = rsi(frame, "Close", 14, "rsi")
+    frame["recent_crossover"] = frame["ema_crossover"].rolling(10).max()
+    frame["recent_crossunder"] = frame["ema_crossunder"].rolling(10).max()
+    return {"BTC": frame}
 ```
 
-→ [Strategy docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/strategies)
+The framework evaluates `signal_cards` against the prepared columns and creates
+signals and decision traces automatically. `prepare_signal_data` is shared by
+vector backtests, event-driven backtests, paper trading, and live trading, while
+the declarative rules govern sizing, exposure, scaling, exits, and cooldowns in
+each mode. The four cards cover long entry and exit plus short entry and cover.
+
+Fees and slippage belong to the portfolio or backtest study because they describe
+a venue or scenario rather than signal logic.
+
+See the [strategy guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/strategies),
+the [basic example](docusaurus/docs/Getting%20Started/strategies.md#basic-strategy-structure),
+and the [strategy showcase](examples/algorithm_examples/strategies_showcase/README.md).
 
 </details>
 
-<details open>
-<summary>
-  <strong>Backtesting Engines</strong>
-</summary> <br>
+<a id="backtesting"></a>
+<details>
+<summary><strong>Backtesting</strong></summary>
+<br>
 
-### Backtesting API (v9)
-
-Use `Study` for the experiment and `BacktestRunConfiguration` for execution.
-With an app, data providers, strategies and training study already configured:
+Backtests use a `Study` to describe the experiment and a
+`BacktestRunConfiguration` to control execution and persistence.
 
 ```python
 from investing_algorithm_framework import BacktestRunConfiguration
 
-run_configuration = BacktestRunConfiguration(
-    backtest_storage_directory="./my-backtests",
-    continue_on_error=True,
-    use_checkpoints=True,
-    show_progress=True,
-    n_workers=8,
-    memory_budget_mb=16_384,          # Soft 16 GiB process-tree RSS budget
-    min_available_memory_mb=4_096,    # Keep 4 GiB of available headroom
-    max_tasks_per_child=16,
-)
-
 results = app.run_backtests(
     strategies=strategies,
     study=training_study,
-    run_configuration=run_configuration,
+    run_configuration=BacktestRunConfiguration(
+        backtest_storage_directory="./my-backtests",
+        n_workers=8,
+        memory_budget_mb=16_384,
+        min_available_memory_mb=4_096,
+    ),
 )
 
-print(results.df)  # Scalar metrics; no full bundle loading
-print(results.directory)
+print(results.df)
 ```
 
-- Use `strategy=` or `algorithm=` with `app.run_backtest()` for a single
-  candidate, or `strategies=` / `algorithms=` for independent candidates.
-- Both methods always return a disk-backed `BacktestIndex`, not a list of
-  `Backtest` objects. Load selected full results explicitly with
-  `results.iter_backtests()` or `results.load_backtests()`.
-- Checkpoints, continue-on-error and progress default to `True`.
-  `BacktestRunConfiguration.from_env()` reads `IAF_BACKTEST_*` settings.
-- Put worker, memory, snapshot and data-preparation settings inside the
-  configuration, not directly on the app call. `result_mode` and
-  `iterative_summary_update` are no longer public options.
-- Keep `window_metrics_filter_function` and `final_metrics_filter_function`
-  on the app call. They receive and return indexes; window summaries are
-  always current.
-- Reuse the same storage directory to resume. Checkpoints match only
-  algorithm IDs and window IDs, so use a different directory when the
-  experiment's data, strategy behavior or assumptions change.
+Both engines return a disk-backed `BacktestIndex`. Use the index for scalar
+filtering and ranking, then load selected full results with
+`results.iter_backtests()` or `results.load_backtests()`.
 
-See [memory-budgeted sweeps](docusaurus/docs/Advanced%20Concepts/vector-backtesting.md#memory-budgeted-sweeps)
-for resource safeguards and filter examples. Memory limits are soft admission
-controls, not hard OS allocation limits.
+### Vector Backtesting
 
-### ⚡ Vector Backtesting — Test thousands of strategies, fast
-
-Polars-powered vectorized signal evaluation. Compare thousands of strategies side by side, sweep parameter grids, run multi-window robustness checks, rank by key metrics and surface your top candidates in seconds — all before committing to a full event-driven simulation.
+The Polars-powered vector engine evaluates signal series in bulk. Use it for
+rapid signal research, parameter sweeps, large candidate sets, and early-stage
+filtering before running more expensive simulations.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="static/features/vector-backtest-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="static/features/vector-backtest-light.svg">
-    <img src="static/features/vector-backtest-dark.svg" alt="Vector backtest engine — run thousands of strategies in parallel" style="max-width: 100%;">
+    <img src="static/features/vector-backtest-dark.svg" alt="Vector backtest engine" style="max-width: 100%;">
   </picture>
 </p>
 
-### 🏃 Event-Driven Backtesting — Bar-by-bar realism
+### Event-Driven Backtesting
 
-Once you've narrowed down promising strategies, run them through a full event-driven simulation. Pluggable slippage and fill models, partial fills, and a complete simulation blotter — using the **same code path** you'll deploy live.
+The event engine processes market data bar by bar through the same strategy and
+order path used in live trading. Use it to validate execution behavior, fills,
+costs, portfolio changes, and interactions between strategies.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="static/features/event-backtest-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="static/features/event-backtest-light.svg">
-    <img src="static/features/event-backtest-dark.svg" alt="Event-driven backtest engine — bar-by-bar realism with order fills" style="max-width: 100%;">
+    <img src="static/features/event-backtest-dark.svg" alt="Event-driven backtest engine" style="max-width: 100%;">
   </picture>
 </p>
 
-</details>
+### Robustness Studies
 
-<details open>
-<summary>
-  <strong>Backtest Optimization</strong>
-</summary> <br>
+`Study`, `Universe`, and `BacktestWindow` support single-window tests, rolling
+windows, anchored windows, holdouts, walk-forward k-fold validation, and
+out-of-sample testing across time periods or universes. Execution assumptions
+are captured with each study so results remain reproducible.
 
-Add `optimization=` to either app backtest method to select from an existing
-candidate collection or generate new parameterized strategies. The optimizer
-chooses what to evaluate; the framework runs and scores the candidates using
-the same event/vector engines and resource controls.
-
-For an existing collection with unique algorithm IDs, supply your own optimizer
-instance supporting `"finite"` search spaces:
-
-```python
-import math
-from investing_algorithm_framework import OptimizationConfiguration
-
-
-def score_candidate(index):
-    pooled = index.df.loc[index.df["universe_key"].isna()]
-    if len(pooled) != 1:
-        raise ValueError("Expected one pooled candidate row")
-    score = float(pooled["summary.sharpe_ratio"].iloc[0])
-    if not math.isfinite(score):
-        raise ValueError("Candidate has no finite Sharpe ratio")
-    return score
-
-
-results = app.run_backtests(
-    algorithms=my_algorithms,
-    study=training_study,
-    run_configuration=run_configuration,
-    optimization=OptimizationConfiguration(
-        search_id="algorithm-search-v1",
-        optimizer=my_optimizer,
-        objective=score_candidate,
-        direction="maximize",
-        max_evaluations=100,
-        max_proposals=1_000,
-        proposal_batch_size=16,
-    ),
-)
-```
-
-`my_algorithms` and `my_optimizer` are user-supplied; no concrete search algorithm
-is selected automatically. To generate candidates instead, omit the collection
-and configure `strategy_factory`, `IntegerParameter` / `FloatParameter`
-definitions and optional constraints with a parameter-capable optimizer.
-
-Implement the `StrategyOptimizer` lifecycle: `initialize`, `ask`, `tell`,
-`is_finished`, `state_dict` and `load_state_dict`. No random, grid, CryStAl or
-Bayesian optimizer implementation is bundled.
-
-The result remains a search-wide `BacktestIndex`. Trials and optimizer snapshots
-are saved under `<storage-root>/optimizations/<search_id>/`. Resume with the same
-configured storage root, search ID and unchanged experiment inputs; worker and
-memory settings may change. The returned index directory is the nested search
-directory, not the storage root.
-
-`proposal_batch_size` controls search admission, not worker count. An optimizer
-can save time by evaluating fewer candidates, but does not make an individual
-backtest faster or guarantee better out-of-sample performance. Distributed
-execution is not included in this API.
-
-See [Backtest Optimization](docusaurus/docs/Advanced%20Concepts/backtest-optimization.md)
-for both candidate modes, the plugin contract, filters and recovery details.
+See the [vector backtesting guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting),
+the [event backtesting guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting),
+and the [tutorial notebooks](examples/tutorial/README.md).
 
 </details>
 
-<details open>
-<summary>
-  <strong>Backtest Analysis & Dashboard</strong>
-</summary> <br>
+<a id="backtest-storage"></a>
+<details>
+<summary><strong>Backtest Storage</strong></summary>
+<br>
 
-Every backtest produces a **self-contained HTML dashboard** — open it in any browser, share with teammates, archive it. No server, no Jupyter, no dependencies. Compare strategies side-by-side, drill into trades, and capture your reasoning as you go.
+Each algorithm is stored as a versioned `.obtf` bundle using the
+[Open Backtest Format](https://github.com/Quant-Commons/Open-Backtest-Format).
+A bundle can contain studies, universes, windows, vector and event runs,
+summaries, metrics, trades, orders, positions, snapshots, execution assumptions,
+and Monte Carlo results.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="static/features/dashboard-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="static/features/dashboard-light.svg">
-    <img src="static/features/dashboard-dark.svg" alt="Backtest analysis dashboard with MCP server and notes" style="max-width: 100%;">
-  </picture>
-</p>
+The storage layer scales from local research to large result collections:
 
-- **Self-contained HTML reports** — equity curves, drawdowns, trade lists, monthly returns, side-by-side strategy comparison
-- **Built-in MCP server** — let Copilot, Claude, or any MCP-compatible agent query your backtests, rank strategies, and reason over trades through `investing-algorithm-framework mcp`
-- **Notes keeping** — annotate every backtest with hypotheses, observations and conclusions; notes travel with the report so your research is never lost
-
-#### From backtest results to a report
-
-> 💡 **Want state-of-the-art analytics, publishable reports, ranking across thousands of runs and AI agents that do the analysis for you?** Partner with our analytics integration partners below — they pick up where the local `report.html` leaves off.
-
-<p align="center">
-  <a href="https://www.finterion.com/" target="_blank">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="static/features/finterion-analytics-dark.svg">
-      <source media="(prefers-color-scheme: light)" srcset="static/features/finterion-analytics-light.svg">
-      <img src="static/features/finterion-analytics-light.svg" alt="Backtest analytics for teams — featuring Finterion" style="max-width: 100%;">
-    </picture>
-  </a>
-</p>
-
-Every app backtest API, vector or event-driven, returns a disk-backed
-`BacktestIndex`. Select candidates using its scalar rows, then explicitly load
-the full `Backtest` objects that `BacktestReport` consumes:
-
-```python
-from investing_algorithm_framework import (
-    BacktestReport, BacktestRunConfiguration, Study, Universe,
-    BacktestWindow, BacktestEngine,
-)
-
-# --- Single event-driven backtest ---
-event_study = Study(
-    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
-    initial_capital=1000,
-    backtest_windows=[BacktestWindow(train_range=date_range)],
-    engines=[BacktestEngine.EVENT_DRIVEN],
-)
-backtests = app.run_backtest(
-    strategy=strategy,
-    study=event_study,
-    run_configuration=BacktestRunConfiguration(
-        backtest_storage_directory="./event-backtests",
-    ),
-)
-BacktestReport(
-    backtests=backtests.load_backtests(workers=1),
-).save("event_report.html")
-
-# --- A sweep of vector backtests (parameter grid / multi-window) ---
-sweep_study = Study(
-    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
-    initial_capital=1000,
-    backtest_windows=[
-        BacktestWindow(train_range=dr)
-        for dr in [range_2022, range_2023, range_2024]
-    ],
-    engines=[BacktestEngine.VECTOR],
-)
-backtests = app.run_backtests(
-    strategies=[StrategyA(), StrategyB(), StrategyC()],
-    study=sweep_study,
-    run_configuration=BacktestRunConfiguration(
-        n_workers=8,
-        backtest_storage_directory="./my-backtests/",
-        memory_budget_mb=16_384,
-        min_available_memory_mb=4_096,
-    ),
-)
-# Only materialize a suitably small selection for the dashboard.
-BacktestReport(
-    backtests=backtests.load_backtests(workers=1),
-).save("sweep_report.html")
-
-# --- Or: load a folder of bundles back later (parallel decode) ---
-report = BacktestReport.open(
-    directory_path="./my-backtests/",
-    workers=-1,
-    show_progress=True,
-)
-report.save("from_disk_report.html")
-```
-
-For sweeps that grow into the thousands, combine this with the [Backtest Storage Layer](examples/storage_layer_demo/README.md) below — rank in SQLite first, then load only the winners into the report:
-
-```python
-from investing_algorithm_framework import BacktestReport
-from investing_algorithm_framework.cli.index_command import (
-    build_index, rank_index,
-)
-from investing_algorithm_framework.services.backtest_store import (
-    LocalDirStore,
-)
-
-# 1. Build (or refresh) the Tier-1 SQLite index over the folder of bundles.
-build_index("./my-backtests/")
-
-# 2. Pick the top 25 by Sharpe straight from SQLite — no Parquet decoded.
-top = rank_index(
-    "./my-backtests/",
-    by="sharpe_ratio",
-    where="summary_number_of_trades > 50",
-    limit=25,
-)
-
-# 3. Materialise only those 25 bundles through the BacktestStore protocol.
-store = LocalDirStore("./my-backtests/")
-winners = [store.open(row["bundle_path"]) for row in top]
-
-# 4. Render a focused dashboard with just the winners.
-BacktestReport(backtests=winners).save("top25_by_sharpe.html")
-```
-
-→ [Backtest dashboard docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting) · [MCP server docs](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server)
-
-</details>
-
-<details open>
-<summary>
-  <strong>Backtest Storage Layer — scale to thousands of backtests</strong>
-</summary> <br>
-
-Once you start sweeping parameter grids and walk-forward windows, a flat folder of `.obtf` bundles stops scaling: every comparison re-decodes multi-MB Parquet metric blobs just to read a Sharpe number. The storage layer fixes that with three tiers behind a single `BacktestStore` protocol:
-
-- **Tier-1 — SQLite index (`index.sqlite`)**: one row per bundle with every scalar from `BacktestSummaryMetrics` promoted to its own column. Ranking 10k+ bundles becomes a sub-100 ms SQL query — no `.obtf` is opened.
-- **Tier-2 — `BacktestStore` adapters**: `LocalDirStore` (flat folder of bundles) or `LocalTieredStore` (hive-partitioned layout). Same handle-based API, swap the implementation without touching call sites.
-- **Tier-3 — content-addressed OHLCV chunks**: SHA-256 deduped per-symbol OHLCV blobs shared across every bundle that references them. `garbage_collect_ohlcv()` reclaims orphans.
-
-A CLI ties it all together: `iaf index` builds/refreshes the Tier-1 SQLite, `iaf list` / `iaf rank` query it, and `iaf migrate-store` moves a whole collection between store kinds in one command.
-
-#### Typical workflow
-
-```python
-from investing_algorithm_framework import BacktestReport
-from investing_algorithm_framework.cli.index_command import (
-    build_index, rank_index,
-)
-from investing_algorithm_framework.services.backtest_store import (
-    LocalDirStore,
-)
-
-# 1. Build (or refresh) the Tier-1 SQLite index over a folder of .obtf bundles.
-build_index("./my-backtests/")          # equivalent to: iaf index ./my-backtests/
-
-# 2. Pick the top 20 by Sharpe straight from SQLite — no Parquet decoded.
-top = rank_index(
-    "./my-backtests/",
-    by="sharpe_ratio",
-    where="summary_number_of_trades > 50",
-    limit=20,
-)
-
-# 3. Materialise just those 20 bundles through the BacktestStore protocol.
-store = LocalDirStore("./my-backtests/")
-backtests = [store.open(row["bundle_path"]) for row in top]
-
-# 4. Feed them straight into the HTML dashboard.
-BacktestReport(backtests=backtests).save("top20.html")
-```
-
-#### Weighted multi-metric ranking with `BacktestEvaluationFocus`
-
-Instead of sorting by a single column, use a **focus preset** to score every bundle across multiple metrics at once — profit, risk, consistency, win rate — weighted by what matters most to your workflow:
-
-```python
-from investing_algorithm_framework import (
-    BacktestReport, BacktestEvaluationFocus,
-)
-from investing_algorithm_framework.cli.index_command import (
-    build_index, rank_index,
-)
-from investing_algorithm_framework.services.backtest_store import (
-    LocalDirStore,
-)
-
-# 1. Build (or refresh) the Tier-1 SQLite index.
-build_index("./my-backtests/")
-
-# 2. Rank with a built-in focus preset (BALANCED, PROFIT, FREQUENCY, RISK_ADJUSTED).
-top = rank_index(
-    "./my-backtests/",
-    focus=BacktestEvaluationFocus.RISK_ADJUSTED,
-    where="summary_number_of_trades > 50",
-    limit=25,
-)
-
-# 3. Or supply fully custom weights — positive favours higher, negative penalises.
-top = rank_index(
-    "./my-backtests/",
-    weights={
-        "sharpe_ratio": 3.0,
-        "sortino_ratio": 2.5,
-        "max_drawdown": -3.0,
-        "win_rate": 2.0,
-        "consistency_score": 1.5,
-    },
-    limit=25,
-)
-
-# 4. Materialise only the winners and render a focused dashboard.
-store = LocalDirStore("./my-backtests/")
-winners = [store.open(row["bundle_path"]) for row in top]
-BacktestReport(backtests=winners).save("top25_risk_adjusted.html")
-```
-
-**Built-in focus presets:**
-
-| Preset | Prioritises |
-|--------|------------|
-| `BALANCED` | Equal mix of profit, risk-adjusted returns, drawdown penalties, and consistency |
-| `PROFIT` | Absolute and relative gains (CAGR, net gain, win rate, profit factor) |
-| `FREQUENCY` | High trade count, short durations, and per-trade efficiency |
-| `RISK_ADJUSTED` | Sharpe, Sortino, Calmar with strong drawdown and volatility penalties |
-
-Or from the shell:
+| Tier | Purpose |
+| --- | --- |
+| SQLite index | Rank and filter scalar metrics across 10,000+ results without decoding bundles |
+| `BacktestStore` | Swap flat `LocalDirStore` and partitioned `LocalTieredStore` layouts |
+| OHLCV chunks | Deduplicate content-addressed market data shared by multiple bundles |
 
 ```bash
 iaf index ./my-backtests/
-iaf rank  ./my-backtests/ --by sharpe_ratio --where "summary_number_of_trades > 50" -n 20
-iaf list  ./my-backtests/ --sort calmar_ratio --json
+iaf rank ./my-backtests/ --by sharpe_ratio \
+  --where "summary_number_of_trades > 50" -n 20
+iaf list ./my-backtests/ --sort calmar_ratio --json
 iaf migrate-store --from local-dir --src ./my-backtests/ \
-                  --to   local-tiered --dst ./tiered/
+  --to local-tiered --dst ./tiered/
 ```
 
-→ End-to-end runnable example: [`examples/storage_layer_demo/`](examples/storage_layer_demo/README.md)
+See the [storage layer example](examples/storage_layer_demo/README.md).
 
 </details>
 
-<details open>
-<summary>
-  <strong>Live Trading</strong>
-</summary> <br>
+<a id="deployment"></a>
+<details>
+<summary><strong>Deployment</strong></summary>
+<br>
 
-Once a strategy proves itself in backtests, deploy it with the **same code path** you backtested. Connect to any exchange — use the built-in [CCXT](https://github.com/ccxt/ccxt) integration, or plug in your own [`OrderExecutor`](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-order-executors) for brokers, FIX gateways, or any custom venue. Run locally, in Docker, or deploy serverless to **AWS Lambda** or **Azure Functions**. Built-in portfolio tracking, position management, order persistence, and automatic state recovery.
+The same strategy can run locally, in a container, as a web service, or in a
+serverless function. Portfolio state, orders, trades, and positions can persist
+across runs.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="static/features/live-trading-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="static/features/live-trading-light.svg">
-    <img src="static/features/live-trading-dark.svg" alt="Live trading & deployment — AWS Lambda and Azure Functions" style="max-width: 100%;">
-  </picture>
-</p>
+### Live Trading
 
-- **No code rewrites** — your `TradingStrategy` runs identically in backtest, paper trading and live
-- **Cloud deploy** — `investing-algorithm-framework init --type aws_lambda` / `--type azure_function`
-- **Multiple exchanges & venues** — CCXT integration out of the box (Binance, Bitvavo, Coinbase, Kraken …), or plug in your own `OrderExecutor` for any broker / FIX / custom venue
-- **Portfolio persistence** — trades, orders and positions survive restarts
+Connect to supported exchanges through CCXT or implement an `OrderExecutor` for
+a broker, FIX gateway, or custom venue. Live mode evaluates schedules, loads
+market data, creates orders, and maintains portfolio state continuously.
 
-→ [Live trading & deployment docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)
+### Paper Trading
 
-</details>
+Paper trading exercises the live strategy path without sending real orders.
+Use it after event-driven validation to verify schedules, data feeds, credentials,
+and operational behavior in current market conditions.
 
-<details open>
-<summary>
-  <strong>Marketplace Integration</strong>
-</summary> <br>
+### Self-Hosted and Serverless
 
-Publish your winning strategies to the [**Finterion**](https://www.finterion.com/) marketplace and monetize them. Investors subscribe to your bot, you earn a recurring revenue share — the framework handles the technical integration.
+Run the application on your own machine or infrastructure, package it in Docker,
+or scaffold AWS Lambda and Azure Functions projects from the CLI:
+
+```bash
+pip install investing-algorithm-framework
+investing-algorithm-framework init
+investing-algorithm-framework init --type aws_lambda
+investing-algorithm-framework init --type azure_function
+```
+
+### Finterion
+
+Publish validated strategies to the
+[Finterion marketplace](https://www.finterion.com/) so investors can subscribe
+to them. The Finterion plugin handles the framework integration.
 
 <p align="center">
   <a href="https://www.finterion.com/" target="_blank">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="static/features/marketplace-dark.svg">
       <source media="(prefers-color-scheme: light)" srcset="static/features/marketplace-light.svg">
-      <img src="static/features/marketplace-dark.svg" alt="Marketplace integration — featuring Finterion" style="max-width: 100%;">
+      <img src="static/features/marketplace-dark.svg" alt="Finterion marketplace integration" style="max-width: 100%;">
     </picture>
   </a>
 </p>
 
-→ [Finterion plugin](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin)
+See the [deployment guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)
+and [Finterion plugin](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin).
 
 </details>
 
+<a id="portfolio-and-credentials-management"></a>
 <details>
-<summary>
-  <strong>Usage and Installation</strong>
-</summary> <br>
+<summary><strong>Portfolio and Credentials Management</strong></summary>
+<br>
 
-To get started, install the framework and scaffold a new project:
-
-```bash
-pip install investing-algorithm-framework
-
-# Generate project structure
-investing-algorithm-framework init
-
-# Or for cloud deployment
-investing-algorithm-framework init --type aws_lambda
-investing-algorithm-framework init --type azure_function
-```
-
-The [documentation](https://coding-kitties.github.io/investing-algorithm-framework/) provides guides and API reference. The [quick start](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation) will walk you through your first strategy.
-
-<details>
-<summary>
-  Creating a Strategy
-</summary> <br>
-
-The framework is designed around the `TradingStrategy` class. You define **what data** your strategy needs and **when to buy or sell** — the framework handles execution, position management, and reporting.
+`app.add_market()` configures a portfolio and its market credentials together.
+Set the trading currency, starting balance, fees, slippage, position mode, and
+paper-trading behavior in one place:
 
 ```python
-from typing import Dict, Any
-
-import pandas as pd
-from pyindicators import ema, rsi, crossover, crossunder
-
-from investing_algorithm_framework import (
-    TradingStrategy, DataSource, TimeUnit, Schedule, DataType,
-    PositionSize, ScalingRule, StopLossRule, CooldownRule,
-    SignalSide, signals_from_column, signal_series_from_column,
+app.add_market(
+  market="BITVAVO",
+  trading_symbol="EUR",
+  initial_balance=10_000,
+  fee_percentage=0.1,
+  paper_trading=True,
 )
-
-
-class RSIEMACrossoverStrategy(TradingStrategy):
-    """
-    EMA crossover + RSI filter strategy with position scaling and stop losses.
-
-    Buy when RSI is oversold AND a recent EMA crossover occurred.
-    Sell when RSI is overbought AND a recent EMA crossunder occurred.
-    Scale into winners, trail a stop loss, and let the framework handle the rest.
-    """
-    schedule = Schedule.every(2, TimeUnit.HOUR)
-    symbols = ["BTC", "ETH"]
-    data_sources = [
-        DataSource(
-            identifier="BTC_ohlcv", symbol="BTC/EUR",
-            data_type=DataType.OHLCV, time_frame="2h",
-            market="BITVAVO", pandas=True, warmup_window=100,
-        ),
-        DataSource(
-            identifier="ETH_ohlcv", symbol="ETH/EUR",
-            data_type=DataType.OHLCV, time_frame="2h",
-            market="BITVAVO", pandas=True, warmup_window=100,
-        ),
-    ]
-
-    # Risk management
-    position_sizes = [
-        PositionSize(symbol="BTC", percentage_of_portfolio=20),
-        PositionSize(symbol="ETH", percentage_of_portfolio=20),
-    ]
-    scaling_rules = [
-        ScalingRule(
-            symbol="BTC", max_entries=3,
-            scale_in_percentage=[50, 25], cooldown_in_bars=5,
-        ),
-        ScalingRule(
-            symbol="ETH", max_entries=3,
-            scale_in_percentage=[50, 25], cooldown_in_bars=5,
-        ),
-    ]
-    stop_losses = [
-        StopLossRule(
-            symbol="BTC", percentage_threshold=5,
-            sell_percentage=100, trailing=True,
-        ),
-        StopLossRule(
-            symbol="ETH", percentage_threshold=5,
-            sell_percentage=100, trailing=True,
-        ),
-    ]
-    # Signal throttling: after a stop-out / sell, block re-entries on
-    # the same symbol for 12 bars, plus a portfolio-wide breather of
-    # 2 bars after any order to avoid same-bar pile-ups.
-    cooldowns = [
-        CooldownRule(
-            symbol="BTC", trigger="sell", blocks="buy", bars=12,
-        ),
-        CooldownRule(
-            symbol="ETH", trigger="sell", blocks="buy", bars=12,
-        ),
-        CooldownRule(trigger="any", blocks="any", bars=2),
-    ]
-
-    def _add_signal_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        df = ema(df, period=12, source_column="Close",
-                 result_column="ema_short")
-        df = ema(df, period=26, source_column="Close",
-                 result_column="ema_long")
-        df = crossover(df, first_column="ema_short",
-                        second_column="ema_long",
-                        result_column="ema_crossover")
-        df = crossunder(df, first_column="ema_short",
-                         second_column="ema_long",
-                         result_column="ema_crossunder")
-        df = rsi(df, period=14, source_column="Close", result_column="rsi")
-
-        df["entry"] = (
-            (df["rsi"] < 30)
-            & (df["ema_crossover"].rolling(window=10).max() > 0)
-        ).fillna(False)
-        df["exit"] = (
-            (df["rsi"] >= 70)
-            & (df["ema_crossunder"].rolling(window=10).max() > 0)
-        ).fillna(False)
-        return df
-
-    def generate_signals(self, context, data: Dict[str, Any]):
-        """Event-mode entry point — live, paper trading, event backtests."""
-        for symbol in self.symbols:
-            df = self._add_signal_columns(data[f"{symbol}_ohlcv"])
-            yield from signals_from_column(
-                df, "entry", side=SignalSide.OPEN_LONG, symbol=symbol,
-                source="rsi_ema_crossover",
-            )
-            yield from signals_from_column(
-                df, "exit", side=SignalSide.CLOSE_LONG, symbol=symbol,
-                source="rsi_ema_crossover",
-            )
-
-    def generate_signal_series(self, data: Dict[str, Any]):
-        """Vector-mode entry point — only needed for vector backtests."""
-        for symbol in self.symbols:
-            df = self._add_signal_columns(data[f"{symbol}_ohlcv"])
-            yield signal_series_from_column(
-                df, "entry", side=SignalSide.OPEN_LONG, symbol=symbol,
-                source="rsi_ema_crossover",
-            )
-            yield signal_series_from_column(
-                df, "exit", side=SignalSide.CLOSE_LONG, symbol=symbol,
-                source="rsi_ema_crossover",
-            )
 ```
 
-Create as many strategy variants as you want — different parameters, different indicators, different symbols — then backtest them all and compare in a single report.
+Keep secrets outside source code with market-scoped environment variables:
+
+```bash
+BITVAVO_API_KEY=<your-api-key>
+BITVAVO_SECRET_KEY=<your-api-secret>
+```
+
+Explicit credentials from a secret manager can be registered with
+`MarketCredential`. Deployment-level `BITVAVO_OVERRIDE_*` variables can enforce
+credentials, paper mode, and managed balance regardless of values supplied by
+the application.
+
+Portfolio state, orders, positions, and trades persist across runs. Optional
+portfolio synchronization reconciles broker balances and supports recurring or
+one-off deposit schedules. Local paper trading requires no real credentials.
+
+See [Portfolio Configuration](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/portfolio-configuration),
+[Credential Management](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/credentials),
+and [Portfolio Synchronization](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/portfolio-sync).
 
 </details>
 
+<a id="dashboard"></a>
 <details>
-<summary>
-  Backtest Report Dashboard
-</summary> <br>
+<summary><strong>Dashboard</strong></summary>
+<br>
 
-Every backtest produces a **single HTML file** you can open in any browser, share with teammates, or archive. No server, no dependencies, no Jupyter required.
+`BacktestReport` creates a self-contained interactive HTML dashboard. Compare
+strategies, inspect equity and drawdown curves, review trades, analyze monthly
+and yearly returns, check window coverage, and add research notes without
+running a separate server.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="static/features/dashboard-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="static/features/dashboard-light.svg">
-    <img src="static/features/dashboard-dark.svg" alt="Self-contained HTML backtest dashboard" style="max-width: 100%;">
+    <img src="static/features/dashboard-dark.svg" alt="Backtest analysis dashboard" style="max-width: 100%;">
   </picture>
 </p>
 
 ```python
 from investing_algorithm_framework import BacktestReport
 
-# After running backtests
-report = BacktestReport(backtest)
-report.show()  # Opens dashboard in your browser
+# Materialize only the selected results when working with a large index.
+BacktestReport(
+    backtests=results.load_backtests(workers=1),
+).save("backtest-report.html")
 
-# Or load previously saved backtests from disk
-report = BacktestReport.open(directory_path="path/to/backtests")
-report.show()
-
-# Compare multiple strategies side by side
-report = BacktestReport.open(backtests=[backtest_a, backtest_b, backtest_c])
-report.show()
-
-# Save as a self-contained HTML file
-report.save("my_report.html")
+# Or reopen a directory of persisted bundles later.
+BacktestReport.open(
+    directory_path="./my-backtests/",
+    workers=-1,
+    show_progress=True,
+).save("backtest-report.html")
 ```
 
-**Overview page** — KPI cards, key metrics ranking table, trading activity, return scenarios, equity curves, metric bar charts, monthly returns heatmap, return distributions, and window coverage matrix.
+The built-in MCP server lets compatible AI tools query stored backtests, compare
+strategies, inspect trades, and work with report notes through
+`investing-algorithm-framework mcp`.
 
-**Strategy pages** — Deep dive into each strategy with per-run equity curves, rolling Sharpe, drawdown, monthly/yearly returns, and portfolio summary.
-
-</details>
-
-<details open>
-<summary>
- Capabilities
-</summary> <br>
-
-| | |
-|---|---|
-| **[Backtest Report Dashboard](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** | Self-contained HTML report with ranking tables, equity curves, metric charts, heatmaps, and strategy comparison |
-| **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting)** | Realistic, order-by-order simulation |
-| **[Vectorized Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)** | Fast signal research and prototyping |
-| **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)** | Compute factors across many symbols at once — rank, filter and score universes per iteration |
-| **50+ Metrics** | CAGR, Sharpe, Sortino, max drawdown, win rate, profit factor, recovery factor, volatility, and more |
-| **[Live Trading](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** | Connect to exchanges via CCXT for real-time execution |
-| **[Portfolio Management](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/portfolio-configuration)** | Position tracking, trade management, persistence |
-| **[Cloud Deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)** | Deploy to AWS Lambda, Azure Functions, or run as a web service |
-| **[Market Data Providers](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-data-providers)** | Built-in providers for CCXT, Yahoo Finance, Alpha Vantage, and Polygon — or build your own |
-| **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)** | Fetch CSV, JSON, or Parquet from any URL with caching, date parsing, and pre/post-processing |
-| **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** | Track any indicator or metric during backtests with `context.record()` |
-| **[Strategies](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/strategies)** | OHLCV, tickers, custom data — Polars and Pandas native |
-| **[Extensible](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-data-providers)** | Custom data providers, order executors, and strategy classes |
+See the [report guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)
+and [MCP server guide](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server).
 
 </details>
 
-</details>
-
+<a id="advanced-features"></a>
 <details>
-<summary>
-  <strong>Plugins</strong>
-</summary> <br>
+<summary><strong>Advanced Features</strong></summary>
+<br>
 
-| Plugin | Description |
-|--------|-------------|
-| [PyIndicators](https://github.com/coding-kitties/PyIndicators) | Technical analysis indicators (EMA, RSI, MACD, etc.) |
-| [Finterion Plugin](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin) | Share and monetize strategies on Finterion's marketplace |
+- **Backtest optimization:** plug in an ask/tell `StrategyOptimizer`, budget candidate evaluations, and resume saved search state.
+- **Long and short trading:** use open/close signals for either side with fill-based P&L and collateral handling.
+- **Cross-sectional pipelines:** rank, filter, and score a universe of symbols on each iteration.
+- **Confluence cards:** combine primary conditions, weighted evidence, requirements, vetoes, and score thresholds.
+- **Decision traces:** retain indicator values, rule outcomes, and scores for signals and no-op decisions.
+- **Risk rules:** configure position sizing, exposure limits, scaling, stop losses, take profits, and signal cooldowns.
+- **Execution models:** use percentage, fixed, basis-point, or volume-aware commission and slippage models.
+- **Monte Carlo testing:** estimate whether performance could plausibly occur by chance.
+- **Metrics and benchmarks:** analyze CAGR, Sharpe, Sortino, Calmar, VaR/CVaR, drawdown, recovery, and benchmark-relative performance.
+- **External data and custom variables:** load cached CSV, JSON, or Parquet data and record strategy-specific values.
+- **Portfolio synchronization:** model recurring or one-off deposits and reconcile live balances with a broker.
+- **Bounded execution:** control workers, memory admission, checkpoints, progress, and failure handling for large sweeps.
+
+See the [advanced concepts documentation](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/)
+and [backtest optimization guide](docusaurus/docs/Advanced%20Concepts/backtest-optimization.md).
+
+</details>
+
+<a id="position-modes"></a>
+<details>
+<summary><strong>Position Modes: NETTING vs. HEDGE</strong></summary>
+<br>
+
+Portfolios use `PositionMode.NETTING` by default: each symbol has one net
+direction, so a long and short cannot coexist. Enable `PositionMode.HEDGE` to
+maintain independent long and short legs for the same symbol, each with its own
+entry, scaling, stop-loss, take-profit, cooldown, and P&L.
+
+```python
+from investing_algorithm_framework import PositionMode
+
+app.add_market(
+  market="BITVAVO",
+  trading_symbol="EUR",
+  initial_balance=10_000,
+  position_mode=PositionMode.HEDGE,
+)
+```
+
+Both backtest engines support `OPEN_LONG`, `CLOSE_LONG`, `OPEN_SHORT`, and
+`CLOSE_SHORT` independently in HEDGE mode. In NETTING mode,
+`flip_on_opposite_signal=True` can close the current direction and open the
+opposite direction on the same bar.
+
+Live HEDGE trading requires an `OrderExecutor` and `PortfolioProvider` that
+explicitly support it. The built-in CCXT adapters support NETTING only, so use
+custom HEDGE-capable adapters for live execution.
+
+See [Position Modes: NETTING vs. HEDGE](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/position-modes).
+
+</details>
+
+<a id="pipelines"></a>
+<details>
+<summary><strong>Pipelines</strong></summary>
+<br>
+
+Pipelines compute factors across many symbols in one pass and return a tidy
+cross-sectional table on each strategy iteration. Use them to define a tradeable
+universe, rank candidates, normalize factors, and construct multi-factor or
+risk-neutral signals without manually looping over symbols.
+
+```python
+from investing_algorithm_framework import AverageDollarVolume, Pipeline, Returns
+
+
+class MomentumScreener(Pipeline):
+  dollar_volume = AverageDollarVolume(window=30)
+  momentum = Returns(window=30)
+
+  universe = dollar_volume.top(100)
+  alpha = momentum.rank(mask=universe)
+
+
+class MomentumStrategy(TradingStrategy):
+  pipelines = [MomentumScreener]
+
+  def generate_signals(self, context, data):
+    candidates = data["MomentumScreener"]
+    leaders = candidates.sort("alpha", descending=True).head(10)
+    # Yield Signal objects for the selected symbols.
+    ...
+```
+
+Built-in factors include returns, liquidity, moving averages, RSI, volatility,
+cross-sectional means, rolling beta, and neutralization. Factors compose with
+arithmetic, ranking, filtering, z-scoring, demeaning, winsorization, and grouped
+transforms.
+
+See the [Pipelines guide](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines),
+[event backtest integration](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines-event-backtest),
+[vector backtest integration](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines-vector-backtest),
+and [live integration](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines-live).
+
+</details>
+
+<a id="monte-carlo-testing"></a>
+<details>
+<summary><strong>Monte Carlo Testing</strong></summary>
+<br>
+
+Monte Carlo permutation testing helps distinguish a strategy's observed edge
+from results that randomized market paths could produce by chance. The framework
+runs the strategy on its original OHLCV data, creates randomized permutations,
+reruns the same strategy on each permutation, and compares the real metrics with
+the resulting null distributions.
+
+Use `app.run_monte_carlo_test(...)` with a strategy, a `BacktestDateRange`, and
+the desired number of permutations. The returned `BacktestMonteCarloTest`
+contains the real metrics, metrics from every permuted run, the original and
+permuted datasets, and p-values for metrics including:
+
+- CAGR, Sharpe, Sortino, and Calmar ratios
+- Profit factor, win rate, and win/loss ratio
+- Annual volatility and maximum drawdown
+- Average monthly return
+
+Lower p-values indicate that fewer randomized runs matched or exceeded the
+observed result. They are evidence about statistical significance, not proof of
+future profitability. Use enough permutations for the precision you need and
+combine the result with out-of-sample and walk-forward validation.
+
+See the [tutorial notebooks](examples/tutorial/README.md) for the robustness
+analysis workflow.
+
+</details>
+
+<a id="plugins-and-supported-libraries"></a>
+<details>
+<summary><strong>Plugins and Supported Libraries</strong></summary>
+<br>
+
+| Integration | Purpose |
+| --- | --- |
+| [PyIndicators](https://github.com/coding-kitties/PyIndicators) | Technical indicators including EMA, RSI, and MACD |
+| [Finterion plugin](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin) | Publish and operate strategies on Finterion |
+| [CCXT](https://github.com/ccxt/ccxt) | Exchange market data and live order execution |
+| Pandas and Polars | Native tabular inputs for strategy and backtest workflows |
+| Yahoo Finance, Alpha Vantage, and Polygon | Built-in market data providers |
+| AWS and Azure | Optional state storage and serverless deployment integrations |
+
+Custom data providers, order executors, storage adapters, strategies, metrics,
+and optimizers can be added without replacing the core workflow.
 
 </details>
 
 ## Development & Contributing
 
-We welcome contributions! Open an issue, pick one up, or send a PR.
+Contributions are welcome. Open an issue, choose an existing one, or submit a
+pull request against the `dev` branch.
 
 ```bash
 git clone https://github.com/coding-kitties/investing-algorithm-framework.git
 cd investing-algorithm-framework
 poetry install
-
-# Run all tests
 python -m unittest discover -s tests
 ```
 
-- [Open an issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new) for bugs or ideas
-- Read the [Contributing Guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing%20Guide/contributing)
-- Read the [Architecture references](/docs/architecture/README.md)
-- PRs go against the `dev` branch
+- [Open an issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new)
+- [Contributing guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing%20Guide/contributing)
+- [Architecture references](docs/architecture/README.md)
 
 ## Resources
 
-- **[Documentation](https://coding-kitties.github.io/investing-algorithm-framework/)** — Guides and API reference
-- **[Quick Start](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation)** — Get up and running
-- **[Discord](https://discord.gg/dQsRmGZP)** — Chat and support
-- **[Reddit](https://www.reddit.com/r/InvestingBots/)** — Strategy discussion
+- [Documentation](https://coding-kitties.github.io/investing-algorithm-framework/)
+- [Quick start](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation)
+- [Tutorial notebooks](examples/tutorial/README.md)
+- [Strategy showcase](examples/algorithm_examples/strategies_showcase/README.md)
+- [Discord](https://discord.gg/dQsRmGZP)
+- [Reddit](https://www.reddit.com/r/InvestingBots/)
 
 ## Risk Disclaimer
 
-If you use this framework for real trading, **do not risk money you are afraid to lose.** Test thoroughly with backtesting first. Start small. We assume no responsibility for your investment results.
+Do not risk money you cannot afford to lose. Backtests and paper trading cannot
+guarantee future performance. Validate strategy behavior, execution assumptions,
+stored results, and operational safeguards before trading with real funds. The
+project and its contributors assume no responsibility for investment results.
 
 ## Acknowledgements
 
-We want to thank all contributors to this project. A full list can be found in [AUTHORS.md](https://github.com/coding-kitties/investing-algorithm-framework/blob/master/AUTHORS.md).
+Thank you to everyone who has contributed code, documentation, testing, ideas,
+and feedback. See [AUTHORS.md](AUTHORS.md) for the contributor list.
 
-## Sponsor
+## Sponsors
 
-<a href="https://www.finterion.com/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png"><source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png"><img src="static/sponsors/finterion-light.png" alt="Finterion" width="180"></picture></a>
+<p align="center">
+  <a href="https://www.finterion.com/" target="_blank">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
+      <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
+      <img src="static/sponsors/finterion-light.png" alt="Finterion" width="180">
+    </picture>
+  </a>
+</p>
 
-**[Finterion](https://www.finterion.com/)** — Marketplace for trading bots. Monetize your strategies by publishing them on Finterion.
+[Finterion](https://www.finterion.com/) is a marketplace for trading bots where
+strategy creators can publish and monetize their work.

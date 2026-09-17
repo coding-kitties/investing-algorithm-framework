@@ -15,6 +15,25 @@ class TestRunReportsController(WebTestBase):
     ]
     external_balances = {"EUR": 1000}
 
+    def test_api_exposes_canonical_and_legacy_trace_fields(self):
+        from investing_algorithm_framework import DecisionTrace
+
+        self.iaf_app.add_strategy(StrategyOne)
+        self.iaf_app.run(number_of_iterations=1)
+        service = self.iaf_app.container.run_report_service()
+        report = service.create({
+            "decision_traces": [DecisionTrace(summary="API trace").to_dict()],
+        })
+        response = self.client.get("/api/run-reports")
+        self.assertEqual(200, response.status_code)
+        items = json.loads(response.data.decode())["items"]
+        item = next(item for item in items if item["id"] == report.id)
+        self.assertEqual(item["decision_traces"], item["score_cards"])
+        self.assertEqual("API trace", item["decision_traces"][0]["summary"])
+        self.assertEqual(
+            1, item["decision_traces"][0]["decision_trace_version"]
+        )
+
     def test_list_run_reports_ordered_by_completion(self):
         self.iaf_app.add_strategy(StrategyOne)
         self.iaf_app.run(number_of_iterations=1)

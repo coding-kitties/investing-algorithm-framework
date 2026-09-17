@@ -57,8 +57,14 @@ from .domain import ApiException, combine_backtests, Study, \
     DateRule, TimeRule, Schedule, ScheduledFunction, \
     Signal, SignalSide, SignalSeries, \
     signals_from_column, signal_series_from_column, signals_from_panel, \
-    ConflictPolicy, ConflictResolution, ScoreCard, ScoreCardEntry, \
-    SCORE_CARD_METADATA_KEY, SCORE_CARD_VERSION  # noqa: F401
+    ConflictPolicy, ConflictResolution, DecisionTrace, DecisionTraceEntry, \
+    DECISION_TRACE_METADATA_KEY, DECISION_TRACE_VERSION, \
+    ScoreCard, ScoreCardEntry, SCORE_CARD_METADATA_KEY, SCORE_CARD_VERSION, \
+    AllOf, AnyOf, AtLeast, Condition, ConditionExpression, condition, \
+    ConfluenceCard, ConfluenceResult, EvaluationContext, Expression, Not, \
+    Operator, PrimaryGroup, EvidenceGroup, GroupEvaluation, Requirement, \
+    RuleEvaluation, ScoreRule, \
+    ScoreType, Veto, CONFLUENCE_CARD_VERSION  # noqa: F401
 from .domain import Pipeline, Factor, CustomFactor, Filter, \
     AverageDollarVolume, AverageTradedValue, CrossSectionalMean, \
     Neutralize, Returns, RollingBeta, RSI, SMA, StaticPerSymbol, \
@@ -196,6 +202,31 @@ __all__ = [
     "Signal",
     "SignalSide",
     "ScoreCard",
+    "DecisionTrace",
+    "DecisionTraceEntry",
+    "DECISION_TRACE_METADATA_KEY",
+    "DECISION_TRACE_VERSION",
+    "AllOf",
+    "AnyOf",
+    "AtLeast",
+    "Condition",
+    "ConditionExpression",
+    "condition",
+    "ConfluenceCard",
+    "ConfluenceResult",
+    "EvaluationContext",
+    "Expression",
+    "Not",
+    "Operator",
+    "PrimaryGroup",
+    "EvidenceGroup",
+    "GroupEvaluation",
+    "Requirement",
+    "RuleEvaluation",
+    "ScoreRule",
+    "ScoreType",
+    "Veto",
+    "CONFLUENCE_CARD_VERSION",
     "ScoreCardEntry",
     "SCORE_CARD_METADATA_KEY",
     "SCORE_CARD_VERSION",

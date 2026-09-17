@@ -2384,9 +2384,7 @@ class App:
             permutated_metrics=permuted_metrics,
             ohlcv_permutated_datasets=permuted_datasets_ordered_by_symbol,
             ohlcv_original_datasets=original_datasets_ordered_by_symbol,
-            backtest_start_date=backtest_date_range.start_date,
-            backtest_end_date=backtest_date_range.end_date,
-            backtest_date_range_name=backtest_date_range.name
+            backtest_window=study.backtest_windows[0],
         )
         return monte_carlo_test_metrics
 
@@ -3508,18 +3506,15 @@ class App:
             portfolio.to_dict() for portfolio in portfolio_service.get_all()
         ]
         trades = [trade.to_dict() for trade in trade_service.get_all()]
-        score_cards = [
+        decision_traces = [
             {
                 "strategy_id": entry.get("strategy_id"),
                 "symbol": item.get("symbol"),
-                "summary": item.get("score_card", {}).get("summary"),
-                "entries": item.get("score_card", {}).get("entries", []),
-                "score_card_version": item.get("score_card", {}).get(
-                    "score_card_version"
-                ),
+                **trace,
             }
             for entry in event_loop_service.signal_log
-            for item in entry.get("score_cards", [])
+            for item in entry.get("decision_traces", [])
+            for trace in [item["decision_trace"]]
         ]
         config = self.container.configuration_service().get_config()
 
@@ -3544,7 +3539,7 @@ class App:
             "positions": positions,
             "portfolios": portfolios,
             "trades": trades,
-            "score_cards": score_cards,
+            "decision_traces": decision_traces,
         })
         return report
 

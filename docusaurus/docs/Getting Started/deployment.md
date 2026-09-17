@@ -2,15 +2,42 @@
 sidebar_position: 11
 ---
 
-# Going Live: Overview
+# Deployments Overview
 
-Once a strategy has been backtested and you're ready to run it against real markets, there are two stages to think about: **rehearsing** it safely, and then **deploying** it so it keeps running without your laptop being open.
+Once an algorithm has been backtested and you're ready to run it against real markets, there are two stages to think about: **rehearsing** it safely, and then **deploying** it so it keeps running without your laptop being open.
 
-## 1. Rehearse with paper trading
+The framework supports both local and cloud deployments, giving you flexibility in how you run your algorithms. Also, you can use a managed cloud service like the Finterion Platform to handle deployment and operation for you.
+
+## Managed Hosting
+
+### Finterion
+
+[![Finterion Platform logo](/img/finterion-light.png)](https://finterion.com)
+
+Finterion provides infrastructure and tools for quantitative trading. One of its key offerings is a managed platform for deploying and operating trading algorithms built with the Investing Algorithm Framework.
+
+It currently provides the following deployment and operational features:
+
+- Managed hosting of algorithms
+- Paper trading on various exchanges and brokers
+- Live deployments on various exchanges and brokers
+- Algorithm versioning and rollback
+- Secure storage of API keys and secrets
+- Drift detection and alerting based on past strategy performance and backtest results
+- Regime shift detection and alerting based on market conditions
+- Risk management and alerting based on predefined thresholds
+- Fine grained control over deployment and operational parameters
+- Marketplace for trading algorithms to be shared and discovered by other users
+
+Follow the following [tutorial](https://finterion.com/docs/deployments) to get started with deploying your algorithm on Finterion.
+
+## Self managed
+
+### 1. Rehearse with paper trading
 
 Before risking real capital (or even before you have exchange API keys at all), run your strategy with [Paper Trading](paper-trading) enabled. It executes your strategy exactly as it would run live — either against a broker's own sandbox/testnet, or against a local simulator — without ever placing a real order.
 
-## 2. Deploy to the cloud
+### 2. Deploy to the cloud
 
 The framework includes a CLI tool (`iaf`) that scaffolds and deploys your project so it can run unattended on a schedule. Two deployment targets are supported out of the box:
 
@@ -43,3 +70,4 @@ This generates:
 - [Paper Trading](paper-trading) — rehearse your strategy risk-free
 - [Deploying to AWS Lambda](deployment-aws-lambda)
 - [Deploying to Azure Functions](deployment-azure-functions)
+- [Finterion Platform](https://finterion.com) — managed hosting and application lifecycle tooling

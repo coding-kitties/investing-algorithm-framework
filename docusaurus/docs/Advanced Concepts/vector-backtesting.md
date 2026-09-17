@@ -2,11 +2,15 @@
 sidebar_position: 2
 ---
 
-# Vector Backtesting
+# Scaling Backtests
 
-Use the vector engine to screen strategy parameters quickly, then validate
-survivors with the event-driven engine. Both engines support disk-backed
-results, progressive pruning, checkpoints, and bounded parallel workers.
+This guide explains how to run large studies without retaining every result in
+memory. It covers disk-backed result indexes, progressive pruning, checkpoints,
+bounded parallel workers, and memory budgets for both backtesting engines.
+
+For engine semantics and a first backtest, start with
+[Vector Backtesting](../Getting%20Started/vector-backtesting) or
+[Event-Driven Backtesting](../Getting%20Started/event-backtesting).
 
 ## Basic Usage
 

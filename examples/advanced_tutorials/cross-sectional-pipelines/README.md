@@ -1,6 +1,6 @@
 # Pipeline API examples
 
-This folder showcases the **Pipeline API (Phase 1)** — a declarative way to
+This folder showcases the **Pipeline API** — a declarative way to
 express cross-sectional screens and signals over a panel of symbols, similar
 in spirit to Quantopian / Zipline pipelines.
 
@@ -33,7 +33,7 @@ class CrossSectionalMomentumBot(TradingStrategy):
     pipelines = [MomentumScreener]
     ...
 
-    def run_strategy(self, context, data):
+    def generate_signals(self, context, data):
         screen = data["MomentumScreener"]            # polars.DataFrame
         targets = screen.sort("alpha", descending=True).head(TOP_N)
         # ... rebalance into `targets` ...

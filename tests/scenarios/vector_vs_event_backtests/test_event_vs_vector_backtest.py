@@ -577,10 +577,13 @@ class TestFlipOnOppositeSignal(TestCase):
     def _run(self, strategy, engine, date_range):
         app = _create_app(f"Flip{engine.value}{strategy.strategy_id}")
         study = _build_study(date_range, engine=engine)
-        kwargs = {"dynamic_position_sizing": True} \
-            if engine is BacktestEngine.VECTOR else {}
+        run_configuration = BacktestRunConfiguration(
+            dynamic_position_sizing=(engine is BacktestEngine.VECTOR),
+        )
         backtests = app.run_backtest(
-            strategy=strategy, study=study, **kwargs,
+            strategy=strategy,
+            study=study,
+            run_configuration=run_configuration,
         )
         return next(backtests.iter_backtests()).get_all_backtest_runs()[0]
 

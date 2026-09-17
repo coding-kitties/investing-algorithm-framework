@@ -1,5 +1,6 @@
 # Pluggable backtest optimization: API and design
 
+
 **Status:** Base contracts, local orchestration and durable resume implemented.
 Concrete optimizers, external-library adapters and distributed execution are
 not included.

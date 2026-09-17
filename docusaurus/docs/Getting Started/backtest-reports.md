@@ -4,7 +4,11 @@ sidebar_position: 10
 
 # Backtest Reports
 
-The framework generates self-contained HTML dashboard reports for analyzing backtest results. Reports work for both single and multi-strategy backtests — no external dependencies required.
+`BacktestReport` turns persisted backtest results into an interactive HTML
+dashboard. Use it to compare studies and engines, inspect individual windows,
+review trades and risk, and record research decisions. Reports work with one
+backtest, many algorithms, and `.obtf` bundles containing multiple studies or
+both execution engines.
 
 :::tip Working with hundreds or thousands of backtests?
 A `BacktestReport` inlines every backtest into a single HTML file, which becomes too heavy for a browser past a few dozen backtests. Use the [Backtest Storage Layer](./backtest-storage.md) to filter your collection down (in SQLite, sub-100 ms) and render reports only over the winners.
@@ -16,15 +20,16 @@ A `BacktestReport` inlines every backtest into a single HTML file, which becomes
 from investing_algorithm_framework import BacktestReport
 
 # Single strategy report
-report = BacktestReport(backtest)
-report.show()  # Opens in browser (or renders inline in Jupyter)
+report = BacktestReport(backtests=[backtest])
+report.show()  # Opens a browser, or renders inline in Jupyter.
 ```
 
 ## Creating Reports
 
 ### From a Backtest Object
 
-After running a backtest, pass the result directly:
+`run_backtest()` returns a `BacktestIndex`. Load the selected bundle before
+passing it to `BacktestReport`:
 
 ```python
 from investing_algorithm_framework import Study, Universe, BacktestWindow
@@ -35,31 +40,56 @@ study = Study(
     backtest_windows=[BacktestWindow(train_range=backtest_range)],
 )
 
-backtests = app.run_backtest(study=study)
-backtest = backtests[0]
+results = app.run_backtest(strategy=strategy, study=study)
+backtest = next(results.iter_backtests())
 
 report = BacktestReport(backtest)
 report.show(browser=True)
 ```
+
+`BacktestReport(backtest)` remains supported for compatibility. New code should
+prefer the explicit `backtests=[...]` form.
 
 ### From Multiple Backtests
 
 Compare strategies side by side in a single dashboard:
 
 ```python
-backtest_a = app.run_backtest(...)
-backtest_b = app.run_backtest(...)
+results = app.run_backtests(strategies=strategies, study=study)
+selected = results.filter(
+    lambda row: row["summary.sharpe_ratio"] > 1.0
+)
+backtests = selected.load_backtests(workers=1)
 
-report = BacktestReport(backtests=[backtest_a, backtest_b])
+report = BacktestReport(backtests=backtests)
 report.show()
 ```
 
+Filtering the lightweight index before loading bundles keeps report generation
+bounded to the strategies you actually want to compare.
+
 This generates a multi-strategy comparison dashboard with:
-- Strategy ranking tables (Key Metrics, Trading Activity)
-- Return Scenarios projections (Good/Average/Bad/Very Bad Year)
-- Normalized equity curves overlay
-- Per-strategy detail pages with Summary, Runs, and Performance tabs
-- Compare mode with monthly return distribution (Rows/Heatmap × Returns/Growth toggles)
+
+- sortable performance and trading-activity tables;
+- normalized equity and drawdown overlays;
+- return scenarios, distributions, rolling Sharpe, and correlations;
+- per-strategy runs, monthly and yearly returns, trades, orders, and positions;
+- a window selector for comparing equivalent historical periods.
+
+### Select a study
+
+By default, the report expands every populated `(study, engine)` pair into a
+separate dashboard entry. This lets a single `.obtf` bundle compare in-sample
+and out-of-sample studies or vector and event evidence side by side.
+
+Scope an in-memory report to one named study when needed:
+
+```python
+report = BacktestReport(
+    backtests=results.load_backtests(workers=1),
+    study="walk_forward_validation",
+)
+```
 
 ### From Saved Backtests on Disk
 
@@ -70,12 +100,15 @@ report = BacktestReport.open(directory_path="./my_backtests")
 report.show()
 ```
 
-The `open()` method recursively finds all valid backtest directories (containing `algorithm_id.json` and a `runs/` folder) **and** any `.obtf` bundle files, and loads them into a single report.
+The `open()` method recursively finds supported saved backtests, including
+`.obtf` bundle files, and loads them into one report.
 
-:::tip Optimized `.obtf` bundle format
-Backtests are saved by default in the framework's custom **`.obtf` bundle format** — a single binary file per backtest combining zstd compression and MessagePack encoding. It is purpose-built for backtest reports: ~21× smaller and ~27× fewer files than the legacy directory format, and `BacktestReport.open()` loads it ~3× faster. The legacy directory format is still fully supported for backwards compatibility, and you can mix both in the same folder.
+:::tip Open Backtest Format
+Backtests are saved by default as `.obtf` bundles. A bundle preserves studies,
+universes, windows, engine results, orders, trades, metrics, and lineage needed
+by reports and downstream analysis.
 
-For very large batches, opt into parallel loading:
+For larger selected sets, opt into parallel loading:
 
 ```python
 report = BacktestReport.open(directory_path="./my_backtests", workers=4)
@@ -149,7 +182,10 @@ report = BacktestReport(backtests=[backtest_a, backtest_b])
 report.save("strategy_comparison.html")
 ```
 
-The output is a single `.html` file with all CSS, JavaScript, and data embedded — no server or internet connection needed to view it.
+The output is a single `.html` file with the report CSS, JavaScript, and
+backtest data embedded. Core analysis works without a report server. Connecting
+to Finterion from its optional marketplace panel requires internet access and
+loads the Finterion authentication SDK.
 
 ## Viewing in Jupyter
 
@@ -164,42 +200,47 @@ report.show(browser=True)  # Also opens in the browser
 
 ## Dashboard Features
 
-### Overview Page
-- **KPI cards**: Best CAGR, best Sharpe, lowest max drawdown (with dual values when a window is selected)
-- **Window Coverage**: Strategy × window matrix showing data coverage
-- **Key Metrics table**: Sortable ranking with CAGR, Sharpe, Sortino, Calmar, Max DD, Volatility, Recovery Factor, Net Gain %
-- **Trading Activity table**: Profit Factor, Win Rate, Trades/yr, Trades/mo, Trades/wk, # Trades, Avg Return, Avg Duration
-- **Return Scenarios**: Good/Average/Bad/Very Bad Year projections based on CAGR ± volatility
-- **Equity curves**: Normalized percentage growth overlay
-- **Collapsible cards**: All chart sections can be collapsed/expanded
+The layout adapts to the number of populated study-engine views.
 
-### Strategy Pages
-Each strategy gets a dedicated page with three tabs:
+### Single view
+
+A report containing one study and engine uses four tabs:
 
 | Tab | Contents |
-|-----|----------|
-| **Summary** | Full KPI grid (CAGR, Sharpe, Sortino, Calmar, Max DD, Profit Factor, Win Rate, Volatility, Recovery Factor, etc.) |
-| **Runs** | Backtest run comparison table, equity overlay across runs |
-| **Performance** | Monthly returns heatmap, yearly returns bar chart, return distribution |
+| --- | --- |
+| **Overview** | Headline KPIs, equity and drawdown, window coverage, and run selection. |
+| **Performance** | Monthly/yearly returns, return distribution, rolling Sharpe, and calendar analysis. |
+| **Trades** | Trades, orders, positions, activity, and signal rejection details. |
+| **Risk** | Drawdown, exposure, risk metrics, and time-weighted views where available. |
 
-Use the run selector pills to switch between summary view and individual backtest runs.
+### Comparison view
 
-### Compare Mode (Multi-Strategy)
-Open the strategy selection modal to pick strategies for comparison. You can set a challenger strategy for highlighting. The compare page includes:
-- **Key Metrics** and **Trading Activity** ranking tables
-- **Return Scenarios** projections
-- **Monthly Returns** with four view modes (Returns/Growth × Rows/Heatmap), plus a year filter
-- Side-by-side equity curves and drawdown overlays
-- Metric bar charts (CAGR, Sharpe, Sortino, Calmar, Max DD, Win Rate, Profit Factor)
-- Return distribution histograms and correlation matrix
-- Rolling Sharpe ratio chart
-- Yearly returns bar charts
+Loading multiple algorithms, studies, or engines enables ranking and comparison.
+The overview includes best-result KPIs, a strategy-by-window coverage matrix,
+sortable key-metric and trading-activity tables, return scenarios, and
+normalized equity and drawdown overlays.
 
-### Sticky Navigation
-The page title bar with the window selector stays visible as you scroll.
+Each study-engine entry has **Summary**, **Runs**, and **Performance** tabs. The
+comparison page adds:
 
-### Dark / Light Theme
-Toggle between dark and light mode using the sun icon in the top-right corner.
+- strategy selection and challenger highlighting;
+- CAGR, Sharpe, Sortino, Calmar, drawdown, win-rate, and profit-factor charts;
+- monthly returns or cumulative growth as rows or a heatmap;
+- yearly returns, distributions, rolling Sharpe, and correlation matrices;
+- window-specific comparisons through the sticky window selector.
+
+### Report Builder and research notes
+
+The Report Builder stores analysis notes in the report, associates strategies
+with keep/maybe/reject decisions, captures chart snapshots, and exports research
+context. The MCP setup panel shows how compatible AI clients can query the same
+backtest directory for deeper analysis.
+
+### Appearance and marketplace
+
+The dashboard supports light and dark themes and responsive navigation. Its
+Finterion panel explains publishing and can connect to the marketplace when the
+viewer is online.
 
 ## Example: Full Workflow
 
@@ -260,8 +301,10 @@ report.show(browser=True)
 | `BacktestReport(backtests=[...])` | Create a report from one or more Backtest objects |
 | `BacktestReport(backtest)` | Create a report from a single Backtest (backward compatible) |
 | `BacktestReport.open(directory_path=..., backtests=[...])` | Load backtests from disk and/or combine with in-memory backtests |
+| `BacktestReport(backtests=[...], study="name")` | Render only one named study from in-memory bundles |
 | `report.show(browser=False)` | Display the report. In Jupyter: renders inline. Otherwise: opens browser. Set `browser=True` to force browser. |
 | `report.save(path)` | Save the report as a self-contained HTML file |
+| `report.pretty_print()` | Print an aggregate summary of rejected signals |
 
 ### `recalculate_backtests_in_directory`
 
@@ -278,6 +321,9 @@ Stream-recalculates every backtest bundle on disk inside worker processes. The f
 | `include_ohlcv` | `bool` | Re-emit attached OHLCV data with the bundle (default `False`) |
 | `max_tasks_per_child` | `int`, optional | Recycle each worker after this many tasks so RSS stays bounded (default `16`) |
 | `update_index` | `bool` | Rewrite `index.parquet` in the destination directory (default `True`) |
+| `study` | `str`, optional | Recompute only runs in the named study |
+| `engine` | `str`, optional | Recompute only `"vector"` or `"event"` runs |
+| `windows` | `List[BacktestDateRange]`, optional | Recompute only matching date ranges |
 
 **Returns:** `int` — the number of backtests recalculated.
 

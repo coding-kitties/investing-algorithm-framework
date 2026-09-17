@@ -16,7 +16,7 @@ from investing_algorithm_framework import (
     create_app,
 )
 
-from strategy import MachineLearningStrategy
+from examples.algorithm_examples.machine_learning_enabled_strategy.strategy import MachineLearningStrategy
 
 
 MODEL_PATH = Path(__file__).parent / "model.pkl"

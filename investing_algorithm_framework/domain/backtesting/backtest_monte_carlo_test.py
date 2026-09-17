@@ -2,7 +2,7 @@ import os
 import json
 
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import ClassVar, List, Dict
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
@@ -40,6 +40,10 @@ class BacktestMonteCarloTest:
         "win_loss_ratio",
         "average_monthly_return"
     ])
+    LOWER_IS_BETTER_METRICS: ClassVar[frozenset] = frozenset({
+        "annual_volatility",
+        "max_drawdown",
+    })
     real_metrics: BacktestMetrics = None
     permutated_metrics: List[BacktestMetrics] = field(default_factory=list)
     p_values: Dict[str, float] = field(default_factory=dict)
@@ -140,12 +144,16 @@ class BacktestMonteCarloTest:
                 for pm in self.permutated_metrics
                 if getattr(pm, metric, None) is not None
             ])
+            dist = dist[np.isfinite(dist)]
 
-            if len(dist) == 0:
+            if len(dist) == 0 or not np.isfinite(real_value):
                 continue
 
             if one_sided:
-                p = np.mean(dist >= real_value)
+                if metric in self.LOWER_IS_BETTER_METRICS:
+                    p = np.mean(dist <= real_value)
+                else:
+                    p = np.mean(dist >= real_value)
             else:
                 p = np.mean(np.abs(dist) >= abs(real_value))
 

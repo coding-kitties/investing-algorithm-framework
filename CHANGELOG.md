@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0a17] — 2026-09-17
+
+### Added
+
+- **Declarative confluence scoring cards**: strategies can compose state and
+  crossover conditions with `AllOf`, `AnyOf`, `Not`, and `AtLeast`, then apply
+  primary qualification, hard requirements, signed score rules, vetoes, and a
+  minimum threshold. Definitions are versioned and JSON round-trippable, and
+  `DecisionTrace.from_confluence_result()` projects each decision into the existing
+  audit/reporting format.
+- **Canonical decision traces**: `DecisionTrace`/`DecisionTraceEntry`,
+  `record_decision_trace()`, and `RunReport.decision_traces` now span runtime,
+  API, and persistence. Legacy ScoreCard imports, methods, metadata keys, and
+  report fields remain supported. Existing SQL history columns are retained;
+  this does not change the backtest storage format.
+- Cross-sectional pipeline, confluence-card, decision-trace, open-backtest-format,
+  and strategy-showcase examples, with corresponding Advanced Concepts guides.
+
+### Changed
+
+- Signal-card strategies can use the same declarative definitions in event and
+  vector backtests by implementing `prepare_signal_data()`.
+- Examples and documentation now use the v9 `Study`, `Universe`,
+  `BacktestWindow`, scheduling, and strategy-phase APIs consistently.
+
+### Fixed
+
+- Monte Carlo tests now retain their requested backtest window and compute
+  one-sided p-values in the correct direction for volatility and drawdown.
+- Resumed event backtests verify that checkpointed windows still exist in the
+  persisted bundle before skipping an algorithm.
+- Non-CCXT OHLCV providers now handle vector requests with window sizes and a
+  missing start date correctly.
+
 ## [9.0.0a16] — 2026-09-10
 
 ### Added
@@ -149,7 +183,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `calmar_ratio` of a flat `0.0`, which the HTML report then painted as
     "Suboptimal", even though a profitable run with zero downside/drawdown
     is an excellent outcome, not a bad one.
-  
+
   **Breaking**: `sortino_ratio` and `calmar_ratio` values in reports
   generated before this release are not directly comparable to values
   generated after it.

@@ -119,8 +119,8 @@ class TestReadmeExample(TestCase):
         # Verify the main strategy example exists
         main_example = extract_main_example_from_readme(self.readme_path)
         self.assertIn('RSIEMACrossoverStrategy', main_example)
-        self.assertIn('generate_signals', main_example)
-        self.assertIn('generate_signal_series', main_example)
+        self.assertIn('signal_cards', main_example)
+        self.assertIn('prepare_signal_data', main_example)
 
     def test_readme_strategy_class_is_valid_python(self):
         """The RSIEMACrossoverStrategy code from README compiles."""

@@ -12,17 +12,20 @@ for the high-level concept.
 ## Quick start
 
 ```python
-from typing import Any, Dict
-
 from investing_algorithm_framework import (
     AverageDollarVolume,
     BacktestDateRange,
+  BacktestWindow,
     Context,
     DataSource,
+  DataType,
     Pipeline,
     Returns,
+  Schedule,
+  Study,
     TimeUnit,
     TradingStrategy,
+  Universe,
     create_app,
 )
 
@@ -37,11 +40,10 @@ class MomentumScreener(Pipeline):
 
 class CrossSectionalMomentum(TradingStrategy):
     algorithm_id = "cross-sectional-momentum"
-    time_unit = TimeUnit.DAY
-    interval = 1
+  schedule = Schedule.every(1, TimeUnit.DAY)
     data_sources = [
         DataSource(
-            data_type="OHLCV",
+      data_type=DataType.OHLCV,
             market="binance",
             symbol=symbol,
             warmup_window=60,
@@ -52,27 +54,35 @@ class CrossSectionalMomentum(TradingStrategy):
     ]
     pipelines = [MomentumScreener]
 
-    def run_strategy(self, context: Context, data: Dict[str, Any]):
+    def generate_signals(self, context: Context, data):
         screen = data["MomentumScreener"]
         top = screen.sort("alpha", descending=True).head(2)
         for row in top.iter_rows(named=True):
             print(row["symbol"], row["momentum"], row["alpha"])
+      return ()
 
-
-app = create_app()
-app.add_strategy(CrossSectionalMomentum)
-app.add_market(market="binance", trading_symbol="EUR", initial_balance=1000)
 
 if __name__ == "__main__":
+  app = create_app()
     app.run_backtest(
-        backtest_date_range=BacktestDateRange(
-            start_date="2024-01-01", end_date="2024-06-01"
+    strategy=CrossSectionalMomentum(),
+    study=Study(
+      name="cross-sectional-momentum",
+      universe=Universe(market="binance", trading_symbol="EUR"),
+      initial_capital=1_000,
+      backtest_windows=[BacktestWindow(
+        train_range=BacktestDateRange(
+          start_date="2024-01-01",
+          end_date="2024-06-01",
+          name="research",
+        ),
+      )],
         ),
     )
 ```
 
-A complete runnable example lives in
-[`examples/pipeline_momentum_screener.py`](https://github.com/coding-kitties/investing-algorithm-framework/blob/dev/examples/pipeline_momentum_screener.py).
+See the complete
+[cross-sectional pipeline tutorial](https://github.com/coding-kitties/investing-algorithm-framework/tree/dev/examples/advanced_tutorials/cross-sectional-pipelines).
 
 ## How it works
 
@@ -167,8 +177,9 @@ class HighLowRange(CustomFactor):
 `pl.Series` aligned with the panel rows. Set:
 
 - `inputs` — the OHLCV columns you read from the panel.
-- `window` — the lookback in bars (used for warmup sizing checks in
-  future phases; also exposed via `pipeline.required_window()`).
+- `window` — the lookback in bars. Strategy construction validates it against
+  each OHLCV source's `warmup_window`; it is also exposed through
+  `pipeline.required_window()`.
 
 ## Cross-sectional ops
 
@@ -184,13 +195,14 @@ a `mask`, symbols outside the mask receive `null`.
 ## Reading the result
 
 ```python
-def run_strategy(self, context, data):
+def generate_signals(self, context, data):
     screen: pl.DataFrame = data["MomentumScreener"]
     if screen.is_empty():
-        return  # universe drained or warmup not yet satisfied
+    return ()  # universe drained or warmup not yet satisfied
 
     top = screen.sort("alpha", descending=True).head(5)
     symbols = top["symbol"].to_list()
+  return ()
 ```
 
 Common patterns:
@@ -205,22 +217,18 @@ pdf = screen.to_pandas()
 
 ## Performance notes
 
-Phase 1 is **eager**: the panel is rebuilt on every iteration. That is
-fine for daily/hourly backtests with up to a few hundred symbols. If
-you need to push further, Phase 2 ([#502](https://github.com/coding-kitties/investing-algorithm-framework/issues/502))
-introduces a vector-mode pipeline executor that materialises factors
-once over the full backtest window.
+Event-mode evaluation is **eager**: the panel and factor values are rebuilt on
+every iteration. That is suitable for daily/hourly backtests with up to a few
+hundred symbols. For larger research runs, use the vector pipeline executor,
+which materialises factors over the full backtest window.
 
-## Limitations (Phase 1)
+## Limitations
 
-- No factor arithmetic (`a + b`, `a / b`, `(a - b).zscore()`); use a
-  `CustomFactor` for now.
-- No cached results between bars (rebuilt each iteration).
+- Factor results are not cached between bars in event mode.
 - Only OHLCV inputs. External data joining is on the roadmap.
 
-These are intentional — the goal of Phase 1 is to nail down the public
-declarative surface (`Pipeline`, `Factor`, `Filter`, `top` / `bottom` /
-`rank`) before scaling the executor.
+Factor arithmetic and cross-sectional transforms use the same declarative API
+documented on the [Pipelines](pipelines.md) page.
 
 ## Troubleshooting
 
@@ -234,6 +242,6 @@ declarative surface (`Pipeline`, `Factor`, `Filter`, `top` / `bottom` /
 ## See also
 
 - [Pipelines](pipelines.md) — concept page.
-- [Pipelines: Vector backtest](pipelines-vector-backtest.md) — Phase 2 roadmap.
-- [Pipelines: Live trading](pipelines-live.md) — Phase 3 roadmap.
+- [Pipelines: Vector backtest](pipelines-vector-backtest.md) — whole-window execution.
+- [Pipelines: Live trading](pipelines-live.md) — supported envelope and hardening status.
 - Design doc: [`docs/architecture/strategy/pipeline-api.md`](https://github.com/coding-kitties/investing-algorithm-framework/blob/dev/docs/architecture/strategy/pipeline-api.md).

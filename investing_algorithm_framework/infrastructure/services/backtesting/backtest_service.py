@@ -464,22 +464,25 @@ class BacktestService:
             strategy: The strategy to validate.
 
         Raises:
-            OperationalException: If the strategy does not override
-                ``generate_signal_series``.
+            OperationalException: If the strategy has neither a vector
+                override nor signal cards with a preparation hook.
         """
         from investing_algorithm_framework.app.strategy import (
             TradingStrategy,
         )
 
-        # ``hasattr`` is always True because the base class defines a
-        # no-op default. Check the method has actually been overridden
-        # by the user subclass.
         own_method = type(strategy).generate_signal_series
         base_method = TradingStrategy.generate_signal_series
-        if own_method is base_method:
+        card_defaults = (
+            bool(strategy.signal_cards)
+            and type(strategy).prepare_signal_data
+            is not TradingStrategy.prepare_signal_data
+        )
+        if own_method is base_method and not card_defaults:
             raise OperationalException(
                 "Strategy must define a vectorized signal generator "
-                "(generate_signal_series). See docs/migration-v8-to-v9.md "
+                "(generate_signal_series), or configure signal_cards and "
+                "prepare_signal_data. See docs/migration-v8-to-v9.md "
                 "§10."
             )
 
@@ -2747,6 +2750,33 @@ class BacktestService:
                         force_rerun=force_rerun,
                         on_checkpoint_match=on_checkpoint_match,
                     )
+
+                verified_matched_ids = []
+                for algorithm_id in matched_ids:
+                    backtest_path = resolve_backtest_path(
+                        backtest_storage_directory, algorithm_id
+                    )
+                    if backtest_path is not None:
+                        persisted = Backtest.open(backtest_path)
+                        persisted_study = persisted.get_study(study.name)
+                        persisted_runs = (
+                            persisted_study.get_runs("event")
+                            if persisted_study is not None else []
+                        )
+                        if any(
+                            run.backtest_start_date
+                            == backtest_date_range.start_date
+                            and run.backtest_end_date
+                            == backtest_date_range.end_date
+                            for run in persisted_runs
+                        ):
+                            verified_matched_ids.append(algorithm_id)
+                            continue
+                    algorithms_to_run.append(next(
+                        algorithm for algorithm in active_algorithms
+                        if algorithm_id_map[id(algorithm)] == algorithm_id
+                    ))
+                matched_ids = verified_matched_ids
 
                 # Add matched (skipped) ids to session cache
                 if session_cache is not None:

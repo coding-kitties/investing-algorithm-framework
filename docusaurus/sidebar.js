@@ -153,6 +153,18 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Advanced Concepts/confluence-cards',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/permutation-testing',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/mcp-server',
+                },
+                {
+                    type: 'doc',
                     id: 'Advanced Concepts/mirror-stop-loss-take-profit',
                 },
                 {
@@ -175,43 +187,75 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
-                    id: 'Getting Started/event-backtesting',
+                    id: 'Getting Started/studies',
                 },
                 {
                     type: 'doc',
-                    id: 'Getting Started/vector-backtesting',
+                    id: 'Getting Started/universes',
                 },
                 {
                     type: 'doc',
-                    id: 'Advanced Concepts/vector-backtesting',
+                    id: 'Getting Started/backtest-windows',
                 },
                 {
-                    type: 'doc',
-                    id: 'Advanced Concepts/OPTIMIZATION_GUIDE',
+                    type: 'category',
+                    label: 'Engines',
+                    items: [
+                        {
+                            type: 'doc',
+                            id: 'Getting Started/event-backtesting',
+                            label: 'Event-Driven Backtesting',
+                        },
+                        {
+                            type: 'doc',
+                            id: 'Getting Started/vector-backtesting',
+                            label: 'Vector Backtesting',
+                        },
+                        {
+                            type: 'doc',
+                            id: 'Advanced Concepts/vector-backtesting',
+                            label: 'Scaling Backtests',
+                        },
+                    ],
                 },
                 {
-                    type: 'doc',
-                    id: 'Advanced Concepts/PARALLEL_PROCESSING_GUIDE',
+                    type: 'category',
+                    label: 'Results and Data',
+                    items: [
+                        {
+                            type: 'doc',
+                            id: 'Getting Started/open-backtest-format',
+                        },
+                        {
+                            type: 'doc',
+                            id: 'Getting Started/backtest-reports',
+                        },
+                        {
+                            type: 'doc',
+                            id: 'Getting Started/backtest-storage',
+                        },
+                        {
+                            type: 'doc',
+                            id: 'Data/backtest_data',
+                            label: 'Inspecting Backtest Data',
+                        },
+                    ],
                 },
                 {
-                    type: 'doc',
-                    id: 'Getting Started/backtest-reports',
-                },
-                {
-                    type: 'doc',
-                    id: 'Getting Started/backtest-storage',
-                },
-                {
-                    type: 'doc',
-                    id: 'Data/backtest_data',
-                },
-                {
-                    type: 'doc',
-                    id: 'Advanced Concepts/pipelines-event-backtest',
-                },
-                {
-                    type: 'doc',
-                    id: 'Advanced Concepts/pipelines-vector-backtest',
+                    type: 'category',
+                    label: 'Pipeline Integration',
+                    items: [
+                        {
+                            type: 'doc',
+                            id: 'Advanced Concepts/pipelines-event-backtest',
+                            label: 'Event-Driven Pipelines',
+                        },
+                        {
+                            type: 'doc',
+                            id: 'Advanced Concepts/pipelines-vector-backtest',
+                            label: 'Vector Pipelines',
+                        },
+                    ],
                 },
             ],
         },

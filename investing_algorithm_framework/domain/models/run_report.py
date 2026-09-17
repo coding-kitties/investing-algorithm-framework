@@ -1,4 +1,40 @@
 from investing_algorithm_framework.domain.models.base_model import BaseModel
+from .decision_trace import normalize_trace_metadata
+
+
+def _normalize_decision_traces(records):
+    normalized = []
+    for record in records or []:
+        if "decision_trace" in record or "score_card" in record:
+            normalized.append(normalize_trace_metadata(record))
+        else:
+            normalized.append(normalize_trace_metadata({
+                "decision_trace": record,
+            })["decision_trace"])
+    return normalized
+
+
+def _normalize_metadata_records(records):
+    return [
+        {**record, "metadata": normalize_trace_metadata(record["metadata"])}
+        if isinstance(record.get("metadata"), dict) else dict(record)
+        for record in records or []
+    ]
+
+
+def _normalize_signal_reports(reports):
+    normalized = []
+    for report in reports or []:
+        traces = _normalize_decision_traces(report.get(
+            "decision_traces", report.get("score_cards", []),
+        ))
+        normalized.append({
+            **report,
+            "signals": _normalize_metadata_records(report.get("signals")),
+            "decision_traces": traces,
+            "score_cards": traces,
+        })
+    return normalized
 
 
 class RunReport(BaseModel):
@@ -39,19 +75,19 @@ class RunReport(BaseModel):
             the strategy emitted this run, whether it turned into an
             order ("approved") or was dropped ("rejected", with the
             reason from the phase pipeline that dropped it). Each
-            entry also carries a "score_cards" list of any
-            ``ScoreCard``s recorded via
-            ``TradingStrategy.record_score_card`` that tick,
+            entry also carries a "decision_traces" list of any
+            ``DecisionTrace`` objects recorded via
+            ``TradingStrategy.record_decision_trace`` that tick,
             independent of whether a signal was actually emitted —
             useful for explaining why *no* signal fired.
         positions: All current positions across configured portfolios.
         portfolios: All current portfolios.
         trades: All current trades across configured portfolios. Each
             trade dict already carries its own ``strategy_id``.
-        score_cards: Every ``ScoreCard`` recorded this run via
-            ``TradingStrategy.record_score_card``, flattened across
+        decision_traces: Every ``DecisionTrace`` recorded this run via
+            ``TradingStrategy.record_decision_trace``, flattened across
             all strategies/ticks into one top-level list — one entry
-            per symbol per run, each carrying its own ``strategy_id``,
+            per recording, each carrying its own ``strategy_id``,
             ``symbol``, ``summary``, and ``entries``. Present even for
             a tick where no signal/order was produced at all, so a
             caller can see *why* nothing happened.
@@ -72,6 +108,7 @@ class RunReport(BaseModel):
         portfolios=None,
         trades=None,
         score_cards=None,
+        decision_traces=None,
     ):
         self.id = id
         self.algorithm_id = algorithm_id
@@ -80,12 +117,23 @@ class RunReport(BaseModel):
         self.number_of_iterations = number_of_iterations
         self.started_at = started_at
         self.completed_at = completed_at
-        self.orders = orders if orders is not None else []
-        self.signals = signals if signals is not None else []
+        self.orders = _normalize_metadata_records(orders)
+        self.signals = _normalize_signal_reports(signals)
         self.positions = positions if positions is not None else []
         self.portfolios = portfolios if portfolios is not None else []
-        self.trades = trades if trades is not None else []
-        self.score_cards = score_cards if score_cards is not None else []
+        self.trades = _normalize_metadata_records(trades)
+        self.decision_traces = _normalize_decision_traces(
+            decision_traces if decision_traces is not None else score_cards
+        )
+
+    @property
+    def score_cards(self):
+        """Compatibility alias for :attr:`decision_traces`."""
+        return self.decision_traces
+
+    @score_cards.setter
+    def score_cards(self, value):
+        self.decision_traces = _normalize_decision_traces(value)
 
     def to_dict(self):
         def ensure_iso(value):
@@ -101,12 +149,15 @@ class RunReport(BaseModel):
             "number_of_iterations": self.number_of_iterations,
             "started_at": ensure_iso(self.started_at),
             "completed_at": ensure_iso(self.completed_at),
-            "orders": self.orders,
-            "signals": self.signals,
+            "orders": _normalize_metadata_records(self.orders),
+            "signals": _normalize_signal_reports(self.signals),
             "positions": self.positions,
             "portfolios": self.portfolios,
-            "trades": self.trades,
-            "score_cards": self.score_cards,
+            "trades": _normalize_metadata_records(self.trades),
+            "decision_traces": _normalize_decision_traces(
+                self.decision_traces
+            ),
+            "score_cards": _normalize_decision_traces(self.decision_traces),
         }
 
     @staticmethod
@@ -125,6 +176,7 @@ class RunReport(BaseModel):
             portfolios=data.get("portfolios"),
             trades=data.get("trades"),
             score_cards=data.get("score_cards"),
+            decision_traces=data.get("decision_traces"),
         )
 
     def __repr__(self):

@@ -148,133 +148,154 @@ implement `supports_position_mode()` for `HEDGE`.
 
 ### Basic Strategy Structure
 
-There are two main approaches to creating strategies:
+There are two main approaches. Prefer the signal-based API when possible: the
+framework can then apply its normal conflict resolution, position sizing, risk,
+order-emission, and cooldown phases.
 
-#### Approach 1: Signal-Based Strategy (Recommended)
+#### Event and vector strategy (recommended)
 
-Override `generate_signals` and yield `Signal` objects using the `signals_from_column` helper, which inspects the latest row of a boolean column and emits at most one signal per call:
+Override both signal hooks to make one strategy usable by both backtest engines:
+
+- `generate_signals` is called once per bar by event-driven backtests, paper
+  trading, and live trading.
+- `generate_signal_series` is called once with the full window by the vector
+  backtest engine.
+
+Keep the indicator calculation shared so both hooks express the same rules.
+`signals_from_column` reads only the latest row for event mode, while
+`signal_series_from_column` returns the complete boolean series for vector mode.
 
 ```python
 from investing_algorithm_framework import (
-    TradingStrategy, TimeUnit, DataSource, PositionSize,
-    SignalSide, signals_from_column,
+    DataSource,
+    PositionSize,
+    Schedule,
+    SignalSide,
+    TimeUnit,
+    TradingStrategy,
+    signal_series_from_column,
+    signals_from_column,
 )
-import pandas as pd
 
-class MySignalStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 1
-    symbols = ["BTC", "ETH"]
 
+class MovingAverageStrategy(TradingStrategy):
+    schedule = Schedule.every(1, TimeUnit.HOUR)
+    symbols = ["BTC"]
     data_sources = [
         DataSource(
             identifier="btc_eur_1h",
             symbol="BTC/EUR",
             time_frame="1h",
-            warmup_window=100,
-            market="BITVAVO"
+            warmup_window=30,
+            market="BITVAVO",
+            pandas=True,
         ),
-        DataSource(
-            identifier="eth_eur_1h",
-            symbol="ETH/EUR",
-            time_frame="1h",
-            warmup_window=100,
-            market="BITVAVO"
-        )
+    ]
+    position_sizes = [
+        PositionSize(symbol="BTC", percentage_of_portfolio=25),
     ]
 
-    position_sizes = [
-        PositionSize(symbol="BTC", percentage=0.5),  # 50% of portfolio
-        PositionSize(symbol="ETH", percentage=0.3),  # 30% of portfolio
-    ]
+    def _with_signals(self, frame):
+        frame = frame.copy()
+        moving_average = frame["Close"].rolling(20).mean()
+        frame["open_long"] = frame["Close"] > moving_average
+        frame["close_long"] = frame["Close"] < moving_average
+        return frame
 
     def generate_signals(self, context, data):
-        """
-        Yield buy/sell signals for each symbol.
-
-        Args:
-            context: Strategy context (portfolio, positions, orders).
-            data: Dictionary with data source identifiers as keys.
-
-        Yields:
-            Signal: Zero or more OPEN_LONG / CLOSE_LONG signals.
-        """
-        # BTC signal logic
-        btc_data = data["btc_eur_1h"]
-        btc_ma20 = btc_data["Close"].rolling(20).mean()
-        btc_data["buy_signal"] = btc_data["Close"] > btc_ma20  # above MA20
-        btc_data["sell_signal"] = btc_data["Close"] < btc_ma20  # below MA20
+        """Event-driven backtest, paper, and live hook."""
+        frame = self._with_signals(data["btc_eur_1h"])
         yield from signals_from_column(
-            btc_data, "buy_signal",
-            side=SignalSide.OPEN_LONG, symbol="BTC",
+            frame,
+            "open_long",
+            side=SignalSide.OPEN_LONG,
+            symbol="BTC",
         )
         yield from signals_from_column(
-            btc_data, "sell_signal",
-            side=SignalSide.CLOSE_LONG, symbol="BTC",
+            frame,
+            "close_long",
+            side=SignalSide.CLOSE_LONG,
+            symbol="BTC",
         )
 
-        # ETH signal logic
-        eth_data = data["eth_eur_1h"]
-        eth_ma20 = eth_data["Close"].rolling(20).mean()
-        eth_data["buy_signal"] = eth_data["Close"] > eth_ma20
-        eth_data["sell_signal"] = eth_data["Close"] < eth_ma20
-        yield from signals_from_column(
-            eth_data, "buy_signal",
-            side=SignalSide.OPEN_LONG, symbol="ETH",
+    def generate_signal_series(self, data):
+        """Vector backtest hook."""
+        frame = self._with_signals(data["btc_eur_1h"])
+        yield signal_series_from_column(
+            frame,
+            "open_long",
+            side=SignalSide.OPEN_LONG,
+            symbol="BTC",
         )
-        yield from signals_from_column(
-            eth_data, "sell_signal",
-            side=SignalSide.CLOSE_LONG, symbol="ETH",
+        yield signal_series_from_column(
+            frame,
+            "close_long",
+            side=SignalSide.CLOSE_LONG,
+            symbol="BTC",
         )
 ```
 
-#### Approach 2: Custom Strategy Logic
+If a strategy only implements `generate_signals`, it can run event-driven,
+paper, and live, but not as a vector backtest. If it only implements
+`generate_signal_series`, it is vector-only.
 
-Override the `apply_strategy` method for full control over trading logic:
+#### Direct event-mode strategy with `run_strategy`
+
+Override `run_strategy` when the strategy needs direct access to `Context` and
+must create its own orders. This bypasses the default signal-processing phases,
+so the strategy is responsible for order conditions, sizing, and routing.
 
 ```python
-from investing_algorithm_framework import TradingStrategy, TimeUnit, OrderSide
+from investing_algorithm_framework import (
+    DataSource,
+    OrderSide,
+    Schedule,
+    TimeUnit,
+    TradingStrategy,
+)
 
-class MyCustomStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 1
 
-    def apply_strategy(self, context, data):
-        """
-        Custom strategy logic with full control.
+class DirectOrderStrategy(TradingStrategy):
+    schedule = Schedule.every(1, TimeUnit.HOUR)
+    symbols = ["BTC"]
+    data_sources = [
+        DataSource(
+            identifier="btc_eur_1h",
+            symbol="BTC/EUR",
+            time_frame="1h",
+            warmup_window=30,
+            market="BITVAVO",
+            pandas=True,
+        ),
+    ]
 
-        Args:
-            context: Context object for portfolio operations
-            data: Dictionary containing market data from data sources
-        """
-        symbol = "BTC"
-        full_symbol = f"{symbol}/{context.get_trading_symbol()}"
+    def run_strategy(self, context, data):
+        frame = data["btc_eur_1h"]
+        price = float(frame["Close"].iloc[-1])
+        moving_average = float(frame["Close"].rolling(20).mean().iloc[-1])
 
-        # Get current price
-        price = context.get_latest_price(full_symbol)
-
-        # Check if we have a position
-        if not self.has_position(symbol):
-            # Create a buy order
-            self.create_limit_order(
-                target_symbol=symbol,
-                order_side=OrderSide.BUY,
-                amount=0.01,
+        if price > moving_average and not context.has_position("BTC"):
+            context.create_limit_order(
+                target_symbol="BTC",
                 price=price,
-                execute=True
+                order_side=OrderSide.BUY,
+                percentage_of_portfolio=25,
             )
-        else:
-            # Check for sell condition
-            position = self.get_position(symbol)
-            if price > position.cost * 1.05:  # 5% profit
-                self.create_limit_order(
-                    target_symbol=symbol,
-                    order_side=OrderSide.SELL,
-                    amount=position.amount,
-                    price=price,
-                    execute=True
-                )
+        elif price < moving_average and context.has_position("BTC"):
+            context.create_limit_order(
+                target_symbol="BTC",
+                price=price,
+                order_side=OrderSide.SELL,
+                percentage_of_position=100,
+            )
 ```
+
+`run_strategy` is used by the event loop for event-driven backtests, paper
+trading, and live trading. The vector engine does not create a `Context` or call
+`run_strategy`; it requires `generate_signal_series`. A direct-order strategy
+must therefore be rewritten in terms of `SignalSeries` before it can use vector
+backtesting. Overriding both methods does not make the direct `run_strategy`
+orders part of a vector run.
 
 ### Registering Your Strategy
 

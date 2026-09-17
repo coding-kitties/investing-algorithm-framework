@@ -5,9 +5,22 @@ sidebar_position: 8
 # Backtesting
 
 Backtesting is the process of running an algorithm against historical market
-data to estimate how it would have performed. The framework offers two
-complementary backtesting modes, pick the one that matches what you
-are trying to learn.
+data to estimate how it would have performed. It helps test strategy logic,
+measure risk and returns, compare variants, and expose execution problems before
+paper or live trading. A backtest is evidence under specific historical data
+and assumptions, not a guarantee of future performance.
+
+The framework represents a reproducible backtest with four core concepts:
+
+| Concept | Question it answers |
+| --- | --- |
+| [Study](studies) | What experiment and assumptions are being evaluated? |
+| [Universe](universes) | Which assets and market are included? |
+| [Backtest window](backtest-windows) | Which training or test periods run? |
+| [Open Backtest Format](open-backtest-format) | How are definitions, results, and lineage persisted? |
+
+The framework offers two complementary backtesting modes. Choose the one that
+matches what you are trying to learn.
 
 ## Choosing a backtesting mode
 
@@ -15,7 +28,7 @@ are trying to learn.
 |--------|-----------------------------------|------------------------------|
 | **Multi strategy support** | Yes | No, you can only test one strategy class per backtest |
 | **Speed** | Slower, realistic simulation | 10-100x faster |
-| **Stop Loss / Take Profit** | Fully supported | Not supported |
+| **Stop Loss / Take Profit** | Fully supported | Fixed rules supported; trailing rules not supported |
 | **Signal Timing** | Executes at next strategy interval | Executes at exact signal timestamp |
 | **Position Sizing** | Based on portfolio at execution time | Based on portfolio at signal time |
 | **Data Loading** | Sliding window at each step | All data loaded at once |
@@ -25,8 +38,9 @@ A common workflow is to use **vector backtesting** for parameter sweeps
 and strategy filtering, and then validate the surviving strategies with
 **event-driven backtesting** for realistic execution.
 
-> Keep in mind that vector backtesting has some limitations: it does not support stop losses or take profits,
-> and it assumes that all signals are executed at the exact timestamp they are generated, which may not be
+> Keep in mind that vector backtesting has some limitations: trailing stop-loss
+> and take-profit rules require event-driven validation, and vector mode assumes
+> that signals execute at the exact timestamp they are generated, which may not be
 > realistic in live trading. Event-driven backtesting, on the other hand, simulates the actual trading
 > loop and is more accurate for final validation of strategies.
 > Also, data the signal generation is probably not the same as the signal generation on event backtesting or
@@ -95,7 +109,7 @@ study = Study(
     ],
 )
 
-backtests = app.run_backtest(
+results = app.run_backtest(
     algorithm=algorithm,
     study=study,
     run_configuration=BacktestRunConfiguration(
@@ -103,7 +117,7 @@ backtests = app.run_backtest(
         use_checkpoints=True,
     ),
 )
-backtest = backtests[0]
+backtest = next(results.iter_backtests())
 
 metrics = backtest.get_backtest_metrics(
     study.backtest_windows[0], study_name=study.name
@@ -118,8 +132,11 @@ best practices.
 ## Vector Backtesting
 
 Vector backtesting processes the entire price series in a single pass,
-which makes it dramatically faster but skips intra-bar simulation
-(no stop losses, take profits, signal cooldowns, order sizing etc). It is ideal for parameter sweeps, running hundreds of strategy variants, and large-scale optimization.
+which makes it dramatically faster but skips realistic intra-bar order
+simulation. Fixed stop-loss and take-profit rules are supported, while trailing
+rules, limit-order behavior, partial fills, and live portfolio timing require
+event-driven validation. It is ideal for parameter sweeps, running hundreds of
+strategy variants, and large-scale optimization.
 
 ```python
 from investing_algorithm_framework import BacktestRunConfiguration
@@ -157,7 +174,7 @@ study = Study(
 # run_backtest auto-detects the vector engine since MyStrategy
 # overrides generate_signal_series (not generate_signals). Vector
 # backtesting only supports a single strategy per backtest.
-backtests = app.run_backtest(
+results = app.run_backtest(
     strategy=MyStrategy(),
     study=study,
     run_configuration=BacktestRunConfiguration(
@@ -165,7 +182,7 @@ backtests = app.run_backtest(
         use_checkpoints=True,
     ),
 )
-backtest = backtests[0]
+backtest = next(results.iter_backtests())
 
 metrics = backtest.get_backtest_metrics(study.backtest_windows[0])
 print(f"Total Return: {metrics.total_return}%")
@@ -183,10 +200,18 @@ strategy filtering, and parallel processing.
 
 ## Data preparation
 
-Both `run_backtest` and `run_backtests` accept a `fill_missing_data`
-flag (default `True`) that automatically fills missing OHLCV rows
-before the backtest runs, so you don't have to hand-roll gap-filling
-yourself.
+Configure data preparation through `BacktestRunConfiguration`.
+`fill_missing_data=True` is the default and fills missing OHLCV rows before a
+run, so you do not have to hand-roll gap filling.
+
+```python
+run_configuration = BacktestRunConfiguration(fill_missing_data=True)
+results = app.run_backtest(
+    strategy=MyStrategy(),
+    study=study,
+    run_configuration=run_configuration,
+)
+```
 
 If you want to precompute features (e.g. for a machine learning model)
 before a vector backtest, do it once outside the strategy and pass the
@@ -215,49 +240,59 @@ study = Study(
     backtest_windows=[BacktestWindow(train_range=r) for r in date_ranges],
 )
 
-backtests = app.run_backtests(strategies=strategies, study=study)
+results = app.run_backtests(strategies=strategies, study=study)
 ```
 
-Use `window_filter_function`/`final_filter_function` to progressively
-prune underperforming strategies between date ranges instead of
-waiting until every window has finished:
+Use `window_metrics_filter_function` to progressively prune underperforming
+strategies between windows. The callback receives the current `BacktestIndex`
+and date range, then returns a subset index:
 
 ```python
-def window_filter(backtest_run):
-    """Runs after each date range; keep only profitable strategies."""
-    return backtest_run.backtest_metrics.total_return > 0
+import pandas as pd
 
-def final_filter(backtest):
-    """Runs once, after all date ranges have completed."""
-    return backtest.backtest_summary.sharpe_ratio > 1.0
 
-backtests = app.run_backtests(
+def keep_profitable(index, date_range):
+    return index.filter(
+        lambda row: (
+            pd.notna(row["summary.total_net_gain"])
+            and row["summary.total_net_gain"] > 0
+        )
+    )
+
+
+results = app.run_backtests(
     strategies=strategies,
     study=study,
-    window_filter_function=window_filter,
-    final_filter_function=final_filter,
+    window_metrics_filter_function=keep_profitable,
 )
 ```
 
-Both `run_backtest` and `run_backtests` support these same
-`window_filter_function`/`final_filter_function` parameters,
-regardless of which engine is used.
+Both entry points also accept `final_metrics_filter_function` for one final
+selection after all windows complete. See [Scaling Backtests](/docs/Advanced%20Concepts/vector-backtesting)
+for metric columns, ranking, checkpoints, and bounded parallel execution.
 
 ## Open Backtest Format
 
-Backtests are persisted in the framework's optimized **`.obtf` bundle format**, which is a single file containing all the data and metadata for a backtest. The format is designed to be efficient for both reading and writing, and is compatible with both event-driven and vector backtesting modes.
-
-The goal of this format is to be **open and extensible**: you can read and write the format without the framework, and you can add your own custom data to the bundle without breaking compatibility with future versions of the framework.
-
-Also this format allows developers to see the entire lineage of a backtest, including the strategies, studies, parameters, and data used to generate the results. This makes it easy to reproduce results and understand how a backtest was generated and to see the performance of your strategy accross scenarios.
+Backtests are persisted as portable, versioned `.obtf` bundles. One bundle can
+hold named studies, universes, windows, execution assumptions, and independent
+vector and event results for an algorithm. See
+[Open Backtest Format](open-backtest-format) for the bundle structure, reading,
+writing, and its relationship to the storage layer.
 
 ## Next Steps
 
+- [Studies](studies) — define the universe, windows, engine, and evaluation
+    assumptions for a reproducible experiment.
+- [Universes](universes) — identify the assets and market being evaluated.
+- [Backtest Windows](backtest-windows) — model simple periods, holdouts,
+  rolling tests, anchored tests, and walk-forward folds.
+- [Open Backtest Format](open-backtest-format) — persist definitions, results,
+  and lineage in portable `.obtf` bundles.
 - [Event-Driven Backtesting](event-backtesting) — realistic simulation
   with full order-execution semantics.
 - [Vector Backtesting](vector-backtesting) — fast parameter sweeps and
   optimization, with window/algorithm checkpoints.
 - [Backtest Reports](/docs/Getting%20Started/backtest-reports) — explore
   results in the interactive dashboard.
-- [Performance Optimization](/docs/Advanced%20Concepts/OPTIMIZATION_GUIDE)
-  — tips for large-scale testing.
+- [Scaling Backtests](/docs/Advanced%20Concepts/vector-backtesting) — use
+    persistent indexes, checkpoints, filtering, and bounded workers at scale.

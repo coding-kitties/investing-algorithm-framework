@@ -245,6 +245,7 @@ def _run_backtest(app, strategy, days=730, **kwargs):
         backtest_windows=[BacktestWindow(train_range=date_range)],
         engines=[BacktestEngine.VECTOR],
     )
+    dynamic_position_sizing = kwargs.pop("dynamic_position_sizing", False)
     backtests = app.run_backtest(
         strategy=strategy,
         study=study,
@@ -252,6 +253,7 @@ def _run_backtest(app, strategy, days=730, **kwargs):
         run_configuration=BacktestRunConfiguration(
             snapshot_interval=SnapshotInterval.DAILY,
             use_checkpoints=False,
+            dynamic_position_sizing=dynamic_position_sizing,
         ),
     )
     backtest = next(backtests.iter_backtests())

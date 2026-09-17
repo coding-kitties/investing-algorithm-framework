@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
-from sqlalchemy.orm import reconstructor
+from sqlalchemy.orm import reconstructor, synonym
 
 from investing_algorithm_framework.domain import RunReport
 from investing_algorithm_framework.infrastructure.database import (
@@ -36,19 +36,21 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
     positions_json = Column(Text, default=None)
     portfolios_json = Column(Text, default=None)
     trades_json = Column(Text, default=None)
-    score_cards_json = Column(Text, default=None)
+    decision_traces_json = Column("score_cards_json", Text, default=None)
+    score_cards_json = synonym("decision_traces_json")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._sync_json_columns()
 
     def _sync_json_columns(self):
-        self.orders_json = json.dumps(self.orders or [])
-        self.signals_json = json.dumps(self.signals or [])
+        payload = self.to_dict()
+        self.orders_json = json.dumps(payload["orders"])
+        self.signals_json = json.dumps(payload["signals"])
         self.positions_json = json.dumps(self.positions or [])
         self.portfolios_json = json.dumps(self.portfolios or [])
-        self.trades_json = json.dumps(self.trades or [])
-        self.score_cards_json = json.dumps(self.score_cards or [])
+        self.trades_json = json.dumps(payload["trades"])
+        self.decision_traces_json = json.dumps(payload["decision_traces"])
 
     @reconstructor
     def init_on_load(self):
@@ -62,14 +64,23 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
             if self.portfolios_json else []
         self.trades = json.loads(self.trades_json) \
             if self.trades_json else []
-        self.score_cards = json.loads(self.score_cards_json) \
-            if self.score_cards_json else []
+        restored = RunReport(
+            orders=self.orders, signals=self.signals, trades=self.trades,
+            decision_traces=json.loads(self.decision_traces_json)
+            if self.decision_traces_json else [],
+        )
+        self.orders = restored.orders
+        self.signals = restored.signals
+        self.trades = restored.trades
+        self.decision_traces = restored.decision_traces
 
     def update(self, data):
         data = dict(data)
+        if "decision_traces" in data:
+            data.pop("score_cards", None)
         json_fields = (
             "orders", "signals", "positions", "portfolios", "trades",
-            "score_cards",
+            "score_cards", "decision_traces",
         )
         for field_name in json_fields:
             if field_name in data:

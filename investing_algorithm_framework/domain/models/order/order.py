@@ -9,6 +9,8 @@ from investing_algorithm_framework.domain.datetime_parsing import (
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.models.decision_trace import \
+    normalize_trace_metadata
 from investing_algorithm_framework.domain.models.order.order_side import \
     OrderSide
 from investing_algorithm_framework.domain.models.order.order_status import \
@@ -94,7 +96,7 @@ class Order(BaseModel):
         self.slippage = slippage
         self.id = id
         self.cost = cost
-        self.metadata = metadata if metadata is not None else {}
+        self.metadata = normalize_trace_metadata(metadata or {})
         self.stop_price = stop_price
         self.triggered_at = triggered_at
         # Strategy that created this order, if known — populated

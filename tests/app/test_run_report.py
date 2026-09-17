@@ -1,12 +1,14 @@
 import os
 import shutil
+import json
+from copy import deepcopy
 from unittest import TestCase
 from unittest.mock import patch
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
     MarketCredential, Schedule, PositionSize, Signal, SignalSide, \
-    ScoreCard, ScoreCardEntry
+    ScoreCard, ScoreCardEntry, DecisionTrace, DecisionTraceEntry, RunReport
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 from tests.resources import random_string, OrderExecutorTest, \
@@ -77,6 +79,101 @@ class OpenLongOnceEverStrategy(TradingStrategy):
         yield Signal(symbol="BTC", side=SignalSide.OPEN_LONG)
 
 
+class NoSignalDecisionTraceStrategy(NoSignalScoreCardStrategy):
+    def generate_signals(self, context, data):
+        self.record_decision_trace(DecisionTrace.of(
+            DecisionTraceEntry("rsi_14", 55.0), summary="No entry",
+        ), symbol="BTC")
+        return iter(())
+
+
+class TestDecisionTraceCompatibility(TestCase):
+    def test_legacy_report_normalization_and_canonical_precedence(self):
+        trace = {"score_card_version": 4, "summary": "Old", "entries": []}
+        legacy = {
+            "score_cards": [{"symbol": "BTC", **trace}],
+            "orders": [{"metadata": {"score_card": trace}}],
+            "signals": [{
+                "strategy_id": "old",
+                "score_cards": [{"symbol": "BTC", "score_card": trace}],
+                "signals": [{"metadata": {"score_card": trace}}],
+            }],
+        }
+        original = deepcopy(legacy)
+        report = RunReport.from_dict(legacy)
+        output = report.to_dict()
+        self.assertEqual(original, legacy)
+        self.assertEqual(output["decision_traces"], output["score_cards"])
+        self.assertEqual(4, output["decision_traces"][0][
+            "decision_trace_version"
+        ])
+        for metadata in (
+            output["orders"][0]["metadata"],
+            output["signals"][0]["signals"][0]["metadata"],
+            output["signals"][0]["decision_traces"][0],
+        ):
+            self.assertEqual(metadata["decision_trace"],
+                             metadata["score_card"])
+        self.assertEqual(output, RunReport.from_dict(output).to_dict())
+        self.assertEqual([], RunReport.from_dict({
+            **legacy, "decision_traces": [],
+        }).decision_traces)
+        report.score_cards = []
+        self.assertEqual([], report.decision_traces)
+
+    def test_legacy_database_migration_reload_and_updates(self):
+        from sqlalchemy import Column, MetaData, Table, create_engine, inspect
+        from sqlalchemy.orm import Session
+        from investing_algorithm_framework.infrastructure.database \
+            .sql_alchemy import _apply_forward_only_migrations
+        from investing_algorithm_framework.infrastructure.models \
+            .run_report.run_report import SQLRunReport
+
+        engine = create_engine("sqlite:///:memory:")
+        self.addCleanup(engine.dispose)
+        old_table = Table("run_reports", MetaData(), *(
+            Column(column.name, column.type, primary_key=column.primary_key)
+            for column in SQLRunReport.__table__.columns
+            if column.name != "score_cards_json"
+        ))
+        old_table.create(engine)
+        with engine.begin() as connection:
+            connection.execute(old_table.insert().values(id=1))
+        _apply_forward_only_migrations(engine)
+        _apply_forward_only_migrations(engine)
+        columns = {item["name"] for item in inspect(engine).get_columns(
+            "run_reports"
+        )}
+        self.assertIn("score_cards_json", columns)
+        self.assertNotIn("decision_traces_json", columns)
+        legacy = [{"symbol": "BTC", "score_card_version": 3,
+                   "summary": "Legacy", "entries": []}]
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO run_reports (id, score_cards_json) VALUES (?, ?)",
+                (2, json.dumps(legacy)),
+            )
+        with Session(engine) as session:
+            self.assertEqual([], session.get(SQLRunReport, 1).decision_traces)
+            report = session.get(SQLRunReport, 2)
+            self.assertEqual(3, report.decision_traces[0][
+                "decision_trace_version"
+            ])
+            self.assertEqual(report.decision_traces_json,
+                             report.score_cards_json)
+            report.update({"decision_traces": [], "score_cards": legacy})
+            session.commit()
+            session.expunge_all()
+            report = session.get(SQLRunReport, 2)
+            self.assertEqual([], report.decision_traces)
+            report.update({"score_cards": legacy})
+            session.commit()
+            session.expunge_all()
+            report = session.get(SQLRunReport, 2)
+            self.assertEqual("Legacy", report.decision_traces[0]["summary"])
+            self.assertEqual(report.decision_traces, report.score_cards)
+
+
 class TestRunReport(TestCase):
 
     def setUp(self) -> None:
@@ -118,6 +215,21 @@ class TestRunReport(TestCase):
     def test_no_run_report_before_run(self):
         app = self._create_app()
         self.assertIsNone(app.get_last_run_report())
+
+    def test_canonical_recording_appears_in_tick_and_top_level_report(self):
+        app = self._create_app(strategy_cls=NoSignalDecisionTraceStrategy)
+        app.run(number_of_iterations=1)
+        report = app.get_last_run_report()
+        self.assertEqual(report["decision_traces"], report["score_cards"])
+        self.assertEqual(1, len(report["decision_traces"]))
+        self.assertEqual(1, report["decision_traces"][0][
+            "decision_trace_version"
+        ])
+        tick = report["signals"][0]
+        self.assertEqual(tick["decision_traces"], tick["score_cards"])
+        self.assertEqual("No entry", tick["decision_traces"][0][
+            "decision_trace"
+        ]["summary"])
 
     @patch(
         "investing_algorithm_framework.services.data_providers."
@@ -212,6 +324,9 @@ class TestRunReport(TestCase):
         report = app.get_last_run_report()
         self.assertEqual(1, len(report["orders"]))
         score_card = report["orders"][0]["metadata"]["score_card"]
+        self.assertEqual(score_card, report["orders"][0]["metadata"][
+            "decision_trace"
+        ])
         self.assertEqual("RSI oversold", score_card["summary"])
         self.assertEqual(
             28.4, score_card["entries"][0]["value"]
@@ -241,6 +356,9 @@ class TestRunReport(TestCase):
         ]
         self.assertEqual("rejected", all_signals[0]["status"])
         score_card = all_signals[0]["metadata"]["score_card"]
+        self.assertEqual(score_card, all_signals[0]["metadata"][
+            "decision_trace"
+        ])
         self.assertEqual("RSI oversold", score_card["summary"])
         self.assertEqual("rsi_14", score_card["entries"][0]["name"])
 
@@ -386,4 +504,3 @@ class TestRunReport(TestCase):
         )
         self.assertIsNotNone(still_open_order)
         self.assertEqual("OPEN", still_open_order["status"])
-

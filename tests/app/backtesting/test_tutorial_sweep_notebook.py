@@ -72,6 +72,12 @@ class TestTutorialSweepNotebook(TestCase):
                         ) or node.func.attr != "run_backtest":
                             continue
                         options = {kw.arg: kw.value for kw in node.keywords}
+                        configuration = options["run_configuration"]
+                        self.assertIsInstance(configuration, ast.Call)
+                        options = {
+                            kw.arg: kw.value
+                            for kw in configuration.keywords
+                        }
                         self.assertEqual(
                             ast.literal_eval(options["n_workers"]), 4,
                         )
@@ -90,16 +96,14 @@ class TestTutorialSweepNotebook(TestCase):
         options = self.app.run_backtest.call_args.kwargs
         signature(App.run_backtest).bind(self.app, **options)
         self.assertNotIn("result_mode", options)
-        self.assertEqual(
-            signature(App.run_backtest).parameters["result_mode"].default,
-            "index",
-        )
-        self.assertEqual(options["memory_budget_mb"], 16_384)
-        self.assertEqual(options["min_available_memory_mb"], 4_096)
-        self.assertEqual(options["n_workers"], 9)
-        self.assertTrue(options["use_checkpoints"])
-        self.assertTrue(options["dynamic_position_sizing"])
-        self.assertFalse(options["continue_on_error"])
+        self.assertNotIn("result_mode", signature(App.run_backtest).parameters)
+        configuration = options["run_configuration"]
+        self.assertEqual(configuration.memory_budget_mb, 16_384)
+        self.assertEqual(configuration.min_available_memory_mb, 4_096)
+        self.assertEqual(configuration.n_workers, 9)
+        self.assertTrue(configuration.use_checkpoints)
+        self.assertTrue(configuration.dynamic_position_sizing)
+        self.assertFalse(configuration.continue_on_error)
         self.assertIs(options["window_metrics_filter_function"], self.prune)
         self.assertNotIn("window_filter_function", options)
         self.assertNotIn("iterative_summary_update", options)
@@ -166,5 +170,8 @@ class TestTutorialSweepNotebook(TestCase):
                     self.namespace,
                 )
                 self.assertEqual(
-                    self.app.run_backtest.call_args.kwargs["n_workers"], 1,
+                    self.app.run_backtest.call_args.kwargs[
+                        "run_configuration"
+                    ].n_workers,
+                    1,
                 )

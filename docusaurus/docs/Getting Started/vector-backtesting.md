@@ -4,7 +4,14 @@ sidebar_position: 10
 
 # Vector Backtesting
 
-Vector backtesting is a high-performance backtesting approach that processes market data in batches rather than tick-by-tick. It is 10-100x faster than event-driven backtesting, making it ideal for testing many strategy variants and parameter combinations.
+Vector backtesting evaluates a strategy's complete price series in batches
+instead of replaying the live event loop one timestamp at a time. A strategy
+implements `generate_signal_series()` and returns timestamp-aligned entry and
+exit signals that the vector engine converts into runs, trades, and metrics.
+
+This removes much of the per-tick framework overhead, making the engine useful
+for parameter screening and broad research. It is not an order-book simulator;
+validate surviving strategies with the event-driven engine before deployment.
 
 ## When to Use Vector Backtesting
 
@@ -40,16 +47,21 @@ study = Study(
     engines=[BacktestEngine.VECTOR],
 )
 
-backtests = app.run_backtest(
+results = app.run_backtest(
     strategy=my_strategy,
     study=study,
 )
-backtest = backtests[0]
+backtest = next(results.iter_backtests())
 ```
+
+`run_backtest()` returns a disk-backed `BacktestIndex`, not a list of full
+bundles. Filter its scalar columns first, then use `iter_backtests()` when you
+need orders, trades, signals, or snapshots.
 
 ### Multiple Strategies
 
-Test many strategies simultaneously:
+Compare many strategy configurations independently. Each strategy receives its
+own portfolio and produces its own `.obtf` bundle:
 
 ```python
 from investing_algorithm_framework import BacktestRunConfiguration
@@ -69,7 +81,7 @@ study = Study(
     engines=[BacktestEngine.VECTOR],
 )
 
-backtests = app.run_backtests(
+results = app.run_backtests(
     strategies=strategies,
     study=study,
     run_configuration=BacktestRunConfiguration(
@@ -78,147 +90,70 @@ backtests = app.run_backtests(
 )
 ```
 
-## Saving and Loading
+## Position sizing
 
-### Save to Directory
+By default, vector runs size each trade against the run's initial balance. This
+keeps the simulation fast and vectorizable, but it does not compound position
+sizes after earlier gains or losses.
+
+Enable dynamic sizing when `PositionSize.percentage_of_portfolio` should use the
+current simulated balance, matching event-driven sizing more closely:
 
 ```python
-from investing_algorithm_framework import BacktestRunConfiguration
-study = Study(
-    universe=Universe(market="bitvavo", trading_symbol="EUR"),
-    initial_capital=1000,
-    backtest_windows=[BacktestWindow(train_range=dr) for dr in date_ranges],
-    engines=[BacktestEngine.VECTOR],
-)
-
-backtests = app.run_backtests(
+results = app.run_backtests(
     strategies=strategies,
     study=study,
     run_configuration=BacktestRunConfiguration(
-        backtest_storage_directory="./my_backtests",
+        dynamic_position_sizing=True,
     ),
 )
 ```
 
-### Load from Directory
+Dynamic sizing performs more sequential work. Use it for parity checks and
+capital-sensitive sizing; leave it disabled for the fastest broad screening.
+
+## Replaying a study with the event engine
+
+Reuse the exact universe, windows, capital, and metadata when validating a
+vector result with realistic execution:
 
 ```python
-from investing_algorithm_framework import load_backtests_from_directory
+vector_backtest = next(results.iter_backtests())
+event_study = vector_backtest.get_study_definition(study.name)
+event_study.engines = [BacktestEngine.EVENT_DRIVEN]
 
-backtests = load_backtests_from_directory("./my_backtests")
-```
-
-## Checkpointing
-
-Resume interrupted backtests without losing progress:
-
-```python
-study = Study(
-    universe=Universe(market="bitvavo", trading_symbol="EUR"),
-    initial_capital=1000,
-    backtest_windows=[BacktestWindow(train_range=dr) for dr in date_ranges],
-    engines=[BacktestEngine.VECTOR],
-)
-
-backtests = app.run_backtests(
-    strategies=strategies,
-    study=study,
-    run_configuration=BacktestRunConfiguration(
-        backtest_storage_directory="./my_backtests",
-        n_workers=8,
-        memory_budget_mb=16_384,
-        min_available_memory_mb=4_096,
-    ),
+event_results = app.run_backtest(
+    strategy=surviving_strategy,
+    study=event_study,
 )
 ```
 
-`BacktestRunConfiguration` enables checkpoints, progress output and
-continue-on-error by default. Window summaries are always current. Use
-`BacktestRunConfiguration.from_env()` to read the same settings from
-`IAF_BACKTEST_*` environment variables.
-
-| Environment variable | Field |
-| --- | --- |
-| `IAF_BACKTEST_CONTINUE_ON_ERROR` | `continue_on_error` |
-| `IAF_BACKTEST_USE_CHECKPOINTS` | `use_checkpoints` |
-| `IAF_BACKTEST_STORAGE_DIRECTORY` | `backtest_storage_directory` |
-| `IAF_BACKTEST_SHOW_PROGRESS` | `show_progress` |
-| `IAF_BACKTEST_N_WORKERS` | `n_workers` |
-| `IAF_BACKTEST_MEMORY_BUDGET_MB` | `memory_budget_mb` |
-| `IAF_BACKTEST_MIN_AVAILABLE_MEMORY_MB` | `min_available_memory_mb` |
-| `IAF_BACKTEST_SNAPSHOT_INTERVAL` | `snapshot_interval` (`DAILY` or `STRATEGY_ITERATION`) |
-| `IAF_BACKTEST_SKIP_DATA_SOURCES_INITIALIZATION` | `skip_data_sources_initialization` |
-| `IAF_BACKTEST_DYNAMIC_POSITION_SIZING` | `dynamic_position_sizing` |
-| `IAF_BACKTEST_FILL_MISSING_DATA` | `fill_missing_data` |
-| `IAF_BACKTEST_MAX_TASKS_PER_CHILD` | `max_tasks_per_child` (`None` disables recycling) |
-
-## Filtering Strategies
-
-Progressively eliminate underperforming strategies during backtesting:
-
-```python
-def window_filter(index, date_range):
-    """Keep algorithms with positive cumulative returns so far."""
-    return index.filter(lambda row: row["summary.total_return"] > 0)
-
-def final_filter(index):
-    """Select completed results."""
-    return index.filter(lambda row: row["summary.sharpe_ratio"] > 1.0)
-
-study = Study(
-    universe=Universe(market="bitvavo", trading_symbol="EUR"),
-    initial_capital=1000,
-    backtest_windows=[BacktestWindow(train_range=dr) for dr in date_ranges],
-    engines=[BacktestEngine.VECTOR],
-)
-
-backtests = app.run_backtests(
-    strategies=strategies,
-    window_metrics_filter_function=window_filter,
-    final_metrics_filter_function=final_filter,
-    study=study,
-)
-```
-
-## Parallel Processing
-
-Utilize multiple CPU cores for faster backtesting:
-
-```python
-from investing_algorithm_framework import BacktestRunConfiguration
-import os
-
-study = Study(
-    universe=Universe(market="bitvavo", trading_symbol="EUR"),
-    initial_capital=1000,
-    backtest_windows=[BacktestWindow(train_range=dr) for dr in date_ranges],
-    engines=[BacktestEngine.VECTOR],
-)
-
-backtests = app.run_backtests(
-    strategies=strategies,
-    study=study,
-    run_configuration=BacktestRunConfiguration(
-        n_workers=os.cpu_count() - 1,
-    ),
-)
-```
+Saving into the same backtest storage directory merges the new engine's result
+slot into the existing algorithm bundle when the algorithm identity matches.
 
 ## Differences from Event-Driven Backtesting
 
 | Aspect | Vector | Event-Driven |
 |--------|--------|-------------|
 | **Speed** | 10-100x faster | Slower, realistic |
-| **Stop Loss / Take Profit** | Not supported | Fully supported |
+| **Stop Loss / Take Profit** | Fixed rules only; no trailing rules | Fully supported |
 | **Signal Timing** | Executes at exact signal timestamp | Executes at next interval boundary |
 | **Data Loading** | All data loaded at once | Sliding window at each step |
 | **Best For** | Fast prototyping, parameter sweeps | Final validation, realistic results |
 
-With a sufficiently large `warmup_window` (e.g., 800 bars), both approaches should produce identical signals. Execution timing may differ slightly since vector backtests execute at the exact signal timestamp while event backtests execute at strategy interval boundaries.
+Signal parity depends on both engines seeing enough history. The vector engine
+evaluates the full batch, while the event engine recalculates over a sliding
+warmup window. Set the event data provider and strategy data source warmup to at
+least two or three times the longest indicator period when comparing signals.
+
+Even with identical signals, execution can differ because vector signals execute
+at their timestamps while event orders require subsequent market events and use
+the live portfolio state.
 
 ## Next Steps
 
-- See the [Advanced Vector Backtesting](/docs/Advanced%20Concepts/vector-backtesting) guide for batching, storage, and advanced filtering
-- Explore [Performance Optimization](/docs/Advanced%20Concepts/OPTIMIZATION_GUIDE) for large-scale testing
-- Check out [Parallel Processing](/docs/Advanced%20Concepts/PARALLEL_PROCESSING_GUIDE) for multi-core utilization
-- Generate [Backtest Reports](backtest-reports) to compare your strategies
+- Use [Scaling Backtests](/docs/Advanced%20Concepts/vector-backtesting) for
+    persistent indexes, progressive filtering, checkpoints, parallel workers, and
+    memory budgets.
+- Replay finalists with [Event-Driven Backtesting](event-backtesting).
+- Generate [Backtest Reports](backtest-reports) to compare selected strategies.

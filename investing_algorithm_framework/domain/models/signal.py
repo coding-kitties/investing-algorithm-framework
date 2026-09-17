@@ -17,7 +17,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
-from .score_card import ScoreCard, SCORE_CARD_METADATA_KEY
+from .decision_trace import (
+    DECISION_TRACE_METADATA_KEY,
+    DecisionTrace,
+    normalize_trace_metadata,
+)
 
 
 class SignalSide(Enum):
@@ -153,6 +157,9 @@ class Signal:
                 f"Signal.strength must be in [0.0, 1.0], "
                 f"got {self.strength!r}"
             )
+        object.__setattr__(
+            self, "metadata", normalize_trace_metadata(self.metadata)
+        )
 
     def with_strength(self, strength: float) -> "Signal":
         """
@@ -179,11 +186,12 @@ class Signal:
             metadata=merged,
         )
 
-    def with_score_card(self, score_card: ScoreCard) -> "Signal":
-        """Return a copy of this signal with ``score_card`` attached
-        under the reserved ``metadata["score_card"]`` key.
+    def with_decision_trace(
+        self, decision_trace: DecisionTrace
+    ) -> "Signal":
+        """Return a copy with a portable decision trace attached.
 
-        A :class:`ScoreCard` is a small, versioned, JSON-only object
+        A :class:`DecisionTrace` is a small, versioned, JSON-only object
         that records *why* this signal fired (or, for a rejected
         signal, what its inputs were) — e.g. the indicator values a
         strategy computed before deciding to emit it. Because
@@ -192,12 +200,16 @@ class Signal:
         is captured in ``RunReport.signals``, this is enough for any
         external tool to render the reasoning behind a decision
         without strategy-specific code — see
-        :class:`~investing_algorithm_framework.domain.models.score_card.ScoreCard`
+        :class:`DecisionTrace`
         for the full design rationale.
         """
-        return self.with_metadata(
-            **{SCORE_CARD_METADATA_KEY: score_card.to_dict()}
-        )
+        return self.with_metadata(**{
+            DECISION_TRACE_METADATA_KEY: decision_trace.to_dict()
+        })
+
+    def with_score_card(self, score_card: DecisionTrace) -> "Signal":
+        """Backward-compatible alias for :meth:`with_decision_trace`."""
+        return self.with_decision_trace(score_card)
 
     def __repr__(self) -> str:  # pragma: no cover - trivial
         src = f" source={self.source!r}" if self.source else ""

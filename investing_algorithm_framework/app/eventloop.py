@@ -54,14 +54,12 @@ def _build_signal_report(strategy: TradingStrategy) -> Dict:
             "reason": reason,
         })
 
+    decision_traces = list(strategy.last_decision_traces or [])
     return {
         "strategy_id": strategy.strategy_id,
         "signals": signals,
-        # Score cards recorded via ``record_score_card`` explain a
-        # tick even when no Signal was emitted at all (e.g. "RSI
-        # neutral, no crossover") — kept separate from ``signals``
-        # since they have no symbol/side/status of their own.
-        "score_cards": list(getattr(strategy, "last_score_cards", None) or []),
+        "decision_traces": decision_traces,
+        "score_cards": decision_traces,
     }
 
 

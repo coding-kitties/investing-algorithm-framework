@@ -50,7 +50,7 @@ You can combine multiple extras:
 pip install investing-algorithm-framework[yahoo,polygon]
 ```
 
-### Cloud Deployment Extras
+## Deployment
 
 If you plan to deploy your bot to AWS Lambda or Azure Functions (see [How to deploy a trading bot](deployment)), install the extra matching your target platform. These pull in the SDKs needed for the corresponding `StateHandler` (e.g. `AWSS3StorageStateHandler`, `AzureBlobStorageStateHandler`) and the `iaf deploy-*` CLI commands:
 
@@ -86,6 +86,32 @@ If you plan to contribute to the framework:
    ```bash
    pip install -e .
    ```
+
+## Managed Platforms
+
+[![Finterion Platform logo](/img/finterion-light.png)](https://finterion.com)
+
+The framework can be run locally or deployed to infrastructure you manage.
+There are also platforms that support the full lifecycle of applications built
+with the Investing Algorithm Framework.
+
+[Finterion Platform](https://finterion.com) provides managed tooling for:
+
+- Integrating applications built with the Investing Algorithm Framework
+- Uploading and storing backtests in the
+   [Open Backtest Format](https://github.com/Quant-Commons/Open-Backtest-Format)
+- Advanced analytics and reporting of backtests
+- Analyzing CAGR, Sharpe ratio, drawdown, alpha, stability, consistency, and
+   walk-forward/out-of-sample performance
+- Connecting supported exchanges and brokers across crypto and traditional
+   markets
+- Publishing research, sharing results, and discussing implementations with
+   the quantitative trading community
+- Live deployments of trading applications in paper and live trading environments
+
+Finterion is optional. The open-source framework remains fully usable on its
+own, while Finterion provides advanced features and a managed path for teams
+and individuals.
 
 ## Next Steps
 

@@ -17,8 +17,15 @@ from .risk_rules import TakeProfitRule, StopLossRule, ScalingRule, \
     CooldownBlocks, CooldownTracker
 from .scheduling import DateRule, Schedule, ScheduledFunction, TimeRule
 from .signal import Signal, SignalSide
-from .score_card import ScoreCard, ScoreCardEntry, \
-    SCORE_CARD_METADATA_KEY, SCORE_CARD_VERSION
+from .decision_trace import DecisionTrace, DecisionTraceEntry, \
+    DECISION_TRACE_METADATA_KEY, DECISION_TRACE_VERSION, \
+    ScoreCard, ScoreCardEntry, SCORE_CARD_METADATA_KEY, SCORE_CARD_VERSION
+from .confluence import AllOf, AnyOf, AtLeast, Condition, \
+    ConditionExpression, condition, ConfluenceCard, ConfluenceResult, \
+    EvaluationContext, EvidenceGroup, GroupEvaluation, Expression, Not, \
+    Operator, PrimaryGroup, \
+    Requirement, RuleEvaluation, ScoreRule, ScoreType, Veto, \
+    CONFLUENCE_CARD_VERSION
 from .signal_series import SignalSeries
 from .signal_helpers import signals_from_column, signals_from_panel, \
     signal_series_from_column
@@ -45,6 +52,31 @@ __all__ = [
     "ScoreCardEntry",
     "SCORE_CARD_METADATA_KEY",
     "SCORE_CARD_VERSION",
+    "DecisionTrace",
+    "DecisionTraceEntry",
+    "DECISION_TRACE_METADATA_KEY",
+    "DECISION_TRACE_VERSION",
+    "AllOf",
+    "AnyOf",
+    "AtLeast",
+    "Condition",
+    "ConditionExpression",
+    "condition",
+    "ConfluenceCard",
+    "ConfluenceResult",
+    "EvaluationContext",
+    "Expression",
+    "Not",
+    "Operator",
+    "PrimaryGroup",
+    "EvidenceGroup",
+    "GroupEvaluation",
+    "Requirement",
+    "RuleEvaluation",
+    "ScoreRule",
+    "ScoreType",
+    "Veto",
+    "CONFLUENCE_CARD_VERSION",
     "StrategyProfile",
     "Trade",
     "MarketCredential",

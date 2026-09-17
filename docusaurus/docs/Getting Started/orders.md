@@ -8,7 +8,9 @@ Learn how to create and manage trading orders with the Investing Algorithm Frame
 
 ## Overview
 
-Orders are instructions to buy or sell assets in the market. The framework provides a comprehensive order management system that supports various order types, execution strategies, and order lifecycle management.
+Orders are instructions to open or close long and short positions. The framework
+supports buy, sell, short, and cover sides across market, limit, stop, and
+stop-limit order types.
 
 ## Order Types
 
@@ -22,14 +24,14 @@ Execute at the best available price. The framework looks up the current price as
 from investing_algorithm_framework import OrderSide
 
 # Buy order - spend 100 EUR worth of BTC at market price
-self.create_market_order(
+context.create_market_order(
     target_symbol="BTC",
     order_side=OrderSide.BUY,
     amount_trading_symbol=100,  # Amount in trading symbol (EUR)
 )
 
 # Sell order - sell 50% of BTC position at market price
-self.create_market_order(
+context.create_market_order(
     target_symbol="BTC",
     order_side=OrderSide.SELL,
     percentage_of_position=50,  # Sell 50% of position
@@ -40,13 +42,13 @@ self.create_market_order(
 
 ```python
 # Buy: spend 10% of portfolio on BTC
-self.create_market_buy_order(
+context.create_market_buy_order(
     target_symbol="BTC",
     percentage_of_portfolio=10,
 )
 
 # Sell: sell 0.5 BTC
-self.create_market_sell_order(
+context.create_market_sell_order(
     target_symbol="BTC",
     amount=0.5,
 )
@@ -81,22 +83,61 @@ study = Study(
 Execute only at a specified price or better:
 
 ```python
+from investing_algorithm_framework import OrderSide
+
 # Buy limit order
-algorithm.create_buy_order(
+context.create_limit_order(
     target_symbol="BTC",
-    amount=100,
-    order_type="LIMIT",
-    price=50000  # Only buy if BTC price is 50,000 USDT or lower
+    order_side=OrderSide.BUY,
+    amount=0.01,
+    price=50000,  # Only buy if BTC is 50,000 EUR or lower
 )
 
 # Sell limit order
-algorithm.create_sell_order(
+context.create_limit_order(
     target_symbol="BTC",
-    percentage=1.0,
-    order_type="LIMIT",
-    price=55000  # Only sell if BTC price is 55,000 USDT or higher
+    order_side=OrderSide.SELL,
+    percentage_of_position=100,
+    price=55000,  # Only sell if BTC is 55,000 EUR or higher
 )
 ```
+
+### Short and Cover Orders
+
+Use a **short** order to open a position that benefits when the asset price
+falls. Use a **cover** order to close all or part of that short position.
+
+```python
+from investing_algorithm_framework import OrderType
+
+# Open a limit short using 10% of portfolio net size as collateral
+context.create_short_order(
+    target_symbol="BTC",
+    price=50000,
+    percentage_of_portfolio=10,
+)
+
+# Cover half of the open short with a limit order
+context.create_cover_order(
+    target_symbol="BTC",
+    price=45000,
+    percentage_of_position=50,
+)
+
+# Market short: price is the sizing and reservation reference
+context.create_short_order(
+    target_symbol="ETH",
+    price=context.get_latest_price("ETH/EUR"),
+    amount=0.5,
+    order_type=OrderType.MARKET,
+)
+```
+
+Short positions are fully collateralized; the framework does not apply
+leverage. Pass either `amount` or `percentage_of_portfolio` when opening a
+short, and either `amount` or `percentage_of_position` when covering one.
+Market short and cover orders follow the same next-candle-open behavior as
+other market orders in event-driven backtests.
 
 ### Stop Orders
 
@@ -109,7 +150,7 @@ A **stop order** rests in the book until the market trades through a configured 
 from investing_algorithm_framework import OrderType, OrderSide
 
 # SELL stop — exit if BTC drops to 45,000 EUR
-self.create_order(
+context.create_order(
     target_symbol="BTC",
     order_side=OrderSide.SELL,
     amount=0.5,
@@ -118,7 +159,7 @@ self.create_order(
 )
 
 # BUY stop — enter on a breakout above 52,000 EUR
-self.create_order(
+context.create_order(
     target_symbol="BTC",
     order_side=OrderSide.BUY,
     amount=0.1,
@@ -134,7 +175,7 @@ A **stop-limit order** triggers like a stop, but instead of becoming a market or
 
 ```python
 # SELL stop-limit — trigger at 45,000, but only sell at 44,500 or better
-self.create_order(
+context.create_order(
     target_symbol="BTC",
     order_side=OrderSide.SELL,
     amount=0.5,
@@ -247,6 +288,17 @@ The helpers currently require an explicit `price` and always produce LIMIT order
 | `percentage_of_position` | `float` | % of position to sell (SELL only) |
 | `percentage` | `float` | % of portfolio net size to allocate |
 | `precision` | `int` | Decimal precision for rounding the amount |
+
+### Short and Cover Parameters
+
+| Parameter | Short order | Cover order |
+|-----------|-------------|-------------|
+| `target_symbol` | Asset to short | Asset whose short position is closed |
+| `price` | Limit price or market-order reference price | Limit price or market-order reference price |
+| `amount` | Units to short | Units to cover |
+| `percentage_of_portfolio` | Percentage of net size used as collateral | Not supported |
+| `percentage_of_position` | Not supported | Percentage of the open short to cover |
+| `order_type` | `LIMIT` by default; also supports `MARKET` | `LIMIT` by default; also supports `MARKET` |
 | `metadata` | `dict` | Additional metadata for the order |
 
 ### Limit Order Parameters
@@ -276,48 +328,20 @@ All order creation methods support these additional parameters:
 ### Checking Order Status
 
 ```python
-def apply_strategy(self, algorithm, market_data):
-    # Get all orders
-    orders = algorithm.get_orders()
+from investing_algorithm_framework import OrderSide, OrderStatus
 
-    # Filter by status
-    pending_orders = [order for order in orders if order.status == "OPEN"]
-    filled_orders = [order for order in orders if order.status == "FILLED"]
+def apply_strategy(self, context, data):
+    pending_orders = context.get_orders(status=OrderStatus.OPEN.value)
+    short_orders = context.get_orders(order_side=OrderSide.SHORT.value)
 
-    # Check specific order
     for order in pending_orders:
         print(f"Order {order.id}: {order.order_type} {order.target_symbol} - {order.status}")
 ```
 
-### Canceling Orders
-
-```python
-def apply_strategy(self, algorithm, market_data):
-    # Cancel specific order
-    orders = algorithm.get_orders()
-    for order in orders:
-        if order.status == "OPEN" and order.created_at < some_time_threshold:
-            algorithm.cancel_order(order.id)
-
-    # Cancel all open orders for a symbol
-    algorithm.cancel_all_orders(symbol="BTC/USDT")
-```
-
-### Modifying Orders
-
-```python
-def apply_strategy(self, algorithm, market_data):
-    orders = algorithm.get_orders()
-
-    for order in orders:
-        if order.status == "OPEN" and order.order_type == "LIMIT":
-            # Update order price
-            algorithm.update_order(
-                order_id=order.id,
-                price=new_price,
-                amount=new_amount
-            )
-```
+`context.get_orders()` can also filter by `target_symbol`, `order_type`,
+`order_side`, and `market`. The current strategy API does not expose public
+order cancellation or in-place modification helpers. Submit a replacement
+order when your strategy needs different order parameters.
 
 ## Order Execution Examples
 
@@ -331,8 +355,9 @@ class DCAStrategy(TradingStrategy):
 
     def apply_strategy(self, context, data):
         # Buy fixed amount regardless of price
-        self.create_market_buy_order(
+        context.create_market_order(
             target_symbol="BTC",
+            order_side=OrderSide.BUY,
             amount_trading_symbol=100,  # Buy 100 EUR worth of BTC
         )
 ```
@@ -406,7 +431,7 @@ class TrailingStopStrategy(TradingStrategy):
 
             if current_price <= stop_price:
                 # Trigger trailing stop - sell entire position at market
-                self.create_market_sell_order(
+                context.create_market_sell_order(
                     target_symbol="BTC",
                     percentage_of_position=100,
                 )
@@ -424,7 +449,7 @@ For **buy orders**, the framework validates that you have sufficient unallocated
 ```python
 # Framework automatically checks if you have sufficient balance
 # This will raise an OperationalException if balance is insufficient
-self.create_market_buy_order(
+context.create_market_buy_order(
     target_symbol="BTC",
     amount_trading_symbol=10000,  # This might exceed available balance
 )
@@ -437,7 +462,7 @@ For **sell orders**, the framework checks that you have enough holdings:
 ```python
 # Framework checks if you have enough holdings to sell
 # This will raise an OperationalException if position is insufficient
-self.create_market_sell_order(
+context.create_market_sell_order(
     target_symbol="BTC",
     percentage_of_position=150,  # Cannot sell more than 100%
 )
@@ -456,32 +481,30 @@ self.create_market_sell_order(
 Always check if your orders are being filled as expected:
 
 ```python
-def check_order_health(self, algorithm):
-    orders = algorithm.get_orders()
+from datetime import datetime, timezone
+from investing_algorithm_framework import OrderStatus
+
+def check_order_health(context):
+    orders = context.get_orders(status=OrderStatus.OPEN.value)
 
     # Check for old unfilled orders
-    current_time = datetime.now()
+    current_time = datetime.now(tz=timezone.utc)
     for order in orders:
-        if order.status == "OPEN":
-            age = current_time - order.created_at
-            if age.total_seconds() > 3600:  # 1 hour
-                print(f"Warning: Order {order.id} has been open for {age}")
+        age = current_time - order.created_at
+        if age.total_seconds() > 3600:  # 1 hour
+            print(f"Warning: Order {order.id} has been open for {age}")
 ```
 
 ### 3. Handle Partial Fills
 
 ```python
-def handle_partial_fills(self, algorithm):
-    orders = algorithm.get_orders()
+def report_fill_progress(context):
+    orders = context.get_orders()
 
     for order in orders:
-        if order.status == "PARTIALLY_FILLED":
-            fill_ratio = order.filled_amount / order.amount
+        if order.filled and order.remaining:
+            fill_ratio = order.filled / order.amount
             print(f"Order {order.id} is {fill_ratio:.1%} filled")
-
-            # Decide whether to cancel or wait
-            if fill_ratio < 0.1:  # Less than 10% filled
-                algorithm.cancel_order(order.id)
 ```
 
 ### 4. Risk Management
@@ -489,16 +512,17 @@ def handle_partial_fills(self, algorithm):
 Always include risk controls in your order logic:
 
 ```python
-def apply_strategy(self, algorithm, market_data):
-    # Check portfolio exposure before placing orders
-    portfolio = algorithm.get_portfolio()
+from investing_algorithm_framework import OrderSide
 
-    if portfolio.get_total_exposure() < 0.9:  # Less than 90% invested
-        # Safe to place buy orders
-        algorithm.create_buy_order(
+def apply_strategy(self, context, data):
+    portfolio = context.get_portfolio()
+    allocation = 1 - (portfolio.get_unallocated() / portfolio.get_net_size())
+
+    if allocation < 0.9:  # Less than 90% allocated
+        context.create_market_order(
             target_symbol="BTC",
-            amount=100,
-            order_type="MARKET"
+            order_side=OrderSide.BUY,
+            amount_trading_symbol=100,
         )
 ```
 

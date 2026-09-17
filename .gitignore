@@ -171,6 +171,7 @@ examples/advanced_strategy/databases/
 examples/advanced_strategy/backtest_databases/
 examples/advanced_strategy/data/
 .data_cache/
+tests/infrastructure/resources/data/*_synth.csv
 
 # Investing Algorithm Framework backtest bundles
 *.obtf

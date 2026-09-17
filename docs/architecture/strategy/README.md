@@ -9,6 +9,7 @@ Everything about how a strategy is defined, wired up, and executed by the framew
 | [`strategy.md`](strategy.md) | The v9 strategy API surface. The two signal-producing methods (`generate_signals` for event / live, `generate_signal_series` for vector), the `Signal` / `SignalSeries` / `SignalSide` vocabulary, and how a signal flows through the phase pipeline into orders. Read this first if you're writing a new strategy. |
 | [`strategy_composition.md`](strategy_composition.md) | Design rationale for the composition model. Explains why `TradingStrategy` is a bag of slots, what each slot means, how phase pipeline / `conflict_policy` / `executor` compose, and the invariants the runtime enforces. Read this if you want to understand *why* the API is shaped the way it is, or if you need to extend it. |
 | [`pipeline-api.md`](pipeline-api.md) | The declarative pipeline API: `Factor` / `Filter` building blocks, `Pipeline` subclasses, universe filtering, cross-sectional signal generation, and the `PipelineEngine` runtime. Used for factor-model style strategies with many symbols. |
+| [`confluence_cards.md`](confluence_cards.md) | Declarative primary qualification, requirements, positive/negative scoring, vetoes, deterministic decisions, and conversion to the existing `DecisionTrace` audit trace. |
 
 ## Related
 

@@ -4,6 +4,10 @@ sidebar_position: 11
 
 # Backtest Storage Layer
 
+This page covers organizing, indexing, and querying collections of backtest
+bundles. For the contents and portability of an individual `.obtf` bundle, see
+[Open Backtest Format](open-backtest-format).
+
 Once you start sweeping parameter grids and walk-forward windows, you quickly end up with **hundreds or thousands of backtests on disk**. Comparing them all in a single HTML dashboard stops scaling at that point — every comparison re-decodes multi-MB metric blobs just to read a Sharpe number, and the resulting `report.html` becomes too heavy for a browser to open.
 
 The **backtest storage layer** solves this with a simple idea: save your backtests to a folder, build a small SQLite index next to them, and filter/rank in that index *before* you ever open a bundle or render a report.
@@ -168,5 +172,5 @@ python examples/storage_layer_demo/demo.py
 - CLI: `iaf index`, `iaf list`, `iaf rank`, `iaf migrate-store` (see `iaf <cmd> --help`)
 - Python: `investing_algorithm_framework.cli.index_command.{build_index, list_index, rank_index}`
 - Stores: `investing_algorithm_framework.services.backtest_store.{LocalDirStore, LocalTieredStore}`
-- Bundle format: see [Backtest Data](../Data/backtest_data.md)
+- Bundle format: see [Open Backtest Format](open-backtest-format)
 - Report API: see [Backtest Reports](./backtest-reports.md)
