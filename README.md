@@ -12,6 +12,7 @@
   <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=windows&style=flat-square&logo=windows&logoColor=white" alt="Windows build"></a>
   <a href="https://pypi.org/project/investing-algorithm-framework/"><img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg?style=flat-square" alt="PyPI version"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/apache%202.0-blue.svg?style=flat-square&label=license" alt="Apache 2.0 license"></a>
+  <a href="https://finterion.com/forum"><img src="https://finterion.com/api/forum-badge.svg" alt="Finterion forum"></a>
 </h4>
 
 <p align="center">
