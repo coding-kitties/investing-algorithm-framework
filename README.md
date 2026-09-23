@@ -12,8 +12,9 @@
   <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=windows&style=flat-square&logo=windows&logoColor=white" alt="Windows build"></a>
   <a href="https://pypi.org/project/investing-algorithm-framework/"><img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg?style=flat-square" alt="PyPI version"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/apache%202.0-blue.svg?style=flat-square&label=license" alt="Apache 2.0 license"></a>
-  <a href="https://finterion.com/community/forum"><img src="https://finterion.com/api/forum-badge.svg" alt="Finterion forum" height="20"></a>
 </h4>
+
+<a href="https://finterion.com/community/forum"><img src="https://finterion.com/api/forum-badge.svg" alt="Finterion forum" height="30"></a>
 
 <p align="center">
   <picture>
@@ -21,6 +22,18 @@
     <source media="(prefers-color-scheme: light)" srcset="static/features/hero-light.svg">
     <img src="static/features/hero-dark.svg" alt="Investing Algorithm Framework features overview" style="max-width: 100%;">
   </picture>
+</p>
+
+<p align="center">
+  <sub>Proudly sponsored by</sub>
+  <br>
+  <a href="https://www.finterion.com/" target="_blank">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
+      <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
+      <img src="static/sponsors/finterion-light.png" alt="Finterion" width="180">
+    </picture>
+  </a>
 </p>
 
 Investing Algorithm Framework is a Python framework for the complete quantitative
