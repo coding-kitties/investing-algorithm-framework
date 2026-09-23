@@ -108,21 +108,11 @@ class PositionService(RepositoryService):
 
         # Update the position
         position = self.get(order.position_id)
-        if PositionMode(position_mode) == PositionMode.HEDGE:
-            self.update(
-                position.id,
-                {
-                    "long_amount": position.long_amount + filled_amount,
-                    "long_cost": position.long_cost + filled_size,
-                }
-            )
-            return
         self.update(
             position.id,
             {
-                "amount": position.get_amount() + filled_amount,
-                "cost":
-                    position.get_cost() + filled_size
+                "long_amount": position.long_amount + filled_amount,
+                "long_cost": position.long_cost + filled_size,
             }
         )
 
@@ -284,20 +274,11 @@ class PositionService(RepositoryService):
             f"filled amount {filled_amount}"
         )
         position = self.get(order.position_id)
-        if PositionMode(position_mode) == PositionMode.HEDGE:
-            self.update(
-                position.id,
-                {
-                    "short_amount": position.short_amount + filled_amount,
-                    "short_cost": position.short_cost + filled_size,
-                }
-            )
-            return
         self.update(
             position.id,
             {
-                "amount": position.get_amount() - filled_amount,
-                "cost": position.get_cost() + filled_size,
+                "short_amount": position.short_amount + filled_amount,
+                "short_cost": position.short_cost + filled_size,
             }
         )
 
@@ -332,48 +313,11 @@ class PositionService(RepositoryService):
     def update_positions_with_cover_order_filled(
         self, order, filled_amount, position_mode=PositionMode.NETTING
     ):
-        """Update the target position when a COVER order fills:
-        increment (toward zero) by ``filled_amount``. Reduces the
-        position's ``cost`` proportionally so net_gain stays
-        consistent for partial covers.
-        """
+        """Reduce short units; TradeService settles the matched FIFO cost."""
         if filled_amount is None or filled_amount <= 0:
             return
 
         position = self.get(order.position_id)
-        if PositionMode(position_mode) == PositionMode.HEDGE:
-            # Guard against a short leg already closed by a concurrent
-            # fill (e.g. two pending COVER orders on the same symbol).
-            fraction = (
-                filled_amount / position.short_amount
-                if position.short_amount else 0
-            )
-            self.update(
-                position.id,
-                {
-                    "short_amount": position.short_amount - filled_amount,
-                    "short_cost": position.short_cost * (1 - fraction),
-                }
-            )
-            return
-        position_amount = position.get_amount() or 0
-
-        # Scale the cost reduction by the fraction of the open short
-        # being closed in this fill.
-        if position_amount < 0:
-            fraction = filled_amount / abs(position_amount)
-        else:
-            fraction = 0
-        cost_reduction = (position.get_cost() or 0) * fraction
-
-        logger.info(
-            f"Syncing position with filled cover order {order.get_id()} "
-            f"filled amount {filled_amount}"
-        )
-        self.update(
-            position.id,
-            {
-                "amount": position.get_amount() + filled_amount,
-                "cost": (position.get_cost() or 0) - cost_reduction,
-            }
-        )
+        self.update(position.id, {
+            'short_amount': position.short_amount - filled_amount,
+        })

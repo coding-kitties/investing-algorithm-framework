@@ -1,4 +1,5 @@
 from datetime import timezone, datetime
+from investing_algorithm_framework.domain.native_event import native_risk
 
 from investing_algorithm_framework.domain.datetime_parsing import (
     parse_datetime as _parse_dt,
@@ -124,6 +125,7 @@ class TradeTakeProfit(BaseModel):
         self.sell_prices = sell_prices
         self.sell_dates = sell_dates
 
+    @native_risk(stop=False, check=False)
     def update_with_last_reported_price(self, current_price: float, date):
         """
         Function to update the take profit price based on
@@ -178,6 +180,7 @@ class TradeTakeProfit(BaseModel):
                 if new_take_profit_price > self.take_profit_price:
                     self.take_profit_price = new_take_profit_price
 
+    @native_risk(stop=False, check=True)
     def has_triggered(self, current_price: float = None) -> bool:
 
         if current_price is None:

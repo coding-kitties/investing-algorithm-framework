@@ -1,0 +1,17 @@
+[package]
+name = "iaf-confluence-native"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+
+[lib]
+name = "iaf_confluence_native"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.24", features = ["abi3-py310"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+[features]
+extension-module = ["pyo3/extension-module"]

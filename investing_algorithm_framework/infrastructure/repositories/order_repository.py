@@ -88,9 +88,24 @@ class SQLOrderRepository(Repository):
                 SQLOrder.trading_symbol == trading_symbol_query_param
             )
 
+        created_after = self.get_query_param('created_at_gt', query_params)
+        if created_after is not None:
+            query = query.filter(SQLOrder.created_at > created_after)
+
         if order_by_created_at_asc:
             query = query.order_by(SQLOrder.created_at.asc())
         else:
             query = query.order_by(SQLOrder.created_at.desc())
+
+        query = query.order_by(
+            SQLOrder.target_symbol,
+            SQLOrder.trading_symbol,
+            SQLOrder.strategy_id,
+            SQLOrder.order_side,
+            SQLOrder.order_type,
+            SQLOrder.price,
+            SQLOrder.amount,
+            SQLOrder.id,
+        )
 
         return query

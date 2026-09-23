@@ -159,7 +159,7 @@ class Test(TestBase):
         trade_service = self.app.container.trade_service()
         self.assertEqual(3, trade_service.count())
         self.assertEqual(
-            0, trade_service.count(
+            2, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}
             )
         )

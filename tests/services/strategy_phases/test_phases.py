@@ -8,7 +8,8 @@ legacy ``run_strategy`` live in
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 from unittest import TestCase
 from unittest.mock import MagicMock
@@ -779,6 +780,49 @@ class TestAttachRiskRulesPhase(TestCase):
 # RecordCooldownPhase
 # --------------------------------------------------------------------- #
 class TestRecordCooldownPhase(TestCase):
+
+    def test_system_exit_watermark_filters_without_changing_scope(self):
+        from investing_algorithm_framework.domain import CooldownRule
+
+        watermark = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        strategy = _StubStrategy(symbols=['BTC'])
+        strategy.cooldowns = [CooldownRule(symbol='BTC', bars=3)]
+        strategy._last_system_exit_scan_at = watermark
+        context = _StubContext()
+        context.order_service = MagicMock()
+        context.order_service.get_all.return_value = [
+            SimpleNamespace(order_side=side, target_symbol=symbol,
+                            metadata={'order_reason': reason},
+                            created_at=watermark + timedelta(seconds=seconds))
+            for side, symbol, reason, seconds in (
+                ('SELL', 'BTC', 'stop_loss', 0),
+                ('COVER', 'BTC', 'stop_loss', 1),
+                ('SELL', 'ETH', 'take_profit', 2),
+                ('SELL', 'BTC', 'manual', 3),
+            )
+        ]
+        state = _make_state(strategy, context)
+        state.bar_index = 10
+        phase = RecordCooldownPhase()
+        phase.run(state)
+        context.order_service.get_all.assert_called_once_with({
+            'created_at_gt': watermark,
+        })
+        self.assertEqual(strategy._last_system_exit_scan_at,
+                         watermark + timedelta(seconds=2))
+        events = dict(strategy._cooldown_tracker._last_event)
+        self.assertTrue(events)
+        self.assertTrue(all(key[1].value != 'sell' for key in events))
+        state.bar_index = 11
+        phase.run(state)
+        self.assertEqual(strategy._cooldown_tracker._last_event, events)
+        context.order_service.get_all.assert_called_with({
+            'created_at_gt': watermark + timedelta(seconds=2),
+        })
+        strategy._last_system_exit_scan_at = None
+        context.order_service.get_all.return_value = []
+        phase.run(state)
+        context.order_service.get_all.assert_called_with({})
 
     def _record(self, strategy, sides):
         context = _StubContext()

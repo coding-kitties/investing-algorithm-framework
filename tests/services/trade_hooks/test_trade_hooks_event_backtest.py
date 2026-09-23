@@ -16,13 +16,17 @@ only (`app.run_backtest`), not compared against the vector engine.
 """
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
     RESOURCE_DIRECTORY, CSVOHLCVDataProvider, Schedule, SignalSide, \
     signals_from_column, StopLossRule, TakeProfitRule, Study, Universe, \
-    BacktestWindow, BacktestEngine
+    BacktestWindow, BacktestEngine, BacktestRunConfiguration
+
+from scripts.bench_vector_snapshot_events import result_digest
 
 CSV_FILENAME = "OHLCV_BTC-EUR_BITVAVO_2h_RISK_RULE_HOOKS.csv"
 WARMUP = 5
@@ -149,9 +153,10 @@ class TakeProfitHookStrategy(_HookRecordingMixin, TradingStrategy):
         )
 
 
-def _create_app(name):
+def _create_app(name, resource_directory=None):
     """Set up an app with CSVOHLCVDataProvider for BTC/EUR."""
-    resource_dir = str(Path(__file__).parent.parent.parent / 'resources')
+    resource_dir = resource_directory or str(
+        Path(__file__).parent.parent.parent / 'resources')
     csv_path = str(
         Path(__file__).parent.parent.parent / 'resources' / 'test_data'
         / 'ohlcv' / CSV_FILENAME
@@ -173,6 +178,72 @@ def _create_app(name):
         priority=1,
     )
     return app
+
+
+class TestMemoryRiskHookParity(TestCase):
+    backends = ('sql', 'memory')
+
+    def test_results_and_callback_observations_match_sql(self):
+        for strategy_type, start, end, expected_hook in (
+            (TrailingStopLossHookStrategy, SL_START_DATE, SL_END_DATE,
+             'on_trade_trailing_stop_loss_triggered'),
+            (TakeProfitHookStrategy, TP_START_DATE, TP_END_DATE,
+             'on_trade_take_profit_triggered'),
+        ):
+            with self.subTest(strategy=strategy_type.__name__):
+                results = {}
+                for backend in self.backends:
+                    observations = []
+
+                    def record(hook_name, trade):
+                        observations.append((
+                            hook_name, trade.status, trade.available_amount,
+                            trade.net_gain, trade.total_fees,
+                            trade.last_reported_price,
+                        ))
+
+                    strategy = strategy_type(algorithm_id='risk-parity')
+                    with TemporaryDirectory() as directory:
+                        app = _create_app('RiskParity', directory)
+                        with patch.object(strategy, '_record', side_effect=record):
+                            backtests = app.run_backtest(
+                                strategy=strategy,
+                                study=Study(
+                                    universe=Universe(
+                                        market='BITVAVO', trading_symbol='EUR'),
+                                    backtest_windows=[BacktestWindow(
+                                        train_range=BacktestDateRange(
+                                            start_date=start, end_date=end))],
+                                    engines=[BacktestEngine.EVENT_DRIVEN],
+                                ),
+                                run_configuration=BacktestRunConfiguration(
+                                    event_state_backend=backend,
+                                    show_progress=False,
+                                    continue_on_error=False,
+                                ),
+                            )
+                        result = next(backtests.iter_backtests()).event_runs[0]
+                        self.assertEqual(len(result.trades), 1)
+                        self.assertEqual(result.trades[0].status, 'CLOSED')
+                        results[backend] = (result_digest(result), observations)
+                    names = [observation[0] for observation in observations]
+                    self.assertIn(expected_hook, names)
+                    self.assertLess(names.index(expected_hook),
+                                    names.index('on_trade_closed'))
+                for backend in self.backends[1:]:
+                    self.assertEqual(results['sql'], results[backend])
+
+
+class TestRustRiskHookParity(TestMemoryRiskHookParity):
+    backends = ('sql', 'rust')
+
+    def setUp(self):
+        try:
+            from investing_algorithm_framework.domain.native_event import \
+                load_native_event_accounting
+            load_native_event_accounting()
+        except ImportError:
+            self.skipTest('Native event accounting extension is not installed')
 
 
 class TestTrailingStopLossHooks(TestCase):
@@ -260,17 +331,14 @@ class TestTrailingStopLossHooks(TestCase):
         trade can't be both fully closed and merely "updated" from the
         same fill, so `on_trade_updated` should NOT also fire here (it
         is reserved for partial-close fills that leave the trade
-        open). Note: `on_trade_closed` actually fires *before* the
-        trailing_stop_loss_triggered dispatch — `_create_order` (which
-        synchronously fills the closing SELL order) runs before
-        `_check_stop_losses` gets to notifying the strategy."""
+        open). The trigger reserves the exit; closure follows its fill."""
         names = [name for name, _ in self.strategy.hook_calls]
         self.assertEqual(1, names.count("on_trade_closed"))
         self.assertEqual(0, names.count("on_trade_updated"))
         triggered_idx = names.index(
             "on_trade_trailing_stop_loss_triggered"
         )
-        self.assertGreater(triggered_idx, names.index("on_trade_closed"))
+        self.assertLess(triggered_idx, names.index("on_trade_closed"))
 
     def test_all_hooks_reference_the_same_trade(self):
         trade_ids = {
@@ -330,12 +398,9 @@ class TestTakeProfitHooks(TestCase):
     def test_closed_hook_fires_after_trigger_not_updated(self):
         """A 100%-closing trigger dispatches `on_trade_closed`, not
         `on_trade_updated` (reserved for partial-close fills that
-        leave the trade open — see `TradeService.
-        _create_trade_allocations_explicit`'s if/else). Note:
-        `on_trade_closed` fires *before* the triggered dispatch — see
-        the trailing stop loss test for why."""
+        leave the trade open). Closure follows execution of the exit."""
         names = [name for name, _ in self.strategy.hook_calls]
         self.assertEqual(1, names.count("on_trade_closed"))
         self.assertEqual(0, names.count("on_trade_updated"))
         triggered_idx = names.index("on_trade_take_profit_triggered")
-        self.assertGreater(triggered_idx, names.index("on_trade_closed"))
+        self.assertLess(triggered_idx, names.index("on_trade_closed"))

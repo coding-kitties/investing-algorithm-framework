@@ -54,7 +54,26 @@ def _environment_int(
 
 @dataclass(frozen=True)
 class BacktestRunConfiguration:
-    """Operational settings shared by vector and event backtest runs."""
+    """Operational settings shared by vector and event backtest runs.
+
+    save_filled_data_points opts into storing synthetic filled OHLCV rows
+    in the CCXT canonical cache. It only applies when fill_missing_data is
+    enabled and data source initialization is not skipped. These rows are
+    copied from adjacent candles, not recovered exchange observations, and
+    subsequent runs reuse them even with fill_missing_data disabled.
+    Other data providers retain their existing persistence behavior.
+
+    execution_backend selects vector execution; event_fill_backend selects
+    only event candle matching. event_schedule_backend selects timestamp
+    traversal, not schedule generation, tick services, or accounting. All
+    default to python; rust is strict and auto permits pre-execution fallback.
+    event_state_backend selects sql (default), memory (Python transitions),
+    or rust (native cash/position, exit allocation and risk transitions).
+    Both experimental archive backends spool execution histories to disk.
+    Rust requires a compatible extension; it never falls back mid-run.
+    Python retains orchestration, allocation selection, persistence and hooks.
+    Active result sets and individual records are not memory bounded.
+    """
 
     continue_on_error: bool = True
     use_checkpoints: bool = True
@@ -68,8 +87,36 @@ class BacktestRunConfiguration:
     dynamic_position_sizing: bool = False
     fill_missing_data: bool = True
     max_tasks_per_child: Optional[int] = 16
+    save_filled_data_points: bool = False
+    signal_storage_directory: Optional[Union[str, Path]] = None
+    execution_backend: str = 'python'
+    hard_memory_limit_mb: Optional[int] = None
+    event_fill_backend: str = 'python'
+    event_schedule_backend: str = 'python'
+    event_state_backend: str = 'sql'
 
     def __post_init__(self):
+        if self.event_state_backend not in ('sql', 'memory', 'rust'):
+            raise ValueError('event_state_backend must be sql, memory or rust')
+        if self.event_schedule_backend not in ('python', 'rust', 'auto'):
+            raise ValueError(
+                'event_schedule_backend must be python, rust or auto'
+            )
+        if self.event_fill_backend not in ('python', 'rust', 'auto'):
+            raise ValueError('event_fill_backend must be python, rust or auto')
+        if self.execution_backend not in ('python', 'rust', 'auto'):
+            raise ValueError('execution_backend must be python, rust or auto')
+        if self.hard_memory_limit_mb is not None and (
+            type(self.hard_memory_limit_mb) is not int
+            or self.hard_memory_limit_mb <= 0
+        ):
+            raise ValueError('hard_memory_limit_mb must be a positive integer')
+        if self.signal_storage_directory is not None:
+            object.__setattr__(self, 'signal_storage_directory', str(
+                Path(self.signal_storage_directory).expanduser().resolve()
+            ))
+        if not isinstance(self.save_filled_data_points, bool):
+            raise ValueError("save_filled_data_points must be a bool")
         if self.n_workers is not None and self.n_workers < -1:
             raise ValueError("n_workers must be -1, 0, or a positive integer")
         for name in ("memory_budget_mb", "min_available_memory_mb"):
@@ -127,5 +174,19 @@ class BacktestRunConfiguration:
             ),
             max_tasks_per_child=_environment_int(
                 env, f"{prefix}MAX_TASKS_PER_CHILD", 16
+            ),
+            save_filled_data_points=_environment_bool(
+                env, f"{prefix}SAVE_FILLED_DATA_POINTS", False
+            ),
+            signal_storage_directory=env.get(
+                f'{prefix}SIGNAL_STORAGE_DIRECTORY'),
+            execution_backend=env.get(f'{prefix}EXECUTION_BACKEND', 'python'),
+            event_fill_backend=env.get(
+                f'{prefix}EVENT_FILL_BACKEND', 'python'),
+            event_schedule_backend=env.get(
+                f'{prefix}EVENT_SCHEDULE_BACKEND', 'python'),
+            event_state_backend=env.get(f'{prefix}EVENT_STATE_BACKEND', 'sql'),
+            hard_memory_limit_mb=_environment_int(
+                env, f'{prefix}HARD_MEMORY_LIMIT_MB', None
             ),
         )

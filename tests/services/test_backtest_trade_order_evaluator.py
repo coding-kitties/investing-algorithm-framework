@@ -1,4 +1,7 @@
 import os
+import random
+import unittest
+from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 
 import polars as pl
@@ -11,6 +14,7 @@ from investing_algorithm_framework import (
     BacktestDateRange,
 )
 from investing_algorithm_framework.domain import INDEX_DATETIME
+from investing_algorithm_framework.domain import Order
 from investing_algorithm_framework.services import (
     BacktestTradeOrderEvaluator,
     OrderBacktestService,
@@ -23,6 +27,173 @@ OHLCV_CSV = os.path.join(
     "resources", "test_data", "ohlcv",
     "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14-21-45_2023-12-25-00-00.csv",
 )
+
+
+class TestNativeEventFills(unittest.TestCase):
+    def test_backend_fallback_and_validation(self):
+        from investing_algorithm_framework.services.trade_order_evaluator \
+            .native import NativeEventFillUnsupported
+        target = ('investing_algorithm_framework.services.'
+                  'trade_order_evaluator.native.load_native_event_fills')
+        arguments = dict(trade_service=MagicMock(), order_service=MagicMock(),
+                         trade_stop_loss_service=MagicMock(),
+                         trade_take_profit_service=MagicMock())
+        for error in (ImportError('not installed'),
+                      NativeEventFillUnsupported('wrong version')):
+            with patch(target, side_effect=error):
+                evaluator = BacktestTradeOrderEvaluator(
+                    **arguments, event_fill_backend='auto')
+                self.assertIsNone(evaluator._native_fills)
+                with self.assertRaises(type(error)):
+                    BacktestTradeOrderEvaluator(
+                        **arguments, event_fill_backend='rust')
+        with patch(target) as loader:
+            BacktestTradeOrderEvaluator(**arguments)
+            loader.assert_not_called()
+        with self.assertRaises(ValueError):
+            BacktestTradeOrderEvaluator(
+                **arguments, event_fill_backend='invalid')
+
+    def test_stop_limit_trigger_without_fill_and_input_fallback(self):
+        from investing_algorithm_framework.services.trade_order_evaluator \
+            .native import NativeEventFillUnsupported, load_native_event_fills
+        try:
+            native = load_native_event_fills()
+        except ImportError:
+            self.skipTest('Optional native extension is not installed')
+        date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        frame = pl.DataFrame({'Datetime': [date], 'Open': [11.0],
+                              'Low': [11.0], 'High': [13.0]})
+        outcomes = []
+        for backend in ('python', 'rust'):
+            service = MagicMock()
+            evaluator = BacktestTradeOrderEvaluator(
+                MagicMock(), MagicMock(), MagicMock(), service,
+                event_fill_backend=backend,
+            )
+            order = Order(id=1, target_symbol='BTC', trading_symbol='EUR',
+                          order_type='STOP_LIMIT', order_side='BUY',
+                          price=10.0, amount=2.0, updated_at=date,
+                          stop_price=12.0)
+            evaluator._check_has_executed(order, frame)
+            service.update.assert_not_called()
+            service.repository.update.assert_called_once_with(
+                1, {'triggered_at': date})
+            outcomes.append(service.mock_calls)
+        self.assertEqual(*outcomes)
+        unsupported = frame.with_columns(pl.lit(None).alias('Low'))
+        with self.assertRaises(NativeEventFillUnsupported):
+            evaluator._check_has_executed(order, unsupported)
+        evaluator.event_fill_backend = 'auto'
+        with patch('investing_algorithm_framework.services.'
+                   'trade_order_evaluator.trade_order_evaluator.'
+                   'TradeOrderEvaluator._check_has_executed') as fallback:
+            evaluator._check_has_executed(order, unsupported)
+            fallback.assert_called_once_with(order, unsupported)
+        with self.assertRaises(ValueError):
+            native.event_fill_decision([0], [], [1.0], 0, 1, True,
+                                       1.0, None, False)
+
+    def test_custom_blotter_partial_fill_and_no_fill_parity(self):
+        from investing_algorithm_framework.services.trade_order_evaluator \
+            .native import load_native_event_fills
+        try:
+            load_native_event_fills()
+        except ImportError:
+            self.skipTest('Optional native extension is not installed')
+        date = datetime(2024, 1, 2, tzinfo=timezone.utc)
+        frame = pl.DataFrame({'Datetime': [date], 'Open': [10.0],
+                              'Low': [9.0], 'High': [11.0], 'Volume': [2.0]})
+        for case in ('partial', 'zero', 'empty', 'before_update', 'no_match'):
+            with self.subTest(case=case):
+                outcomes = []
+                for backend in ('python', 'rust'):
+                    calls = MagicMock()
+                    blotter = calls.blotter
+                    blotter.get_fill_price.return_value = 10.25
+                    blotter.get_fill_amount.return_value = (
+                        0.0 if case == 'zero' else 0.5)
+                    blotter.on_fill.return_value = 0.1
+                    blotter.get_commission_rate.return_value = 0.01
+                    evaluator = BacktestTradeOrderEvaluator(
+                        MagicMock(), MagicMock(), MagicMock(), calls.orders,
+                        blotter=blotter, event_fill_backend=backend,
+                    )
+                    order = Order(
+                        id=1, target_symbol='BTC', trading_symbol='EUR',
+                        order_type='LIMIT', order_side='BUY', amount=2.0,
+                        remaining=1.5, filled=0.5, order_fee=0.2,
+                        price=8.0 if case == 'no_match' else 10.0,
+                        updated_at=(date.replace(day=3)
+                                    if case == 'before_update' else date),
+                    )
+                    evaluator._check_has_executed(
+                        order, frame.head(0) if case == 'empty' else frame)
+                    if case == 'partial':
+                        calls.orders.update.assert_called_once_with(1, {
+                            'filled': 1.0, 'remaining': 1.0,
+                            'order_fee': 0.2 + 0.1,
+                        })
+                    else:
+                        calls.orders.update.assert_not_called()
+                    outcomes.append(calls.mock_calls)
+                self.assertEqual(*outcomes)
+
+    def test_exact_decisions_and_fill_updates(self):
+        try:
+            from investing_algorithm_framework.services.trade_order_evaluator \
+                .native import load_native_event_fills
+            load_native_event_fills()
+        except ImportError:
+            self.skipTest('Optional native extension is not installed')
+        generator = random.Random(411)
+        dates = [datetime(2024, 1, day, tzinfo=timezone.utc)
+                 for day in range(1, 21)]
+        for kind in ('MARKET', 'LIMIT', 'STOP', 'STOP_LIMIT'):
+            for side in ('BUY', 'SELL', 'SHORT', 'COVER'):
+                for triggered in (False, True):
+                    for volume in (False, True):
+                        with self.subTest(kind=kind, side=side,
+                                          triggered=triggered, volume=volume):
+                            frame = pl.DataFrame({
+                                'Datetime': dates,
+                                'Open': [10.0] * len(dates),
+                                'Low': [generator.uniform(7, 11)
+                                        for _ in dates],
+                                'High': [generator.uniform(11, 14)
+                                         for _ in dates],
+                            })
+                            frame = frame.with_columns(
+                                pl.col('Datetime').cast(
+                                    pl.Datetime(
+                                        'ns' if volume else 'us', 'UTC')
+                                )
+                            )
+                            if volume:
+                                frame = frame.with_columns(pl.lit(20.0)
+                                                           .alias('Volume'))
+                            outcomes = []
+                            for backend in ('python', 'rust'):
+                                service = MagicMock()
+                                evaluator = BacktestTradeOrderEvaluator(
+                                    trade_service=MagicMock(),
+                                    trade_stop_loss_service=MagicMock(),
+                                    trade_take_profit_service=MagicMock(),
+                                    order_service=service,
+                                    event_fill_backend=backend,
+                                )
+                                order = Order(
+                                    id=1, target_symbol='BTC',
+                                    trading_symbol='EUR', order_type=kind,
+                                    order_side=side, price=10.0, amount=2.0,
+                                    remaining=2.0, filled=0.0,
+                                    updated_at=dates[3], stop_price=12.0,
+                                )
+                                if triggered:
+                                    order.set_triggered_at(dates[2])
+                                evaluator._check_has_executed(order, frame)
+                                outcomes.append(service.mock_calls)
+                            self.assertEqual(outcomes[0], outcomes[1])
 
 
 class TestBacktestTradeOrderEvaluatorStopLoss(TestBase):

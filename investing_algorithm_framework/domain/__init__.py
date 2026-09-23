@@ -57,7 +57,8 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     convert_polars_to_pandas, random_number, is_jupyter_notebook, \
     csv_to_list, StoppableThread, load_csv_into_dict, tqdm, \
     is_timezone_aware, sync_timezones, get_timezone, format_datetime_utc
-from .backtesting import BacktestRun, BacktestSummaryMetrics, \
+from .backtesting import BacktestRun, BacktestHistory, \
+    BacktestSummaryMetrics, \
     BacktestDateRange, Backtest, BacktestMetrics, combine_backtests, \
     combine_multi_universe_backtest, BacktestEngine, \
     BacktestMonteCarloTest, BacktestEvaluationFocus, \
@@ -159,6 +160,7 @@ __all__ = [
     "parse_decimal_to_string",
     "parse_string_to_decimal",
     "BacktestRun",
+    "BacktestHistory",
     "DATETIME_FORMAT_BACKTESTING",
     "BACKTESTING_FLAG",
     "PortfolioSnapshot",

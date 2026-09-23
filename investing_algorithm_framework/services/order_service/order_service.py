@@ -1,4 +1,7 @@
 import logging
+
+from investing_algorithm_framework.domain.native_event import native_order
+import math
 from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
@@ -232,11 +235,16 @@ class OrderService(RepositoryService):
         data["id"] = self._create_order_id()
 
         order = self.repository.create(data, save=False)
+        self._validate_order_fee(
+            order.order_fee, order.order_fee_currency, order.trading_symbol
+        )
 
         # v9.0 (#431) — snapshot the price used to reserve cash so that
         # slippage between reservation and fill can be settled later
         # even after order.price is overwritten by the executor.
-        if OrderSide.BUY.equals(order.order_side):
+        if any(side.equals(order.order_side) for side in (
+            OrderSide.BUY, OrderSide.SHORT, OrderSide.COVER,
+        )):
             reservation_price = order.reservation_price
             if reservation_price is not None:
                 order.metadata["_reservation_price"] = reservation_price
@@ -252,6 +260,9 @@ class OrderService(RepositoryService):
 
         if execute:
             order = self.execute_order(order, portfolio)
+        self._validate_order_fee(
+            order.order_fee, order.order_fee_currency, order.trading_symbol
+        )
 
         # v9.0 (#431) — if the caller supplied filled / remaining / status
         # explicitly, prefer them over whatever the executor returned. This
@@ -319,6 +330,7 @@ class OrderService(RepositoryService):
 
         if sync:
             order = self.get(order_id)
+            self._settle_order_fee(order)
             if OrderSide.BUY.equals(order_side):
                 self._sync_portfolio_with_created_buy_order(order)
                 # v9.0 (#431) — if the executor reported the order
@@ -382,7 +394,16 @@ class OrderService(RepositoryService):
             Order: Order object that has been updated
         """
         previous_order = self.order_repository.get(object_id)
+        self._validate_order_fee(
+            data.get('order_fee', previous_order.order_fee),
+            data.get('order_fee_currency', previous_order.order_fee_currency),
+            previous_order.trading_symbol,
+        )
         new_order = self.order_repository.update(object_id, data)
+        self._settle_order_fee(new_order, previous_order.order_fee or 0)
+        self.trade_service.reconcile_order_fees(
+            new_order, previous_order.order_fee or 0
+        )
         filled_difference = new_order.get_filled() \
             - previous_order.get_filled()
 
@@ -402,7 +423,10 @@ class OrderService(RepositoryService):
             else:
                 self._sync_with_sell_order_filled(previous_order, new_order)
 
-        if "status" in data:
+        if "status" in data and previous_order.status not in (
+            OrderStatus.CANCELED.value, OrderStatus.EXPIRED.value,
+            OrderStatus.REJECTED.value,
+        ):
 
             if OrderStatus.CANCELED.equals(new_order.get_status()):
                 if OrderSide.BUY.equals(new_side):
@@ -437,6 +461,38 @@ class OrderService(RepositoryService):
                     self._sync_with_sell_order_expired(new_order)
 
         return new_order
+
+    @staticmethod
+    def _validate_order_fee(fee, currency, trading_symbol):
+        if fee is None:
+            return
+        if not math.isfinite(fee) or fee < 0:
+            raise OperationalException(
+                'Order fee must be finite and nonnegative'
+            )
+        if fee and currency and currency.upper() != trading_symbol.upper():
+            raise OperationalException(
+                'Order fee settlement requires a quote-currency fee; '
+                'convert the fee before reporting it'
+            )
+
+    @native_order('fee')
+    def _settle_order_fee(self, order, previous_fee=0):
+        """Settle only the newly reported cumulative quote-currency fee."""
+        difference = (order.order_fee or 0) - previous_fee
+        if difference == 0:
+            return
+        position = self.position_service.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        quote_position = self.position_service.find({
+            'portfolio': portfolio.id, 'symbol': portfolio.trading_symbol,
+        })
+        self.portfolio_repository.update(portfolio.id, {
+            'unallocated': portfolio.unallocated - difference,
+        })
+        self.position_service.update(quote_position.id, {
+            'amount': quote_position.amount - difference,
+        })
 
     def execute_order(self, order, portfolio) -> Order:
         """
@@ -1019,6 +1075,7 @@ class OrderService(RepositoryService):
 
         return position
 
+    @native_order('create')
     def _sync_portfolio_with_created_buy_order(self, order):
         """
         Function to sync the portfolio and positions with a created buy order.
@@ -1039,6 +1096,7 @@ class OrderService(RepositoryService):
             portfolio.id, {"unallocated": portfolio.get_unallocated() - size}
         )
 
+    @native_order('create')
     def _sync_portfolio_with_created_sell_order(self, order):
         """
         Function to sync the portfolio with a created sell order. The
@@ -1071,8 +1129,12 @@ class OrderService(RepositoryService):
             self.portfolio_repository.update(
                 portfolio.id,
                 {
-                    "unallocated": portfolio.get_unallocated() + size
+                    "unallocated": portfolio.get_unallocated() + size,
+                    "total_trade_volume": portfolio.total_trade_volume + size,
                 }
+            )
+            self.trade_service.update_trade_with_filled_sell_order(
+                filled, order
             )
 
     # ------------------------------------------------------------------
@@ -1101,6 +1163,7 @@ class OrderService(RepositoryService):
     #     reject
     # ------------------------------------------------------------------
 
+    @native_order('create')
     def _sync_portfolio_with_created_short_order(self, order):
         """Reserve cash collateral for a freshly-created SHORT order.
         Cash-side semantics are identical to a BUY reservation; the
@@ -1117,6 +1180,7 @@ class OrderService(RepositoryService):
             {"unallocated": portfolio.get_unallocated() - size}
         )
 
+    @native_order('create')
     def _sync_portfolio_with_created_cover_order(self, order):
         """Reserve cash to buy back the short for a freshly-created
         COVER order. Cash-side semantics are identical to a BUY
@@ -1133,6 +1197,7 @@ class OrderService(RepositoryService):
             {"unallocated": portfolio.get_unallocated() - size}
         )
 
+    @native_order('fill')
     def _sync_with_short_order_filled(self, previous_order, current_order):
         """SHORT fill: release the per-fill reservation, credit
         proceeds, drive the target position further negative, create
@@ -1239,6 +1304,7 @@ class OrderService(RepositoryService):
             current_order.updated_at or current_order.created_at,
         )
 
+    @native_order('fill')
     def _sync_with_cover_order_filled(self, previous_order, current_order):
         """COVER fill: release the per-fill reservation, debit the
         actual cover cost, move the target position toward zero, and
@@ -1442,6 +1508,7 @@ class OrderService(RepositoryService):
                 f"for rule {rule.id}: {exc}"
             )
 
+    @native_order('fill')
     def _sync_with_buy_order_filled(self, previous_order, current_order):
         """
         Function to sync the portfolio, position and trades with the
@@ -1764,6 +1831,7 @@ class OrderService(RepositoryService):
             )
         self.order_repository.save(current_order)
 
+    @native_order('fill')
     def _sync_with_sell_order_filled(self, previous_order, current_order):
         """
         Function to sync the portfolio, position and trades with the
@@ -1825,13 +1893,11 @@ class OrderService(RepositoryService):
         # Update the position if the amount has changed
         if current_order.amount != previous_order.amount:
             difference = current_order.amount - previous_order.amount
-            cost = difference * current_order.get_price()
             if self._position_mode(portfolio) == PositionMode.HEDGE:
                 self.position_service.update(
                     position.id,
                     {
                         "long_amount": position.long_amount - difference,
-                        "long_cost": position.long_cost - cost,
                     }
                 )
             else:
@@ -1839,7 +1905,6 @@ class OrderService(RepositoryService):
                     position.id,
                     {
                         "amount": position.get_amount() - difference,
-                        "cost": position.get_cost() - cost
                     }
                 )
 
@@ -1847,6 +1912,7 @@ class OrderService(RepositoryService):
             filled_difference, current_order
         )
 
+    @native_order('cancel')
     def _restore_buy_order_balance(self, order):
         """Shared logic: restore reserved balance when a BUY order is
         cancelled, expired, rejected, or failed.
@@ -1882,6 +1948,7 @@ class OrderService(RepositoryService):
             {"amount": trading_symbol_position.get_amount() + size}
         )
 
+    @native_order('cancel')
     def _restore_sell_order_position(self, order):
         """Shared logic: restore locked position when a SELL order is
         cancelled, expired, rejected, or failed."""

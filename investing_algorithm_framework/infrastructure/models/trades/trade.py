@@ -54,6 +54,12 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         'SQLOrder',
         secondary=order_trade_association,
         back_populates='trades',
+        order_by=(
+            '(SQLOrder.created_at, SQLOrder.target_symbol, '
+            'SQLOrder.trading_symbol, SQLOrder.strategy_id, '
+            'SQLOrder.order_side, SQLOrder.order_type, '
+            'SQLOrder.price, SQLOrder.amount, SQLOrder.id)'
+        ),
         lazy='joined'
     )
     target_symbol = Column(String)

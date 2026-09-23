@@ -26,6 +26,9 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
     __tablename__ = "run_reports"
     id = Column(Integer, primary_key=True, unique=True)
     algorithm_id = Column(String, default=None)
+    status = Column(String, default="completed")
+    error = Column(Text, default=None)
+    reason = Column(Text, default=None)
     environment = Column(String, default=None)
     is_paper = Column(Boolean, default=None)
     number_of_iterations = Column(Integer, default=None)

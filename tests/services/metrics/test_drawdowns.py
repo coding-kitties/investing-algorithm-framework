@@ -18,6 +18,130 @@ def _make_snapshots(timestamps, values):
     return snapshots
 
 
+class TestNativeDrawdown(unittest.TestCase):
+    def test_native_rejects_unsupported_inputs(self):
+        from decimal import Decimal
+        from investing_algorithm_framework.services.metrics.native import (
+            NativeMetricsUnsupported, native_risk_metrics,
+        )
+        try:
+            import iaf_confluence_native as native
+        except ImportError:
+            self.skipTest('Optional native extension is not installed')
+        for value in (float('nan'), float('inf'), Decimal('1.2'),
+                      2 ** 10000):
+            snapshots = _make_snapshots([datetime(2024, 1, 1)], [value])
+            snapshots[0].cash_flow = 0
+            with self.assertRaises(NativeMetricsUnsupported):
+                native_risk_metrics(snapshots)
+        for values, flows, elapsed in (
+            ([1.0], [], [0]), ([1.0], [0.0], []),
+            ([1.0], [0.0], [-1]),
+            ([1.0, 2.0], [0.0, 0.0], [1, 0]),
+            ([1.0], [float('nan')], [0]),
+            ([1e-300, 1e300], [0.0, 0.0], [0, 1]),
+        ):
+            with self.assertRaises(ValueError):
+                native.risk_metrics(values, flows, elapsed)
+
+    def test_backend_selection_and_fallback(self):
+        from unittest.mock import patch
+        from investing_algorithm_framework import (
+            BacktestDateRange, BacktestWindow, BacktestRun,
+        )
+        from investing_algorithm_framework.domain.models.portfolio \
+            .portfolio_snapshot import PortfolioSnapshot
+        from investing_algorithm_framework.services.metrics.generate import (
+            create_backtest_metrics,
+        )
+        from investing_algorithm_framework.services.metrics.native import (
+            NativeMetricsUnsupported,
+        )
+        run = BacktestRun(
+            backtest_window=BacktestWindow(train_range=BacktestDateRange(
+                start_date=datetime(2024, 1, 1),
+                end_date=datetime(2024, 1, 2))),
+            initial_unallocated=100,
+            portfolio_snapshots=[PortfolioSnapshot(
+                created_at=timestamp, total_value=value,
+                portfolio_id='test', trading_symbol='EUR',
+            ) for timestamp, value in (
+                (datetime(2024, 1, 1), 100), (datetime(2024, 1, 2), 80))],
+            trades=[],
+        )
+        target = ('investing_algorithm_framework.services.metrics.native.'
+                  'native_risk_metrics')
+        for error in (ImportError('not installed'),
+                      NativeMetricsUnsupported('unsupported')):
+            with patch(target, side_effect=error) as native:
+                result = create_backtest_metrics(
+                    run, 0, ['max_drawdown'], metrics_backend='auto')
+                self.assertEqual(result.max_drawdown, .2)
+                native.assert_called_once()
+                with self.assertRaises(type(error)):
+                    create_backtest_metrics(
+                        run, 0, ['max_drawdown'], metrics_backend='rust')
+            with patch(target) as native:
+                create_backtest_metrics(run, 0, ['max_drawdown'])
+                native.assert_not_called()
+        with patch(target, return_value={'max_drawdown': .123}) as native:
+            result = create_backtest_metrics(
+                run, 0, ['max_drawdown'], metrics_backend='rust')
+            self.assertEqual(result.max_drawdown, .123)
+            native.assert_called_once()
+        with self.assertRaises(ValueError):
+            create_backtest_metrics(run, 0, [], metrics_backend='invalid')
+
+    def test_exact_native_parity(self):
+        import numpy as np
+        from investing_algorithm_framework.services.metrics.native import (
+            native_risk_metrics,
+        )
+        from investing_algorithm_framework.services.metrics.drawdown import (
+            get_twr_drawdown_series, get_twr_max_drawdown,
+            get_twr_max_drawdown_duration,
+        )
+        from investing_algorithm_framework.services.metrics.equity_curve import (
+            get_equity_curve, get_twr_equity_curve,
+        )
+        try:
+            import iaf_confluence_native
+        except ImportError:
+            self.skipTest('Optional native extension is not installed')
+        self.assertEqual(iaf_confluence_native.DRAWDOWN_SEMANTICS_VERSION,
+                         'drawdown-v1')
+        functions = {
+            'equity_curve': get_equity_curve,
+            'drawdown_series': get_drawdown_series,
+            'max_drawdown': get_max_drawdown,
+            'max_drawdown_absolute': get_max_drawdown_absolute,
+            'max_drawdown_duration': get_max_drawdown_duration,
+            'twr_equity_curve': get_twr_equity_curve,
+            'twr_drawdown_series': get_twr_drawdown_series,
+            'twr_max_drawdown': get_twr_max_drawdown,
+            'twr_max_drawdown_duration': get_twr_max_drawdown_duration,
+        }
+        generator = random.Random(101)
+        cases = [[], [0], [-2, -4, 0], [100, 100, 100],
+                 [100, 80, 0, -10, 100], [100, 50, 60], [100, 80, 110.0],
+                 [generator.uniform(10, 1000) for _ in range(500)]]
+        for values in cases:
+            for scalar in (float, np.float64, lambda value: value):
+                with self.subTest(count=len(values), scalar=scalar):
+                    dates = [datetime(2024, 1, 1) + timedelta(hours=13 * index)
+                             for index in range(len(values))]
+                    snapshots = _make_snapshots(dates, map(scalar, values))
+                    for index, snapshot in enumerate(snapshots):
+                        snapshot.cash_flow = 5.0 if index % 3 == 0 else 0.0
+                    snapshots.reverse()
+                    expected = {name: function(snapshots)
+                                for name, function in functions.items()}
+                    self.assertEqual(expected, native_risk_metrics(snapshots))
+                    actual = native_risk_metrics(snapshots)
+                    self.assertIs(type(actual['max_drawdown_absolute']),
+                                  type(expected['max_drawdown_absolute']))
+
+
 class TestDrawdownFunctions(unittest.TestCase):
 
     def setUp(self):

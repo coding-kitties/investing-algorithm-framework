@@ -9,6 +9,7 @@ from werkzeug.datastructures import MultiDict
 from investing_algorithm_framework.domain import OperationalException, \
     DEFAULT_PAGE_VALUE, DEFAULT_PER_PAGE_VALUE
 from investing_algorithm_framework.infrastructure.database import Session
+from .event_memory import event_memory_routed
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -29,6 +30,7 @@ class Repository(ABC):
     DEFAULT_PER_PAGE = DEFAULT_PER_PAGE_VALUE
     DEFAULT_PAGE = DEFAULT_PAGE_VALUE
 
+    @event_memory_routed
     def create(self, data, save=True):
         created_object = self.base_class(**data)
         if save:
@@ -44,6 +46,7 @@ class Repository(ABC):
 
         return created_object
 
+    @event_memory_routed
     def update(self, object_id, data):
         # List all datetime fields for your model
         datetime_fields = [
@@ -63,6 +66,7 @@ class Repository(ABC):
                 db.rollback()
                 raise OperationalException("Error updating object")
 
+    @event_memory_routed
     def update_all(self, query_params, data):
 
         with Session() as db:
@@ -83,6 +87,7 @@ class Repository(ABC):
                 db.rollback()
                 raise OperationalException("Error updating object")
 
+    @event_memory_routed
     def delete(self, object_id):
 
         with Session() as db:
@@ -96,6 +101,7 @@ class Repository(ABC):
                 db.rollback()
                 raise OperationalException("Error deleting object")
 
+    @event_memory_routed
     def delete_all(self, query_params):
 
         with Session() as db:
@@ -117,6 +123,7 @@ class Repository(ABC):
                 db.rollback()
                 raise OperationalException("Error deleting all objects")
 
+    @event_memory_routed
     def get_all(self, query_params=None):
         query_params = MultiDict(query_params)
 
@@ -131,6 +138,7 @@ class Repository(ABC):
                 logger.error(e)
                 raise OperationalException("Error getting all objects")
 
+    @event_memory_routed
     def get(self, object_id):
 
         with Session() as db:
@@ -144,6 +152,26 @@ class Repository(ABC):
 
             return match
 
+    @event_memory_routed
+    def iter_all(self, query_params=None, batch_size=256):
+        """Export detached records in pages from a stable repository."""
+        if type(batch_size) is not int or batch_size <= 0:
+            raise ValueError('batch_size must be a positive integer')
+        offset = 0
+        while True:
+            with Session() as db:
+                query = self.apply_query_params(
+                    db, db.query(self.base_class), MultiDict(query_params),
+                )
+                page = query.limit(batch_size).offset(offset).all()
+            if not page:
+                return
+            yield from page
+            offset += len(page)
+            if len(page) < batch_size:
+                return
+            del page
+
     @abstractmethod
     def _apply_query_params(self, db, query, query_params):
         raise NotImplementedError()
@@ -156,6 +184,7 @@ class Repository(ABC):
 
         return query
 
+    @event_memory_routed
     def exists(self, query_params):
         with Session() as db:
             try:
@@ -166,6 +195,7 @@ class Repository(ABC):
                 logger.error(e)
                 raise OperationalException("Error checking if object exists")
 
+    @event_memory_routed
     def find(self, query_params):
 
         if query_params is None or len(query_params) == 0:
@@ -185,6 +215,7 @@ class Repository(ABC):
                 logger.error(e)
                 raise OperationalException(self.DEFAULT_NOT_FOUND_MESSAGE)
 
+    @event_memory_routed
     def count(self, query_params=None):
 
         with Session() as db:
@@ -266,6 +297,7 @@ class Repository(ABC):
 
         return new_selection
 
+    @event_memory_routed
     def save(self, object_to_save):
         """
         Save an object to the database with SQLAlchemy.
@@ -286,6 +318,7 @@ class Repository(ABC):
                 db.rollback()
                 raise OperationalException("Error saving object")
 
+    @event_memory_routed
     def save_objects(self, objects):
 
         with Session() as db:

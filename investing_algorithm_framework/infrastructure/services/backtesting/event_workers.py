@@ -1,7 +1,9 @@
 """Spawn workers with private event-engine services and SQLite databases."""
 
 from copy import deepcopy
+from pathlib import Path
 from tempfile import TemporaryDirectory
+from uuid import uuid4
 
 from investing_algorithm_framework.domain import (
     BACKTESTING_INITIAL_AMOUNT, DATABASE_DIRECTORY_PATH, DATABASE_NAME,
@@ -69,9 +71,23 @@ def run_event_worker(arguments):
                 blotter=app.get_blotter(),
                 memory_budget_mb=settings["memory_budget_mb"],
                 min_available_memory_mb=settings["min_available_memory_mb"],
+                signal_storage_directory=settings.get(
+                    'signal_storage_directory'
+                ),
+                event_fill_backend=settings.get(
+                    'event_fill_backend', 'python'),
+                event_schedule_backend=settings.get(
+                    'event_schedule_backend', 'python'),
+                event_state_backend=settings.get('event_state_backend', 'sql'),
             )
-            # Only the coordinator merges bundles and writes checkpoints.
-            return results
+            paths = []
+            for result in results:
+                path = (
+                    Path(settings['result_directory']) / f'{uuid4().hex}.obtf'
+                )
+                result.save_bundle(path)
+                paths.append(str(path))
+            return paths
         finally:
             teardown_sqlalchemy()
             app.container.unwire()

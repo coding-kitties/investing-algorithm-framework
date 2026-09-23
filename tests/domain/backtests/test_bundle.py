@@ -10,7 +10,9 @@ helpers.
 import os
 import shutil
 import tempfile
+from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
 from investing_algorithm_framework.domain import (
     Backtest,
@@ -79,6 +81,149 @@ class TestBundleRoundTrip(TestCase):
             _normalize(self.fixture.to_dict()),
         )
 
+    def test_save_does_not_use_whole_payload_encoder(self):
+        target = Path(self.tmp) / 'streamed.obtf'
+        with patch(
+            'investing_algorithm_framework.domain.backtesting.bundle.'
+            '_encode_payload', side_effect=AssertionError('Whole payload'),
+        ):
+            save_bundle(self.fixture, target)
+        self.assertEqual(
+            _normalize(open_bundle(target).to_dict()),
+            _normalize(self.fixture.to_dict()),
+        )
+
+    def test_metric_spool_round_trip_and_invalid_input_cleanup(self):
+        from datetime import datetime, timedelta, timezone
+        from investing_algorithm_framework.domain.backtesting.bundle import (
+            _series_to_parquet_file, _parquet_bytes_to_series,
+        )
+        from investing_algorithm_framework.domain.backtesting.history import (
+            BacktestHistory,
+        )
+
+        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        history = BacktestHistory(
+            (float(index), start + timedelta(minutes=index))
+            for index in range(10000)
+        )
+        blob = _series_to_parquet_file(history)
+        with blob.source as source:
+            source.seek(0)
+            restored = _parquet_bytes_to_series(source.read())
+        self.assertEqual(restored, [
+            (value, timestamp.isoformat()) for value, timestamp in history
+        ])
+        for invalid in ((1,), (1, 'invalid-date'), ('invalid-value', start)):
+            with self.subTest(invalid=invalid):
+                source = tempfile.TemporaryFile()
+                with patch(
+                    'investing_algorithm_framework.domain.backtesting.'
+                    'bundle.tempfile.TemporaryFile', return_value=source,
+                ):
+                    self.assertIsNone(_series_to_parquet_file(
+                        [(1, start)] * 4097 + [invalid]))
+                self.assertTrue(source.closed)
+
+    def test_metric_spool_closes_when_blob_is_released(self):
+        import gc
+        from datetime import datetime, timezone
+        from investing_algorithm_framework.domain.backtesting.bundle import (
+            _series_to_parquet_file,
+        )
+
+        blob = _series_to_parquet_file([
+            (1.0, datetime(2024, 1, 1, tzinfo=timezone.utc)),
+        ])
+        source = blob.source
+        self.assertFalse(source.closed)
+        del blob
+        gc.collect()
+        self.assertTrue(source.closed)
+
+    def test_stream_encoder_bounds_extra_allocation(self):
+        import tracemalloc
+        from investing_algorithm_framework.domain.backtesting.bundle import (
+            _atomic_write_document, _decode_payload,
+        )
+
+        document = {'history': [{'value': 12.5, 'id': 1}] * 100000,
+                    'blob': b'x' * (16 * 1024 * 1024)}
+        target = Path(self.tmp) / 'encoded.obtf'
+        tracemalloc.start()
+        try:
+            _atomic_write_document(
+                target, document, format_version=BUNDLE_FORMAT_VERSION,
+            )
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        self.assertLess(peak, 2 * 1024 * 1024)
+        version, restored = _decode_payload(target.read_bytes())
+        self.assertEqual(version, BUNDLE_FORMAT_VERSION)
+        self.assertEqual(restored, document)
+
+    def test_stream_failure_preserves_target_and_cleans_temporary_files(self):
+        from investing_algorithm_framework.domain.backtesting.bundle import (
+            _atomic_write_document, _atomic_bundle_file,
+        )
+
+        target = Path(self.tmp) / 'preserved.obtf'
+        save_bundle(self.fixture, target)
+        before = target.read_bytes()
+        document = {}
+        document['cycle'] = document
+        with self.assertRaisesRegex(ValueError, 'nesting'):
+            _atomic_write_document(
+                target, document, format_version=BUNDLE_FORMAT_VERSION,
+            )
+        self.assertEqual(target.read_bytes(), before)
+        with self.assertRaisesRegex(RuntimeError, 'interrupted'):
+            with _atomic_bundle_file(target) as destination:
+                destination.write(b'partial')
+                raise RuntimeError('interrupted')
+        self.assertEqual(target.read_bytes(), before)
+        self.assertEqual(list(Path(self.tmp).iterdir()), [target])
+
+    def test_vector_result_bundle_numeric_and_history_fidelity(self):
+        from datetime import datetime, timezone
+        from scripts.bench_backtest_streaming import strategy_for, vector_case
+        from investing_algorithm_framework import BacktestDateRange
+
+        result = vector_case(strategy_for('ema', ['BTC']), BacktestDateRange(
+            start_date=datetime(2023, 11, 2, tzinfo=timezone.utc),
+            end_date=datetime(2023, 12, 2, tzinfo=timezone.utc),
+        ), 'python')()
+        original = Backtest(algorithm_id='fidelity', vector_runs=[result])
+        path = os.path.join(self.tmp, 'vector' + BUNDLE_EXT)
+        save_bundle(original, path)
+        restored = open_bundle(path).vector_runs[0]
+
+        def canonical(value, key=None):
+            from uuid import UUID
+            if isinstance(value, dict):
+                return {name: canonical(item, name)
+                        for name, item in value.items()}
+            if isinstance(value, (list, tuple)):
+                return [canonical(item, key) for item in value]
+            if isinstance(value, UUID):
+                return str(value)
+            if key in ('yearly_returns', 'best_year', 'worst_year'):
+                if isinstance(value, str):
+                    return datetime.fromisoformat(value).date().isoformat()
+            return _normalize(value)
+
+        for name in ('trades', 'orders', 'positions', 'portfolio_snapshots'):
+            self.assertEqual(
+                canonical([item.to_dict() for item in getattr(result, name)]),
+                canonical([item.to_dict() for item in getattr(restored, name)]),
+                name,
+            )
+        self.assertEqual(canonical(result.signal_events),
+                         canonical(restored.signal_events))
+        self.assertEqual(canonical(result.backtest_metrics.to_dict()),
+                         canonical(restored.backtest_metrics.to_dict()))
+
     def test_bundle_round_trip_preserves_hedge_mode_and_legs(self):
         from copy import deepcopy
 
@@ -93,7 +238,8 @@ class TestBundleRoundTrip(TestCase):
             long_cost=200.0,
             short_cost=165.0,
         )]
-        run.portfolio_snapshots[-1].position_snapshots = [PositionSnapshot(
+        snapshots = run.portfolio_snapshots.materialize()
+        snapshots[-1].position_snapshots = [PositionSnapshot(
             symbol="BTC/EUR",
             amount=0.5,
             cost=200.0,
@@ -102,6 +248,8 @@ class TestBundleRoundTrip(TestCase):
             long_cost=200.0,
             short_cost=165.0,
         )]
+
+        run.portfolio_snapshots = snapshots
 
         save_bundle(backtest, path)
         loaded_run = open_bundle(path).vector_runs[0]

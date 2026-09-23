@@ -37,7 +37,10 @@ store handle), so cross-run analytics is one DuckDB / Polars scan::
 from __future__ import annotations
 
 import logging
+import os
+import re
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Iterable, Iterator, List, Optional, Union
 
@@ -136,6 +139,22 @@ class LocalTieredStore(BacktestStore):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    def begin_run(self, run_id, attempt_id, schemas, **options):
+        from .streaming import LocalRunWriter
+        return LocalRunWriter(self, run_id, attempt_id, schemas, **options)
+
+    def open_run_manifest(self, handle):
+        from .streaming import read_manifest
+        return read_manifest(self, handle)
+
+    def iter_run_batches(self, handle, kind=None):
+        from .streaming import iter_batches
+        return iter_batches(self, handle, kind)
+
+    def discard_run_attempt(self, handle, *, producer_stopped=False):
+        from .streaming import discard_attempt
+        discard_attempt(self, handle, producer_stopped=producer_stopped)
+
     @staticmethod
     def _normalize_handle(handle: StoreHandle) -> str:
         """Strip the .obtf suffix; handles are stored bare in Tier-1."""
@@ -171,6 +190,81 @@ class LocalTieredStore(BacktestStore):
         if self._index_path.is_file():
             return SqliteBacktestIndex.open(self._index_path)
         return SqliteBacktestIndex.create(self._index_path)
+
+    def _definition_path(self, definition_id: str) -> Path:
+        match = re.fullmatch(r"([a-z_]+):sha256:([0-9a-f]{64})", definition_id)
+        if match is None:
+            raise StoreError("Invalid definition ID")
+        kind, digest = match.groups()
+        return self.root / "definitions" / kind / f"{digest}.json"
+
+    def put_definition(self, kind: str, payload: bytes) -> str:
+        """Atomically publish immutable canonical bytes without replacement."""
+        from investing_algorithm_framework.domain.backtesting.records import (
+            CardDefinition, content_id, decode_canonical,
+        )
+        from investing_algorithm_framework.domain.backtesting import (
+            record_schemas,
+        )
+
+        document = decode_canonical(payload)
+        if kind == "card":
+            CardDefinition(payload)
+        elif kind == "provenance":
+            record_schemas.validate_provenance(document)
+        identity = content_id(kind, document)
+        target = self._definition_path(identity)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            if self.get_definition(identity) != payload:
+                raise StoreError("Definition content collision")
+            return identity
+        descriptor, temporary = tempfile.mkstemp(
+            prefix=".definition-", suffix=".tmp", dir=target.parent
+        )
+        try:
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(payload)
+                output.flush()
+                os.fsync(output.fileno())
+            try:
+                os.link(temporary, target)
+            except FileExistsError:
+                if self.get_definition(identity) != payload:
+                    raise StoreError("Definition content collision")
+            if os.name == "posix":
+                for directory in (
+                    target.parent, target.parent.parent, self.root
+                ):
+                    directory_fd = os.open(directory, os.O_RDONLY)
+                    try:
+                        os.fsync(directory_fd)
+                    finally:
+                        os.close(directory_fd)
+        finally:
+            os.unlink(temporary)
+        return identity
+
+    def get_definition(self, definition_id: str) -> bytes:
+        """Verify canonical encoding and content hash on every read."""
+        from investing_algorithm_framework.domain.backtesting.records import (
+            content_id, decode_canonical,
+        )
+
+        target = self._definition_path(definition_id)
+        try:
+            payload = target.read_bytes()
+        except FileNotFoundError as error:
+            raise StoreHandleNotFoundError(definition_id) from error
+        try:
+            actual_id = content_id(
+                definition_id.split(":", 1)[0], decode_canonical(payload)
+            )
+        except (ValueError, TypeError) as error:
+            raise StoreError("Corrupt definition encoding") from error
+        if actual_id != definition_id:
+            raise StoreError("Definition checksum mismatch")
+        return payload
 
     # ------------------------------------------------------------------
     # BacktestStore: write / open / exists / delete

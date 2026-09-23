@@ -7,6 +7,7 @@ from itertools import chain
 import multiprocessing
 import os
 from pathlib import Path
+import sys
 import threading
 from time import monotonic
 
@@ -23,6 +24,38 @@ _THREAD_ENVIRONMENT = (
 )
 _SPAWN_ENVIRONMENT_LOCK = threading.RLock()
 _MB = 1024 * 1024
+
+
+def require_hard_memory_limit(limit_mb):
+    """Verify an externally enforced cgroup-v2 cap inherited by workers."""
+    if limit_mb is None:
+        return
+    if type(limit_mb) is not int or limit_mb <= 0:
+        raise ValueError('hard_memory_limit_mb must be a positive integer')
+    message = (
+        'hard_memory_limit_mb requires Linux cgroup v2 with a verified '
+        'current-group memory.max no greater than the requested limit and '
+        'memory.swap.max=0. Configure the container/cgroup before starting '
+        'Python; RSS polling is not a hard limit.'
+    )
+    if sys.platform != 'linux':
+        raise BacktestResourceError(message)
+    try:
+        memberships = Path('/proc/self/cgroup').read_text().splitlines()
+        relative = next(line[3:] for line in memberships
+                        if line.startswith('0::'))
+        if not relative.startswith('/') or '..' in Path(relative).parts:
+            raise ValueError('Unverifiable cgroup membership')
+        directory = Path('/sys/fs/cgroup') / relative.lstrip('/')
+        members = (directory / 'cgroup.procs').read_text().splitlines()
+        if str(os.getpid()) not in members:
+            raise ValueError('Current process not present in cgroup')
+        maximum = int((directory / 'memory.max').read_text().strip())
+        swap = int((directory / 'memory.swap.max').read_text().strip())
+        if not 0 < maximum <= limit_mb * _MB or swap != 0:
+            raise ValueError('Cgroup limit exceeds requested budget')
+    except (OSError, ValueError, StopIteration) as exc:
+        raise BacktestResourceError(message) from exc
 
 
 @contextmanager

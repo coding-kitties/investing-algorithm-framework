@@ -138,7 +138,9 @@ class RecordCooldownPhase(StrategyPhase):
 
         watermark = strategy._last_system_exit_scan_at
         try:
-            orders = order_service.get_all({})
+            orders = order_service.get_all(
+                {'created_at_gt': watermark} if watermark is not None else {}
+            )
         except Exception:
             return
 

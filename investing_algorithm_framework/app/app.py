@@ -946,77 +946,85 @@ class App:
         number_of_iterations: int = None,
         run_immediately_on_start: bool = True,
     ):
+        """Run the app and return its latest report when execution finishes.
+
+        Failures persist a failed report when storage is available, then
+        re-raise the original exception. Continuous runs publish reports
+        during execution through ``get_last_run_report``/``get_run_reports``.
         """
-        Entry point to run the application. This method should be called to
-        start the trading bot. This method can be called in three modes:
+        self._last_run_report = None
+        self._report_event_loop = None
+        self._report_algorithm = None
+        self._report_state_loaded = False
+        self._report_started_at = datetime.now(timezone.utc)
+        try:
+            self._run(number_of_iterations, run_immediately_on_start)
+        except (Exception, KeyboardInterrupt) as error:
+            if self._last_run_report is None \
+                    or self._last_run_report.status != "failed":
+                self._last_run_report = None
+                try:
+                    self.initialize_storage()
+                    self._last_run_report = self._build_run_report(
+                        self._report_event_loop, self._report_started_at,
+                        number_of_iterations=number_of_iterations,
+                        status="failed", error=str(error) or "Interrupted",
+                        reason="interrupted" if isinstance(
+                            error, KeyboardInterrupt) else "execution_error",
+                    )
+                except Exception:
+                    logger.exception("Could not persist failed run report")
+            raise
+        finally:
+            if self._state_handler is not None and self._report_state_loaded:
+                try:
+                    config = self.container.configuration_service() \
+                        .get_config()
+                    self._state_handler.save(config[RESOURCE_DIRECTORY])
+                except Exception:
+                    logger.exception("Could not save run state")
+        return self.get_last_run_report()
 
-        - Without any params: In this mode, the app runs until a keyboard
-        interrupt is received. This mode is useful when running the app in
-        a loop.
-        - With a payload: In this mode, the app runs only once with the
-        payload provided. This mode is useful when running the app in a
-        one-off mode, such as running the app from the command line or
-        on a schedule. Payload is a dictionary that contains the data to
-        handle for the algorithm. This data should look like this:
-        {
-            "action": "RUN_STRATEGY",
-        }
-        - With a number of iterations: In this mode, the app runs for the
-        number of iterations provided. This mode is useful when running the
-        app in a loop for a fixed number of iterations.
-
-        This function first checks if there is an algorithm registered.
-         If not, it raises an OperationalException. Then it
-         initializes the algorithm with the services and the configuration.
-
-        Args:
-            number_of_iterations (int): The number of iterations to run the
-                algorithm for
-            run_immediately_on_start (bool): When True (default), every
-                strategy evaluates on the very first tick regardless of
-                its configured schedule (there is no prior run yet to
-                compare against). Set to False to instead wait for each
-                strategy's normal interval to elapse before its first
-                run — e.g. a strategy scheduled every 2 hours would only
-                run for the first time 2 hours after startup.
-
-        Returns:
-            None
-        """
+    def _run(
+        self,
+        number_of_iterations: int = None,
+        run_immediately_on_start: bool = True,
+    ):
+        """Initialize services and execute the bounded or continuous loop."""
         self.initialize_config()
 
-        # Run all on_initialize hooks
         for hook in self._on_initialize_hooks:
             logger.info(
                 f"Running on_initialize hook: {hook.__class__.__name__}"
             )
             hook.on_run(self.context)
 
-        # Load the state if a state handler is provided
         if self._state_handler is not None:
             logger.info("Detected state handler, loading state")
             self._state_handler.initialize()
             config = self.container.configuration_service().get_config()
             self._state_handler.load(config[RESOURCE_DIRECTORY])
+            self._report_state_loaded = True
 
         algorithm_runner = self._bind_algorithm_control_persistence()
-
+        self.initialize_storage()
         if not algorithm_runner.is_enabled():
             control_state = algorithm_runner.get_control_state()
             logger.info(
-                "Algorithm is disabled (stopped via the control API "
-                f"or control file, reason: {control_state.get('reason')})"
-                " — skipping this run."
+                "Algorithm is disabled, skipping this run (reason: %s)",
+                control_state.get("reason"),
+            )
+            self._last_run_report = self._build_run_report(
+                None, self._report_started_at,
+                number_of_iterations=number_of_iterations,
+                status="skipped", reason="algorithm_disabled",
             )
             return
 
-        self.initialize_storage()
         logger.info("App initialization complete")
         event_loop_service = None
-        run_started_at = datetime.now(timezone.utc)
-
+        run_started_at = self._report_started_at
         try:
-            # Run all on_after_initialize hooks
             for hook in self._on_after_initialize_hooks:
                 logger.info(
                     f"Running on_after_initialize "
@@ -1025,6 +1033,7 @@ class App:
                 hook.on_run(self.context)
 
             algorithm = self.get_algorithm()
+            self._report_algorithm = algorithm
             self.initialize_data_sources(algorithm.data_sources)
             self.initialize_services()
             self.initialize_portfolios()
@@ -1096,6 +1105,7 @@ class App:
                 algorithm, trade_order_evaluator=trade_order_evaluator,
                 run_immediately_on_start=run_immediately_on_start,
             )
+            self._report_event_loop = event_loop_service
 
             if number_of_iterations is None:
                 logger.info("Startup complete — entering live loop")
@@ -1104,13 +1114,16 @@ class App:
                 # and persist a RunReport after every tick that
                 # actually ran a strategy — not just once when the
                 # loop eventually stops.
-                def _build_iteration_run_report(strategies):
+                def _build_iteration_run_report(started_at, **outcome):
+                    self._last_run_report = None
                     self._last_run_report = self._build_run_report(
-                        event_loop_service, run_started_at,
-                        algorithm=algorithm, number_of_iterations=None,
+                        event_loop_service, started_at,
+                        algorithm=algorithm, number_of_iterations=1,
+                        **outcome,
                     )
+                    return self.get_last_run_report()
 
-                event_loop_service.on_iteration_complete = \
+                event_loop_service.on_iteration_report = \
                     _build_iteration_run_report
             else:
                 logger.info(
@@ -1124,15 +1137,7 @@ class App:
                 # `/api/algorithm/start` and `/api/algorithm/stop`)
                 # without killing the process. The main thread just
                 # keeps the process alive alongside the web thread.
-                def _build_web_run_report():
-                    self._last_run_report = self._build_run_report(
-                        event_loop_service, run_started_at,
-                        algorithm=algorithm, number_of_iterations=None,
-                    )
-
-                algorithm_runner.configure(
-                    event_loop_service, on_stop=_build_web_run_report
-                )
+                algorithm_runner.configure(event_loop_service)
                 algorithm_runner.start()
 
                 try:
@@ -1144,19 +1149,26 @@ class App:
                     # persist 'disabled' or the next `python
                     # test.py` run would silently skip.
                     algorithm_runner.stop(wait=True, persist=False)
-                    exit(0)
+                    raise
             else:
                 try:
                     event_loop_service.start(
                         number_of_iterations=number_of_iterations
                     )
-                    self._last_run_report = self._build_run_report(
-                        event_loop_service, run_started_at,
-                        algorithm=algorithm,
-                        number_of_iterations=number_of_iterations,
-                    )
+                    if number_of_iterations is not None \
+                            or self._last_run_report is None:
+                        self._last_run_report = self._build_run_report(
+                            event_loop_service, run_started_at,
+                            algorithm=algorithm,
+                            number_of_iterations=number_of_iterations,
+                            status=("completed"
+                                    if event_loop_service.signal_log
+                                    else "skipped"),
+                            reason=(None if event_loop_service.signal_log
+                                    else "no_strategy_due"),
+                        )
                 except KeyboardInterrupt:
-                    exit(0)
+                    raise
         except Exception as e:
             logger.error(e)
             raise e
@@ -1164,16 +1176,6 @@ class App:
 
             if event_loop_service is not None:
                 self._run_history = event_loop_service.history
-
-            try:
-                # Upload state if state handler is provided
-                if self._state_handler is not None:
-                    logger.info("Detected state handler, saving state")
-                    config = \
-                        self.container.configuration_service().get_config()
-                    self._state_handler.save(config[RESOURCE_DIRECTORY])
-            except Exception as e:
-                logger.error(e)
 
     def validate(self, require_portfolio: bool = True) -> None:
         """
@@ -1649,6 +1651,9 @@ class App:
         """
         if run_configuration is None:
             run_configuration = BacktestRunConfiguration()
+        from investing_algorithm_framework.infrastructure.services \
+            .backtesting.vector_resources import require_hard_memory_limit
+        require_hard_memory_limit(run_configuration.hard_memory_limit_mb)
         show_progress = run_configuration.show_progress
         continue_on_error = run_configuration.continue_on_error
         backtest_storage_directory = (
@@ -1666,6 +1671,7 @@ class App:
         )
         dynamic_position_sizing = run_configuration.dynamic_position_sizing
         fill_missing_data = run_configuration.fill_missing_data
+        save_filled_data_points = run_configuration.save_filled_data_points
         max_tasks_per_child = run_configuration.max_tasks_per_child
 
         _modes_given = sum(
@@ -1979,10 +1985,16 @@ class App:
                 use_checkpoints=use_checkpoints,
                 dynamic_position_sizing=dynamic_position_sizing,
                 fill_missing_data=fill_missing_data,
+                save_filled_data_points=save_filled_data_points,
                 result_mode="index",
                 memory_budget_mb=memory_budget_mb,
                 min_available_memory_mb=min_available_memory_mb,
                 max_tasks_per_child=max_tasks_per_child,
+                signal_storage_directory=(
+                    run_configuration.signal_storage_directory
+                ),
+                execution_backend=run_configuration.execution_backend,
+                hard_memory_limit_mb=run_configuration.hard_memory_limit_mb,
                 window_metrics_filter_function=(
                     window_metrics_filter_function
                 ),
@@ -2111,10 +2123,22 @@ class App:
                     backtest_storage_directory=backtest_storage_directory,
                     use_checkpoints=use_checkpoints,
                     fill_missing_data=fill_missing_data,
+                    save_filled_data_points=save_filled_data_points,
                     blotter=self._blotter,
                     result_mode="index",
                     n_workers=n_workers,
                     max_tasks_per_child=max_tasks_per_child,
+                    signal_storage_directory=(
+                        run_configuration.signal_storage_directory
+                    ),
+                    event_fill_backend=run_configuration.event_fill_backend,
+                    event_schedule_backend=(
+                        run_configuration.event_schedule_backend
+                    ),
+                    event_state_backend=run_configuration.event_state_backend,
+                    hard_memory_limit_mb=(
+                        run_configuration.hard_memory_limit_mb
+                    ),
                     study=study,
                     prepare_backtest=prepare_event_backtest,
                     memory_budget_mb=memory_budget_mb,
@@ -3386,21 +3410,11 @@ class App:
         return self._run_history
 
     def get_last_run_report(self) -> Optional[dict]:
-        """
-        Return a snapshot of what the most recent bounded ``run()``
-        invocation did — the orders it created, every signal it
-        evaluated (including ones rejected without an order), and the
-        resulting positions, portfolios, and trades.
+        """Return the latest completed, failed or skipped report as a dict.
 
-        Only populated after a non-web, bounded run (i.e. one where
-        ``number_of_iterations`` was given, such as an AWS Lambda or
-        Azure Function invocation) completes without raising. Intended
-        to be returned directly as (or merged into) that invocation's
-        response body.
-
-        Returns:
-            dict or None: The run report as a dict, or None if no
-                bounded run has completed yet in this process.
+        Bounded invocations produce one report; continuous runs publish one
+        per execution tick. None means no report is available for this run.
+        Use ``get_run_reports`` to retrieve persisted reports across processes.
         """
         if self._last_run_report is None:
             return None
@@ -3445,6 +3459,9 @@ class App:
         run_started_at: datetime,
         algorithm=None,
         number_of_iterations: int = None,
+        status: str = "completed",
+        error: str = None,
+        reason: str = None,
     ) -> RunReport:
         """
         Assemble and persist a :class:`RunReport` for the run that
@@ -3495,24 +3512,29 @@ class App:
             )
 
         run_started_at = _aware(run_started_at)
-        orders = [
-            order.to_dict() for order in order_service.get_all()
-            if _in_report(order)
-        ]
-        positions = [
-            position.to_dict() for position in position_service.get_all()
-        ]
-        portfolios = [
-            portfolio.to_dict() for portfolio in portfolio_service.get_all()
-        ]
-        trades = [trade.to_dict() for trade in trade_service.get_all()]
+        orders, positions, portfolios, trades = [], [], [], []
+        if event_loop_service is not None:
+            try:
+                orders = [order.to_dict() for order in order_service.get_all()
+                          if _in_report(order)]
+                positions = [position.to_dict()
+                             for position in position_service.get_all()]
+                portfolios = [portfolio.to_dict()
+                              for portfolio in portfolio_service.get_all()]
+                trades = [trade.to_dict() for trade in trade_service.get_all()]
+            except Exception:
+                if status != "failed":
+                    raise
+                logger.exception("Could not snapshot failed run state")
+        signal_log = (event_loop_service.signal_log
+                      if event_loop_service is not None else [])
         decision_traces = [
             {
                 "strategy_id": entry.get("strategy_id"),
                 "symbol": item.get("symbol"),
                 **trace,
             }
-            for entry in event_loop_service.signal_log
+            for entry in signal_log
             for item in entry.get("decision_traces", [])
             for trace in [item["decision_trace"]]
         ]
@@ -3528,14 +3550,19 @@ class App:
         )
 
         report = run_report_service.create({
-            "algorithm_id": getattr(algorithm, "algorithm_id", None),
+            "algorithm_id": getattr(
+                algorithm or getattr(self, "_report_algorithm", None),
+                "algorithm_id", None),
+            "status": status,
+            "error": error,
+            "reason": reason,
             "environment": config.get(ENVIRONMENT),
             "is_paper": is_paper,
             "number_of_iterations": number_of_iterations,
             "started_at": run_started_at,
             "completed_at": datetime.now(timezone.utc),
             "orders": orders,
-            "signals": list(event_loop_service.signal_log),
+            "signals": list(signal_log),
             "positions": positions,
             "portfolios": portfolios,
             "trades": trades,

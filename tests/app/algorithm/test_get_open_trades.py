@@ -47,6 +47,8 @@ class Test(TestBase):
             order_side="SELL",
             amount=20
         )
+        self.assertEqual(1, len(self.app.context.get_open_trades("BTC")))
+        order_service.check_pending_orders()
         self.assertEqual(0, len(self.app.context.get_open_trades("BTC")))
 
     def test_get_open_trades_with_close_trades(self):
@@ -90,7 +92,7 @@ class Test(TestBase):
                 self.app.context.get_orders(order_side="SELL", status="OPEN")
             )
         )
-        self.assertEqual(1, len(self.app.context.get_open_trades("BTC")))
+        self.assertEqual(2, len(self.app.context.get_open_trades("BTC")))
         self.app.context.create_limit_order(
             target_symbol="BTC",
             price=10,
@@ -100,6 +102,8 @@ class Test(TestBase):
         self.assertEqual(2, len(
             self.app.context.get_orders(order_side="SELL", status="OPEN"))
         )
+        self.assertEqual(2, len(self.app.context.get_open_trades("BTC")))
+        order_service.check_pending_orders()
         self.assertEqual(0, len(self.app.context.get_open_trades("BTC")))
 
     def test_get_open_trades_with_close_trades_of_partial_buy_orders(self):
@@ -167,7 +171,7 @@ class Test(TestBase):
         )
 
         trades = self.app.context.get_open_trades()
-        self.assertEqual(1, len(trades))
+        self.assertEqual(2, len(trades))
         trade_one = self.app.context.get_trade(order_id=order_one_id)
         trade_two = self.app.context.get_trade(order_id=order_two_id)
         self.assertEqual(0, trade_one.available_amount)

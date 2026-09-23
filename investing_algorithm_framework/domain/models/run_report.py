@@ -38,19 +38,19 @@ def _normalize_signal_reports(reports):
 
 
 class RunReport(BaseModel):
-    """Snapshot of what a single ``App.run()`` invocation did.
+    """Persisted outcome of a bounded invocation or continuous execution tick.
 
-    Built after a successful, bounded (``number_of_iterations``) run —
-    the manual/stateless invocation path used by AWS Lambda, Azure
-    Functions, and similar on-demand triggers — and persisted so it
-    can be inspected after the (stateless) process has already exited.
-    Intended to be returned directly as (or merged into) the response
-    body of such a handler, so a caller can see what happened without
-    inspecting logs or querying the database by hand.
+    No-signal strategy executions are completed runs. Failed and skipped
+    executions carry explicit outcomes rather than reusing an earlier report.
 
     Attributes:
         id: Identifier assigned once the report is persisted. None
             for a report that has not been saved yet.
+        status: "completed", "failed", or "skipped". Legacy reports default
+            to "completed".
+        error: Error text for a failed execution, otherwise None.
+        reason: Outcome reason, such as "algorithm_disabled" or
+            "execution_error".
         algorithm_id: The id of the algorithm that produced this run,
             so reports from multiple bots sharing one database can be
             told apart.
@@ -63,7 +63,7 @@ class RunReport(BaseModel):
         number_of_iterations: The bounded iteration count passed to
             ``App.run()`` for this invocation.
         started_at: When this invocation began.
-        completed_at: When this invocation finished successfully.
+        completed_at: When this invocation finished, including failure/skip.
         orders: Orders created during this run, most-recent last. Each
             order dict already carries its own ``strategy_id``.
             Includes new orders, orders whose status changed this run
@@ -109,8 +109,14 @@ class RunReport(BaseModel):
         trades=None,
         score_cards=None,
         decision_traces=None,
+        status="completed",
+        error=None,
+        reason=None,
     ):
         self.id = id
+        self.status = status
+        self.error = error
+        self.reason = reason
         self.algorithm_id = algorithm_id
         self.environment = environment
         self.is_paper = is_paper
@@ -143,6 +149,9 @@ class RunReport(BaseModel):
 
         return {
             "id": self.id,
+            "status": self.status or "completed",
+            "error": self.error,
+            "reason": self.reason,
             "algorithm_id": self.algorithm_id,
             "environment": self.environment,
             "is_paper": self.is_paper,
@@ -164,6 +173,9 @@ class RunReport(BaseModel):
     def from_dict(data: dict):
         return RunReport(
             id=data.get("id"),
+            status=data.get("status", "completed"),
+            error=data.get("error"),
+            reason=data.get("reason"),
             algorithm_id=data.get("algorithm_id"),
             environment=data.get("environment"),
             is_paper=data.get("is_paper"),

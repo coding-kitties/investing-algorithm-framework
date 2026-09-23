@@ -9,6 +9,8 @@ from investing_algorithm_framework.domain import OrderStatus, TradeStatus, \
     DataType, INDEX_DATETIME, PositionMode, random_number, random_string
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
+from investing_algorithm_framework.domain.native_event import \
+    native_event_engine
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,11 @@ def _safe_order_fee(order):
 def _safe_buy_order(trade):
     """Safely get buy_order from a trade, avoiding lazy-load errors."""
     try:
+        if trade.is_short:
+            return next(
+                order for order in trade.orders
+                if OrderSide.SHORT.equals(order.order_side)
+            )
         return getattr(trade, 'buy_order', None)
     except Exception:
         return None
@@ -34,21 +41,46 @@ def _get_buy_fee_portion(trade, portion_amount):
     """Get proportional buy fee for *portion_amount* of the trade."""
     buy_order = _safe_buy_order(trade)
     fee = _safe_order_fee(buy_order) if buy_order else 0
-    if fee and trade.amount:
-        return fee * (portion_amount / trade.amount)
+    if fee and buy_order.filled:
+        return fee * (portion_amount / buy_order.filled)
     return 0
 
 
-def _get_sell_fee_portion(sell_order, portion_amount):
-    """Get proportional sell fee for *portion_amount* of the sell order."""
-    fee = _safe_order_fee(sell_order)
-    try:
-        amount = sell_order.amount if sell_order else 0
-    except Exception:
-        amount = 0
-    if fee and amount:
-        return fee * (portion_amount / amount)
-    return 0
+def _exit_values(trade, amount, price, fee_difference, filled_difference,
+                 open_price=None):
+    native = native_event_engine()
+    opening_price = trade.open_price if open_price is None else open_price
+    if native is not None:
+        order = _safe_buy_order(trade)
+        return native.event_exit_values(
+            bool(trade.is_short), opening_price, price, amount,
+            _safe_order_fee(order) if order is not None else 0,
+            (order.filled or 0) if order is not None else 0,
+            fee_difference, filled_difference,
+        )
+    buy_fee = _get_buy_fee_portion(trade, amount)
+    sell_fee = fee_difference * (amount / filled_difference)
+    cost = opening_price * amount
+    gain = ((opening_price - price) * amount if trade.is_short
+            else price * amount - cost) - buy_fee - sell_fee
+    return buy_fee, sell_fee, cost, gain
+
+
+def _python_cover_fills(trades, filled, price, fee_difference):
+    remaining = filled
+    for index, trade in enumerate(trades):
+        if remaining <= 0:
+            break
+        available = trade.available_amount or 0
+        if available <= 0:
+            continue
+        portion = min(available, remaining)
+        entry_fee, exit_fee, cost, gain = _exit_values(
+            trade, portion, price, fee_difference, filled)
+        yield (index, portion, entry_fee, exit_fee, cost, gain,
+               available - portion, (trade.net_gain or 0) + gain,
+               (trade.total_fees or 0) + entry_fee + exit_fee)
+        remaining -= portion
 
 
 class TradeService(RepositoryService):
@@ -65,7 +97,7 @@ class TradeService(RepositoryService):
     partially closed by multiple sell orders. The TradeAllocation table
     acts as the allocation ledger — each record captures how much of a
     sell order was allocated to close a specific trade, along with the
-    prices, fees, and net_gain contribution at time of creation.
+    reservation at placement and realized prices, fees, and net_gain at fill.
 
     There are two creation paths for these allocation records:
 
@@ -77,15 +109,14 @@ class TradeService(RepositoryService):
       order should close. Used by stop-loss / take-profit flows.
 
     Both paths delegate per-allocation accounting to a single shared
-    method (`_allocate_sell_to_trade`) which computes proportional fees,
-    net_gain contribution, updates trade state, and persists the
-    allocation record with all derived values stored.
+    method (`_allocate_sell_to_trade`) which reserves available units.
+    Fills settle actual execution prices, proportional fees and FIFO cost
+    before lifecycle hooks run. Placement does not realize profit.
 
     The allocation records also enable **cancellation reversal**
     (`update_trade_with_removed_sell_order`): when a sell order is
-    cancelled, expired, or rejected, the stored `net_gain_contribution`,
-    `buy_fee`, `sell_fee`, and `amount_pending` on each allocation
-    record are used to restore trade state — no re-derivation needed.
+    cancelled, expired, or rejected, only `amount_pending` is released.
+    Already-realized profit, fees and position cost are not reversed.
     """
 
     def __init__(
@@ -109,6 +140,60 @@ class TradeService(RepositoryService):
         self.trade_take_profit_repository = trade_take_profit_repository
         self.trade_allocation_repository = trade_allocation_repository
         self.trade_hook_dispatcher = trade_hook_dispatcher
+
+    def reconcile_order_fees(self, order, previous_fee=0):
+        """Reconcile executed allocations against cumulative reported fees."""
+        if not order.order_fee and not previous_fee:
+            return
+        trades = self.get_all({'order_id': order.id})
+        position = self.position_repository.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        total_difference = 0
+        for trade in trades:
+            opening_order = _safe_buy_order(trade)
+            opening = (
+                opening_order is not None and opening_order.id == order.id
+            )
+            allocations = self.trade_allocation_repository.get_all({
+                'trade_id': trade.id,
+            })
+            trade_difference = 0
+            for allocation in allocations:
+                if not opening and allocation.order_id != order.id:
+                    continue
+                field = 'buy_fee' if opening else 'sell_fee'
+                native = native_event_engine()
+                if native is not None:
+                    fee, difference, gain = native.event_fee_correction(
+                        order.order_fee or 0, order.filled or 0,
+                        allocation.amount, allocation.amount_pending,
+                        getattr(allocation, field) or 0,
+                        allocation.net_gain_contribution,
+                    )
+                else:
+                    executed = allocation.amount - allocation.amount_pending
+                    fee = (order.order_fee or 0) * (
+                        executed / order.filled if order.filled else 0
+                    )
+                    difference = fee - (getattr(allocation, field) or 0)
+                    gain = allocation.net_gain_contribution - difference
+                if difference == 0:
+                    continue
+                setattr(allocation, field, fee)
+                allocation.net_gain_contribution = gain
+                self.trade_allocation_repository.save(allocation)
+                trade_difference += difference
+            if trade_difference:
+                self.repository.update(trade.id, {
+                    'net_gain': trade.net_gain - trade_difference,
+                    'total_fees': (trade.total_fees or 0) + trade_difference,
+                })
+                total_difference += trade_difference
+        if total_difference:
+            self.portfolio_repository.update(portfolio.id, {
+                'total_net_gain': portfolio.total_net_gain - total_difference,
+                'net_size': portfolio.net_size - total_difference,
+            })
 
     def _dispatch_trade_hook(self, hook_name, trade):
         """Best-effort notify the owning strategy of a trade-lifecycle
@@ -307,11 +392,8 @@ class TradeService(RepositoryService):
         the target symbol with the filled portion of a COVER order.
 
         Uses FIFO across open short trades for the symbol/portfolio.
-        Realizes ``net_gain = (open_price - fill_price) * portion`` per
-        trade — inverse of the long path — and closes the trade when
-        ``available_amount`` reaches zero. Skips ``TradeAllocation``
-        bookkeeping in phase 2 (stop-loss / take-profit on shorts is
-        a later phase).
+        Realizes entry proceeds minus cover cost and proportional fees.
+        Allocations retain realized fees for later fee corrections.
         """
         if filled_difference is None or filled_difference <= 0:
             return
@@ -340,7 +422,8 @@ class TradeService(RepositoryService):
         # FIFO: oldest opened first.
         short_trades.sort(key=lambda t: t.opened_at)
 
-        if explicit_allocations:
+        native = native_event_engine()
+        if explicit_allocations and native is None:
             # Stable reorder: requested trade_ids first (preserving the
             # caller-supplied order), all others (FIFO) appended.
             requested_ids = [
@@ -352,7 +435,6 @@ class TradeService(RepositoryService):
             tail = [t for t in short_trades if t.id not in set(requested_ids)]
             short_trades = head + tail
 
-        remaining = filled_difference
         fill_price = cover_order.get_price()
         closed_at = cover_order.updated_at or cover_order.created_at
         # Re-fetch a local handle so attaching it to the trade's
@@ -360,27 +442,57 @@ class TradeService(RepositoryService):
         # caller's reference (which the order_service.update flow
         # still needs to read ``status`` from).
         cover_order_id = cover_order.get_id()
+        allocations = self.trade_allocation_repository.get_all({
+            'order_id': cover_order_id,
+        })
+        fee_difference = (cover_order.order_fee or 0) - sum(
+            allocation.sell_fee or 0 for allocation in allocations
+            if allocation.trade_id is not None
+        )
+        total_gain = 0
+        cost = 0
+        changed_trades = []
 
-        for trade in short_trades:
-            if remaining <= 0:
-                break
+        if native is not None:
+            indices = {trade.id: index
+                       for index, trade in enumerate(short_trades)}
+            requested = [indices[item['trade_id']]
+                         for item in (explicit_allocations or [])
+                         if item.get('trade_id') in indices]
+            rows = []
+            for trade in short_trades:
+                entry = _safe_buy_order(trade)
+                rows.append((
+                    trade.available_amount or 0, trade.open_price,
+                    trade.net_gain or 0, trade.total_fees or 0,
+                    _safe_order_fee(entry) if entry is not None else 0,
+                    (entry.filled or 0) if entry is not None else 0,
+                ))
+            fills, cost, total_gain = native.event_cover_plan(
+                rows, requested, filled_difference, fill_price, fee_difference)
+        else:
+            fills = _python_cover_fills(
+                short_trades, filled_difference, fill_price, fee_difference)
 
-            available = trade.available_amount or 0
-            if available <= 0:
-                continue
-
-            portion = min(available, remaining)
-            # Inverse of the long path: short gains when fill < open.
-            net_gain_contribution = (
-                trade.open_price - fill_price
-            ) * portion
-
-            new_available = available - portion
-            new_net_gain = (trade.net_gain or 0) + net_gain_contribution
+        for (index, portion, entry_fee, exit_fee, realized_cost,
+             net_gain_contribution, new_available, new_net_gain,
+             total_fees) in fills:
+            trade = short_trades[index]
+            self.trade_allocation_repository.create({
+                'order_id': cover_order_id, 'trade_id': trade.id,
+                'amount': portion, 'amount_pending': 0,
+                'open_price': trade.open_price, 'close_price': fill_price,
+                'buy_fee': entry_fee, 'sell_fee': exit_fee,
+                'net_gain_contribution': net_gain_contribution,
+            })
+            if native is None:
+                total_gain += net_gain_contribution
+                cost += realized_cost
 
             updates = {
                 "available_amount": new_available,
                 "net_gain": new_net_gain,
+                "total_fees": total_fees,
                 "updated_at": closed_at,
             }
             if new_available <= 0:
@@ -388,73 +500,66 @@ class TradeService(RepositoryService):
                 updates["closed_at"] = closed_at
 
             self.update(trade.id, updates)
-            if self.trade_hook_dispatcher is not None:
-                updated_trade = self.get(trade.id)
-                if updates.get("status") == TradeStatus.CLOSED.value:
-                    self._dispatch_trade_hook(
-                        "on_trade_closed", updated_trade
-                    )
-                else:
-                    self._dispatch_trade_hook(
-                        "on_trade_updated", updated_trade
-                    )
+            changed_trades.append(trade.id)
             local_cover_order = self.order_repository.get(cover_order_id)
             self.repository.add_order_to_trade(trade, local_cover_order)
 
-            remaining -= portion
+        if native is not None:
+            self._settle_native_exit_totals(
+                position, cost, total_gain, filled_difference, fill_price,
+                short=True)
+        else:
+            self.position_repository.update(position.id, {
+                'short_cost': max(0, position.short_cost - cost),
+            })
+            portfolio = self.portfolio_repository.get(position.portfolio_id)
+            self.portfolio_repository.update(portfolio.id, {
+                'total_net_gain': portfolio.total_net_gain + total_gain,
+                'net_size': portfolio.net_size + total_gain,
+                'total_revenue': portfolio.total_revenue + cost,
+            })
+        for trade_id in changed_trades:
+            trade = self.get(trade_id)
+            self._dispatch_trade_hook(
+                'on_trade_closed' if TradeStatus.CLOSED.equals(trade.status)
+                else 'on_trade_updated', trade,
+            )
+
+    def _settle_native_exit_totals(self, position, cost, gain, amount, price,
+                                   *, short=False, portfolio=None):
+        if portfolio is None:
+            portfolio = self.portfolio_repository.get(position.portfolio_id)
+        field = 'short_cost' if short else 'long_cost'
+        basis, net_gain, net_size, revenue = \
+            native_event_engine().event_exit_aggregates(
+                short, getattr(position, field),
+                (portfolio.total_net_gain, portfolio.net_size,
+                 portfolio.total_revenue), (cost, gain), (amount, price))
+        self.position_repository.update(position.id, {field: basis})
+        self.portfolio_repository.update(portfolio.id, {
+            'total_net_gain': net_gain, 'net_size': net_size,
+            'total_revenue': revenue,
+        })
 
     def _allocate_sell_to_trade(
-        self, trade_id, sell_order, amount_to_close
+        self, trade_id, sell_order, amount_to_close, next_available=None
     ):
-        """
-        Core allocation method — creates a single TradeAllocation record
-        linking a sell order to a trade for the given amount, computes
-        fees and net_gain, updates the trade, and stores everything on
-        the allocation record.
-
-        Both Path 1 (FIFO) and Path 2 (explicit trades) delegate here.
-
-        Args:
-            trade_id: int, the id of the trade to (partially) close
-            sell_order: Sell order providing the close price
-            amount_to_close: float, the amount being closed on this trade
-
-        Returns:
-            The created allocation record
-        """
+        """Reserve a trade portion without realizing profit or closing it."""
         trade = self.get(trade_id)
         open_price = trade.open_price
-        sell_price = sell_order.price
-        # v9.0 (#431) — STOP SELL orders carry no ``price`` until they
-        # trigger and fill. Fall back to ``stop_price`` for the initial
-        # allocation accounting so reservation succeeds; the eventual
-        # fill-time sync will overwrite trade state with the real
-        # execution price.
-        if sell_price is None or sell_price == 0:
-            sell_price = sell_order.stop_price or 0
         sell_order_id = sell_order.id
         sell_updated_at = sell_order.updated_at
         current_available = trade.available_amount
-        current_net_gain = trade.net_gain
-        current_filled = trade.filled_amount
-        current_amount = trade.amount
-
-        buy_fee = _get_buy_fee_portion(trade, amount_to_close)
-        sell_fee = _get_sell_fee_portion(sell_order, amount_to_close)
-        cost = open_price * amount_to_close
-        net_gain = (sell_price * amount_to_close) - cost - buy_fee - sell_fee
-
-        # Create the allocation record with all derived values stored
         allocation = self.trade_allocation_repository.create({
             "order_id": sell_order_id,
             "trade_id": trade_id,
             "amount": amount_to_close,
             "amount_pending": amount_to_close,
             "open_price": open_price,
-            "close_price": sell_price,
-            "buy_fee": buy_fee,
-            "sell_fee": sell_fee,
-            "net_gain_contribution": net_gain,
+            "close_price": 0,
+            "buy_fee": 0,
+            "sell_fee": 0,
+            "net_gain_contribution": 0,
         })
 
         # Re-fetch trade after DB operation to avoid detached instance
@@ -464,32 +569,35 @@ class TradeService(RepositoryService):
         sell_order = self.order_repository.get(sell_order_id)
         self.repository.add_order_to_trade(trade, sell_order)
 
-        # Update trade state
-        new_available = current_available - amount_to_close
-        update_data = {
-            "available_amount": new_available,
+        self.repository.update(trade_id, {
+            "available_amount": (
+                current_available - amount_to_close
+                if next_available is None else next_available),
             "updated_at": sell_updated_at,
-            "net_gain": current_net_gain + net_gain,
-        }
-
-        # A trade is CLOSED only when all amount is sold
-        # (available == 0) and the buy order is fully filled
-        # (filled_amount == amount).
-        if new_available == 0 and current_filled == current_amount:
-            update_data["closed_at"] = sell_updated_at
-            update_data["status"] = TradeStatus.CLOSED.value
-        elif new_available == 0:
-            # All available sold but buy order not fully filled
-            update_data["closed_at"] = sell_updated_at
-
-        self.update(trade_id, update_data)
-        if self.trade_hook_dispatcher is not None:
-            updated_trade = self.get(trade_id)
-            if update_data.get("status") == TradeStatus.CLOSED.value:
-                self._dispatch_trade_hook("on_trade_closed", updated_trade)
-            else:
-                self._dispatch_trade_hook("on_trade_updated", updated_trade)
+        })
         return allocation
+
+    def _reserve_native_trades(self, sell_order, trades, requested=None):
+        rows = []
+        for trade in trades:
+            timestamp = 0
+            if requested is None and not trade.is_short \
+                    and trade.available_amount > 0:
+                opened = trade.opened_at
+                if opened.utcoffset() is not None:
+                    opened = opened.astimezone(timezone.utc)
+                timestamp = ((opened.toordinal() * 86400 + opened.hour * 3600
+                              + opened.minute * 60 + opened.second) * 1000000
+                             + opened.microsecond)
+            rows.append((timestamp, trade.available_amount, trade.is_short))
+        try:
+            plan = native_event_engine().event_reservation_plan(
+                rows, sell_order.amount, requested)
+        except ValueError as exc:
+            raise OperationalException(str(exc)) from exc
+        for index, amount, available in plan:
+            self._allocate_sell_to_trade(
+                trades[index].id, sell_order, amount, available)
 
     def _create_trade_allocations_fifo(self, sell_order):
         """
@@ -517,6 +625,8 @@ class TradeService(RepositoryService):
             "target_symbol": sell_order.target_symbol,
             "portfolio_id": portfolio_id
         })
+        if native_event_engine() is not None:
+            return self._reserve_native_trades(sell_order, matching_trades)
         total_available_to_close = 0
         amount_to_close = sell_order.amount
         trade_queue = PriorityQueue()
@@ -674,6 +784,18 @@ class TradeService(RepositoryService):
 
         Delegates per-allocation accounting to `_allocate_sell_to_trade`.
         """
+        if native_event_engine() is not None:
+            candidates = {}
+            requested = []
+            for entry in trades:
+                identity = entry['trade_id']
+                if identity not in candidates:
+                    candidates[identity] = (
+                        len(candidates), self.get(identity))
+                requested.append((candidates[identity][0], entry['amount']))
+            return self._reserve_native_trades(
+                sell_order, [entry[1] for entry in candidates.values()],
+                requested)
 
         for trade_data in trades:
             trade = self.get(trade_data["trade_id"])
@@ -690,16 +812,13 @@ class TradeService(RepositoryService):
         position_mode=PositionMode.NETTING,
     ):
         """
-        Create trade allocation records for a sell order, update the
-        associated trades, position cost, and portfolio net_gain.
+        Reserve trade units for a SELL without realizing cost or P&L.
 
         If only the sell order is provided, FIFO matching is used. If
         trades/stop_losses/take_profits are provided, explicit matching
         is used.
 
-        After creating the allocation records, this method reads back
-        the stored fees and net_gain_contribution to update the position
-        and portfolio — no re-derivation needed.
+        Position cost and portfolio P&L are settled by the fill handler.
 
         Args:
             sell_order: Order object representing the sell order that has
@@ -714,15 +833,6 @@ class TradeService(RepositoryService):
             None
         """
         sell_order_id = sell_order.id
-        sell_price = sell_order.price
-        # v9.0 (#431) — STOP SELL orders carry no ``price`` until they
-        # trigger and fill. Fall back to ``stop_price`` so portfolio
-        # revenue/cost accounting succeeds; the eventual fill-time
-        # sync will replace these estimates with real values.
-        if sell_price is None or sell_price == 0:
-            sell_price = sell_order.stop_price or 0
-        sell_amount = sell_order.amount
-
         if (trades is None or len(trades) == 0) \
                 and (stop_losses is None or len(stop_losses) == 0) \
                 and (take_profits is None or len(take_profits) == 0):
@@ -744,58 +854,14 @@ class TradeService(RepositoryService):
                     sell_order, trades
                 )
 
-        # Retrieve all allocation records for this sell order
-        allocations = self.trade_allocation_repository.get_all({
-            "order_id": sell_order_id
-        })
-
-        # Update the position cost using stored values
-        position = self.position_repository.find({
-            "order_id": sell_order_id
-        })
-
-        cost = 0
-        net_gain = 0
-
-        for allocation in allocations:
-            if allocation.trade_id is not None:
-                cost += allocation.open_price * allocation.amount
-                net_gain += allocation.net_gain_contribution
-
-        if PositionMode(position_mode) == PositionMode.HEDGE:
-            self.position_repository.update(
-                position.id, {"long_cost": position.long_cost - cost}
-            )
-        else:
-            position.cost -= cost
-            self.position_repository.save(position)
-
-        # Update the net gain, net size of the portfolio
-        portfolio = self.portfolio_repository.get(position.portfolio_id)
-        portfolio.total_net_gain += net_gain
-        portfolio.net_size += net_gain
-        portfolio.total_revenue += sell_price * sell_amount
-        self.portfolio_repository.save(portfolio)
-
     def update_trade_with_removed_sell_order(
         self, sell_order, position_mode=PositionMode.NETTING
     ) -> Trade:
         """
-        Cancellation reversal — undo the effect of a sell order.
+        Release unfilled reservations when a SELL is cancelled.
 
-        When a sell order is cancelled, expired, or rejected, this
-        method reads the stored values from each TradeAllocation record
-        to restore each affected trade to its pre-sell state:
-
-        - `available_amount` is increased by the allocated amount.
-        - `net_gain` is decreased by the stored `net_gain_contribution`.
-        - Trade status is set back to OPEN.
-        - Associated stop-loss / take-profit sold_amounts are reversed.
-        - Position cost and portfolio net_gain / net_size are restored.
-
-        Because fees and net_gain are stored on the allocation record
-        at creation time, no re-derivation is needed — eliminating
-        the risk of calculation mismatches.
+        Restore available units and unfilled risk-rule reservations;
+        preserve already-realized profit, fees, and cost basis.
 
         Args:
             sell_order (Order): Order object representing the sell order
@@ -804,8 +870,7 @@ class TradeService(RepositoryService):
         Returns:
             Trade: Trade object representing the updated trade object
         """
-        position_cost = 0
-        total_net_gain = 0
+        trade = None
 
         # Get all allocation records for this sell order
         allocations = self.trade_allocation_repository.get_all({
@@ -816,30 +881,12 @@ class TradeService(RepositoryService):
             # If trade id is not None, update the trade object
             if allocation.trade_id is not None:
                 trade = self.get(allocation.trade_id)
-                cost = allocation.amount_pending * allocation.open_price
-
-                # Scale the stored net_gain_contribution proportionally
-                # to the unfilled (pending) portion. If the order was
-                # partially filled before cancellation, only reverse
-                # the unfilled part.
-                if allocation.amount and allocation.amount > 0:
-                    pending_ratio = (
-                        allocation.amount_pending / allocation.amount
-                    )
-                else:
-                    pending_ratio = 1
-                net_gain = allocation.net_gain_contribution * pending_ratio
-
                 trade.available_amount += allocation.amount_pending
-                trade.status = TradeStatus.OPEN.value
                 trade.updated_at = sell_order.updated_at
-                trade.net_gain -= net_gain
-                trade.cost += cost
                 trade = self.save(trade)
-
-                # Update the position cost
-                position_cost += cost
-                total_net_gain += net_gain
+                allocation.amount -= allocation.amount_pending
+                allocation.amount_pending = 0
+                self.trade_allocation_repository.save(allocation)
 
             if allocation.stop_loss_id is not None:
                 stop_loss = self.trade_stop_loss_repository\
@@ -869,23 +916,6 @@ class TradeService(RepositoryService):
 
                 self.trade_take_profit_repository.save(take_profit)
 
-        # Update the position cost
-        position = self.position_repository.find({
-            "order_id": sell_order.id
-        })
-        if PositionMode(position_mode) == PositionMode.HEDGE:
-            self.position_repository.update(
-                position.id, {"long_cost": position.long_cost + position_cost}
-            )
-        else:
-            position.cost += position_cost
-            self.position_repository.save(position)
-
-        # Update the net gain of the portfolio
-        portfolio = self.portfolio_repository.get(position.portfolio_id)
-        portfolio.total_net_gain -= total_net_gain
-        portfolio.net_size -= total_net_gain
-        self.portfolio_repository.save(portfolio)
         return trade
 
     def update_trade_with_filled_sell_order(
@@ -913,26 +943,115 @@ class TradeService(RepositoryService):
         trade_filled_difference = filled_difference
         stop_loss_filled_difference = filled_difference
         take_profit_filled_difference = filled_difference
-        total_amount_in_allocations = 0
-        trade_allocations = []
+        trade_allocations = [
+            allocation for allocation in allocations
+            if allocation.trade_id is not None
+        ]
+        total_amount_in_allocations = sum(
+            allocation.amount for allocation in trade_allocations
+        )
+        excess = total_amount_in_allocations - sell_order.amount
+        for allocation in reversed(trade_allocations):
+            if excess <= 0:
+                break
+            released = min(excess, allocation.amount_pending)
+            allocation.amount -= released
+            allocation.amount_pending -= released
+            self.trade_allocation_repository.save(allocation)
+            trade = self.get(allocation.trade_id)
+            self.repository.update(trade.id, {
+                'available_amount': trade.available_amount + released,
+            })
+            excess -= released
+        position = self.position_repository.find({'order_id': sell_order.id})
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        cost = 0
+        net_gain = 0
+        changed_trades = []
+        recorded_fee = sum(
+            allocation.sell_fee or 0 for allocation in allocations
+            if allocation.trade_id is not None
+        )
+        fee_difference = (sell_order.order_fee or 0) - recorded_fee
+        native = native_event_engine()
+        planned = {}
+        if native is not None and filled_difference > 0:
+            trade_indices = {}
+            trade_states = []
+            entries = {}
+            rows = []
+            for allocation in trade_allocations:
+                identity = allocation.trade_id
+                if identity not in trade_indices:
+                    trade = self.get(identity)
+                    trade_indices[identity] = len(trade_states)
+                    trade_states.append((trade.net_gain or 0,
+                                         trade.total_fees or 0))
+                    entry = _safe_buy_order(trade)
+                    entries[identity] = (
+                        _safe_order_fee(entry) if entry is not None else 0,
+                        (entry.filled or 0) if entry is not None else 0,
+                    )
+                rows.append((
+                    trade_indices[identity], allocation.amount,
+                    allocation.amount_pending, allocation.open_price,
+                    allocation.close_price, allocation.buy_fee,
+                    allocation.sell_fee, allocation.net_gain_contribution,
+                    *entries[identity],
+                ))
+            fills, cost, net_gain = native.event_sell_plan(
+                rows, trade_states, filled_difference, sell_order.price,
+                fee_difference)
+            planned = {trade_allocations[fill[0]].id: fill[1:]
+                       for fill in fills}
 
         for allocation in allocations:
             # Update the trade allocation
             if allocation.trade_id is not None \
-                    and trade_filled_difference > 0:
+                    and (allocation.id in planned if native is not None
+                         else trade_filled_difference > 0):
 
-                trade_allocations.append(allocation)
-                total_amount_in_allocations += allocation.amount
-
-                if allocation.amount_pending >= trade_filled_difference:
-                    amount = trade_filled_difference
-                    trade_filled_difference = 0
+                if native is not None:
+                    (allocation.amount_pending, allocation.close_price,
+                     allocation.buy_fee, allocation.sell_fee,
+                     allocation.net_gain_contribution, trade_gain,
+                     trade_fees) = planned[allocation.id]
                 else:
-                    amount = allocation.amount_pending
-                    trade_filled_difference -= amount
-
-                allocation.amount_pending -= amount
+                    if allocation.amount_pending >= trade_filled_difference:
+                        amount = trade_filled_difference
+                        trade_filled_difference = 0
+                    else:
+                        amount = allocation.amount_pending
+                        trade_filled_difference -= amount
+                    if amount <= 0:
+                        continue
+                    trade = self.get(allocation.trade_id)
+                    buy_fee, sell_fee, realized_cost, gain = _exit_values(
+                        trade, amount, sell_order.price, fee_difference,
+                        filled_difference, open_price=allocation.open_price)
+                    previously_filled = (
+                        allocation.amount - allocation.amount_pending
+                    )
+                    allocation.close_price = (
+                        allocation.close_price * previously_filled
+                        + sell_order.price * amount
+                    ) / (previously_filled + amount)
+                    allocation.buy_fee += buy_fee
+                    allocation.sell_fee += sell_fee
+                    allocation.net_gain_contribution += gain
+                    allocation.amount_pending -= amount
+                    trade_gain = (trade.net_gain or 0) + gain
+                    trade_fees = (trade.total_fees or 0) + buy_fee + sell_fee
+                    cost += realized_cost
+                    net_gain += gain
                 self.trade_allocation_repository.save(allocation)
+                self.repository.update(allocation.trade_id, {
+                    'net_gain': trade_gain,
+                    'updated_at': sell_order.updated_at,
+                    'total_fees': trade_fees,
+                })
+                if allocation.trade_id not in changed_trades:
+                    changed_trades.append(allocation.trade_id)
 
             if allocation.stop_loss_id is not None \
                     and stop_loss_filled_difference > 0:
@@ -966,28 +1085,37 @@ class TradeService(RepositoryService):
                 allocation.amount_pending -= amount
                 self.trade_allocation_repository.save(allocation)
 
-        # Update trade available amount if the total amount in allocations
-        # is not equal to the sell order amount
-        if total_amount_in_allocations != sell_order.amount:
-            difference = sell_order.amount - total_amount_in_allocations
-            trades = []
-
-            for allocation in trade_allocations:
-                trade = self.get(allocation.trade_id)
-                trades.append(trade)
-
-            # Sort trades by created_at with the most recent first
-            trades = sorted(
-                trades,
-                key=lambda x: x.updated_at,
-                reverse=True
+        if native is not None:
+            self._settle_native_exit_totals(
+                position, cost, net_gain, filled_difference, sell_order.price,
+                portfolio=portfolio)
+        else:
+            self.position_repository.update(position.id, {
+                'long_cost': position.long_cost - cost,
+            })
+            self.portfolio_repository.update(portfolio.id, {
+                'total_net_gain': portfolio.total_net_gain + net_gain,
+                'net_size': portfolio.net_size + net_gain,
+                'total_revenue': portfolio.total_revenue
+                + filled_difference * sell_order.price,
+            })
+        for trade_id in changed_trades:
+            trade = self.get(trade_id)
+            pending = sum(
+                allocation.amount_pending
+                for allocation in self.trade_allocation_repository.get_all({
+                    'trade_id': trade_id,
+                })
             )
-            queue = PeekableQueue(trades)
-
-            while difference != 0 and not queue.is_empty():
-                trade = queue.dequeue()
-                trade.available_amount -= difference
-                self.save(trade)
+            closed = trade.available_amount == 0 and pending == 0
+            if closed:
+                trade = self.repository.update(trade_id, {
+                    'status': TradeStatus.CLOSED.value,
+                    'closed_at': sell_order.updated_at,
+                })
+            self._dispatch_trade_hook(
+                'on_trade_closed' if closed else 'on_trade_updated', trade,
+            )
 
     def update_trades_with_market_data(self, market_data):
         """

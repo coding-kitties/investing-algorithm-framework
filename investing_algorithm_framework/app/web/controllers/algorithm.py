@@ -88,18 +88,36 @@ def invoke_algorithm(
     their configured schedule. The algorithm must already be running
     (see POST /api/algorithm/start). Pass one or more repeatable
     ``?strategy_id=`` query params to only invoke specific strategies;
-    omit to invoke all of them.
+    omit to invoke all of them. ``?wait=true&timeout=30`` waits for the
+    requested tick's persisted report (including failure/skip outcomes).
+    A timeout returns 504 without cancelling the queued execution.
     """
     strategy_ids = request.query_params.getlist("strategy_id") or None
+    wait = request.query_params.get("wait", "false").lower() \
+        in ("1", "true", "yes")
 
     try:
-        algorithm_runner.invoke_now(strategy_ids)
+        timeout = float(request.query_params.get("timeout", "30"))
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("timeout must be a positive finite number")
+        report = algorithm_runner.invoke_now(
+            strategy_ids, wait=wait, timeout=timeout)
+    except ValueError as error:
+        return JSONResponse(
+            content={"error_message": str(error)}, status_code=400)
+    except TimeoutError:
+        return JSONResponse(content={
+            "invoked": True,
+            "error_message": "Wait timed out; execution was not cancelled. "
+                             "Check /api/run-reports for its outcome.",
+        }, status_code=504)
     except OperationalException as e:
         return JSONResponse(content={"error_message": str(e)}, status_code=409)
 
     return JSONResponse(content={
         "invoked": True,
         "strategy_ids": strategy_ids,
+        **({"report": report} if wait else {}),
         **algorithm_runner.get_status_report(),
     }, status_code=200)
 

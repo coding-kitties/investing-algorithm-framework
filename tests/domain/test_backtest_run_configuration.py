@@ -20,9 +20,13 @@ class TestBacktestRunConfiguration(unittest.TestCase):
         self.assertFalse(configuration.skip_data_sources_initialization)
         self.assertFalse(configuration.dynamic_position_sizing)
         self.assertTrue(configuration.fill_missing_data)
+        self.assertFalse(configuration.save_filled_data_points)
         self.assertEqual(configuration.max_tasks_per_child, 16)
         self.assertIsNone(configuration.backtest_storage_directory)
         self.assertIsNone(configuration.n_workers)
+        self.assertEqual(configuration.event_fill_backend, 'python')
+        self.assertEqual(configuration.event_schedule_backend, 'python')
+        self.assertEqual(configuration.event_state_backend, 'sql')
 
     def test_from_env_parses_all_settings(self):
         configuration = BacktestRunConfiguration.from_env(
@@ -39,6 +43,10 @@ class TestBacktestRunConfiguration(unittest.TestCase):
                 "IAF_BACKTEST_DYNAMIC_POSITION_SIZING": "yes",
                 "IAF_BACKTEST_FILL_MISSING_DATA": "off",
                 "IAF_BACKTEST_MAX_TASKS_PER_CHILD": "3",
+                "IAF_BACKTEST_SAVE_FILLED_DATA_POINTS": "true",
+                "IAF_BACKTEST_EVENT_FILL_BACKEND": "rust",
+                "IAF_BACKTEST_EVENT_SCHEDULE_BACKEND": "rust",
+                "IAF_BACKTEST_EVENT_STATE_BACKEND": "memory",
             }
         )
 
@@ -59,6 +67,10 @@ class TestBacktestRunConfiguration(unittest.TestCase):
         self.assertTrue(configuration.dynamic_position_sizing)
         self.assertFalse(configuration.fill_missing_data)
         self.assertEqual(configuration.max_tasks_per_child, 3)
+        self.assertTrue(configuration.save_filled_data_points)
+        self.assertEqual(configuration.event_fill_backend, 'rust')
+        self.assertEqual(configuration.event_schedule_backend, 'rust')
+        self.assertEqual(configuration.event_state_backend, 'memory')
 
     def test_from_env_supports_custom_prefix(self):
         configuration = BacktestRunConfiguration.from_env(
@@ -67,6 +79,12 @@ class TestBacktestRunConfiguration(unittest.TestCase):
         )
 
         self.assertEqual(configuration.n_workers, 4)
+
+    def test_rust_state_backend_from_environment(self):
+        configuration = BacktestRunConfiguration.from_env(environment={
+            'IAF_BACKTEST_EVENT_STATE_BACKEND': 'rust',
+        })
+        self.assertEqual(configuration.event_state_backend, 'rust')
 
     def test_from_env_rejects_invalid_boolean(self):
         with self.assertRaises(ImproperlyConfigured):
@@ -90,6 +108,10 @@ class TestBacktestRunConfiguration(unittest.TestCase):
             {"snapshot_interval": "DAILY"},
             {"n_workers": -2},
             {"memory_budget_mb": 0},
+            {"save_filled_data_points": "false"},
+            {"event_fill_backend": "invalid"},
+            {"event_schedule_backend": "invalid"},
+            {"event_state_backend": "invalid"},
         ):
             with self.subTest(settings=settings):
                 with self.assertRaises(ValueError):

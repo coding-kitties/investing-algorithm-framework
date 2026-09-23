@@ -128,6 +128,36 @@ class BacktestStore(Protocol):
 
 
 @runtime_checkable
+class SupportsStreamingRuns(Protocol):
+    """Optional attempt-scoped history writer; not a complete Backtest API."""
+
+    def begin_run(self, run_id, attempt_id, schemas, **options):
+        """Create an exclusive append/flush/commit/abort writer."""
+        ...
+
+    def open_run_manifest(self, handle):
+        """Read a committed manifest and verify its chunk index."""
+        ...
+
+    def iter_run_batches(self, handle, kind=None):
+        """Read and verify bounded history batches, optionally by kind."""
+        ...
+
+
+@runtime_checkable
+class SupportsRecordDefinitions(Protocol):
+    """Optional immutable, content-addressed language-neutral documents."""
+
+    def put_definition(self, kind: str, payload: bytes) -> str:
+        """Publish canonical bytes once; return their verified content ID."""
+        ...
+
+    def get_definition(self, definition_id: str) -> bytes:
+        """Read and verify bytes by ID; missing/corrupt data is an error."""
+        ...
+
+
+@runtime_checkable
 class SupportsCopyFrom(Protocol):
     """Stores that can ingest from another :class:`BacktestStore`.
 

@@ -636,15 +636,18 @@ class ConfluenceCard:
             ),
         )
 
-    def evaluate_series(self, dataframe):
+    def evaluate_series(self, dataframe, *, backend="python"):
         """Batch score, available, and qualified columns on the input index.
 
         Rows must already be in chronological order. Any required null or
         missing crossing history makes the card unavailable for that row.
+        ``backend="rust"`` requires the optional native numeric kernel;
+        ``"auto"`` falls back for unavailable/unsupported native inputs.
+        Python remains the default. Each frame starts fresh crossing history.
         """
         from .confluence_frame import evaluate_card_series
 
-        return evaluate_card_series(self, dataframe)
+        return evaluate_card_series(self, dataframe, backend=backend)
 
     def evaluate(self, context: EvaluationContext) -> ConfluenceResult:
         evaluations: list[RuleEvaluation] = []

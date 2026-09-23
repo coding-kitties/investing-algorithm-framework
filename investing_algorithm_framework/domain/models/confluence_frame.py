@@ -100,9 +100,21 @@ def evaluate_expression_series(expression, frame):
     return matched.astype("boolean").where(available)
 
 
-def evaluate_card_series(card, frame):
+def evaluate_card_series(card, frame, *, backend="python"):
     """Return score, available, and qualified without per-row objects."""
     _validate_frame(frame)
+    if backend not in ("python", "rust", "auto"):
+        raise ValueError("backend must be 'python', 'rust', or 'auto'")
+    if backend != "python":
+        from .confluence_native import (
+            NativeConfluenceUnsupported, evaluate_native_card,
+        )
+
+        try:
+            return evaluate_native_card(card, frame)
+        except (ImportError, NativeConfluenceUnsupported):
+            if backend == "rust":
+                raise
     available = _constant(frame, True)
     score = _constant(frame, 0.0)
     qualified = _constant(frame, True)

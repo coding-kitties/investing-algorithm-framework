@@ -11,9 +11,23 @@ from investing_algorithm_framework.domain.models import Trade
 
 from .backtest_date_range import BacktestDateRange
 from .backtest_window import BacktestWindow
+from .history import BacktestHistory, SerializedHistory
 
 
 logger = getLogger(__name__)
+
+
+def _serialize_metric_point(point):
+    value, timestamp = point
+    return value, (timestamp.isoformat() if hasattr(timestamp, 'isoformat')
+                   else timestamp)
+
+
+_METRIC_HISTORY_FIELDS = frozenset({
+    'equity_curve', 'cumulative_return_series', 'rolling_sharpe_ratio',
+    'monthly_returns', 'yearly_returns', 'drawdown_series',
+    'twr_equity_curve', 'twr_drawdown_series',
+})
 
 
 @dataclass
@@ -22,6 +36,10 @@ class BacktestMetrics:
     Represents the result of a backtest, including metrics such as
     total return, annualized return, volatility, Sharpe ratio,
     and maximum drawdown.
+
+    Time series are read-only ``BacktestHistory`` sequences of
+    ``(value, timestamp)`` pairs. Assign any iterable to replace a series;
+    use ``series.materialize()`` for a mutable in-memory copy.
 
     .. note:: Field semantics & known duplicates (issue #511)
 
@@ -47,9 +65,8 @@ class BacktestMetrics:
             at the start of the backtest.
         final_value (float): The final value of the portfolio at the end
             of the backtest.
-        equity_curve (List[Tuple[datetime, float]]): A list of
-            tuples representing  the equity curve, where each tuple
-            contains a date and the  corresponding portfolio value.
+        equity_curve (BacktestHistory): Equity curve pairs containing
+            the portfolio value and its timestamp.
         total_growth (float): The growth of the portfolio over the
             backtest period.
         total_growth_percentage (float): The percentage growth of the portfolio
@@ -61,7 +78,7 @@ class BacktestMetrics:
         cagr (float): The compound annual growth rate of the backtest.
         sharpe_ratio (float): The Sharpe ratio of the backtest, indicating
             risk-adjusted return.
-        rolling_sharpe_ratio (List[Tuple[datetime, float]): A list of rolling
+        rolling_sharpe_ratio (BacktestHistory): A series of rolling
             Sharpe ratios over the backtest period.
         sortino_ratio (float): The Sortino ratio of the backtest, focusing
             on downside risk.
@@ -71,11 +88,11 @@ class BacktestMetrics:
             as total profit divided by total loss.
         annual_volatility (float): The annualized volatility of the
             portfolio returns.
-        monthly_returns (List[Tuple[datetime, float]]): A list of monthly
+        monthly_returns (BacktestHistory): A series of monthly
             returns during the backtest.
-        yearly_returns (List[Tuple[datetime, float]]): A list of yearly returns
+        yearly_returns (BacktestHistory): A series of yearly returns
             during the backtest.
-        drawdown_series (List[Tuple[datetime, float]]): A list of drawdown
+        drawdown_series (BacktestHistory): A series of drawdown
             values over the backtest period.
         max_drawdown (float): The maximum drawdown observed during
             the backtest.
@@ -159,7 +176,7 @@ class BacktestMetrics:
     """
     backtest_window: BacktestWindow
     initial_unallocated: float = 0.0
-    equity_curve: List[Tuple[float, datetime]] = field(default_factory=list)
+    equity_curve: BacktestHistory = field(default_factory=BacktestHistory)
     total_growth: float = 0.0
     total_growth_percentage: float = 0.0
     total_net_gain: float = 0.0
@@ -168,12 +185,12 @@ class BacktestMetrics:
     total_loss_percentage: float = 0.0
     final_value: float = 0.0
     cumulative_return: float = 0.0
-    cumulative_return_series: List[Tuple[float, datetime]] = \
-        field(default_factory=list)
+    cumulative_return_series: BacktestHistory = \
+        field(default_factory=BacktestHistory)
     cagr: float = 0.0
     sharpe_ratio: float = 0.0
-    rolling_sharpe_ratio: List[Tuple[float, datetime]] = \
-        field(default_factory=list)
+    rolling_sharpe_ratio: BacktestHistory = \
+        field(default_factory=BacktestHistory)
     sortino_ratio: float = 0.0
     calmar_ratio: float = 0.0
     omega_ratio: float = 0.0
@@ -182,9 +199,9 @@ class BacktestMetrics:
     gross_loss: float = None
     annual_volatility: float = 0.0
     ulcer_index: float = 0.0
-    monthly_returns: List[Tuple[float, datetime]] = field(default_factory=list)
-    yearly_returns: List[Tuple[float, date]] = field(default_factory=list)
-    drawdown_series: List[Tuple[float, datetime]] = field(default_factory=list)
+    monthly_returns: BacktestHistory = field(default_factory=BacktestHistory)
+    yearly_returns: BacktestHistory = field(default_factory=BacktestHistory)
+    drawdown_series: BacktestHistory = field(default_factory=BacktestHistory)
     max_drawdown: float = 0.0
     max_drawdown_absolute: float = 0.0
     max_daily_drawdown: float = 0.0
@@ -192,10 +209,9 @@ class BacktestMetrics:
     # TWR (alpha-only) variants — scrub external cash flows so deposits
     # don't mask drawdowns. The raw fields above remain account-value
     # based for absolute reporting.
-    twr_equity_curve: List[Tuple[float, datetime]] = \
-        field(default_factory=list)
-    twr_drawdown_series: List[Tuple[float, datetime]] = \
-        field(default_factory=list)
+    twr_equity_curve: BacktestHistory = field(default_factory=BacktestHistory)
+    twr_drawdown_series: BacktestHistory = field(
+        default_factory=BacktestHistory)
     twr_max_drawdown: float = 0.0
     twr_max_drawdown_duration: int = 0
     trades_per_year: float = 0.0
@@ -311,7 +327,13 @@ class BacktestMetrics:
             self.backtest_end_date - self.backtest_start_date
         ).days
 
-    def to_dict(self) -> dict:
+    def __setattr__(self, name, value):
+        if name in _METRIC_HISTORY_FIELDS and not isinstance(
+                value, BacktestHistory):
+            value = BacktestHistory(value)
+        object.__setattr__(self, name, value)
+
+    def to_dict(self, *, materialize_history: bool = True) -> dict:
         """
         Convert the BacktestMetrics instance to a dictionary.
         Ensures all datetime values are serialized to ISO format, but
@@ -325,6 +347,10 @@ class BacktestMetrics:
             return value.isoformat() \
                 if hasattr(value, "isoformat") else value
 
+        def series(history):
+            view = SerializedHistory(history, _serialize_metric_point)
+            return list(view) if materialize_history else view
+
         return {
             "backtest_window": self.backtest_window.to_dict(),
             "backtest_start_date": ensure_iso(self.backtest_start_date),
@@ -332,8 +358,7 @@ class BacktestMetrics:
             "backtest_date_range_name": self.backtest_date_range_name,
             "window_role": self.window_role,
             "initial_unallocated": self.initial_unallocated,
-            "equity_curve": [(value, ensure_iso(date))
-                             for value, date in self.equity_curve],
+            "equity_curve": series(self.equity_curve),
             "final_value": self.final_value,
             "total_net_gain": self.total_net_gain,
             "total_net_gain_percentage": self.total_net_gain_percentage,
@@ -342,14 +367,10 @@ class BacktestMetrics:
             "total_loss": self.total_loss,
             "total_loss_percentage": self.total_loss_percentage,
             "cumulative_return": self.cumulative_return,
-            "cumulative_return_series": [(value, ensure_iso(date))
-                                         for value, date in
-                                         self.cumulative_return_series],
+            "cumulative_return_series": series(self.cumulative_return_series),
             "cagr": self.cagr,
             "sharpe_ratio": self.sharpe_ratio,
-            "rolling_sharpe_ratio": [(value, ensure_iso(date))
-                                     for value, date in
-                                     self.rolling_sharpe_ratio],
+            "rolling_sharpe_ratio": series(self.rolling_sharpe_ratio),
             "sortino_ratio": self.sortino_ratio,
             "calmar_ratio": self.calmar_ratio,
             "omega_ratio": self.omega_ratio,
@@ -358,22 +379,15 @@ class BacktestMetrics:
             "gross_loss": self.gross_loss,
             "annual_volatility": self.annual_volatility,
             "ulcer_index": self.ulcer_index,
-            "monthly_returns": [(value, ensure_iso(date))
-                                for value, date in self.monthly_returns],
-            "yearly_returns": [(value, ensure_iso(date))
-                               for value, date in self.yearly_returns],
-            "drawdown_series": [(value, ensure_iso(date))
-                                for value, date in self.drawdown_series],
+            "monthly_returns": series(self.monthly_returns),
+            "yearly_returns": series(self.yearly_returns),
+            "drawdown_series": series(self.drawdown_series),
             "max_drawdown": self.max_drawdown,
             "max_drawdown_absolute": self.max_drawdown_absolute,
             "max_daily_drawdown": self.max_daily_drawdown,
             "max_drawdown_duration": self.max_drawdown_duration,
-            "twr_equity_curve": [(value, ensure_iso(date))
-                                 for value, date in self.twr_equity_curve],
-            "twr_drawdown_series": [
-                (value, ensure_iso(date))
-                for value, date in self.twr_drawdown_series
-            ],
+            "twr_equity_curve": series(self.twr_equity_curve),
+            "twr_drawdown_series": series(self.twr_drawdown_series),
             "twr_max_drawdown": self.twr_max_drawdown,
             "twr_max_drawdown_duration": self.twr_max_drawdown_duration,
             "trades_per_year": self.trades_per_year,
@@ -479,25 +493,20 @@ class BacktestMetrics:
     @staticmethod
     def _parse_tuple_list_datetime(
         data: List[List]
-    ) -> List[Tuple[float, datetime]]:
-        """
-            Parse a list of [value, datetime_string]
-            into List[Tuple[float, datetime]]
-        """
-        return [
+    ) -> BacktestHistory:
+        """Parse serialized points directly into disk-backed history."""
+        return BacktestHistory(
             (float(value), datetime.fromisoformat(date_str))
             for value, date_str in data
-        ]
+        )
 
     @staticmethod
-    def _parse_tuple_list_date(data: List[List]) -> List[Tuple[float, date]]:
-        """
-        Parse a list of [value, date_string] into List[Tuple[float, date]]
-        """
-        return [
+    def _parse_tuple_list_date(data: List[List]) -> BacktestHistory:
+        """Parse serialized date points directly into disk-backed history."""
+        return BacktestHistory(
             (float(value), datetime.fromisoformat(date_str).date())
             for value, date_str in data
-        ]
+        )
 
     @staticmethod
     def _parse_tuple_datetime(data) -> Tuple[float, datetime]:

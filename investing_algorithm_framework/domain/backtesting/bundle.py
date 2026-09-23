@@ -53,11 +53,15 @@ from __future__ import annotations
 
 import hashlib
 import io
+from contextlib import contextmanager
+import struct
+import tempfile
 import logging
 import os
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+from weakref import finalize
 
 import msgpack
 import zstandard as zstd
@@ -212,6 +216,59 @@ def _from_epoch_ms(ts_ms: Optional[int]) -> Optional[datetime]:
     if ts_ms is None:
         return None
     return datetime.fromtimestamp(int(ts_ms) / 1000, tz=timezone.utc)
+
+
+class _FileBlob:
+    def __init__(self, source):
+        self.source = source
+        self.size = source.tell()
+        finalize(self, source.close)
+
+
+def _series_to_parquet_file(series):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    if not series:
+        return None
+    source = tempfile.TemporaryFile()
+    schema = pa.schema([('ts', pa.int64()), ('value', pa.float64())])
+    try:
+        valid = True
+        with pq.ParquetWriter(source, schema, compression='zstd',
+                              compression_level=5) as writer:
+            timestamps, values = [], []
+            for entry in series:
+                if not isinstance(entry, (list, tuple)) or len(entry) != 2:
+                    valid = False
+                    break
+                value, timestamp = entry
+                timestamp = _to_epoch_ms(timestamp)
+                if timestamp is None:
+                    valid = False
+                    break
+                try:
+                    value = float(value) if value is not None else None
+                except (TypeError, ValueError):
+                    valid = False
+                    break
+                timestamps.append(timestamp)
+                values.append(value)
+                if len(values) == 4096:
+                    writer.write_table(pa.table(
+                        {'ts': timestamps, 'value': values}, schema=schema))
+                    timestamps, values = [], []
+            if valid and values:
+                writer.write_table(pa.table(
+                    {'ts': timestamps, 'value': values}, schema=schema))
+        if not valid:
+            source.close()
+            return None
+        source.flush()
+        return _FileBlob(source)
+    except BaseException:
+        source.close()
+        raise
 
 
 def _series_to_parquet_bytes(series: Any) -> Optional[bytes]:
@@ -426,6 +483,52 @@ def _encode_payload(doc: dict, *, format_version: int) -> bytes:
     return _MAGIC + format_version.to_bytes(4, "little") + body
 
 
+def _iter_msgpack_chunks(value, packer, depth=0):
+    from .history import SerializedHistory
+
+    if depth > 256:
+        raise ValueError('Bundle nesting exceeds 256 levels')
+    if isinstance(value, dict):
+        yield packer.pack_map_header(len(value))
+        for key, item in value.items():
+            yield from _iter_msgpack_chunks(key, packer, depth + 1)
+            yield from _iter_msgpack_chunks(item, packer, depth + 1)
+    elif isinstance(value, (list, tuple, SerializedHistory)):
+        yield packer.pack_array_header(len(value))
+        for item in value:
+            yield from _iter_msgpack_chunks(item, packer, depth + 1)
+    elif isinstance(value, _FileBlob):
+        yield struct.pack('>BI', 0xc6, value.size)
+        value.source.seek(0)
+        while chunk := value.source.read(65536):
+            yield chunk
+    elif isinstance(value, (bytes, bytearray)):
+        yield struct.pack('>BI', 0xc6, len(value))
+        view = memoryview(value)
+        for offset in range(0, len(view), 65536):
+            yield view[offset:offset + 65536]
+    else:
+        yield packer.pack(value)
+
+
+def _atomic_write_document(target, doc, *, format_version):
+    packer = msgpack.Packer(
+        use_bin_type=True, datetime=False, default=_msgpack_default,
+    )
+    with tempfile.TemporaryFile(dir=target.parent) as spool:
+        for chunk in _iter_msgpack_chunks(doc, packer):
+            spool.write(chunk)
+        size = spool.tell()
+        spool.seek(0)
+        with _atomic_bundle_file(target) as destination:
+            destination.write(_MAGIC + format_version.to_bytes(4, 'little'))
+            compressor = zstd.ZstdCompressor(level=_ZSTD_LEVEL)
+            with compressor.stream_writer(
+                    destination, size=size, closefd=False) as writer:
+                while chunk := spool.read(65536):
+                    writer.write(chunk)
+
+
 def _decode_payload(blob: bytes) -> Tuple[int, dict]:
     """Decode a bundle byte string and return ``(format_version, doc)``.
 
@@ -459,6 +562,7 @@ def _extract_metric_blobs(
     blobs: Dict[str, bytes],
     *,
     key_prefix: str,
+    spool: bool = False,
 ) -> None:
     """Walk ``run_dicts`` and replace heavy metric series with
     ``{"@blob": "<key>"}`` references; the actual Parquet bytes are
@@ -490,7 +594,8 @@ def _extract_metric_blobs(
             series = metrics.get(field)
             if series is None:
                 continue
-            payload = _series_to_parquet_bytes(series)
+            payload = (_series_to_parquet_file(series) if spool
+                       else _series_to_parquet_bytes(series))
             if payload is None:
                 # Unrecognised shape \u2014 keep inline as v1 fallback.
                 continue
@@ -623,7 +728,9 @@ _build_v3_envelope = _build_v4_envelope
 # ---------------------------------------------------------------------------
 
 
-def _build_v5_envelope(backtest: Backtest) -> dict:
+def _build_v5_envelope(
+    backtest: Backtest, *, materialize_history=True,
+) -> dict:
     """Build the on-disk ``doc`` dict for a v5 bundle.
 
     The envelope IS the ``Backtest.to_dict()`` shape plus a
@@ -635,7 +742,9 @@ def _build_v5_envelope(backtest: Backtest) -> dict:
     ``studies/<study_name>/<engine>_runs/<idx>/metrics/<field>.parquet``
     """
     blobs: Dict[str, bytes] = {}
-    envelope: Dict[str, Any] = backtest.to_dict()
+    envelope: Dict[str, Any] = backtest.to_dict(
+        materialize_history=materialize_history,
+    )
     envelope["format_version"] = BUNDLE_FORMAT_VERSION
 
     # Extract heavy metric series into Parquet blobs, updating the
@@ -650,6 +759,7 @@ def _build_v5_envelope(backtest: Backtest) -> dict:
                     run_dicts,
                     blobs,
                     key_prefix=f"studies/{name}/{engine}_runs",
+                    spool=not materialize_history,
                 )
 
     if blobs:
@@ -999,23 +1109,30 @@ def _load_existing_v5_envelope_for_merge(
     return _build_v5_envelope(existing_bt)
 
 
-def _atomic_write_bytes(target: Path, payload: bytes) -> None:
-    """Atomically write *payload* to *target*.
+@contextmanager
+def _atomic_bundle_file(target: Path):
+    """Yield a temporary destination and atomically publish it to *target*.
 
-    Writes to ``<target>.tmp.<pid>``, ``fsync``s the temp file,
+    Writes to a unique sibling temporary file, ``fsync``s the temp file,
     ``os.replace``s it over the target, then ``fsync``s the parent
     directory. Matches the v2 writer's atomicity guarantees (design
     doc \u00a73.5).
     """
-    tmp = target.with_name(f"{target.name}.tmp.{os.getpid()}")
-    with open(tmp, "wb") as f:
-        f.write(payload)
-        f.flush()
-        try:
-            os.fsync(f.fileno())
-        except OSError:  # pragma: no cover - rare fs without fsync
-            pass
-    os.replace(tmp, target)
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f'{target.name}.tmp.', dir=target.parent,
+    )
+    try:
+        with os.fdopen(descriptor, 'wb') as destination:
+            yield destination
+            destination.flush()
+            try:
+                os.fsync(destination.fileno())
+            except OSError:
+                pass
+        os.replace(temporary, target)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
     try:
         dir_fd = os.open(target.parent, os.O_RDONLY)
     except OSError:  # pragma: no cover - dir fsync unsupported
@@ -1027,6 +1144,11 @@ def _atomic_write_bytes(target: Path, payload: bytes) -> None:
             pass
     finally:
         os.close(dir_fd)
+
+
+def _atomic_write_bytes(target: Path, payload: bytes) -> None:
+    with _atomic_bundle_file(target) as destination:
+        destination.write(payload)
 
 
 def save_bundle(
@@ -1094,7 +1216,7 @@ def save_bundle(
         )
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    doc = _build_v5_envelope(backtest)
+    doc = _build_v5_envelope(backtest, materialize_history=False)
 
     if include_ohlcv and getattr(backtest, "ohlcv", None):
         store = (
@@ -1120,8 +1242,7 @@ def save_bundle(
         if existing is not None:
             _merge_v5_envelopes(doc, existing)
 
-    payload = _encode_payload(doc, format_version=format_version)
-    _atomic_write_bytes(target, payload)
+    _atomic_write_document(target, doc, format_version=format_version)
     return target
 
 

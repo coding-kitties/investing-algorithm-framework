@@ -63,3 +63,12 @@ class TakeProfitRule:
         self.symbol = symbol
         self.side = side
         self.mirror_on_exchange = mirror_on_exchange
+
+    def __repr__(self) -> str:
+        return (
+            f"TakeProfitRule(symbol={self.symbol!r}, "
+            f"percentage_threshold={self.percentage_threshold}, "
+            f"sell_percentage={self.sell_percentage}, "
+            f"trailing={self.trailing}, side={self.side!r}, "
+            f"mirror_on_exchange={self.mirror_on_exchange})"
+        )

@@ -1,4 +1,5 @@
 from datetime import timezone, datetime
+from investing_algorithm_framework.domain.native_event import native_risk
 
 from investing_algorithm_framework.domain.datetime_parsing import (
     parse_datetime as _parse_dt,
@@ -124,6 +125,7 @@ class TradeStopLoss(BaseModel):
         self.sell_prices = sell_prices
         self.sell_dates = sell_dates
 
+    @native_risk(stop=True, check=False)
     def update_with_last_reported_price(self, current_price: float, date):
         """
         Function to update the take profit price based on the last
@@ -176,6 +178,7 @@ class TradeStopLoss(BaseModel):
                 self.stop_loss_price = self.high_water_mark * \
                     (1 - (self.percentage / 100))
 
+    @native_risk(stop=True, check=True)
     def has_triggered(self, current_price: float) -> bool:
         """
         Function to check if the stop loss has triggered.

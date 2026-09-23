@@ -65,6 +65,33 @@ only differences are:
 
 User code never sees these differences.
 
+### Live Run Reports
+
+`report = app.run(number_of_iterations=1)` returns the persisted report as a
+dictionary in live and paper mode. Bounded invocations aggregate their ticks.
+Continuous runs persist one report per strategy execution tick, including
+ticks that emit no signals. Idle polling does not create reports. Signals and
+decision traces are tick-local; positions, portfolios, trades, and pending
+orders describe current state and can legitimately appear in multiple reports.
+
+Reports have `status` (`completed`, `failed`, or `skipped`), `error`, and
+`reason`. Disabled invocations and accepted manual requests interrupted by
+shutdown are skipped. A synchronous failure persists a fresh failed report
+before re-raising its original exception. `app.get_last_run_report()` exposes
+the latest outcome; `app.get_run_reports()` reads persisted history. Storage
+failures cannot guarantee persistence and never substitute an earlier report.
+
+For a running web algorithm, use
+`app.container.algorithm_runner().invoke_now(wait=True, timeout=30)` or
+`POST /api/algorithm/invoke?wait=true&timeout=30`. The result is the report for
+the requested execution tick, not the latest unrelated report. Requests queued
+before the same tick are coalesced and share its report. The HTTP response
+contains it in `report`. Python raises `TimeoutError` and HTTP returns 504 when
+the wait expires; execution is not cancelled and its outcome is still persisted.
+Without `wait`, invocation only acknowledges queueing. Unknown strategy IDs
+are rejected before queueing. Background strategy failures return failed
+reports to waiters and retain the runner's existing stop-on-error behavior.
+
 ---
 
 ## 2. The `INDEX_DATETIME` contract

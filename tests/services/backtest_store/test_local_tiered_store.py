@@ -18,6 +18,8 @@ from investing_algorithm_framework.services.backtest_store import (
     LocalTieredStore,
     StoreHandleNotFoundError,
     SupportsCopyFrom,
+    SupportsRecordDefinitions,
+    StoreError,
 )
 
 
@@ -27,6 +29,321 @@ _FIXTURE = os.path.join(
     "backtest_reports_for_testing",
     "test_algorithm_backtest",
 )
+
+
+class TestStreamingRuns(TestCase):
+    def test_vector_engine_streams_identical_signals_and_results(self):
+        from scripts.bench_vector_snapshot_events import workload, result_digest
+        from investing_algorithm_framework.services.backtest_store.recording \
+            import SignalRecorder, iter_signal_reports
+        from investing_algorithm_framework.domain.backtesting.backtest_run \
+            import _deserialise_signal_events
+
+        for backend in ('python', 'auto'):
+            service, arguments = workload(64, 2)
+            expected = service.run(**arguments, execution_backend=backend)
+            service, arguments = workload(64, 2)
+            with SignalRecorder(self.directory.name, engine='vector',
+                                batch_rows=3) as recorder:
+                result = service.run(**arguments, execution_backend=backend,
+                                     signal_recorder=recorder)
+                self.assertEqual([], result.signal_events)
+                reports = list(iter_signal_reports(
+                    self.directory.name, result.metadata['signal_history']))
+                result.signal_events = _deserialise_signal_events(reports)
+                self.assertEqual(result_digest(expected), result_digest(result))
+
+    def test_signal_adapter_bounds_and_roundtrip(self):
+        from investing_algorithm_framework.services.backtest_store.recording \
+            import SignalRecorder, iter_signal_reports
+
+        with SignalRecorder(self.directory.name, engine='vector',
+                            batch_bytes=128, max_record_bytes=64,
+                            batch_rows=3) as recorder:
+            for sequence in range(100):
+                recorder.append({'sequence': sequence})
+            recorder.commit()
+            self.assertLessEqual(recorder.peak_buffer_bytes, 128)
+            self.assertEqual([], recorder._payloads)
+            self.assertEqual([{'sequence': value} for value in range(100)],
+                             list(iter_signal_reports(
+                                 self.directory.name, recorder.reference())))
+        with SignalRecorder(self.directory.name, engine='event',
+                            batch_bytes=128, max_record_bytes=64) as recorder:
+            with self.assertRaises(StoreError):
+                recorder.append({'value': 'x' * 100})
+
+    def setUp(self):
+        import pyarrow as arrow
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.store = LocalTieredStore(self.directory.name)
+        self.schema = arrow.schema([
+            arrow.field('timestamp_us', arrow.int64(), nullable=False),
+            arrow.field('value', arrow.float64(), nullable=False),
+        ])
+        self.batch = arrow.RecordBatch.from_pylist([
+            {'timestamp_us': 1, 'value': 100.},
+            {'timestamp_us': 2, 'value': 102.},
+        ], schema=self.schema)
+
+    def test_bounded_roundtrip_and_commit_visibility(self):
+        from investing_algorithm_framework.services.backtest_store import (
+            SupportsStreamingRuns,
+        )
+        self.assertIsInstance(self.store, SupportsStreamingRuns)
+        writer = self.store.begin_run('run', 'attempt', {'snapshot': self.schema},
+                                      max_batch_bytes=32, max_batch_rows=2)
+        for _ in range(10):
+            writer.append_batch('snapshot', self.batch)
+        self.assertEqual(32, writer.peak_batch_bytes)
+        with self.assertRaises(StoreHandleNotFoundError):
+            self.store.open_run_manifest(writer.handle)
+        handle = writer.commit()
+        self.assertEqual(handle, writer.commit())
+        manifest = self.store.open_run_manifest(handle)
+        self.assertEqual({'snapshot': 20}, manifest['counts'])
+        self.assertEqual(10, manifest['chunks'])
+        self.assertEqual([self.batch.to_pylist()] * 10, [
+            batch.to_pylist() for batch in self.store.iter_run_batches(handle)
+        ])
+        with self.assertRaises(StoreError):
+            writer.append_batch('snapshot', self.batch)
+        with self.assertRaises(StoreError):
+            writer.abort()
+
+    def test_limits_abort_and_attempt_isolation(self):
+        writer = self.store.begin_run('run', 'one', {'snapshot': self.schema},
+                                      max_batch_bytes=16)
+        with self.assertRaises(StoreError):
+            writer.append_batch('snapshot', self.batch)
+        self.assertEqual(0, writer.chunk_count)
+        with self.assertRaises(StoreError):
+            self.store.begin_run('run', 'one', {'snapshot': self.schema})
+        writer.abort()
+        writer.abort()
+        with self.store.begin_run('run', 'two', {'snapshot': self.schema}) as other:
+            other.append_batch('snapshot', self.batch)
+        self.assertFalse(other.path.exists())
+
+    def test_slice_retains_large_buffer_and_row_limit(self):
+        import pyarrow as arrow
+        large = arrow.RecordBatch.from_arrays([
+            arrow.array(range(1000)), arrow.array([1.] * 1000),
+        ], schema=self.schema)
+        with self.store.begin_run('run', 'slice', {'snapshot': self.schema},
+                                  max_batch_bytes=32) as writer:
+            with self.assertRaises(StoreError):
+                writer.append_batch('snapshot', large.slice(0, 1))
+        with self.store.begin_run('run', 'rows', {'snapshot': self.schema},
+                                  max_batch_rows=1) as writer:
+            with self.assertRaises(StoreError):
+                writer.append_batch('snapshot', self.batch)
+
+    def test_io_failure_poisoning_and_explicit_orphan_cleanup(self):
+        from unittest.mock import patch
+        writer = self.store.begin_run(
+            'run', 'failed', {
+                'snapshot': self.schema})
+        with patch('pyarrow.parquet.write_table', side_effect=OSError('disk full')):
+            with self.assertRaises(OSError):
+                writer.append_batch('snapshot', self.batch)
+        with self.assertRaises(StoreError):
+            writer.commit()
+        with self.assertRaises(StoreHandleNotFoundError):
+            self.store.open_run_manifest(writer.handle)
+        with self.assertRaises(StoreError):
+            self.store.discard_run_attempt(writer.handle)
+        self.store.discard_run_attempt(writer.handle, producer_stopped=True)
+        self.assertFalse(writer.path.exists())
+
+    def test_encoded_limit_and_manifest_failure(self):
+        from unittest.mock import patch
+        with self.store.begin_run('run', 'small', {'snapshot': self.schema},
+                                  max_chunk_bytes=16) as writer:
+            with self.assertRaises((StoreError, OSError)):
+                writer.append_batch('snapshot', self.batch)
+            with self.assertRaises(StoreError):
+                writer.commit()
+        with self.store.begin_run('run', 'link', {'snapshot': self.schema}) as writer:
+            writer.append_batch('snapshot', self.batch)
+            with patch('os.link', side_effect=OSError('publication failed')):
+                with self.assertRaises(OSError):
+                    writer.commit()
+            with self.assertRaises(StoreHandleNotFoundError):
+                self.store.open_run_manifest(writer.handle)
+
+    def test_slow_sink_applies_backpressure(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from unittest.mock import patch
+        import pyarrow.parquet as parquet
+        entered, release = Event(), Event()
+        original = parquet.write_table
+
+        def slow_write(*args, **kwargs):
+            entered.set()
+            if not release.wait(5):
+                raise AssertionError('Timed out waiting for test release')
+            return original(*args, **kwargs)
+
+        with self.store.begin_run('run', 'slow', {'snapshot': self.schema}) as writer:
+            with patch('pyarrow.parquet.write_table', side_effect=slow_write):
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(
+                        writer.append_batch, 'snapshot', self.batch)
+                    try:
+                        self.assertTrue(entered.wait(5))
+                        self.assertFalse(future.done())
+                        self.assertEqual(0, writer.chunk_count)
+                    finally:
+                        release.set()
+                    future.result(timeout=5)
+            writer.commit()
+
+    def test_move_corruption_and_retry_isolation(self):
+        writer = self.store.begin_run('run', 'one', {'snapshot': self.schema})
+        writer.append_batch('snapshot', self.batch)
+        writer.commit()
+        with self.assertRaises(StoreError):
+            self.store.discard_run_attempt(
+                writer.handle, producer_stopped=True)
+        with self.store.begin_run('run', 'two', {'snapshot': self.schema}) as other:
+            other.commit()
+        moved = Path(self.directory.name) / 'moved'
+        shutil.copytree(self.store.root / 'streams', moved / 'streams')
+        copy = LocalTieredStore(moved)
+        self.assertEqual(self.batch.to_pylist(),
+                         next(copy.iter_run_batches(writer.handle)).to_pylist())
+        (writer.path / 'chunks' / '000000000000.parquet').write_bytes(b'corrupt')
+        with self.assertRaises(StoreError):
+            list(self.store.iter_run_batches(writer.handle))
+        self.assertEqual([], list(self.store.iter_run_batches(other.handle)))
+        (other.path / 'chunks.jsonl').write_bytes(b'corrupt')
+        with self.assertRaises(StoreError):
+            self.store.open_run_manifest(other.handle)
+
+    def test_canonical_evidence_schema_and_invalid_nulls(self):
+        import pyarrow as arrow
+        from investing_algorithm_framework.domain.backtesting.record_schemas import (
+            record_batch, record_schema,
+        )
+        schema = record_schema('generic_trace')
+        batch = record_batch('generic_trace', [{
+            'evaluation_id': 'ev', 'attempt_id': 'evidence', 'sequence': 0,
+            'timestamp_us': 123, 'symbol_id': 'BTC', 'strategy_id': 'ema',
+            'trace_payload': b'{}',
+        }])
+        with self.store.begin_run('run', 'evidence', {'generic_trace': schema}) as writer:
+            writer.append_batch('generic_trace', batch)
+            writer.commit()
+        self.assertTrue(
+            next(
+                self.store.iter_run_batches(
+                    writer.handle)).equals(batch))
+        invalid = arrow.RecordBatch.from_pylist([
+            {'timestamp_us': None, 'value': 1.},
+        ], schema=self.schema)
+        with self.store.begin_run('run', 'invalid', {'snapshot': self.schema}) as writer:
+            with self.assertRaises(StoreError):
+                writer.append_batch('snapshot', invalid)
+
+    def test_killed_producer_leaves_only_uncommitted_chunks(self):
+        import subprocess
+        import sys
+        script = '''
+import os
+import sys
+import pyarrow as arrow
+from investing_algorithm_framework.services.backtest_store import LocalTieredStore
+store = LocalTieredStore(sys.argv[1])
+schema = arrow.schema([('value', arrow.int64())])
+writer = store.begin_run('crash', 'attempt', {'data': schema})
+writer.append_batch('data', arrow.RecordBatch.from_pylist(
+    [{'value': 1}], schema=schema))
+os._exit(42)
+'''
+        result = subprocess.run(
+            [sys.executable, '-c', script, self.directory.name],
+            capture_output=True, timeout=60,
+        )
+        self.assertEqual(42, result.returncode, result.stderr.decode())
+        path = self.store.root / 'streams' / 'crash' / 'attempt'
+        self.assertEqual(1, len(list((path / 'chunks').glob('*.parquet'))))
+        with self.assertRaises(StoreHandleNotFoundError):
+            self.store.open_run_manifest('crash/attempt')
+        self.store.discard_run_attempt('crash/attempt', producer_stopped=True)
+        self.assertFalse(path.exists())
+
+    def test_flush_failure_is_not_committable(self):
+        from unittest.mock import patch
+        with self.store.begin_run('run', 'flush', {'snapshot': self.schema}) as writer:
+            writer.append_batch('snapshot', self.batch)
+            with patch('os.fsync', side_effect=OSError('fsync failed')):
+                with self.assertRaises(OSError):
+                    writer.flush()
+            with self.assertRaises(StoreError):
+                writer.commit()
+
+
+class TestRecordDefinitions(TestCase):
+
+    def setUp(self):
+        from investing_algorithm_framework import (
+            ConfluenceCard, PrimaryGroup, condition,
+        )
+        from investing_algorithm_framework.domain.backtesting.records import (
+            CardDefinition,
+        )
+
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.store = LocalTieredStore(self.directory.name)
+        self.definition = CardDefinition.from_card(ConfluenceCard(
+            "persisted", PrimaryGroup(condition("price", "gt", value=0)),
+        ))
+
+    def test_definition_is_deduplicated_and_portable(self):
+        self.assertIsInstance(self.store, SupportsRecordDefinitions)
+        identity = self.store.put_definition("card", self.definition.payload)
+        self.assertEqual(self.definition.card_id, identity)
+        path = self.store._definition_path(identity)
+        before = path.stat().st_mtime_ns
+        self.assertEqual(identity, self.store.put_definition(
+            "card", self.definition.payload
+        ))
+        self.assertEqual(before, path.stat().st_mtime_ns)
+        moved = Path(self.directory.name) / "copy"
+        shutil.copytree(self.store.root / "definitions", moved / "definitions")
+        self.assertEqual(self.definition.payload,
+                         LocalTieredStore(moved).get_definition(identity))
+        self.assertEqual([path], list(path.parent.glob("*.json")))
+        self.assertEqual([], list(path.parent.glob("*.tmp")))
+
+    def test_concurrent_writers_publish_one_complete_definition(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            identities = list(executor.map(
+                lambda _: self.store.put_definition(
+                    "card", self.definition.payload
+                ), range(12),
+            ))
+        self.assertEqual({self.definition.card_id}, set(identities))
+        self.assertEqual(self.definition.payload,
+                         self.store.get_definition(identities[0]))
+
+    def test_missing_corrupt_and_unsafe_ids_fail(self):
+        with self.assertRaises(StoreHandleNotFoundError):
+            self.store.get_definition(self.definition.card_id)
+        with self.assertRaises(StoreError):
+            self.store.get_definition("../../other")
+        identity = self.store.put_definition("card", self.definition.payload)
+        self.store._definition_path(identity).write_bytes(b'[]')
+        with self.assertRaises(StoreError):
+            self.store.get_definition(identity)
+        with self.assertRaises(StoreError):
+            self.store.put_definition("card", self.definition.payload)
 
 
 class TestLocalTieredStore(TestCase):

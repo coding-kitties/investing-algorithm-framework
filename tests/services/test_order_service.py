@@ -590,7 +590,7 @@ class TestOrderService(TestBase):
             sell_order.position_id
         )
         self.assertEqual(0, position.amount)
-        self.assertEqual(0, position.cost)
+        self.assertEqual(1000, position.cost)
 
         trade = trade_service.find(
             {

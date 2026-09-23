@@ -1,0 +1,12 @@
+[build-system]
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
+
+[project]
+name = "iaf-confluence-native"
+version = "0.1.0"
+requires-python = ">=3.10"
+description = "Optional numeric confluence batch kernel for IAF"
+
+[tool.maturin]
+features = ["extension-module"]

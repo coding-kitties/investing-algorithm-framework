@@ -22,6 +22,47 @@ class _Payload:
 
 
 class TestBoundedVectorResources(unittest.TestCase):
+    def test_hard_memory_limit_requires_verified_cgroup(self):
+        files = {
+            '/proc/self/cgroup': '0::/backtests\n',
+            '/sys/fs/cgroup/backtests/cgroup.procs': str(os.getpid()),
+            '/sys/fs/cgroup/backtests/memory.max': str(512 * 1024 * 1024),
+            '/sys/fs/cgroup/backtests/memory.swap.max': '0',
+        }
+
+        def read(path, *args, **kwargs):
+            try:
+                return files[str(path)]
+            except KeyError:
+                raise FileNotFoundError(str(path))
+
+        with patch.object(resources.sys, 'platform', 'linux'), patch.object(
+            resources.Path, 'read_text', read,
+        ):
+            resources.require_hard_memory_limit(512)
+            resources.require_hard_memory_limit(1024)
+            for path, value in (
+                ('memory.max', 'max'), ('memory.max', str(1024 ** 3)),
+                ('memory.swap.max', '1'), ('cgroup.procs', '-1'),
+            ):
+                key = '/sys/fs/cgroup/backtests/' + path
+                previous = files[key]
+                files[key] = value
+                with self.subTest(path=path, value=value):
+                    with self.assertRaises(resources.BacktestResourceError):
+                        resources.require_hard_memory_limit(512)
+                files[key] = previous
+            files['/proc/self/cgroup'] = '0::/../hidden\n'
+            with self.assertRaises(resources.BacktestResourceError):
+                resources.require_hard_memory_limit(512)
+
+    def test_hard_memory_limit_rejects_unsupported_platform(self):
+        with patch.object(resources.sys, 'platform', 'darwin'):
+            resources.require_hard_memory_limit(None)
+            with self.assertRaisesRegex(resources.BacktestResourceError,
+                                        'requires Linux cgroup v2'):
+                resources.require_hard_memory_limit(512)
+
     def test_bounded_futures_are_released_before_replacement(self):
         future_refs, payload_refs, generation_sizes = [], [], []
         consumed = []

@@ -443,7 +443,7 @@ class Study:
                 out.append(engine)
         return out
 
-    def to_dict(self) -> dict:
+    def to_dict(self, *, materialize_history: bool = True) -> dict:
         """Return a JSON-friendly dict for serialisation.
 
         Engines are emitted only when populated. Universe/windows are
@@ -485,7 +485,8 @@ class Study:
                 if self.execution_config is not None else None
             ),
             "vector_runs": [
-                r.to_dict() for r in self.get_runs(engine="vector")
+                r.to_dict(materialize_history=materialize_history)
+                for r in self.get_runs(engine="vector")
             ],
             "vector_summary": self.get_summary(engine="vector").to_dict()
             if self.get_summary(engine="vector") is not None else None,
@@ -498,7 +499,8 @@ class Study:
                 for mct in (vector_slot.monte_carlo_tests or [])
             ],
             "event_runs": [
-                r.to_dict() for r in self.get_runs(engine="event")
+                r.to_dict(materialize_history=materialize_history)
+                for r in self.get_runs(engine="event")
             ],
             "event_summary": self.get_summary(engine="event").to_dict()
             if self.get_summary(engine="event") is not None else None,

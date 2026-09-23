@@ -41,6 +41,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 from unittest import TestCase
+from unittest.mock import patch
 
 from investing_algorithm_framework import (
     BacktestDateRange,
@@ -556,6 +557,26 @@ class TestDeterministicLongEventScenarioWithSellCooldown(TestCase):
 # ─────────────────────────────────────────────────────────────────────
 
 class TestDeterministicLongVectorScenario(TestCase):
+    def test_signal_free_bars_do_not_query_cooldown_rules(self):
+        from investing_algorithm_framework.domain import CooldownTracker
+
+        with patch.object(
+            DeterministicLongStrategy, '_annotate',
+            new=staticmethod(lambda frame: frame.assign(
+                buy_signal=False, sell_signal=False)),
+        ), patch.object(
+            DeterministicLongStrategy, 'cooldowns',
+            [CooldownRule(trigger='any', bars=3)],
+        ), patch.object(
+            CooldownTracker, 'is_blocked',
+            side_effect=AssertionError('No signal needs a cooldown query'),
+        ):
+            result = _run_vector_backtest(
+                DeterministicLongStrategy, LONG_CSV, LONG_START, LONG_END,
+                'vector-no-signal-cooldown',
+            )
+        self.assertEqual(len(result.trades), 0)
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

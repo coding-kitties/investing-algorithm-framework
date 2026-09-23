@@ -14,4 +14,9 @@ class SQLTradeAllocationRepository(Repository):
             order_id = query_params["order_id"]
             query = query.filter(SQLTradeAllocation.order_id == order_id)
 
-        return query
+        if "trade_id" in query_params:
+            query = query.filter(
+                SQLTradeAllocation.trade_id == query_params["trade_id"]
+            )
+
+        return query.order_by(SQLTradeAllocation.id)

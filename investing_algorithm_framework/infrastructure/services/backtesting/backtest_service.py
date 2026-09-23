@@ -5,12 +5,15 @@ import multiprocessing
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Callable, Dict, List, Literal, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
 import polars as pl
 
+from investing_algorithm_framework.infrastructure.data_providers.ccxt import \
+    CCXTOHLCVDataProvider
 from investing_algorithm_framework.domain import BacktestRun, \
     OperationalException, BacktestDateRange, BacktestWindow, Backtest, \
     combine_backtests, \
@@ -691,7 +694,8 @@ class BacktestService:
         data_sources: List[DataSource],
         backtest_date_range: BacktestDateRange,
         show_progress: bool = False,
-        fill_missing_data: bool = False
+        fill_missing_data: bool = False,
+        save_filled_data_points: bool = False,
     ):
         """
         Function to initialize the data sources for the app in backtest mode.
@@ -708,6 +712,8 @@ class BacktestService:
             fill_missing_data (bool): If True, missing time series data
                 entries will be filled automatically before preparing the
                 backtest data.
+            save_filled_data_points (bool): Persist synthetic filled candles
+                for CCXT OHLCV providers; other providers are unchanged.
 
         Returns:
             None
@@ -737,11 +743,17 @@ class BacktestService:
         # Prepare the backtest data for each data provider
         # Fill missing data is handled inside prepare_backtest_data
         for _, data_provider in data_providers:
+            preparation_options = {}
+            if save_filled_data_points and isinstance(
+                data_provider, CCXTOHLCVDataProvider
+            ):
+                preparation_options["save_filled_data_points"] = True
             data_provider.prepare_backtest_data(
                 backtest_start_date=backtest_date_range.start_date,
                 backtest_end_date=backtest_date_range.end_date,
                 fill_missing_data=fill_missing_data,
-                show_progress=show_progress
+                show_progress=show_progress,
+                **preparation_options,
             )
 
     def run_vector_backtests(
@@ -778,6 +790,10 @@ class BacktestService:
         final_metrics_filter_function: Optional[
             Callable[[BacktestIndex], BacktestIndex]
         ] = None,
+        save_filled_data_points: bool = False,
+        signal_storage_directory=None,
+        execution_backend='python',
+        hard_memory_limit_mb=None,
     ) -> Union[List[Backtest], BacktestIndex]:
         """
         OPTIMIZED version: Run vectorized backtests with optional
@@ -890,6 +906,8 @@ class BacktestService:
         ):
             if callback is not None and not callable(callback):
                 raise OperationalException("Metrics filters must be callable.")
+        from .vector_resources import require_hard_memory_limit
+        require_hard_memory_limit(hard_memory_limit_mb)
         memory_guard = MemoryGuard(
             memory_budget_mb, min_available_memory_mb
         )
@@ -1078,7 +1096,8 @@ class BacktestService:
                     data_sources,
                     backtest_date_range,
                     show_progress=show_progress,
-                    fill_missing_data=fill_missing_data
+                    fill_missing_data=fill_missing_data,
+                    save_filled_data_points=save_filled_data_points,
                 )
             memory_guard.require()
 
@@ -1207,6 +1226,7 @@ class BacktestService:
                             risk_free_rate, continue_on_error,
                             None if n_workers else self._data_provider_service,
                             False, dynamic_position_sizing,
+                            None, signal_storage_directory, execution_backend,
                         )
 
                 if n_workers and strategies_to_run:
@@ -2125,6 +2145,11 @@ class BacktestService:
         Returns:
             List[Backtest]: List of completed backtest results
         """
+        signal_storage_directory = None
+        execution_backend = 'python'
+        if len(args) == 12:
+            signal_storage_directory, execution_backend = args[-2:]
+            args = args[:10]
         # Support both old (9-element) and new (10-element) tuple
         if len(args) == 10:
             (
@@ -2182,13 +2207,25 @@ class BacktestService:
 
         for strategy in strategy_batch:
             try:
-                backtest_run = vector_backtest_service.run(
-                    strategy=strategy,
-                    backtest_date_range=backtest_date_range,
-                    portfolio_configuration=portfolio_configuration,
-                    risk_free_rate=risk_free_rate,
-                    dynamic_position_sizing=dynamic_position_sizing,
-                )
+                from investing_algorithm_framework.services.backtest_store \
+                    import StoreError
+                from investing_algorithm_framework.services.backtest_store \
+                    .recording import recording_session
+                with recording_session(
+                    signal_storage_directory, 'vector',
+                    {'algorithm_id': str(strategy.algorithm_id),
+                     'start': backtest_date_range.start_date.isoformat(),
+                     'end': backtest_date_range.end_date.isoformat()},
+                ) as recorder:
+                    backtest_run = vector_backtest_service.run(
+                        strategy=strategy,
+                        backtest_date_range=backtest_date_range,
+                        portfolio_configuration=portfolio_configuration,
+                        risk_free_rate=risk_free_rate,
+                        dynamic_position_sizing=dynamic_position_sizing,
+                        execution_backend=execution_backend,
+                        signal_recorder=recorder,
+                    )
                 backtest = Backtest(
                     algorithm_id=strategy.algorithm_id,
                     metadata=strategy.metadata if hasattr(
@@ -2218,7 +2255,7 @@ class BacktestService:
                     with progress_counter.get_lock():
                         progress_counter.value += 1
 
-            except (MemoryError, BacktestResourceError):
+            except (MemoryError, BacktestResourceError, StoreError):
                 raise
             except Exception as e:
                 if continue_on_error:
@@ -2444,11 +2481,14 @@ class BacktestService:
             BACKTESTING_INITIAL_AMOUNT, LAST_SNAPSHOT_DATETIME
         from investing_algorithm_framework.infrastructure.database \
             .sql_alchemy import Session, SQLBaseModel
+        from investing_algorithm_framework.infrastructure.repositories \
+            .event_memory import event_memory_active
 
-        with Session() as db:
-            for table in reversed(SQLBaseModel.metadata.sorted_tables):
-                db.execute(table.delete())
-            db.commit()
+        if not event_memory_active():
+            with Session() as db:
+                for table in reversed(SQLBaseModel.metadata.sorted_tables):
+                    db.execute(table.delete())
+                db.commit()
 
         initial_amount = self._configuration_service.config.get(
             BACKTESTING_INITIAL_AMOUNT, None
@@ -2500,6 +2540,12 @@ class BacktestService:
         final_metrics_filter_function: Optional[
             Callable[[BacktestIndex], BacktestIndex]
         ] = None,
+        save_filled_data_points: bool = False,
+        signal_storage_directory=None,
+        hard_memory_limit_mb=None,
+        event_fill_backend='python',
+        event_schedule_backend='python',
+        event_state_backend='sql',
     ) -> Union[List[Backtest], BacktestIndex]:
         """
         Run event-driven backtests with checkpointing and bounded workers.
@@ -2622,6 +2668,28 @@ class BacktestService:
                 raise OperationalException(
                     "Backtest callbacks must be callable."
                 )
+        from .vector_resources import require_hard_memory_limit
+        require_hard_memory_limit(hard_memory_limit_mb)
+        if event_fill_backend not in ('python', 'rust', 'auto'):
+            raise ValueError('event_fill_backend must be python, rust or auto')
+        if event_fill_backend == 'rust':
+            from investing_algorithm_framework.services.trade_order_evaluator \
+                .native import load_native_event_fills
+            load_native_event_fills()
+        if event_schedule_backend not in ('python', 'rust', 'auto'):
+            raise ValueError(
+                'event_schedule_backend must be python, rust or auto'
+            )
+        if event_schedule_backend == 'rust':
+            from investing_algorithm_framework.app.native_schedule import \
+                load_native_schedule
+            load_native_schedule()
+        if event_state_backend not in ('sql', 'memory', 'rust'):
+            raise ValueError('event_state_backend must be sql, memory or rust')
+        if event_state_backend == 'rust':
+            from investing_algorithm_framework.domain.native_event import \
+                load_native_event_accounting
+            load_native_event_accounting()
         memory_guard = MemoryGuard(
             memory_budget_mb, min_available_memory_mb,
         )
@@ -2719,7 +2787,8 @@ class BacktestService:
                     data_sources,
                     backtest_date_range,
                     show_progress=show_progress,
-                    fill_missing_data=fill_missing_data
+                    fill_missing_data=fill_missing_data,
+                    save_filled_data_points=save_filled_data_points,
                 )
             memory_guard.require()
 
@@ -2842,15 +2911,25 @@ class BacktestService:
                     "continue_on_error": continue_on_error,
                     "memory_budget_mb": memory_budget_mb,
                     "min_available_memory_mb": min_available_memory_mb,
+                    "signal_storage_directory": signal_storage_directory,
+                    "event_fill_backend": event_fill_backend,
+                    "event_schedule_backend": event_schedule_backend,
+                    "event_state_backend": event_state_backend,
                 }
-                with tqdm(
+                with TemporaryDirectory(prefix="iaf-event-results-") as \
+                        result_directory, tqdm(
                     total=len(algorithms_to_run),
                     desc="Running event backtests", colour="green",
                     disable=not show_progress,
                 ) as progress:
-                    def consume_event_results(results):
-                        for result in results:
-                            save_event_result(result)
+                    settings["result_directory"] = result_directory
+
+                    def consume_event_results(paths):
+                        for path in paths:
+                            try:
+                                save_event_result(Backtest.open(path))
+                            finally:
+                                Path(path).unlink(missing_ok=True)
                         progress.update(1)
 
                     bounded_process_map(
@@ -2900,7 +2979,21 @@ class BacktestService:
                             else algorithm.id
                         )
 
+                        recorder = None
+                        from contextlib import ExitStack
+                        state_scope = ExitStack()
+                        from investing_algorithm_framework.services \
+                            .backtest_store import StoreError
                         try:
+                            if event_state_backend in ('memory', 'rust'):
+                                from investing_algorithm_framework \
+                                    .infrastructure.repositories.event_memory \
+                                    import event_memory_scope
+                                state_scope.enter_context(event_memory_scope(
+                                    accounting_backend=(
+                                        'rust' if event_state_backend == 'rust'
+                                        else 'python'),
+                                ))
                             # Reset portfolio/order/trade/position state
                             # before every isolated (algorithm, window) run
                             # so this run starts from a clean, freshly
@@ -2971,6 +3064,7 @@ class BacktestService:
                                     portfolio_configuration=pc,
                                     blotter=blotter,
                                     context=context,
+                                    event_fill_backend=event_fill_backend,
                                 )
                             )
 
@@ -2989,13 +3083,24 @@ class BacktestService:
                                 algorithm=algorithm,
                                 trade_order_evaluator=trade_order_evaluator
                             )
-                            # Show progress for single backtest,
-                            # hide for batches
+                            if signal_storage_directory is not None:
+                                from investing_algorithm_framework.services \
+                                    .backtest_store.recording import (
+                                        SignalRecorder,
+                                    )
+                                recorder = SignalRecorder(
+                                    signal_storage_directory, engine='event',
+                                    metadata={
+                                        'algorithm_id': str(algorithm_id),
+                                        'start': start_date,
+                                        'end': end_date,
+                                    },
+                                )
+                                event_loop_service.signal_log = recorder
                             event_loop_service.start(
                                 schedule=schedule,
-                                show_progress=(
-                                    show_progress and is_single_backtest
-                                ),
+                                event_schedule_backend=event_schedule_backend,
+                                show_progress=show_progress,
                                 resource_check=(
                                     memory_guard.check_periodically
                                     if memory_guard.enabled else None
@@ -3015,6 +3120,13 @@ class BacktestService:
                                 )
                             )
 
+                            if recorder is not None:
+                                recorder.commit()
+                                for completed_run in backtest.event_runs:
+                                    completed_run.metadata.update(
+                                        signal_history=recorder.reference()
+                                    )
+
                             # Add metadata
                             if (hasattr(algorithm, 'metadata')
                                     and algorithm.metadata):
@@ -3027,6 +3139,8 @@ class BacktestService:
 
                         except (MemoryError, BacktestResourceError):
                             raise
+                        except (StoreError, OSError):
+                            raise
                         except Exception as e:
                             if continue_on_error:
                                 logger.error(
@@ -3036,6 +3150,13 @@ class BacktestService:
                                 continue
                             else:
                                 raise
+
+                        finally:
+                            try:
+                                if recorder is not None:
+                                    recorder.__exit__(None, None, None)
+                            finally:
+                                state_scope.close()
 
                         # Stamping and persistence failures must never be
                         # treated as skippable strategy errors.

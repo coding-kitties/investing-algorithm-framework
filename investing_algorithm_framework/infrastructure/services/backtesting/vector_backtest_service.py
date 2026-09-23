@@ -20,6 +20,24 @@ from investing_algorithm_framework.services.pipeline import \
 logger = logging.getLogger(__name__)
 
 
+def _index_snapshot_trade_events(trades):
+    """Index lifecycle events without changing per-timestamp trade order."""
+    events = {}
+    for trade in trades:
+        if trade.opened_at is not None:
+            events.setdefault(trade.opened_at, []).append(trade)
+        if trade.closed_at is not None and trade.closed_at != trade.opened_at:
+            events.setdefault(trade.closed_at, []).append(trade)
+    return events
+
+
+def _loop_values(series):
+    """Expose positional values without changing nullable scalar semantics."""
+    if isinstance(series.dtype, pd.api.extensions.ExtensionDtype):
+        return series.array
+    return series.to_numpy(copy=False)
+
+
 class VectorBacktestService:
 
     def __init__(
@@ -34,6 +52,9 @@ class VectorBacktestService:
         portfolio_configuration: PortfolioConfiguration,
         risk_free_rate: float = 0.027,
         dynamic_position_sizing: bool = False,
+        execution_backend: str = "python",
+        signal_recorder=None,
+        metrics_backend: str = "python",
     ) -> BacktestRun:
         """
         Vectorized backtest for multiple assets using strategy
@@ -51,6 +72,14 @@ class VectorBacktestService:
                 event-based backtesting). If False (default), position sizes
                 are calculated once at the start based on initial portfolio
                 value. Default is False for backward compatibility.
+            execution_backend: "python" (default), "rust" (strict native
+                subset), or "auto" (native with Python fallback). Native
+                supports netting with standard costs, sizing, deposits, flips,
+                cooldowns and fixed TP/SL. Scaling, hedge mode, custom models,
+                trailing rules and simultaneous long/short entries use Python.
+                This selects execution, independently of confluence evaluation.
+            metrics_backend: "python" (default), "rust" for native risk
+                metrics, or "auto" with Python fallback.
 
         Returns:
             BacktestRun: The backtest run containing the results and metrics.
@@ -63,6 +92,8 @@ class VectorBacktestService:
             trades. If you need to replicate signals externally, make
             sure to include the same warmup period in your data.
         """
+        if execution_backend not in ("python", "rust", "auto"):
+            raise ValueError("execution_backend must be python, rust or auto")
         initial_amount = portfolio_configuration.initial_balance
         trading_symbol = portfolio_configuration.trading_symbol
         position_mode = PositionMode(portfolio_configuration.position_mode)
@@ -191,7 +222,7 @@ class VectorBacktestService:
         if shorting_enabled:
             all_signal_symbols |= set(short_signals.keys())
             all_signal_symbols |= set(cover_signals.keys())
-        for symbol in all_signal_symbols:
+        for symbol in sorted(all_signal_symbols):
             full_symbol = f"{symbol}/{trading_symbol}"
 
             # find PositionSize object: symbol-specific entry takes
@@ -306,13 +337,19 @@ class VectorBacktestService:
             symbol_data[symbol] = {
                 'full_symbol': full_symbol,
                 'pos_size_obj': pos_size_obj,
-                'close': close,
-                'buy_signal': buy_signal,
-                'sell_signal': sell_signal,
-                'scale_in_signal': si_signal,
-                'scale_out_signal': so_signal,
-                'short_signal': short_signal,
-                'cover_signal': cover_signal,
+                'close': _loop_values(close),
+                'buy_signal': buy_signal if hedge_mode else
+                _loop_values(buy_signal),
+                'sell_signal': sell_signal if hedge_mode else
+                _loop_values(sell_signal),
+                'scale_in_signal': si_signal if hedge_mode else
+                _loop_values(si_signal),
+                'scale_out_signal': so_signal if hedge_mode else
+                _loop_values(so_signal),
+                'short_signal': short_signal if hedge_mode else
+                _loop_values(short_signal),
+                'cover_signal': cover_signal if hedge_mode else
+                _loop_values(cover_signal),
                 'scaling_rule': scaling_rule,
                 'trading_cost': trading_cost,
                 'initial_capital_for_trade': initial_capital_for_trade,
@@ -341,7 +378,7 @@ class VectorBacktestService:
             }
 
         # Signal event log — records every fired signal and its outcome
-        signal_events = []
+        signal_events = signal_recorder if signal_recorder is not None else []
 
         # Portfolio-scoped cooldown tracker for CooldownRule evaluation.
         # Shared across symbols so portfolio-scoped rules (symbol=None) work.
@@ -1172,8 +1209,41 @@ class VectorBacktestService:
                             bar_index=bar_index, position_side="short",
                         )
 
+        execution_events = None
+        if execution_backend != "python":
+            from .vector_native import (
+                NativeExecutionUnsupported, native_events,
+                materialize_executions, materialize_snapshots,
+            )
+
+            try:
+                execution_events = native_events(
+                    symbol_data, len(index), initial_amount, strategy,
+                    dynamic_position_sizing=dynamic_position_sizing,
+                    hedge_mode=hedge_mode, deposit_events=deposit_events,
+                    index=index,
+                )
+            except (ImportError, NativeExecutionUnsupported):
+                if execution_backend == "rust":
+                    raise
+        if execution_events is not None:
+            trades, orders, signal_events = materialize_executions(
+                execution_events.events, symbol_data, index,
+                trading_symbol, strategy, signal_recorder=signal_recorder,
+            )
+            snapshots.extend(materialize_snapshots(
+                execution_events, symbol_data, index,
+                portfolio.identifier, trades, initial_amount,
+            ))
+            del execution_events
+            execution_rows = ()
+            snapshot_index = ()
+        else:
+            execution_rows = range(len(index))
+            snapshot_index = index
+
         # Process all timestamps in chronological order
-        for i in range(len(index)):
+        for i in execution_rows:
             current_date = index[i]
 
             # Convert the pd.Timestamp to an utc datetime object
@@ -1196,7 +1266,7 @@ class VectorBacktestService:
 
             # Process each symbol at this timestamp
             for symbol, data in symbol_data.items():
-                current_price = float(data['close'].iloc[i])
+                current_price = float(data['close'][i])
                 if hedge_mode:
                     _process_hedge_bar(
                         symbol, data, current_price, current_date, i
@@ -1233,31 +1303,30 @@ class VectorBacktestService:
 
                 in_cooldown = data['cooldown_remaining'] > 0
 
-                # CooldownRule gating (portfolio-aware, side-specific)
-                rule_block_buy, _rule_buy = cooldown_tracker.is_blocked(
-                    strategy_cooldowns,
-                    signal_side="buy",
-                    symbol=symbol,
-                    bar_index=i,
-                )
-                rule_block_sell, _rule_sell = cooldown_tracker.is_blocked(
-                    strategy_cooldowns,
-                    signal_side="sell",
-                    symbol=symbol,
-                    bar_index=i,
-                )
-
                 # Read raw boolean signals for this bar
-                is_buy = bool(data['buy_signal'].iloc[i])
-                is_sell = bool(data['sell_signal'].iloc[i])
-                is_scale_in = bool(data['scale_in_signal'].iloc[i])
-                is_scale_out = bool(data['scale_out_signal'].iloc[i])
+                is_buy = bool(data['buy_signal'][i])
+                is_sell = bool(data['sell_signal'][i])
+                is_scale_in = bool(data['scale_in_signal'][i])
+                is_scale_out = bool(data['scale_out_signal'][i])
                 # SHORT / COVER (#433). When shorting is disabled these
                 # series are all-False and the branches are no-ops.
-                is_short_sig = bool(data['short_signal'].iloc[i])
-                is_cover_sig = bool(data['cover_signal'].iloc[i])
+                is_short_sig = bool(data['short_signal'][i])
+                is_cover_sig = bool(data['cover_signal'][i])
                 is_short_pos = data['is_short']
                 is_long_pos = has_position and not is_short_pos
+
+                rule_block_buy = False
+                rule_block_sell = False
+                if is_buy or is_scale_in or is_cover_sig:
+                    rule_block_buy, _ = cooldown_tracker.is_blocked(
+                        strategy_cooldowns, signal_side="buy",
+                        symbol=symbol, bar_index=i,
+                    )
+                if is_sell or is_scale_out or is_short_sig:
+                    rule_block_sell, _ = cooldown_tracker.is_blocked(
+                        strategy_cooldowns, signal_side="sell",
+                        symbol=symbol, bar_index=i,
+                    )
 
                 flip_enabled = bool(getattr(
                     strategy, 'flip_on_opposite_signal', False
@@ -1653,7 +1722,7 @@ class VectorBacktestService:
             if dynamic_position_sizing:
                 for symbol, data in symbol_data.items():
                     if hedge_mode:
-                        current_price = float(data['close'].iloc[i])
+                        current_price = float(data['close'][i])
                         long_trades = data['legs']['long']['open_trades']
                         short_trades = data['legs']['short']['open_trades']
                         open_trades_value[(symbol, 'long')] = sum(
@@ -1674,7 +1743,7 @@ class VectorBacktestService:
                             short_proceeds - short_liability
                         continue
                     if data['open_trades']:
-                        current_price = float(data['close'].iloc[i])
+                        current_price = float(data['close'][i])
                         if data['is_short']:
                             # For shorts the proceeds are already in
                             # ``current_unallocated``; this slot holds
@@ -1708,9 +1777,12 @@ class VectorBacktestService:
         # TWR-aware return metrics (CAGR, monthly/yearly returns) to
         # subtract external deposits before computing returns.
         deposit_replay_idx = 0
+        snapshot_trade_events = (
+            _index_snapshot_trade_events(trades) if len(snapshot_index) else {}
+        )
 
         # Create portfolio snapshots
-        for ts in index:
+        for ts in snapshot_index:
             allocated = 0
             interval_datetime = pd.Timestamp(ts).to_pydatetime()
             interval_datetime = interval_datetime.replace(tzinfo=timezone.utc)
@@ -1727,7 +1799,7 @@ class VectorBacktestService:
                 snapshot_cash_flow += deposit_amount
                 deposit_replay_idx += 1
 
-            for trade in trades:
+            for trade in snapshot_trade_events.get(interval_datetime, ()):
 
                 if trade.opened_at == interval_datetime:
                     if trade.is_short:
@@ -1817,6 +1889,7 @@ class VectorBacktestService:
                 )
             )
 
+        del snapshot_trade_events
         unique_symbols = set()
         for trade in trades:
             unique_symbols.add(trade.target_symbol)
@@ -1895,15 +1968,18 @@ class VectorBacktestService:
             number_of_trades_open=number_of_trades_open,
             number_of_positions=len(unique_symbols),
             signals=raw_signals,
-            signal_events=signal_events,
+            signal_events=signal_events if signal_recorder is None else [],
             recorded_values=self._convert_recorded_values(raw_recorded),
             metadata={"position_mode": position_mode.value},
         )
 
         # Create backtest metrics
         run.backtest_metrics = create_backtest_metrics(
-            run, risk_free_rate=risk_free_rate
+            run, risk_free_rate=risk_free_rate, metrics_backend=metrics_backend
         )
+        if signal_recorder is not None:
+            signal_recorder.commit()
+            run.metadata['signal_history'] = signal_recorder.reference()
         return run
 
     @staticmethod

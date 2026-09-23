@@ -323,7 +323,8 @@ class TestBacktestReportDataTransform(TestCase):
 
     def test_run_data_includes_net_gross_and_side_exposure(self):
         run = self.report.backtests[0].vector_runs[0]
-        run.portfolio_snapshots[-1].position_snapshots = [PositionSnapshot(
+        snapshots = run.portfolio_snapshots.materialize()
+        snapshots[-1].position_snapshots = [PositionSnapshot(
             symbol="BTC/EUR",
             amount=0.5,
             cost=200.0,
@@ -332,6 +333,7 @@ class TestBacktestReportDataTransform(TestCase):
             long_cost=200.0,
             short_cost=165.0,
         )]
+        run.portfolio_snapshots = snapshots
 
         snapshot = self.report._build_run_data()["run-0-0"]["snapshot"]
 

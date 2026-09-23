@@ -47,8 +47,9 @@ from .trades import get_average_trade_duration, get_average_trade_size, \
     get_current_average_trade_gain, get_current_average_trade_return, \
     get_current_average_trade_duration, get_current_average_trade_loss, \
     get_average_win_duration, get_average_loss_duration, \
-    get_max_consecutive_wins, get_max_consecutive_losses, \
-    get_directional_trade_statistics
+    get_max_consecutive_wins, get_max_consecutive_losses
+from .trades import summarize_trade_history
+from .inputs import TradeInput, prepare_metric_inputs
 from .value_at_risk import get_value_at_risk, \
     get_conditional_value_at_risk
 
@@ -572,6 +573,8 @@ def create_backtest_metrics(
     backtest_run: BacktestRun,
     risk_free_rate: float,
     metrics: List[str] = None,
+    *,
+    metrics_backend: str = "python",
 ) -> BacktestMetrics:
     """
     Create a BacktestMetrics instance and optionally save it to a file.
@@ -583,10 +586,17 @@ def create_backtest_metrics(
             metric calculations.
         metrics (List[str], optional): List of metric names to compute.
             If None, a default set of metrics will be computed.
+        metrics_backend: "python", "rust" for native risk metrics, or
+            "auto" to fall back for unavailable/unsupported native inputs.
+            Other metrics continue to use Python.
     Returns:
         BacktestMetrics: The computed backtest metrics.
     """
 
+    if metrics_backend not in ("python", "rust", "auto"):
+        raise ValueError("metrics_backend must be python, rust or auto")
+    source_run = backtest_run
+    backtest_run = prepare_metric_inputs(backtest_run)
     if metrics is None:
         metrics = [
             "backtest_start_date",
@@ -696,10 +706,25 @@ def create_backtest_metrics(
         initial_unallocated=backtest_run.initial_unallocated or 0.0,
     )
 
+    native_values = summarize_trade_history(backtest_run.trades, metrics)
+    if metrics_backend != "python":
+        from .native import (
+            NATIVE_METRICS, NativeMetricsUnsupported, native_risk_metrics,
+        )
+        if NATIVE_METRICS.intersection(metrics):
+            try:
+                native_values.update(native_risk_metrics(
+                    backtest_run.portfolio_snapshots
+                ))
+            except (ImportError, NativeMetricsUnsupported):
+                if metrics_backend == "rust":
+                    raise
+
     def safe_set(metric_name, func, *args, index=None):
         if metric_name in metrics:
             try:
-                value = func(*args)
+                value = (native_values[metric_name]
+                         if metric_name in native_values else func(*args))
                 if index is not None and isinstance(value, (list, tuple)):
                     setattr(backtest_metrics, metric_name, value[index])
                 else:
@@ -738,7 +763,7 @@ def create_backtest_metrics(
             # always 0 otherwise. ``total_loss_percentage`` is the gross
             # loss expressed as a fraction of the initial unallocated
             # capital (decimal, e.g. ``0.05`` for a 5% loss magnitude).
-            gross_loss_value = get_gross_loss(backtest_run.trades)
+            gross_loss_value = native_values['gross_loss']
             initial_value = backtest_run.initial_unallocated or 0.0
 
             if "total_loss" in metrics:
@@ -854,9 +879,7 @@ def create_backtest_metrics(
     safe_set("number_of_trades", get_number_of_trades, backtest_run.trades)
     safe_set("number_of_trades_closed", get_number_of_closed_trades, backtest_run.trades)
     safe_set("number_of_trades_opened", get_number_of_open_trades, backtest_run.trades)
-    directional_statistics = get_directional_trade_statistics(
-        backtest_run.trades
-    )
+    directional_statistics = native_values
     for metric_name, value in directional_statistics.items():
         if metric_name in metrics:
             setattr(backtest_metrics, metric_name, value)
@@ -919,4 +942,9 @@ def create_backtest_metrics(
     safe_set("cvar_95", get_conditional_value_at_risk, backtest_run.portfolio_snapshots, 0.95)
     safe_set("max_consecutive_wins", get_max_consecutive_wins, backtest_run.trades)
     safe_set("max_consecutive_losses", get_max_consecutive_losses, backtest_run.trades)
+    for name in ('best_trade', 'worst_trade'):
+        selected = getattr(backtest_metrics, name)
+        if isinstance(selected, TradeInput):
+            setattr(backtest_metrics, name,
+                    source_run.trades[selected.source_index])
     return backtest_metrics

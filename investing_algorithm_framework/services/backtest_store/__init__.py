@@ -17,6 +17,8 @@ from .base import (
     StoreError,
     StoreHandleNotFoundError,
     SupportsCopyFrom,
+    SupportsRecordDefinitions,
+    SupportsStreamingRuns,
 )
 from .local_dir_store import LocalDirStore
 from .local_tiered_store import LocalTieredStore
@@ -27,6 +29,8 @@ __all__ = [
     "StoreError",
     "StoreHandleNotFoundError",
     "SupportsCopyFrom",
+    "SupportsRecordDefinitions",
+    "SupportsStreamingRuns",
     "LocalDirStore",
     "LocalTieredStore",
 ]

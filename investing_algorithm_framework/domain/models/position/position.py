@@ -91,6 +91,8 @@ class Position(BaseModel):
             return self.long_cost
         if self.amount < 0:
             return self.short_cost
+        if self.gross_amount == 0:
+            return self.gross_cost
         return 0
 
     @cost.setter

@@ -32,6 +32,7 @@ from ..models.trade.trade_take_profit import (
 from .backtest_date_range import BacktestDateRange
 from .backtest_metrics import BacktestMetrics
 from .backtest_window import BacktestWindow
+from .history import BacktestHistory
 
 
 logger = getLogger(__name__)
@@ -179,6 +180,11 @@ class BacktestRun:
     :pyattr:`window_role`; the full parent window stays accessible on
     :pyattr:`backtest_window` for consumers that need the training
     portion of a walk-forward run.
+
+    Orders, trades and portfolio snapshots are read-only disk-backed
+    histories. Reads return detached records; materialize, edit and reassign
+    a history to replace its contents. Unfiltered queries share the history;
+    filtered queries scan it into a new disk-backed history.
     """
 
     backtest_window: BacktestWindow
@@ -188,9 +194,10 @@ class BacktestRun:
     number_of_days: int = 0
     number_of_hours: int = 0
     backtest_metrics: Optional[BacktestMetrics] = None
-    portfolio_snapshots: List[PortfolioSnapshot] = field(default_factory=list)
-    trades: List[Trade] = field(default_factory=list)
-    orders: List[Order] = field(default_factory=list)
+    portfolio_snapshots: BacktestHistory = field(
+        default_factory=BacktestHistory)
+    trades: BacktestHistory = field(default_factory=BacktestHistory)
+    orders: BacktestHistory = field(default_factory=BacktestHistory)
     positions: List[Position] = field(default_factory=list)
     number_of_trades: int = 0
     number_of_trades_closed: int = 0
@@ -202,6 +209,19 @@ class BacktestRun:
     signal_events: List[Dict[str, Any]] = field(default_factory=list)
     recorded_values: Dict[str, List] = field(default_factory=dict)
     metadata: Dict[str, str] = field(default_factory=dict)
+
+    def __setattr__(self, name, value):
+        models = {
+            'portfolio_snapshots': PortfolioSnapshot,
+            'trades': Trade,
+            'orders': Order,
+        }
+        if name in models and (
+            not isinstance(value, BacktestHistory)
+            or value._model is not models[name]
+        ):
+            value = BacktestHistory(value, model=models[name])
+        object.__setattr__(self, name, value)
 
     # ------------------------------------------------------------------
     # Derived active-range fields
@@ -247,7 +267,7 @@ class BacktestRun:
     # Serialisation
     # ------------------------------------------------------------------
 
-    def to_dict(self) -> dict:
+    def to_dict(self, *, materialize_history: bool = True) -> dict:
         """Return a JSON-friendly dict matching OBTF §Run structure."""
         return {
             "backtest_window": self.backtest_window.to_dict(),
@@ -261,15 +281,20 @@ class BacktestRun:
             "number_of_days": self.number_of_days,
             "number_of_hours": self.number_of_hours,
             "backtest_metrics": (
-                self.backtest_metrics.to_dict()
+                self.backtest_metrics.to_dict(
+                    materialize_history=materialize_history)
                 if self.backtest_metrics is not None
                 else None
             ),
-            "portfolio_snapshots": [
-                ps.to_dict() for ps in self.portfolio_snapshots
-            ],
-            "trades": [t.to_dict() for t in self.trades],
-            "orders": [o.to_dict() for o in self.orders],
+            "portfolio_snapshots": (
+                list(self.portfolio_snapshots.serialized())
+                if materialize_history else
+                self.portfolio_snapshots.serialized()
+            ),
+            "trades": (list(self.trades.serialized()) if materialize_history
+                       else self.trades.serialized()),
+            "orders": (list(self.orders.serialized()) if materialize_history
+                       else self.orders.serialized()),
             "positions": [p.to_dict() for p in self.positions],
             "number_of_trades": self.number_of_trades,
             "number_of_trades_closed": self.number_of_trades_closed,
@@ -330,19 +355,19 @@ class BacktestRun:
         ):
             data.pop(key, None)
 
-        data["orders"] = [
+        data["orders"] = (
             Order.from_dict(o) for o in (data.get("orders") or [])
-        ]
+        )
         data["positions"] = [
             Position.from_dict(p) for p in (data.get("positions") or [])
         ]
-        data["trades"] = [
+        data["trades"] = (
             Trade.from_dict(t) for t in (data.get("trades") or [])
-        ]
-        data["portfolio_snapshots"] = [
+        )
+        data["portfolio_snapshots"] = (
             PortfolioSnapshot.from_dict(ps)
             for ps in (data.get("portfolio_snapshots") or [])
-        ]
+        )
         data["signals"] = data.get("signals") or {}
         data["signal_events"] = _deserialise_signal_events(
             data.get("signal_events") or []
@@ -448,7 +473,7 @@ class BacktestRun:
         opened_at_gt: datetime = None,
         opened_at_gte: datetime = None,
         order_id: str = None
-    ) -> List[Trade]:
+    ) -> BacktestHistory:
         """
         Get the trades of a backtest report
 
@@ -463,65 +488,26 @@ class BacktestRun:
             order_id (str): The order ID to filter the trades
 
         Returns:
-            list: The trades of the backtest report
+            BacktestHistory: Read-only trades matching the filters.
         """
-        selection = self.trades
-
-        if target_symbol is not None:
-            selection = [
-                trade for trade in selection
-                if trade.target_symbol.lower() == target_symbol.lower()
-            ]
-
-        if trade_status is not None:
-            trade_status = TradeStatus.from_value(trade_status)
-            selection = [
-                trade for trade in selection
-                if trade.status == trade_status.value
-            ]
-
-        if opened_at is not None:
-            selection = [
-                trade for trade in selection
-                if trade.opened_at == opened_at
-            ]
-
-        if opened_at_lt is not None:
-            selection = [
-                trade for trade in selection
-                if trade.opened_at < opened_at_lt
-            ]
-
-        if opened_at_lte is not None:
-            selection = [
-                trade for trade in selection
-                if trade.opened_at <= opened_at_lte
-            ]
-
-        if opened_at_gt is not None:
-            selection = [
-                trade for trade in selection
-                if trade.opened_at > opened_at_gt
-            ]
-
-        if opened_at_gte is not None:
-            selection = [
-                trade for trade in selection
-                if trade.opened_at >= opened_at_gte
-            ]
-
-        if order_id is not None:
-            new_selection = []
-            for trade in selection:
-
-                for order in trade.orders:
-                    if order.order_id == order_id:
-                        new_selection.append(trade)
-                        break
-
-            selection = new_selection
-
-        return selection
+        if all(value is None for value in (
+                target_symbol, trade_status, opened_at, opened_at_lt,
+                opened_at_lte, opened_at_gt, opened_at_gte, order_id)):
+            return self.trades
+        status = TradeStatus.from_value(trade_status).value \
+            if trade_status is not None else None
+        return BacktestHistory((trade for trade in self.trades if (
+            (target_symbol is None or
+             trade.target_symbol.lower() == target_symbol.lower())
+            and (status is None or trade.status == status)
+            and (opened_at is None or trade.opened_at == opened_at)
+            and (opened_at_lt is None or trade.opened_at < opened_at_lt)
+            and (opened_at_lte is None or trade.opened_at <= opened_at_lte)
+            and (opened_at_gt is None or trade.opened_at > opened_at_gt)
+            and (opened_at_gte is None or trade.opened_at >= opened_at_gte)
+            and (order_id is None or any(
+                order.order_id == order_id for order in trade.orders))
+        )), model=Trade)
 
     def get_stop_losses(
         self,
@@ -650,7 +636,7 @@ class BacktestRun:
         created_at_lte: Optional[datetime] = None,
         created_at_gt: Optional[datetime] = None,
         created_at_gte: Optional[datetime] = None
-    ) -> List[PortfolioSnapshot]:
+    ) -> BacktestHistory:
         """
         Get the portfolio snapshots of the backtest report
 
@@ -665,35 +651,24 @@ class BacktestRun:
                 the snapshots
 
         Returns:
-            list: The portfolio snapshots of the backtest report
+            BacktestHistory: Read-only snapshots matching the filters.
         """
-        selection = self.portfolio_snapshots
+        if all(value is None for value in (
+                created_at_lt, created_at_lte, created_at_gt, created_at_gte)):
+            return self.portfolio_snapshots
 
-        if created_at_lt is not None:
-            selection = [
-                snapshot for snapshot in selection
-                if snapshot.created_at < created_at_lt
-            ]
+        def matches(snapshot):
+            timestamp = snapshot.created_at
+            return (
+                (created_at_lt is None or timestamp < created_at_lt)
+                and (created_at_lte is None or timestamp <= created_at_lte)
+                and (created_at_gt is None or timestamp > created_at_gt)
+                and (created_at_gte is None or timestamp >= created_at_gte)
+            )
 
-        if created_at_lte is not None:
-            selection = [
-                snapshot for snapshot in selection
-                if snapshot.created_at <= created_at_lte
-            ]
-
-        if created_at_gt is not None:
-            selection = [
-                snapshot for snapshot in selection
-                if snapshot.created_at > created_at_gt
-            ]
-
-        if created_at_gte is not None:
-            selection = [
-                snapshot for snapshot in selection
-                if snapshot.created_at >= created_at_gte
-            ]
-
-        return selection
+        return BacktestHistory(
+            filter(matches, self.portfolio_snapshots), model=PortfolioSnapshot,
+        )
 
     def get_orders(
         self,
@@ -705,7 +680,7 @@ class BacktestRun:
         created_at_lte: datetime = None,
         created_at_gt: datetime = None,
         created_at_gte: datetime = None
-    ) -> List[Order]:
+    ) -> BacktestHistory:
         """
         Get the orders of a backtest report
 
@@ -720,61 +695,26 @@ class BacktestRun:
             created_at_gte (datetime): The created_at date to filter the orders
 
         Returns:
-            list: The orders of the backtest report
+            BacktestHistory: Read-only orders matching the filters.
         """
-        selection = self.orders
-
-        if created_at is not None:
-            selection = [
-                order for order in selection
-                if order.created_at == created_at
-            ]
-
-        if created_at_lt is not None:
-            selection = [
-                order for order in selection
-                if order.created_at < created_at_lt
-            ]
-
-        if created_at_lte is not None:
-            selection = [
-                order for order in selection
-                if order.created_at <= created_at_lte
-            ]
-
-        if created_at_gt is not None:
-            selection = [
-                order for order in selection
-                if order.created_at > created_at_gt
-            ]
-
-        if created_at_gte is not None:
-            selection = [
-                order for order in selection
-                if order.created_at >= created_at_gte
-            ]
-
-        if target_symbol is not None:
-            selection = [
-                order for order in selection
-                if order.target_symbol == target_symbol
-            ]
-
-        if order_side is not None:
-            order_side = OrderSide.from_value(order_side)
-            selection = [
-                order for order in selection
-                if order.order_side == order_side.value
-            ]
-
-        if order_status is not None:
-            status = OrderStatus.from_value(order_status)
-            selection = [
-                order for order in selection
-                if order.status == status.value
-            ]
-
-        return selection
+        if all(value is None for value in (
+                target_symbol, order_side, order_status, created_at,
+                created_at_lt, created_at_lte, created_at_gt, created_at_gte)):
+            return self.orders
+        side = OrderSide.from_value(order_side).value \
+            if order_side is not None else None
+        status = OrderStatus.from_value(order_status).value \
+            if order_status is not None else None
+        return BacktestHistory((order for order in self.orders if (
+            (created_at is None or order.created_at == created_at)
+            and (created_at_lt is None or order.created_at < created_at_lt)
+            and (created_at_lte is None or order.created_at <= created_at_lte)
+            and (created_at_gt is None or order.created_at > created_at_gt)
+            and (created_at_gte is None or order.created_at >= created_at_gte)
+            and (target_symbol is None or order.target_symbol == target_symbol)
+            and (side is None or order.order_side == side)
+            and (status is None or order.status == status)
+        )), model=Order)
 
     def __repr__(self) -> str:
         return (

@@ -108,6 +108,8 @@ class SQLPosition(SQLBaseModel, Position, SQLAlchemyModelExtension):
                 self.cost = self.long_cost
             elif self.amount < 0:
                 self.cost = self.short_cost
+            elif self.gross_amount == 0:
+                self.cost = self.gross_cost
             else:
                 self.cost = 0
         finally:

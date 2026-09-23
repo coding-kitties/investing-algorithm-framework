@@ -1050,7 +1050,7 @@ class Backtest:
 
         return rows
 
-    def to_dict(self) -> dict:
+    def to_dict(self, *, materialize_history: bool = True) -> dict:
         """Convert the Backtest instance to a dictionary.
 
         Canonical v9.0 shape: shared scalar fields at the top level,
@@ -1070,7 +1070,7 @@ class Backtest:
             "parameters": self.parameters,
             "tag": self.tag,
             "studies": {
-                name: study.to_dict()
+                name: study.to_dict(materialize_history=materialize_history)
                 for name, study in self._studies.items()
             },
         }

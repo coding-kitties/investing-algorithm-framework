@@ -120,6 +120,10 @@ def _apply_forward_only_migrations(bind):
         # RunReport gained a top-level score_cards list after the
         # run_reports table already shipped in 9.0.0a7.
         "ALTER TABLE run_reports ADD COLUMN score_cards_json TEXT",
+        "ALTER TABLE run_reports ADD COLUMN status VARCHAR "
+        "NOT NULL DEFAULT 'completed'",
+        "ALTER TABLE run_reports ADD COLUMN error TEXT",
+        "ALTER TABLE run_reports ADD COLUMN reason TEXT",
         # Broker-native mirror stop-loss / take-profit safety net.
         # ``mirror_on_exchange`` is the opt-in flag copied from the
         # rule at attach time; the rest track the live exchange-side

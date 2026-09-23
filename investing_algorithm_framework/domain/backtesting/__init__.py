@@ -4,6 +4,7 @@ from .backtest_date_range import BacktestDateRange
 from .backtest_window import BacktestWindow
 from .backtest_metrics import BacktestMetrics
 from .backtest_run import BacktestRun
+from .history import BacktestHistory
 from .backtest import Backtest
 from .universe import Universe
 from .backtest_monte_carlo_test import BacktestMonteCarloTest
@@ -80,6 +81,7 @@ __all__ = [
     "BacktestWindow",
     "BacktestMetrics",
     "BacktestRun",
+    "BacktestHistory",
     "BacktestMonteCarloTest",
     "BacktestEvaluationFocus",
     "BacktestIndex",

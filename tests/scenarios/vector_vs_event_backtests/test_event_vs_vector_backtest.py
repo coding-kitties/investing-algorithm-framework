@@ -52,7 +52,7 @@ from investing_algorithm_framework import TradingStrategy, DataSource, \
 CSV_FILENAME = "OHLCV_BTC-EUR_BITVAVO_2h_LONG_SHORT_CYCLE.csv"
 WARMUP = 5
 LONG_START_DATE = datetime(2020, 12, 20, 10, 0, 0, tzinfo=timezone.utc)
-LONG_END_DATE = datetime(2020, 12, 20, 16, 0, 0, tzinfo=timezone.utc)
+LONG_END_DATE = datetime(2020, 12, 20, 18, 0, 0, tzinfo=timezone.utc)
 SHORT_START_DATE = datetime(2020, 12, 20, 22, 0, 0, tzinfo=timezone.utc)
 SHORT_END_DATE = datetime(2020, 12, 21, 6, 0, 0, tzinfo=timezone.utc)
 MARKET = "BITVAVO"
@@ -579,6 +579,7 @@ class TestFlipOnOppositeSignal(TestCase):
         study = _build_study(date_range, engine=engine)
         run_configuration = BacktestRunConfiguration(
             dynamic_position_sizing=(engine is BacktestEngine.VECTOR),
+            continue_on_error=False,
         )
         backtests = app.run_backtest(
             strategy=strategy,

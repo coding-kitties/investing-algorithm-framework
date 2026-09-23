@@ -141,6 +141,10 @@ class TestBacktestMemoryOptions(TestCase):
         self.assertIs(actual, result)
         self.assertEqual(run.call_args.kwargs["result_mode"], "index")
         for name, value in vars(configuration).items():
+            if name in ('event_fill_backend', 'event_schedule_backend',
+                        'event_state_backend'):
+                self.assertNotIn(name, run.call_args.kwargs)
+                continue
             if name == "backtest_storage_directory":
                 value = value.resolve()
             self.assertEqual(run.call_args.kwargs[name], value)
@@ -266,6 +270,91 @@ class TestBacktestMemoryOptions(TestCase):
         pd.testing.assert_frame_equal(index.df, resumed.df)
         self.assertEqual(len(list(resumed.iter_backtests())), 2)
 
+    def test_sequential_event_progress_for_single_and_multiple_algorithms(self):
+        self.study.engines = [BacktestEngine.EVENT_DRIVEN]
+        for count in (1, 2):
+            for visible in (False, True):
+                with self.subTest(count=count, visible=visible):
+                    progress_calls = []
+
+                    def progress(**kwargs):
+                        from tqdm import tqdm
+                        progress_calls.append(kwargs)
+                        return tqdm(**kwargs)
+
+                    strategies = [
+                        EventIndexStrategy(algorithm_id=f"event-{index}")
+                        for index in range(count)
+                    ]
+                    with patch(
+                        "investing_algorithm_framework.app.eventloop.tqdm",
+                        side_effect=progress,
+                    ):
+                        result = self.app.run_backtest(
+                            strategies=strategies, study=self.study,
+                            run_configuration=BacktestRunConfiguration(
+                                backtest_storage_directory=(
+                                    Path(self.storage.name)
+                                    / f"progress-{count}-{visible}"
+                                ),
+                                n_workers=0, use_checkpoints=False,
+                                show_progress=visible, continue_on_error=False,
+                            ),
+                        )
+                    self.assertEqual(len(result.load_backtests(workers=1)), count)
+                    self.assertEqual(len(progress_calls), count)
+                    for options in progress_calls:
+                        self.assertEqual(options["disable"], not visible)
+                        self.assertGreater(options["total"], 0)
+
+    def test_strict_native_event_requires_extension_before_execution(self):
+        self.study.engines = [BacktestEngine.EVENT_DRIVEN]
+        target = ('investing_algorithm_framework.services.'
+                  'trade_order_evaluator.native.load_native_event_fills')
+        with patch(target, side_effect=ImportError('native unavailable')), \
+                patch.object(EventLoopService, 'start') as execute:
+            with self.assertRaisesRegex(ImportError, 'native unavailable'):
+                self.app.run_backtest(
+                    strategy=EventIndexStrategy(algorithm_id='strict'),
+                    study=self.study,
+                    run_configuration=BacktestRunConfiguration(
+                        event_fill_backend='rust', continue_on_error=True,
+                    ),
+                )
+            execute.assert_not_called()
+
+    def test_strict_native_schedule_preflights_before_execution(self):
+        self.study.engines = [BacktestEngine.EVENT_DRIVEN]
+        with patch(
+            'investing_algorithm_framework.app.native_schedule.'
+            'load_native_schedule', side_effect=ImportError('missing'),
+        ), patch.object(EventLoopService, 'start') as execute:
+            with self.assertRaisesRegex(ImportError, 'missing'):
+                self.app.run_backtest(
+                    strategy=EventIndexStrategy(algorithm_id='strict-schedule'),
+                    study=self.study,
+                    run_configuration=BacktestRunConfiguration(
+                        event_schedule_backend='rust', continue_on_error=True,
+                    ),
+                )
+            execute.assert_not_called()
+
+    def test_strict_native_accounting_preflights_before_execution(self):
+        self.study.engines = [BacktestEngine.EVENT_DRIVEN]
+        with patch(
+            'investing_algorithm_framework.domain.native_event.'
+            'load_native_event_accounting',
+            side_effect=ImportError('missing accounting extension'),
+        ), patch.object(EventLoopService, 'start') as execute:
+            with self.assertRaisesRegex(ImportError, 'missing accounting'):
+                self.app.run_backtest(
+                    strategy=EventIndexStrategy(algorithm_id='strict-state'),
+                    study=self.study,
+                    run_configuration=BacktestRunConfiguration(
+                        event_state_backend='rust', continue_on_error=True),
+                )
+            execute.assert_not_called()
+
     def test_event_engine_returns_persistent_index_by_default(self):
         self.study.engines = [BacktestEngine.EVENT_DRIVEN]
         strategy = EventIndexStrategy(algorithm_id="event-index")
@@ -297,13 +386,108 @@ class TestBacktestMemoryOptions(TestCase):
         )
         pd.testing.assert_frame_equal(result.df, reopened.df)
 
+    def test_event_signal_recording_publishes_and_fails_closed(self):
+        from investing_algorithm_framework.services.backtest_store import (
+            StoreError,
+        )
+        from investing_algorithm_framework.services.backtest_store.recording \
+            import SignalRecorder, iter_signal_reports
+
+        self.study.engines = [BacktestEngine.EVENT_DRIVEN]
+        root = Path(self.storage.name) / 'signals'
+        configuration = BacktestRunConfiguration(
+            signal_storage_directory=root, n_workers=0,
+            use_checkpoints=False, show_progress=False,
+        )
+        result = self.app.run_backtest(
+            strategy=EventIndexStrategy(algorithm_id='recorded-event'),
+            study=self.study, run_configuration=configuration,
+        )
+        backtest_run = result.load_backtests(workers=1)[0].event_runs[0]
+        reference = backtest_run.metadata['signal_history']
+        reports = list(iter_signal_reports(root, reference))
+        self.assertEqual(len(reports), 25)
+        published = set(root.glob('streams/event/*/manifest.json'))
+        with patch.object(SignalRecorder, 'append',
+                          side_effect=StoreError('recording failure')):
+            with self.assertRaisesRegex(StoreError, 'recording failure'):
+                self.app.run_backtest(
+                    strategy=EventIndexStrategy(algorithm_id='failed-event'),
+                    study=self.study, run_configuration=configuration,
+                )
+        self.assertEqual(set(root.glob('streams/event/*/manifest.json')),
+                         published)
+        self.assertEqual(len(list((root / 'streams/event').iterdir())), 1)
+
     def test_parallel_event_workers_match_sequential_trades_and_resume(self):
+        self._check_event_workers_and_resume('python')
+
+    def test_native_event_workers_match_python_and_resume(self):
+        try:
+            from investing_algorithm_framework.services.trade_order_evaluator \
+                .native import load_native_event_fills
+            load_native_event_fills()
+        except ImportError:
+            self.skipTest('Optional native extension is not installed')
+        self._check_event_workers_and_resume('rust', 'rust')
+
+    def test_memory_event_workers_match_sql_and_resume(self):
+        self._check_event_workers_and_resume('python', 'python', 'memory')
+
+    def test_rust_accounting_workers_match_sql_and_resume(self):
+        try:
+            from investing_algorithm_framework.domain.native_event import \
+                load_native_event_accounting
+            load_native_event_accounting()
+        except ImportError:
+            self.skipTest('Optional native extension is not installed')
+        self._check_event_workers_and_resume('python', 'python', 'rust')
+
+    def test_memory_event_risk_results_match_sql_without_tick_sql(self):
+        from sqlalchemy import event
+        from sqlalchemy.engine import Engine
+        from investing_algorithm_framework.infrastructure.repositories \
+            .event_memory import event_memory_active
+        from scripts.bench_backtest_streaming import event_case, strategy_for
+        from scripts.bench_vector_snapshot_events import result_payload
+
+        def forbid_memory_sql(*args):
+            if event_memory_active():
+                raise AssertionError('SQL inside memory event scope')
+
+        date_range = BacktestDateRange(
+            start_date=datetime(2023, 11, 2, tzinfo=timezone.utc),
+            end_date=datetime(2023, 12, 2, tzinfo=timezone.utc),
+        )
+        results = {}
+        event.listen(Engine, 'before_cursor_execute', forbid_memory_sql)
+        try:
+            for backend in ('sql', 'memory'):
+                with TemporaryDirectory() as directory:
+                    result = event_case(
+                        strategy_for('ema', ['BTC', 'DOT'], event=True),
+                        date_range, directory, event_state_backend=backend,
+                    )()
+                    self.assertGreater(len(result.trades), 0)
+                    results[backend] = result_payload(result)
+        finally:
+            event.remove(Engine, 'before_cursor_execute', forbid_memory_sql)
+        self.maxDiff = None
+        for section in ('orders', 'trades', 'snapshots', 'positions',
+                'signals', 'metrics'):
+            self.assertEqual(results['sql'][section],
+                             results['memory'][section], section)
+
+    def _check_event_workers_and_resume(
+        self, event_fill_backend, event_schedule_backend='python',
+        event_state_backend='sql',
+    ):
         self.study.engines = [BacktestEngine.EVENT_DRIVEN]
         self.study.risk_free_rate = 0.03
         self.study.backtest_windows = [BacktestWindow(
             train_range=BacktestDateRange(
                 start_date=datetime(2020, 12, 20, 10, tzinfo=timezone.utc),
-                end_date=datetime(2020, 12, 20, 16, tzinfo=timezone.utc),
+                end_date=datetime(2020, 12, 20, 18, tzinfo=timezone.utc),
             ),
         )]
         csv_path = Path(__file__).resolve().parents[2] / "resources" \
@@ -328,12 +512,30 @@ class TestBacktestMemoryOptions(TestCase):
             run_configuration=BacktestRunConfiguration(
                 n_workers=2,
                 max_tasks_per_child=2,
+                event_fill_backend=event_fill_backend,
+                event_schedule_backend=event_schedule_backend,
+                event_state_backend=event_state_backend,
+                continue_on_error=False,
             ),
         )
+        self.assertEqual(len(parallel.df), len(sequential.df))
+        self.assertGreater(len(parallel.df), 0)
         for expected, actual in zip(
             sequential.iter_backtests(), parallel.iter_backtests(),
         ):
             expected_summary = expected.get_summary("event", self.study.name)
+            from scripts.bench_vector_snapshot_events import \
+                result_digest, result_payload
+            expected_payload = result_payload(
+                expected.get_all_backtest_runs()[0])
+            actual_payload = result_payload(actual.get_all_backtest_runs()[0])
+            for section in expected_payload:
+                self.assertEqual(expected_payload[section],
+                                 actual_payload[section], section)
+            self.assertEqual(
+                result_digest(expected.get_all_backtest_runs()[0]),
+                result_digest(actual.get_all_backtest_runs()[0]),
+            )
             actual_summary = actual.get_summary("event", self.study.name)
             self.assertEqual(
                 expected_summary.total_net_gain, actual_summary.total_net_gain,
@@ -360,6 +562,9 @@ class TestBacktestMemoryOptions(TestCase):
                     n_workers=2,
                     use_checkpoints=True,
                     backtest_storage_directory=parallel.directory,
+                    event_fill_backend=event_fill_backend,
+                    event_schedule_backend=event_schedule_backend,
+                    event_state_backend=event_state_backend,
                 ),
             )
         pd.testing.assert_frame_equal(parallel.df, resumed.df)
@@ -389,6 +594,68 @@ class TestBacktestMemoryOptions(TestCase):
             self.assertNotEqual(resource, Path(self.storage.name))
             self.assertIn(resource.as_posix(), row["database_uri"])
             self.assertFalse(resource.exists(), "worker directory leaked")
+
+    def test_parallel_event_handoff_contains_only_bundle_paths(self):
+        from investing_algorithm_framework.infrastructure.services.backtesting \
+            import backtest_service as service_module
+
+        self.study.engines = [BacktestEngine.EVENT_DRIVEN]
+        process_map = service_module.bounded_process_map
+        handoff_paths = []
+
+        def inspect_handoff(function, arguments, consume, **kwargs):
+            def check(paths):
+                self.assertEqual(len(paths), 1)
+                for path in paths:
+                    self.assertIsInstance(path, str)
+                    self.assertTrue(Path(path).is_file())
+                    handoff_paths.append(Path(path))
+                consume(paths)
+                self.assertTrue(all(not Path(path).exists() for path in paths))
+
+            return process_map(function, arguments, check, **kwargs)
+
+        with patch.object(
+            service_module, "bounded_process_map", side_effect=inspect_handoff,
+        ):
+            result = self.app.run_backtest(
+                strategies=[
+                    EventIndexStrategy(algorithm_id=f"handoff-{number}")
+                    for number in range(2)
+                ],
+                study=self.study,
+                run_configuration=BacktestRunConfiguration(n_workers=2),
+            )
+        self.assertEqual(result.df["algorithm_id"].nunique(), 2)
+        self.assertEqual(len(handoff_paths), 2)
+        self.assertTrue(all(not path.parent.exists() for path in handoff_paths))
+
+    def test_event_handoff_is_cleaned_when_coordinator_fails(self):
+        from investing_algorithm_framework.infrastructure.services.backtesting \
+            import backtest_service as service_module
+
+        self.study.engines = [BacktestEngine.EVENT_DRIVEN]
+        process_map = service_module.bounded_process_map
+        handoff_paths = []
+
+        def fail_handoff(function, arguments, consume, **kwargs):
+            def fail(paths):
+                handoff_paths.extend(Path(path) for path in paths)
+                self.assertTrue(all(path.is_file() for path in handoff_paths))
+                raise RuntimeError("intentional coordinator failure")
+
+            return process_map(function, arguments, fail, **kwargs)
+
+        with patch.object(
+            service_module, "bounded_process_map", side_effect=fail_handoff,
+        ), self.assertRaisesRegex(RuntimeError, "intentional coordinator"):
+            self.app.run_backtest(
+                strategy=EventIndexStrategy(algorithm_id="failed-handoff"),
+                study=self.study,
+                run_configuration=BacktestRunConfiguration(n_workers=1),
+            )
+        self.assertEqual(len(handoff_paths), 1)
+        self.assertTrue(all(not path.parent.exists() for path in handoff_paths))
 
     def test_parallel_event_failure_keeps_completed_checkpoint(self):
         self.study.engines = [BacktestEngine.EVENT_DRIVEN]

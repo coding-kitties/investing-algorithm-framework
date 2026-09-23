@@ -4,6 +4,75 @@ from investing_algorithm_framework.domain import Trade, TradeStatus, \
     BacktestRun
 
 
+def summarize_trade_history(trades, requested):
+    """Compute compatible scalar metrics in one bounded history scan."""
+    counts = {'total': 0, 'closed': 0, 'open': 0, 'positive': 0,
+              'negative': 0, 'winning': 0, 'current_winning': 0}
+    directions = {
+        side: {'total': 0, 'closed': 0, 'positive': 0, 'negative': 0}
+        for side in ('long', 'short')
+    }
+    gross_profit = gross_loss = total_size = total_duration = 0.0
+    for trade in trades:
+        counts['total'] += 1
+        side = directions['short' if trade.is_short else 'long']
+        side['total'] += 1
+        gain = trade.net_gain_absolute
+        if gain > 0:
+            gross_profit += gain
+            counts['current_winning'] += 1
+        elif gain < 0:
+            gross_loss += abs(gain)
+        if 'average_trade_size' in requested:
+            total_size += trade.amount * trade.open_price
+        if TradeStatus.OPEN.equals(trade.status):
+            counts['open'] += 1
+        if not TradeStatus.CLOSED.equals(trade.status):
+            continue
+        counts['closed'] += 1
+        side['closed'] += 1
+        counts['winning'] += int(trade.net_gain > 0)
+        if gain > 0:
+            counts['positive'] += 1
+            side['positive'] += 1
+        elif gain < 0:
+            counts['negative'] += 1
+            side['negative'] += 1
+        if 'average_trade_duration' in requested:
+            total_duration += (
+                trade.closed_at - trade.opened_at).total_seconds() / 3600
+    total = counts['total']
+    closed = counts['closed']
+    result = {
+        'number_of_trades': total,
+        'number_of_trades_closed': closed,
+        'number_of_trades_opened': counts['open'],
+        'number_of_positive_trades': counts['positive'],
+        'number_of_negative_trades': counts['negative'],
+        'percentage_positive_trades': (
+            counts['positive'] / closed * 100.0 if closed else 0.0),
+        'percentage_negative_trades': (
+            counts['negative'] / closed * 100.0 if closed else 0.0),
+        'win_rate': counts['winning'] / closed if closed else 0.0,
+        'current_win_rate': (
+            counts['current_winning'] / total if total else 0.0),
+        'gross_profit': gross_profit,
+        'gross_loss': gross_loss,
+        'profit_factor': (gross_profit / gross_loss if gross_loss else
+                          float('inf') if gross_profit > 0 else 0.0),
+        'average_trade_size': total_size / total if total else 0.0,
+        'average_trade_duration': total_duration / closed if closed else 0.0,
+    }
+    for side, values in directions.items():
+        result[f'number_of_{side}_trades'] = values['total']
+        result[f'number_of_{side}_trades_closed'] = values['closed']
+        result[f'number_of_winning_{side}_trades'] = values['positive']
+        result[f'number_of_losing_{side}_trades'] = values['negative']
+        result[f'{side}_win_rate'] = (
+            values['positive'] / values['closed'] if values['closed'] else 0.0)
+    return result
+
+
 def get_directional_trade_statistics(trades: List[Trade]) -> dict:
     """Return long/short trade counts and closed-trade win rates."""
     statistics = {}

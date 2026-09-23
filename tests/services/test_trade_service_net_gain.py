@@ -80,7 +80,7 @@ class TestTradeServiceNetGain(TestBase):
         self.assertEqual(100, trade.available_amount)
 
         # Sell 100 ADA at 15 EUR
-        order_service.create({
+        sell = order_service.create({
             "target_symbol": "ADA",
             "trading_symbol": "EUR",
             "amount": 100,
@@ -91,6 +91,10 @@ class TestTradeServiceNetGain(TestBase):
         })
 
         # Verify trade net_gain: (15 * 100) - (10 * 100) = 500
+        self.assertEqual(0, trade_service.get(trade.id).net_gain)
+        order_service.update(sell.id, {
+            'filled': 100, 'remaining': 0, 'status': OrderStatus.CLOSED.value,
+        })
         trade = trade_service.get(trade.id)
         self.assertAlmostEqual(500, trade.net_gain)
 
@@ -127,7 +131,7 @@ class TestTradeServiceNetGain(TestBase):
         self.assertEqual(TradeStatus.OPEN.value, trade2.status)
 
         # Sell 200 ADA at 15 — closes both trades
-        order_service.create({
+        sell = order_service.create({
             "target_symbol": "ADA",
             "trading_symbol": "EUR",
             "amount": 200,
@@ -138,6 +142,11 @@ class TestTradeServiceNetGain(TestBase):
         })
 
         # Verify individual trade net_gains
+        order_service.update(sell.id, {'filled': 100, 'remaining': 100})
+        self.assertEqual(0, trade_service.get(trade2.id).net_gain)
+        order_service.update(sell.id, {
+            'filled': 200, 'remaining': 0, 'status': OrderStatus.CLOSED.value,
+        })
         trade1 = trade_service.get(trade1.id)
         trade2 = trade_service.get(trade2.id)
         expected_gain_1 = (15 * 100) - (10 * 100)   # 500
@@ -185,7 +194,7 @@ class TestTradeServiceNetGain(TestBase):
         trade2 = trade_service.find({"order_id": buy2.id})
 
         # Sell 150 ADA at 15 with explicit trades in data
-        order_service.create({
+        sell = order_service.create({
             "target_symbol": "ADA",
             "trading_symbol": "EUR",
             "amount": 150,
@@ -200,6 +209,9 @@ class TestTradeServiceNetGain(TestBase):
         })
 
         # Verify individual trade net_gains use per-trade amounts
+        order_service.update(sell.id, {
+            'filled': 150, 'remaining': 0, 'status': OrderStatus.CLOSED.value,
+        })
         trade1 = trade_service.get(trade1.id)
         trade2 = trade_service.get(trade2.id)
         expected_gain_1 = (15 * 100) - (10 * 100)  # 500

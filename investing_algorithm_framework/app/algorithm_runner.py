@@ -1,7 +1,9 @@
 import json
 import logging
+import math
 import os
 import threading
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -219,7 +221,10 @@ class AlgorithmRunner:
         self.enable()
         return True
 
-    def invoke_now(self, strategy_ids: Optional[list] = None) -> None:
+    def invoke_now(
+        self, strategy_ids: Optional[list] = None, *,
+        wait: bool = False, timeout: float = 30,
+    ) -> Optional[dict]:
         """
         Forces the algorithm's strategies to run on the loop's very
         next tick, ignoring their configured schedule. The algorithm
@@ -230,11 +235,17 @@ class AlgorithmRunner:
         Args:
             strategy_ids: Optional; specific strategy IDs to invoke.
                 When None, every registered strategy is invoked.
+            wait: Return the persisted report for the requested tick.
+                Requests coalesced into the same tick share its report.
+            timeout: Positive finite seconds to wait. A timeout does not
+                cancel execution; its eventual report remains persisted.
 
         Raises:
             OperationalException: If the algorithm is not currently
                 running.
         """
+        if wait and (not math.isfinite(timeout) or timeout <= 0):
+            raise ValueError("timeout must be a positive finite number")
         with self._lock:
             if self._status != RUNNING:
                 raise OperationalException(
@@ -243,8 +254,19 @@ class AlgorithmRunner:
                     "a run."
                 )
             event_loop_service = self._event_loop_service
-
-        event_loop_service.request_immediate_run(strategy_ids)
+            if wait and threading.current_thread() is self._thread:
+                raise OperationalException(
+                    "Cannot wait for a run from the algorithm loop thread.")
+            if wait and event_loop_service.on_iteration_report is None:
+                raise OperationalException("Run reporting is not configured.")
+            completion = event_loop_service.request_immediate_run(strategy_ids)
+        if wait:
+            try:
+                return completion.result(timeout=timeout)
+            except FutureTimeoutError as error:
+                raise TimeoutError(
+                    "Wait timed out; execution was not cancelled.") from error
+        return None
 
     def stop(
         self,

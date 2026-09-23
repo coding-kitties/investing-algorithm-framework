@@ -526,10 +526,13 @@ class TestGetUnfilledSellValue(TestBase):
         trade_service = self.app.container.trade_service()
         self.assertEqual(3, trade_service.count())
         self.assertEqual(
-            0, trade_service.count(
+            2, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}
             )
         )
+        self.assertEqual(3, trade_service.count({"portfolio_id": portfolio.id}))
+        self.assertEqual(2, len(trade_service.get_all(
+            {"portfolio_id": portfolio.id, "status": "OPEN"})))
 
         position_service = self.app.container.position_service()
         self.assertEqual(4, position_service.count())

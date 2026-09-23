@@ -72,6 +72,7 @@ class EventBacktestService:
         event_loop_service,
         trade_order_evaluator,
         show_progress: bool = True,
+        metrics_backend: str = "python",
     ) -> BacktestRun:
         """
         Run an event-driven backtest for an algorithm.
@@ -88,6 +89,8 @@ class EventBacktestService:
             trade_order_evaluator: The trade order evaluator for handling
                 pending orders, stop losses, and take profits.
             show_progress: Whether to show progress bars.
+            metrics_backend: "python", "rust" for native risk metrics,
+                or "auto" with Python fallback. The event loop stays Python.
 
         Returns:
             BacktestRun: The backtest run containing results and metrics.
@@ -117,6 +120,7 @@ class EventBacktestService:
             risk_free_rate=risk_free_rate,
             recorded_values=event_loop_service.context
             .get_recorded_values(),
+            metrics_backend=metrics_backend,
         )
 
     def generate_schedule(
@@ -157,6 +161,7 @@ class EventBacktestService:
         number_of_runs: int,
         risk_free_rate: float,
         recorded_values: dict = None,
+        metrics_backend: str = "python",
     ) -> BacktestRun:
         """
         Create a BacktestRun from the current state after event loop execution.
@@ -187,14 +192,16 @@ class EventBacktestService:
             backtest_window=BacktestWindow(train_range=backtest_date_range),
             initial_unallocated=initial_unallocated,
             created_at=datetime.now(tz=timezone.utc),
-            portfolio_snapshots=self._portfolio_snapshot_service.get_all(
-                {"portfolio_id": portfolio.id}
+            portfolio_snapshots=(
+                self._portfolio_snapshot_service.repository.iter_all(
+                    {"portfolio_id": portfolio.id}
+                )
             ),
             number_of_runs=number_of_runs,
-            trades=self._trade_service.get_all(
+            trades=self._trade_service.repository.iter_all(
                 {"portfolio_id": portfolio.id}
             ),
-            orders=self._order_service.get_all(
+            orders=self._order_service.repository.iter_all(
                 {"portfolio_id": portfolio.id}
             ),
             positions=self._position_repository.get_all(
@@ -227,7 +234,7 @@ class EventBacktestService:
 
         # Calculate and add metrics
         backtest_metrics = create_backtest_metrics(
-            run, risk_free_rate=risk_free_rate
+            run, risk_free_rate=risk_free_rate, metrics_backend=metrics_backend
         )
         run.backtest_metrics = backtest_metrics
 

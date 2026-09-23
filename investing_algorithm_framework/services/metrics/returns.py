@@ -5,8 +5,11 @@ import pandas as pd
 
 from investing_algorithm_framework.domain import PortfolioSnapshot, Trade, \
     OperationalException
+from ._returns_helper import snapshots_to_dataframe
+from .inputs import shared_snapshot_calculation
 
 
+@shared_snapshot_calculation
 def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, datetime]]:
     """
     Calculate the monthly time-weighted returns from a list of portfolio
@@ -29,14 +32,7 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
     """
 
     # Create DataFrame from snapshots
-    data = [
-        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
-        for s in snapshots
-    ]
-    df = pd.DataFrame(data, columns=["created_at", "total_value", "cash_flow"])
-    df['created_at'] = pd.to_datetime(df['created_at'])
-    df = df.sort_values('created_at').drop_duplicates('created_at')\
-        .set_index('created_at')
+    df = snapshots_to_dataframe(snapshots)
 
     monthly_value = df['total_value'].resample('ME').last().dropna()
     monthly_cf = df['cash_flow'].resample('ME').sum()
@@ -58,6 +54,7 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
     return monthly_returns
 
 
+@shared_snapshot_calculation
 def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, date]]:
     """
     Calculate the yearly time-weighted returns from a list of portfolio
@@ -75,14 +72,7 @@ def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, 
     """
 
     # Create DataFrame from snapshots
-    data = [
-        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
-        for s in snapshots
-    ]
-    df = pd.DataFrame(data, columns=["created_at", "total_value", "cash_flow"])
-    df['created_at'] = pd.to_datetime(df['created_at'])
-    df = df.sort_values('created_at').drop_duplicates('created_at')\
-        .set_index('created_at')
+    df = snapshots_to_dataframe(snapshots).copy(deep=False)
 
     # Remove timezone information if present to avoid warning
     if df.index.tz is not None:

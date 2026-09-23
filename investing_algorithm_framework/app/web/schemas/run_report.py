@@ -3,6 +3,9 @@ from marshmallow import Schema, fields
 
 class RunReportSerializer(Schema):
     id = fields.Integer(dump_only=True)
+    status = fields.String(dump_only=True)
+    error = fields.String(dump_only=True, allow_none=True)
+    reason = fields.String(dump_only=True, allow_none=True)
     algorithm_id = fields.String(dump_only=True)
     environment = fields.String(dump_only=True)
     is_paper = fields.Boolean(dump_only=True)

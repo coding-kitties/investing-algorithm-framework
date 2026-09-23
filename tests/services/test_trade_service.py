@@ -401,8 +401,8 @@ class TestTradeService(TestBase):
         self.assertEqual(0, trade.remaining)
         self.assertEqual(0, trade.available_amount)
         self.assertEqual(2004, trade.filled_amount)
-        self.assertAlmostEqual(2004 * 0.3 - 2004 * 0.2, trade.net_gain)
-        self.assertEqual(TradeStatus.CLOSED.value, trade.status)
+        self.assertEqual(0, trade.net_gain)
+        self.assertEqual(TradeStatus.OPEN.value, trade.status)
         self.assertEqual(0.2, trade.open_price)
         self.assertEqual(2, len(trade.orders))
 
@@ -492,8 +492,8 @@ class TestTradeService(TestBase):
         self.assertEqual(0, trade.remaining)
         self.assertEqual(0, trade.available_amount)
         self.assertEqual(2004, trade.filled_amount)
-        self.assertEqual(TradeStatus.CLOSED.value, trade.status)
-        self.assertAlmostEqual(2004 * 0.3 - 2004 * 0.2, trade.net_gain)
+        self.assertEqual(TradeStatus.OPEN.value, trade.status)
+        self.assertEqual(0, trade.net_gain)
         self.assertEqual(0.2, trade.open_price)
         self.assertEqual(2, len(trade.orders))
 
@@ -657,9 +657,9 @@ class TestTradeService(TestBase):
             self.assertEqual(0, t.remaining)
             self.assertEqual(t.amount, t.filled_amount)
             self.assertEqual(0, t.available_amount)
-            self.assertEqual(TradeStatus.CLOSED.value, t.status)
+            self.assertEqual(TradeStatus.OPEN.value, t.status)
             self.assertEqual(2, len(t.orders))
-            self.assertNotEqual(0, t.net_gain)
+            self.assertEqual(0, t.net_gain)
 
         order_service.update(
             sell_order_id,
@@ -2858,6 +2858,10 @@ class TestTradeService(TestBase):
             self.assertEqual(20, order_data["amount"])
             self.assertEqual("ADA", order_data["target_symbol"])
             sell_order = order_service.create(order_data)
+            self.assertEqual('OPEN', trade_service.get(trade_one_id).status)
+            order_service.update(sell_order.id, {
+                'filled': sell_order.amount, 'remaining': 0, 'status': 'CLOSED',
+            })
 
         # Trade should be closed
         trade_one = trade_service.get(trade_one_id)
@@ -2957,6 +2961,10 @@ class TestTradeService(TestBase):
             self.assertEqual(20, order_data["amount"])
             self.assertEqual("ADA", order_data["target_symbol"])
             sell_order = order_service.create(order_data)
+            self.assertEqual('OPEN', trade_service.get(trade_one_id).status)
+            order_service.update(sell_order.id, {
+                'filled': sell_order.amount, 'remaining': 0, 'status': 'CLOSED',
+            })
 
         # Trade should be closed
         trade_one = trade_service.get(trade_one_id)
@@ -3542,11 +3550,11 @@ class TestTradeService(TestBase):
             self.assertEqual("ADA", order_data["target_symbol"])
             sell_order = order_service.create(order_data)
 
-        # Check that the trade is closed
         trade_one = trade_service.get(trade_one_id)
         self.assertEqual(0, trade_one.available_amount)
         self.assertEqual(20, trade_one.amount)
-        self.assertEqual("CLOSED", trade_one.status)
+        self.assertEqual("OPEN", trade_one.status)
+        self.assertEqual(0, trade_one.net_gain)
 
         # Check that the take profits are triggered and not active anymore.
         # Cancel all orders
@@ -3655,11 +3663,11 @@ class TestTradeService(TestBase):
             self.assertEqual("ADA", order_data["target_symbol"])
             sell_order = order_service.create(order_data)
 
-        # Check that the trade is closed
         trade_one = trade_service.get(trade_one_id)
         self.assertEqual(0, trade_one.available_amount)
         self.assertEqual(20, trade_one.amount)
-        self.assertEqual("CLOSED", trade_one.status)
+        self.assertEqual("OPEN", trade_one.status)
+        self.assertEqual(0, trade_one.net_gain)
 
         # Check that the take profits are triggered and not active anymore.
         # Cancel all orders

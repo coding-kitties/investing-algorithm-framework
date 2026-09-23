@@ -5,6 +5,128 @@ All notable changes to this project will be documented in this file.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [9.0.0a18] - 2026-09-23
+
+### Release Scope
+
+- Python remains the default and reference implementation. Rust stays an
+  optional, explicitly selected backend; installing it does not change defaults.
+  No general Rust speedup, Python-free engine, or hard whole-process memory
+  limit is promised. A stable release requires verified cross-platform gates.
+
+### Added
+
+- The Rust event backend now owns the archive's disk-backed scalar query index,
+  FIFO/explicit SELL reservation plans, lifecycle phase ordering, scheduled tick
+  traversal and market evaluation traversal. Native candle selection is enabled
+  automatically for this backend. Strategies, providers, custom fill models and
+  persistence remain Python adapters; this is not Python-free execution.
+  New `event-lifecycle-v1` and `event-archive-v2` capabilities require rebuilding
+  older extensions. The native wheel now bundles SQLite through rusqlite.
+- Strict opt-in `event_state_backend="rust"` for archive-backed event accounting
+  and built-in long/short fixed/trailing risk transitions. Actual services use
+  native order, exit, allocation and fee calculations; workers and callbacks
+  share the persisted state. Batched SELL/COVER planners now consume allocations,
+  apply explicit COVER priority and finalize trade/position/portfolio settlement
+  in Rust. Python retains candidate queries, entry reservations, persistence
+  and lifecycle orchestration. The extension requires `event-settlement-v1`
+  in addition to `event-accounting-v1`; incompatible builds fail before execution
+  without replay. Exact parity passes; no general speed or RSS gain is established.
+- Optional Rust kernels for confluence batches, eligible vector NETTING runs,
+  risk metrics, event fill selection and event timestamp traversal. Python
+  remains the default. The separate native broker is an unintegrated prototype,
+  not a replacement event engine.
+- Optional Python memory-state backtests with disk-backed snapshots, orders,
+  trades, allocations and risk rules. Sparse SQLite indexes support detached
+  reads, filtered queries and late corrections without retaining all history
+  objects. Verified workloads avoid ORM tick queries, not all SQLite I/O.
+  Active result sets, individual records and write batches are not capped;
+  this is not a whole-engine memory bound or native accounting integration.
+- Versioned language-neutral decision records and a local bounded chunk-writer
+  capability with manifests and atomic publication. Complete integration across
+  event/vector histories and retention policies remains open.
+- Paired fresh-process benchmarks reporting execution/metric runtime, worker
+  and process-tree peak RSS, exact result parity and persistence differences.
+  The latest long-vector improvement comes from Python metric optimization;
+  72 subsequent Python/Rust comparisons preserve exact execution parity but
+  establish no consistent Rust runtime or peak-memory advantage.
+
+### Changed
+
+- Shared event/vector provider conversion uses serial Arrow conversion for
+  frames up to 10,000 rows and avoids redundant deduplication copies when
+  indexed timestamps are unique. Larger frames retain the original path.
+  Event cooldown scans filter orders after the existing watermark in SQL,
+  Python archives and Rust archives; archive timestamp indexes avoid decoding
+  old rows. Python vector cooldown checks skip signal-free sides while keeping
+  same-bar post-fill checks. Native event users must rebuild for
+  `event-archive-v2`. Year-long real-provider comparisons preserve exact results;
+  event execution improves on the measured workload, while vector timings are
+  mixed and do not establish an overall speedup.
+- Archive decoding bulk-loads fresh detached scalar state while retaining
+  relationship instrumentation and subsequent edit/save tracking. Alternating
+  RSS-free BTC/DOT EMA runs show 9.8% and 10.4% lower median execution time over
+  365 and 650 days with exact result/bundle parity. This reduces Python overhead
+  on the Rust event backend; it is not a general Rust-versus-Python speed claim.
+- Native archive queries reuse prepared SELECT statements and avoid temporary
+  tables for up to 128 matched rows. Larger queries retain the bounded prefix
+  and spool only the remainder. Snapshot ordering and interleaved-update reads
+  are preserved. Small-query microbenchmarks improve substantially; the measured
+  30-day backtest does not establish an end-to-end speedup.
+- Archive reads avoid redundant per-row SQLite lookups and recursive copies of
+  already-detached objects, while preserving pending-graph and interleaved-write
+  behavior. Polars-to-pandas conversion avoids a redundant copy and datetime
+  parsing. Six paired event runs preserve exact results with 17.7% lower median
+  execution time on the measured workload; peak RSS is effectively unchanged.
+- Metric generation decodes trade/snapshot histories once into compact scalar
+  inputs and shares DataFrame, daily, monthly and yearly batch calculations.
+  Numeric types and exact metric values are preserved. Temporary metric memory
+  still grows with history length.
+- Python releases now depend on Python and native validation. Separate native
+  releases build platform ABI3 wheels and source distributions, with isolated
+  installation and parity checks before publishing.
+- Backtest result orders, trades, portfolio snapshots and metric time series
+  now use read-only, disk-backed `BacktestHistory` sequences by default.
+  Iteration, indexing, slicing and existing filters remain supported. Reads
+  are detached; use `.materialize()`, edit the resulting list and reassign it
+  to change a result. Scratch storage requires writable temporary disk space.
+- Bundle saves stream history records and batch metric Parquet encoding.
+  Public `to_dict()` and legacy JSON serialization still materialize history.
+  Bundle loading/merging and some metric computations remain eager; this is
+  not a whole-engine memory bound or native event-engine integration.
+
+### Fixed
+
+- Shared disk-backed histories explicitly close their temporary files when
+  the last view is collected or at normal interpreter shutdown, preventing
+  unclosed-file resource warnings without invalidating surviving slices.
+  Bundle Parquet scratch files also close when their blob wrapper is released.
+- Portfolio-filtered trade counts no longer multiply trades with multiple
+  orders, and combined portfolio/order filters preserve both constraints.
+- Live and paper bounded invocations return their persisted run report.
+  Continuous strategy ticks publish isolated reports, including no-signal
+  executions, without a duplicate shutdown summary. Failed/skipped outcomes
+  are explicit; synchronous failures still raise the original exception.
+  Manual invocation supports `invoke_now(wait=True, timeout=30)` and
+  `POST /api/algorithm/invoke?wait=true&timeout=30`. Waiting is correlated to
+  the requested tick; timeout does not cancel execution. Report persistence
+  requires working storage. Legacy report rows remain readable.
+- Archive numeric normalization no longer invokes legacy position setters that
+  collapsed hedge legs or retained incorrect cost after the final short cover.
+- SELL/COVER profit and closure now settle at fill time with FIFO allocation,
+  reservation release, partial fills and cumulative quote-fee reconciliation,
+  including late corrections. Hooks observe settled accounting. Rerun old
+  backtest checkpoints; existing live SQL ledgers need explicit reconciliation.
+- Deterministic symbol/order processing prevents generated IDs or set ordering
+  from changing capital contention and fresh-process backtest results.
+- Removed unnecessary detached relationship copies in Python memory state and
+  whole-state rollback copies in the native broker prototype.
+- Resolved all 28 findings from the full framework CI lint gate. Release
+  validation includes Rust tests, formatting, Clippy and installed-wheel parity;
+  cross-platform execution still needs its first verified GitHub run.
+
 ## [9.0.0a17] — 2026-09-17
 
 ### Added

@@ -1,9 +1,12 @@
 import os
 import shutil
 import json
+from tempfile import TemporaryDirectory
 from copy import deepcopy
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
@@ -13,6 +16,10 @@ from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 from tests.resources import random_string, OrderExecutorTest, \
     PortfolioProviderTest
+from investing_algorithm_framework.app.algorithm_runner import (
+    AlgorithmRunner, RUNNING,
+)
+from investing_algorithm_framework.domain import OperationalException
 
 
 class OpenLongOnceStrategy(TradingStrategy):
@@ -134,7 +141,8 @@ class TestDecisionTraceCompatibility(TestCase):
         old_table = Table("run_reports", MetaData(), *(
             Column(column.name, column.type, primary_key=column.primary_key)
             for column in SQLRunReport.__table__.columns
-            if column.name != "score_cards_json"
+            if column.name not in ("score_cards_json", "status", "error",
+                                   "reason")
         ))
         old_table.create(engine)
         with engine.begin() as connection:
@@ -156,6 +164,15 @@ class TestDecisionTraceCompatibility(TestCase):
         with Session(engine) as session:
             self.assertEqual([], session.get(SQLRunReport, 1).decision_traces)
             report = session.get(SQLRunReport, 2)
+            self.assertEqual("completed", report.status)
+            report.update({"status": "failed", "error": "Test failure",
+                           "reason": "strategy_error"})
+            session.commit()
+            session.expunge_all()
+            report = session.get(SQLRunReport, 2)
+            self.assertEqual("failed", report.to_dict()["status"])
+            self.assertEqual("Test failure", report.to_dict()["error"])
+            self.assertEqual("strategy_error", report.to_dict()["reason"])
             self.assertEqual(3, report.decision_traces[0][
                 "decision_trace_version"
             ])
@@ -178,11 +195,8 @@ class TestRunReport(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "resources"
-            )
-        )
+        self.resource_directory = TemporaryDirectory()
+        self.resource_dir = self.resource_directory.name
 
     def tearDown(self) -> None:
         super().tearDown()
@@ -191,8 +205,11 @@ class TestRunReport(TestCase):
             path = os.path.join(self.resource_dir, subdir)
             if os.path.exists(path):
                 shutil.rmtree(path, ignore_errors=True)
+        self.resource_directory.cleanup()
 
-    def _create_app(self, strategy_cls=OpenLongOnceStrategy, paper_trading=False):
+    def _create_app(
+        self, strategy_cls=OpenLongOnceStrategy, paper_trading=False,
+    ):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
@@ -216,6 +233,41 @@ class TestRunReport(TestCase):
         app = self._create_app()
         self.assertIsNone(app.get_last_run_report())
 
+    def test_bounded_run_returns_report_and_failure_replaces_it(self):
+        app = self._create_app(NoSignalDecisionTraceStrategy)
+        with patch("investing_algorithm_framework.app.eventloop.sleep"):
+            report = app.run(number_of_iterations=1)
+        self.assertEqual(report, app.get_last_run_report())
+        self.assertEqual("completed", report["status"])
+        with patch.object(NoSignalDecisionTraceStrategy, "generate_signals",
+                          side_effect=RuntimeError("Strategy failed")):
+            with self.assertRaisesRegex(RuntimeError, "Strategy failed"):
+                app.run(number_of_iterations=1)
+        failed = app.get_last_run_report()
+        self.assertNotEqual(report["id"], failed["id"])
+        self.assertEqual("failed", failed["status"])
+        self.assertEqual("Strategy failed", failed["error"])
+        self.assertEqual(failed, app.get_run_reports()[0])
+
+    def test_disabled_and_not_due_runs_return_skipped_reports(self):
+        app = self._create_app(
+            NoSignalDecisionTraceStrategy, paper_trading=True)
+        with patch("investing_algorithm_framework.app.eventloop.sleep"):
+            report = app.run(number_of_iterations=1,
+                             run_immediately_on_start=False)
+        self.assertEqual("skipped", report["status"])
+        self.assertEqual("no_strategy_due", report["reason"])
+        self.assertTrue(report["is_paper"])
+        app.container.algorithm_runner().disable("Maintenance")
+        try:
+            skipped = app.run(number_of_iterations=1)
+        finally:
+            app.container.algorithm_runner().enable()
+        self.assertEqual("skipped", skipped["status"])
+        self.assertEqual("algorithm_disabled", skipped["reason"])
+        self.assertNotEqual(report["id"], skipped["id"])
+        self.assertEqual(skipped, app.get_run_reports()[0])
+
     def test_canonical_recording_appears_in_tick_and_top_level_report(self):
         app = self._create_app(strategy_cls=NoSignalDecisionTraceStrategy)
         app.run(number_of_iterations=1)
@@ -230,6 +282,156 @@ class TestRunReport(TestCase):
         self.assertEqual("No entry", tick["decision_traces"][0][
             "decision_trace"
         ]["summary"])
+
+    def test_scheduled_no_signal_reports_are_isolated_without_stop_duplicate(
+        self,
+    ):
+        app = self._create_app(
+            NoSignalDecisionTraceStrategy, paper_trading=True)
+
+        def run_two_ticks(loop, **kwargs):
+            for iteration in range(2):
+                loop._run_iteration(loop.strategies, tasks=[])
+
+        with patch("investing_algorithm_framework.app.app.EventLoopService."
+                   "start", new=run_two_ticks):
+            report = app.run()
+        reports = app.get_run_reports()
+        self.assertEqual(2, len(reports))
+        self.assertEqual(reports[0], report)
+        self.assertNotEqual(reports[0]["started_at"], reports[1]["started_at"])
+        for report in reports:
+            self.assertEqual("completed", report["status"])
+            self.assertTrue(report["is_paper"])
+            self.assertEqual(1, len(report["signals"]))
+            self.assertEqual([], report["signals"][0]["signals"])
+            self.assertEqual(1, len(report["decision_traces"]))
+
+    def test_scheduled_failure_does_not_include_previous_tick_signals(self):
+        app = self._create_app(NoSignalDecisionTraceStrategy)
+
+        def run_then_fail(loop, **kwargs):
+            loop._run_iteration(loop.strategies, tasks=[])
+            with patch.object(NoSignalDecisionTraceStrategy,
+                              "generate_signals",
+                              side_effect=RuntimeError("Tick failed")):
+                loop._run_iteration(loop.strategies, tasks=[])
+
+        with patch("investing_algorithm_framework.app.app.EventLoopService."
+                   "start", new=run_then_fail):
+            with self.assertRaisesRegex(RuntimeError, "Tick failed"):
+                app.run()
+        reports = app.get_run_reports()
+        self.assertEqual(2, len(reports))
+        self.assertEqual("failed", reports[0]["status"])
+        self.assertEqual("Tick failed", reports[0]["error"])
+        self.assertEqual([], reports[0]["signals"])
+        self.assertEqual([], reports[0]["decision_traces"])
+        self.assertEqual(reports[0], app.get_last_run_report())
+
+    def test_manual_wait_returns_requested_tick_not_previous_report(self):
+        app = self._create_app(
+            NoSignalDecisionTraceStrategy, paper_trading=True)
+
+        def run_manual(loop, *args):
+            loop._run_iteration(loop.strategies, tasks=[])
+            previous = app.get_last_run_report()
+            runner = AlgorithmRunner()
+            runner.configure(loop)
+            runner._status = RUNNING
+            queued = Event()
+            original_request = loop.request_immediate_run
+
+            def enqueue(strategy_ids):
+                completion = original_request(strategy_ids)
+                queued.set()
+                return completion
+
+            with patch.object(loop, "request_immediate_run", new=enqueue):
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    waiting = executor.submit(
+                        runner.invoke_now, wait=True, timeout=5)
+                    self.assertTrue(queued.wait(5))
+                    strategies = loop._pop_immediate_strategies(
+                        loop._configuration_service.config["INDEX_DATETIME"])
+                    report = loop._run_iteration(strategies, tasks=[])
+                    self.assertEqual(report, waiting.result(timeout=5))
+            self.assertNotEqual(previous["id"], report["id"])
+            self.assertEqual("completed", report["status"])
+            self.assertEqual(1, len(report["signals"]))
+
+        with patch("investing_algorithm_framework.app.app.EventLoopService."
+                   "_start", new=run_manual):
+            app.run()
+        self.assertEqual(2, len(app.get_run_reports()))
+
+    def test_manual_timeout_does_not_cancel_and_failure_resolves_requests(
+        self,
+    ):
+        app = self._create_app(NoSignalDecisionTraceStrategy)
+
+        def run_manual(loop, *args):
+            runner = AlgorithmRunner()
+            runner.configure(loop)
+            runner._status = RUNNING
+            with self.assertRaises(TimeoutError):
+                runner.invoke_now(wait=True, timeout=0.001)
+            with self.assertRaises(OperationalException):
+                runner.invoke_now(["missing"], wait=True)
+            for timeout in (0, -1, float("nan"), float("inf")):
+                with self.assertRaises(ValueError):
+                    runner.invoke_now(wait=True, timeout=timeout)
+            completion = loop.request_immediate_run()
+            strategies = loop._pop_immediate_strategies(
+                loop._configuration_service.config["INDEX_DATETIME"])
+            with patch.object(NoSignalDecisionTraceStrategy,
+                              "generate_signals",
+                              side_effect=RuntimeError("Manual failure")):
+                with self.assertRaisesRegex(RuntimeError, "Manual failure"):
+                    loop._run_iteration(strategies, tasks=[])
+            report = completion.result(timeout=1)
+            self.assertEqual("failed", report["status"])
+            self.assertEqual("Manual failure", report["error"])
+            self.assertEqual(report, app.get_last_run_report())
+            self.assertEqual(1, len(app.get_run_reports()))
+
+        with patch("investing_algorithm_framework.app.app.EventLoopService."
+                   "_start", new=run_manual):
+            app.run()
+
+    def test_stop_records_skipped_queued_request(self):
+        app = self._create_app(NoSignalDecisionTraceStrategy)
+        requests = []
+
+        def queue_then_stop(loop, *args):
+            requests.append(loop.request_immediate_run())
+            loop.request_stop()
+
+        with patch("investing_algorithm_framework.app.app.EventLoopService."
+                   "_start", new=queue_then_stop):
+            report = app.run()
+        self.assertEqual(report, requests[0].result(timeout=1))
+        self.assertEqual("skipped", report["status"])
+        self.assertEqual("loop_stopped", report["reason"])
+        self.assertEqual(1, len(app.get_run_reports()))
+
+    def test_state_handler_saves_failure_report_after_persistence(self):
+        app = self._create_app(NoSignalDecisionTraceStrategy)
+        state_handler = Mock()
+        app._state_handler = state_handler
+        saved_reports = []
+
+        def save_reports(directory):
+            saved_reports.append(app.get_run_reports())
+
+        state_handler.save.side_effect = save_reports
+        with patch.object(NoSignalDecisionTraceStrategy, "generate_signals",
+                          side_effect=RuntimeError("Save my failure")):
+            with self.assertRaisesRegex(RuntimeError, "Save my failure"):
+                app.run(number_of_iterations=1)
+        self.assertEqual(1, len(saved_reports))
+        self.assertEqual("failed", saved_reports[0][0]["status"])
+        self.assertIsNotNone(saved_reports[0][0]["algorithm_id"])
 
     @patch(
         "investing_algorithm_framework.services.data_providers."

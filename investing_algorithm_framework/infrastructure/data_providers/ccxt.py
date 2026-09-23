@@ -183,6 +183,7 @@ class CCXTOHLCVDataProvider(DataProvider):
         backtest_end_date,
         fill_missing_data: bool = False,
         show_progress: bool = False,
+        save_filled_data_points: bool = False,
     ) -> None:
         """
         Prepares backtest data for a given symbol and date range.
@@ -197,6 +198,9 @@ class CCXTOHLCVDataProvider(DataProvider):
                 the window cache.
             show_progress (bool): If True, print progress messages when
                 filling missing data.
+            save_filled_data_points (bool): Persist synthetic filled candles
+                in the canonical cache when filling is enabled. Existing
+                cached candles outside this window are preserved.
 
         Raises:
             OperationalException: If the backtest start date is before the
@@ -289,8 +293,6 @@ class CCXTOHLCVDataProvider(DataProvider):
                     f"{self.symbol} {self.time_frame}"
                 )
 
-                # Fill the missing data (never write back to the
-                # source file during backtest preparation)
                 filled_data = fill_missing_timeseries_data(
                     self.data,
                     missing_dates=missing_dates,
@@ -300,6 +302,17 @@ class CCXTOHLCVDataProvider(DataProvider):
                 if filled_data is not None:
                     self.data = filled_data
                     data = filled_data
+                    if save_filled_data_points and storage_directory_path:
+                        cached = self._read_canonical_file(
+                            storage_directory_path, self.symbol,
+                            self.market, self.time_frame,
+                        )
+                        merged = self._merge_ohlcv_frames(
+                            [filled_data, cached])
+                        self._write_canonical_file(
+                            storage_directory_path, self.symbol,
+                            self.market, self.time_frame, merged,
+                        )
 
         # Check if data is empty before accessing min/max
         if self.data is None or len(self.data) == 0:

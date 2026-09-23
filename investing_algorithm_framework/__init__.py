@@ -38,6 +38,7 @@ from .domain import ApiException, combine_backtests, Study, \
     Trade, APP_MODE, AppMode, DATETIME_FORMAT, TIMEZONE, \
     load_backtests_from_directory, load_backtests, \
     BacktestDateRange, convert_polars_to_pandas, BacktestRun, Universe, \
+    BacktestHistory, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, StopLossRule, \
     ScalingRule, TradingCost, ExposureRule, BacktestEngine, \
     CooldownRule, CooldownTrigger, CooldownBlocks, CooldownTracker, \
@@ -373,6 +374,7 @@ __all__ = [
     "get_positive_trades",
     "get_number_of_trades",
     "BacktestRun",
+    "BacktestHistory",
     "load_backtests_from_directory",
     "load_backtests",
     "save_backtests_to_directory",

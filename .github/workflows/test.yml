@@ -9,10 +9,14 @@ on:
     paths:
       - 'investing_algorithm_framework/**'
       - 'tests/**'
+      - 'native/**'
+      - '.github/workflows/native.yml'
       - '.github/workflows/test.yml'
       - 'pyproject.toml'
       - 'poetry.lock'
   workflow_dispatch: {}
+  workflow_call: {}
+  pull_request: {}
 
 jobs:
   linting:
@@ -26,7 +30,7 @@ jobs:
       #----------------------------------------------
       #        load pip cache if cache exists
       #----------------------------------------------
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip
@@ -74,7 +78,7 @@ jobs:
       #----------------------------------------------
       - name: Load cached venv
         id: cached-poetry-dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}

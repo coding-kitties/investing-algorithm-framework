@@ -363,6 +363,17 @@ class TestMirrorOrderCancellation(TestBase):
         self.assertEqual(OrderStatus.CANCELED.value, mirror_order.status)
 
         trade = trade_service.get(trade.id)
+        self.assertEqual(TradeStatus.OPEN.value, trade.status)
+        exits = order_service.get_all({
+            'status': OrderStatus.OPEN.value,
+            'order_side': 'SELL', 'portfolio_id': 1,
+        })
+        self.assertEqual(1, len(exits))
+        order_service.update(exits[0].id, {
+            'filled': exits[0].amount, 'remaining': 0,
+            'status': OrderStatus.CLOSED.value,
+        })
+        trade = trade_service.get(trade.id)
         self.assertEqual(TradeStatus.CLOSED.value, trade.status)
 
     def test_manual_close_trade_cancels_resting_mirror_order(self):

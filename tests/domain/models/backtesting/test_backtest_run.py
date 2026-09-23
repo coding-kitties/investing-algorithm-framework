@@ -17,6 +17,199 @@ def _backtest_window(start_date, end_date):
 
 class TestBacktestRunRejectionSummary(TestCase):
 
+    def test_history_shutdown_closes_live_and_cyclic_storage(self):
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, '-W', 'always::ResourceWarning', '-c',
+             'import pickle\n'
+             'from investing_algorithm_framework import BacktestHistory\n'
+             'history = BacktestHistory(range(10))\n'
+             'view = history[1:]\n'
+             'restored = pickle.loads(pickle.dumps(history))\n'
+             'history.cycle = history\n'
+             'del history\n'
+             'assert list(view) == list(range(1, 10))\n'],
+            capture_output=True, text=True, timeout=60,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn('ResourceWarning', result.stderr)
+
+    def test_history_closes_files_when_construction_fails(self):
+        from unittest.mock import patch
+        from investing_algorithm_framework import BacktestHistory
+
+        data = tempfile.TemporaryFile()
+        with patch('investing_algorithm_framework.domain.backtesting.'
+                   'history.TemporaryFile',
+                   side_effect=[data, OSError('Cannot create index')]):
+            with self.assertRaisesRegex(OSError, 'Cannot create index'):
+                BacktestHistory([1])
+        self.assertTrue(data.closed)
+
+        data, index = tempfile.TemporaryFile(), tempfile.TemporaryFile()
+
+        def broken_records():
+            yield 1
+            raise ValueError('Cannot read next record')
+
+        with patch('investing_algorithm_framework.domain.backtesting.'
+                   'history.TemporaryFile', side_effect=[data, index]):
+            with self.assertRaisesRegex(ValueError, 'Cannot read next record'):
+                BacktestHistory(broken_records())
+        self.assertTrue(data.closed)
+        self.assertTrue(index.closed)
+
+    def test_history_closes_files_after_last_shared_view(self):
+        from copy import deepcopy
+        import gc
+        import pickle
+        from investing_algorithm_framework import BacktestHistory
+
+        for restored in (False, True):
+            with self.subTest(restored=restored):
+                history = BacktestHistory(range(10))
+                if restored:
+                    history = pickle.loads(pickle.dumps(history))
+                data, index = history._data, history._index
+                view = deepcopy(history)[2:5]
+                del history
+                gc.collect()
+                self.assertFalse(data.closed)
+                self.assertFalse(index.closed)
+                self.assertEqual([2, 3, 4], list(view))
+                del view
+                gc.collect()
+                self.assertTrue(data.closed)
+                self.assertTrue(index.closed)
+
+    def test_history_retained_allocation_does_not_scale_with_row_count(self):
+        import tracemalloc
+        from investing_algorithm_framework import BacktestHistory
+
+        tracemalloc.start()
+        try:
+            history = BacktestHistory((PortfolioSnapshot(
+                created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                total_value=float(index),
+            ) for index in range(100000)), model=PortfolioSnapshot)
+            self.assertEqual(len(history), 100000)
+            self.assertEqual(sum(snapshot.total_value for snapshot in history),
+                             4999950000.0)
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        self.assertLess(peak, 1024 * 1024)
+
+    def test_history_storage_lifetime_and_portable_reads(self):
+        import gc
+        import weakref
+        from unittest.mock import patch
+        from investing_algorithm_framework import BacktestHistory
+
+        history = BacktestHistory(range(100))
+        data = weakref.ref(history._data)
+        index = weakref.ref(history._index)
+        view = history[10:20]
+        del history
+        gc.collect()
+        self.assertIsNotNone(data())
+        with patch('investing_algorithm_framework.domain.backtesting.'
+                   'history.os', spec=[]):
+            self.assertEqual(list(view), list(range(10, 20)))
+            self.assertEqual(view[-1], 19)
+        del view
+        gc.collect()
+        self.assertIsNone(data())
+        self.assertIsNone(index())
+        self.assertIsNone(BacktestHistory()._data)
+
+    def test_assigning_raw_history_normalizes_domain_records(self):
+        from investing_algorithm_framework import BacktestHistory
+
+        snapshot = PortfolioSnapshot(
+            created_at=datetime(2024, 1, 1), total_value=100,
+        )
+        run = BacktestRun(
+            backtest_window=_backtest_window(
+                datetime(2024, 1, 1), datetime(2024, 1, 31)),
+            portfolio_snapshots=BacktestHistory([snapshot]),
+        )
+        self.assertEqual(run.to_dict()['portfolio_snapshots'],
+                         [snapshot.to_dict()])
+        self.assertIs(run.portfolio_snapshots._model, PortfolioSnapshot)
+
+    def test_histories_are_detached_read_only_and_slice_without_copying(self):
+        from copy import deepcopy
+        import gc
+        import pickle
+        import weakref
+        from investing_algorithm_framework.domain.backtesting.history import \
+            BacktestHistory
+
+        snapshots = [PortfolioSnapshot(
+            portfolio_id='test', trading_symbol='EUR', total_value=number,
+            created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        ) for number in range(100)]
+        references = [weakref.ref(snapshot) for snapshot in snapshots]
+        run = BacktestRun(
+            backtest_window=_backtest_window(
+                datetime(2024, 1, 1), datetime(2024, 1, 31)),
+            portfolio_snapshots=iter(snapshots),
+        )
+        del snapshots
+        gc.collect()
+        self.assertTrue(all(reference() is None for reference in references))
+        history = run.portfolio_snapshots
+        self.assertIsInstance(history, BacktestHistory)
+        self.assertEqual(len(history), 100)
+        history[0].total_value = 500
+        self.assertEqual(history[0].total_value, 0)
+        self.assertEqual(history[-1].total_value, 99)
+        with self.assertRaises(IndexError):
+            history[100]
+        with self.assertRaises(TypeError):
+            history.append(history[0])
+        with self.assertRaises(TypeError):
+            history[0] = history[1]
+        view = history[1::2]
+        self.assertIs(view._data, history._data)
+        self.assertEqual([item.total_value for item in view],
+                         list(range(1, 100, 2)))
+        readers = [iter(history), iter(history)]
+        for number in range(100):
+            for reader in readers:
+                self.assertEqual(next(reader).total_value, number)
+        copied = deepcopy(run)
+        self.assertIs(copied.portfolio_snapshots._data, history._data)
+        restored = pickle.loads(pickle.dumps(run))
+        self.assertEqual(restored.to_dict(), run.to_dict())
+        with self.assertRaises(TypeError):
+            restored.portfolio_snapshots.append(history[0])
+        materialized = history.materialize()
+        materialized[0].total_value = 500
+        run.portfolio_snapshots = materialized
+        self.assertEqual(run.portfolio_snapshots[0].total_value, 500)
+        self.assertEqual(history[0].total_value, 0)
+
+    def test_history_stream_does_not_retain_decoded_records(self):
+        import weakref
+        from investing_algorithm_framework.domain.backtesting.history import \
+            BacktestHistory
+
+        history = BacktestHistory((PortfolioSnapshot(
+            portfolio_id='test', trading_symbol='EUR', total_value=number,
+            created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        ) for number in range(10000)), model=PortfolioSnapshot)
+        references = []
+        for snapshot in history:
+            if references:
+                self.assertIsNone(references[-1]())
+            references.append(weakref.ref(snapshot))
+        del snapshot
+        self.assertTrue(all(reference() is None for reference in references))
+
     def test_empty(self):
         run = BacktestRun(
             backtest_window=_backtest_window(
@@ -99,6 +292,30 @@ class TestBacktestRunRejectionSummary(TestCase):
 
 
 class TestBacktestMetrics(TestCase):
+
+    def test_metric_histories_are_read_only_and_serialize_lazily(self):
+        from investing_algorithm_framework import BacktestHistory
+        from investing_algorithm_framework.domain.backtesting.history import (
+            SerializedHistory,
+        )
+
+        timestamp = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        metrics = BacktestMetrics(
+            backtest_window=_backtest_window(timestamp, datetime(2024, 2, 1)),
+            equity_curve=((float(index), timestamp) for index in range(10)),
+        )
+        self.assertIsInstance(metrics.equity_curve, BacktestHistory)
+        with self.assertRaises(TypeError):
+            metrics.equity_curve.append((100.0, timestamp))
+        eager = metrics.to_dict()['equity_curve']
+        lazy = metrics.to_dict(materialize_history=False)['equity_curve']
+        self.assertIsInstance(eager, list)
+        self.assertIsInstance(lazy, SerializedHistory)
+        self.assertEqual(list(lazy), eager)
+        self.assertEqual(list(lazy[2:5]), eager[2:5])
+        metrics.equity_curve = [(99.0, timestamp)]
+        self.assertEqual(metrics.equity_curve[0], (99.0, timestamp))
+        self.assertEqual(len(lazy), 10)
 
     def setUp(self):
         # Create a temporary directory for each test

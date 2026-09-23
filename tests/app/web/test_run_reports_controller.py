@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential
@@ -14,6 +15,29 @@ class TestRunReportsController(WebTestBase):
         MarketCredential(market="BITVAVO", api_key="", secret_key="")
     ]
     external_balances = {"EUR": 1000}
+
+    def test_manual_invoke_wait_returns_report(self):
+        runner = self.iaf_app.container.algorithm_runner()
+        report = {"id": 42, "status": "completed", "signals": []}
+        with patch.object(runner, "invoke_now", return_value=report) as invoke:
+            response = self.client.post(
+                "/api/algorithm/invoke?wait=true&timeout=5&strategy_id=alpha")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(report, json.loads(response.data.decode())["report"])
+        invoke.assert_called_once_with(["alpha"], wait=True, timeout=5.0)
+
+    def test_manual_invoke_timeout_and_invalid_timeout(self):
+        runner = self.iaf_app.container.algorithm_runner()
+        with patch.object(runner, "invoke_now", side_effect=TimeoutError):
+            response = self.client.post("/api/algorithm/invoke?wait=true")
+        self.assertEqual(504, response.status_code)
+        self.assertTrue(json.loads(response.data.decode())["invoked"])
+        with patch.object(runner, "invoke_now") as invoke:
+            for timeout in ("0", "-1", "nan", "inf", "invalid"):
+                response = self.client.post(
+                    f"/api/algorithm/invoke?wait=true&timeout={timeout}")
+                self.assertEqual(400, response.status_code)
+            invoke.assert_not_called()
 
     def test_api_exposes_canonical_and_legacy_trace_fields(self):
         from investing_algorithm_framework import DecisionTrace

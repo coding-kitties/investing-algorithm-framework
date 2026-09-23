@@ -1,0 +1,163 @@
+name: Native wheels and parity
+
+on:
+  push:
+    paths:
+      - 'native/**'
+      - 'investing_algorithm_framework/**'
+      - 'tests/**'
+      - 'scripts/bench_vector_snapshot_events.py'
+      - 'pyproject.toml'
+      - '.github/workflows/native.yml'
+      - '.github/workflows/publish.yml'
+      - '.github/workflows/test.yml'
+  pull_request:
+    paths:
+      - 'native/**'
+      - 'investing_algorithm_framework/**'
+      - 'tests/**'
+      - 'scripts/bench_vector_snapshot_events.py'
+      - 'pyproject.toml'
+      - '.github/workflows/native.yml'
+      - '.github/workflows/publish.yml'
+      - '.github/workflows/test.yml'
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/confluence
+      - run: cargo fmt --manifest-path native/confluence/Cargo.toml --check
+      - run: cargo test --locked --manifest-path native/confluence/Cargo.toml
+      - run: cargo clippy --locked --manifest-path native/confluence/Cargo.toml --all-targets -- -D warnings
+
+  framework-wheel:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip wheel --no-deps . --wheel-dir framework-dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: framework-wheel
+          path: framework-dist/*.whl
+          if-no-files-found: error
+
+  wheels:
+    needs: rust
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-22.04, target: x86_64, platform: linux-x64}
+          - {os: ubuntu-24.04-arm, target: aarch64, platform: linux-arm64}
+          - {os: macos-15-intel, target: x86_64, platform: macos-x64}
+          - {os: macos-14, target: aarch64, platform: macos-arm64}
+          - {os: windows-2022, target: x86_64, platform: windows-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: auto
+          args: --release --locked --manifest-path native/confluence/Cargo.toml --out native-dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: native-dist/*.whl
+          if-no-files-found: error
+
+  installed-parity:
+    needs: [wheels, framework-wheel]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux-x64, linux-arm64, macos-x64, macos-arm64, windows-x64]
+        python: ['3.10', '3.12', '3.13']
+        include:
+          - {platform: linux-x64, os: ubuntu-22.04}
+          - {platform: linux-arm64, os: ubuntu-24.04-arm}
+          - {platform: macos-x64, os: macos-15-intel}
+          - {platform: macos-arm64, os: macos-14}
+          - {platform: windows-x64, os: windows-2022}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: native-dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: framework-wheel
+          path: framework-dist
+      - name: Install built wheels, never compile a fallback
+        run: |
+          python -m pip install --only-binary=:all: --no-deps native-dist/*.whl
+          python -m pip install framework-dist/*.whl pytest httpx pyindicators==0.11.1
+          python -m pip check
+      - name: Isolated installed-package smoke test
+        run: python -I native/confluence/tests/wheel_smoke.py
+      - name: Native and Python exact parity
+        run: |
+          python -c "import iaf_confluence_native; assert iaf_confluence_native.NETTING_SEMANTICS_VERSION == 'netting-accounting-v5'"
+          python -m pytest -q tests/domain/models/test_confluence_native.py tests/infrastructure/services/backtesting/test_vector_snapshot_events.py tests/services/metrics/test_drawdowns.py tests/services/test_order_backtest_service.py tests/services/test_backtest_trade_order_evaluator.py tests/app/test_eventloop.py
+          python -m pytest -q tests/services/trade_hooks/test_trade_hooks_event_backtest.py::TestRustRiskHookParity tests/app/backtesting/test_backtest_memory_options.py::TestBacktestMemoryOptions::test_rust_accounting_workers_match_sql_and_resume tests/app/backtesting/test_backtest_memory_options.py::TestBacktestMemoryOptions::test_strict_native_accounting_preflights_before_execution
+          python -m pytest -q tests/infrastructure/repositories/test_event_memory.py::TestEventMemoryState::test_native_index_filters_streams_and_observes_updates
+
+  sdist:
+    needs: rust
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - run: python -m pip install 'maturin>=1.8,<2'
+      - run: maturin sdist --manifest-path native/confluence/Cargo.toml --out native-sdist
+      - name: Verify source distribution builds and imports
+        run: |
+          python -m pip wheel --no-deps native-sdist/*.tar.gz --wheel-dir source-wheel
+          python -m pip install --no-deps source-wheel/*.whl
+          python -I -c "import iaf_confluence_native; assert iaf_confluence_native.SEMANTICS_VERSION == 'confluence-vector-v1'"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-sdist
+          path: native-sdist/*.tar.gz
+          if-no-files-found: error
