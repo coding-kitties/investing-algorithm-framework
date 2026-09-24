@@ -24,6 +24,9 @@ def _json(value):
 
 
 def _sync_directory(path):
+    """Flush directory metadata on POSIX; Windows only supports file fsync."""
+    if os.name != 'posix':
+        return
     descriptor = os.open(path, os.O_RDONLY)
     try:
         os.fsync(descriptor)

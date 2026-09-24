@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Streaming storage syncs directory metadata only on POSIX, matching the
+  definition store; file flushes remain enabled on Windows.
+- Windows test fixtures use UTF-8 notebook reads, portable mocked cgroup paths,
+  and explicit SQLite cleanup for checkpoint, optimizer, and memory comparisons.
 - Session-index persistence uses a writable flush handle for Windows.
 - Native parity tests respect the Python 3.12+ dynamic-sizing contract and
   verify rejection and automatic fallback on older Python versions.

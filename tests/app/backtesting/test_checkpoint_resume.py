@@ -27,8 +27,12 @@ class TestVectorCheckpointResume(TestCase):
     engine_name = "vector"
 
     def setUp(self):
+        from investing_algorithm_framework.infrastructure.database \
+            .sql_alchemy import teardown_sqlalchemy
+
         temporary = TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
+        self.addCleanup(teardown_sqlalchemy)
         self.resources = Path(temporary.name)
         self.directory = self.resources / "results"
         start = datetime(2020, 12, 20, 10, tzinfo=timezone.utc)

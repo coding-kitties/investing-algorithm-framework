@@ -32,7 +32,7 @@ class TestBoundedVectorResources(unittest.TestCase):
 
         def read(path, *args, **kwargs):
             try:
-                return files[str(path)]
+                return files[path.as_posix()]
             except KeyError:
                 raise FileNotFoundError(str(path))
 
@@ -221,9 +221,9 @@ class TestBoundedVectorResources(unittest.TestCase):
         }
 
         def read(path):
-            if str(path) not in files:
+            if path.as_posix() not in files:
                 raise FileNotFoundError(path)
-            return files[str(path)]
+            return files[path.as_posix()]
 
         with patch.object(Path, "exists", return_value=True), patch.object(
             Path, "read_text", autospec=True, side_effect=read,

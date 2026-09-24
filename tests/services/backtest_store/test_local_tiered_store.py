@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
 from investing_algorithm_framework.domain import (
     Backtest,
@@ -32,6 +33,40 @@ _FIXTURE = os.path.join(
 
 
 class TestStreamingRuns(TestCase):
+    def test_directory_sync_skips_unsupported_windows_open(self):
+        from investing_algorithm_framework.services.backtest_store \
+            import streaming
+
+        with patch.object(streaming.os, 'name', 'nt'), patch.object(
+            streaming.os, 'open', side_effect=PermissionError,
+        ) as open_directory, patch.object(streaming.os, 'fsync') as sync:
+            streaming._sync_directory(self.directory.name)
+        open_directory.assert_not_called()
+        sync.assert_not_called()
+
+    def test_directory_sync_closes_posix_descriptor_on_failure(self):
+        from investing_algorithm_framework.services.backtest_store \
+            import streaming
+
+        for error in (None, OSError('sync failed')):
+            with self.subTest(error=error), patch.object(
+                streaming.os, 'name', 'posix',
+            ), patch.object(
+                streaming.os, 'open', return_value=123,
+            ) as open_directory, patch.object(
+                streaming.os, 'fsync', side_effect=error,
+            ) as sync, patch.object(streaming.os, 'close') as close:
+                if error is None:
+                    streaming._sync_directory(self.directory.name)
+                else:
+                    with self.assertRaisesRegex(OSError, 'sync failed'):
+                        streaming._sync_directory(self.directory.name)
+                open_directory.assert_called_once_with(
+                    self.directory.name, os.O_RDONLY,
+                )
+                sync.assert_called_once_with(123)
+                close.assert_called_once_with(123)
+
     def test_vector_engine_streams_identical_signals_and_results(self):
         from scripts.bench_vector_snapshot_events import workload, result_digest
         from investing_algorithm_framework.services.backtest_store.recording \

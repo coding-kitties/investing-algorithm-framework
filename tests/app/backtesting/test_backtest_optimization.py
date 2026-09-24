@@ -86,8 +86,12 @@ class OptimizationFixture(TestCase):
     engine = BacktestEngine.VECTOR
 
     def setUp(self):
+        from investing_algorithm_framework.infrastructure.database \
+            .sql_alchemy import teardown_sqlalchemy
+
         temp = TemporaryDirectory()
         self.addCleanup(temp.cleanup)
+        self.addCleanup(teardown_sqlalchemy)
         self.directory = Path(temp.name)
         self.study = Study(
             name="optimization",

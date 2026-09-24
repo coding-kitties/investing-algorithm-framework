@@ -448,8 +448,11 @@ class TestBacktestMemoryOptions(TestCase):
         self._check_event_workers_and_resume('python', 'python', 'rust')
 
     def test_memory_event_risk_results_match_sql_without_tick_sql(self):
+        from contextlib import ExitStack
         from sqlalchemy import event
         from sqlalchemy.engine import Engine
+        from investing_algorithm_framework.infrastructure.database \
+            .sql_alchemy import teardown_sqlalchemy
         from investing_algorithm_framework.infrastructure.repositories \
             .event_memory import event_memory_active
         from scripts.bench_backtest_streaming import event_case, strategy_for
@@ -467,7 +470,9 @@ class TestBacktestMemoryOptions(TestCase):
         event.listen(Engine, 'before_cursor_execute', forbid_memory_sql)
         try:
             for backend in ('sql', 'memory'):
-                with TemporaryDirectory() as directory:
+                with TemporaryDirectory() as directory, \
+                        ExitStack() as cleanup:
+                    cleanup.callback(teardown_sqlalchemy)
                     result = event_case(
                         strategy_for('ema', ['BTC', 'DOT'], event=True),
                         date_range, directory, event_state_backend=backend,

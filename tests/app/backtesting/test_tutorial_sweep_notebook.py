@@ -23,7 +23,7 @@ NOTEBOOK = (
 class TestTutorialSweepNotebook(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.notebook = json.loads(NOTEBOOK.read_text())
+        cls.notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
         cls.source = "".join(next(
             cell["source"] for cell in cls.notebook["cells"]
             if cell["cell_type"] == "code"
@@ -61,7 +61,9 @@ class TestTutorialSweepNotebook(TestCase):
             "04_in_sample_event_validation.ipynb",
             "06_event_backtest.ipynb",
         ):
-            notebook = json.loads((NOTEBOOK.parent / name).read_text())
+            notebook = json.loads(
+                (NOTEBOOK.parent / name).read_text(encoding="utf-8")
+            )
             for cell in notebook["cells"]:
                 if cell["cell_type"] != "code":
                     continue
