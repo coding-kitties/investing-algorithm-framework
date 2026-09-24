@@ -213,7 +213,7 @@ class LocalRunWriter:
     def flush(self):
         self._require_open()
         try:
-            with (self.path / 'chunks.jsonl').open('rb') as index:
+            with (self.path / 'chunks.jsonl').open('r+b') as index:
                 os.fsync(index.fileno())
             _sync_directory(self.path / 'chunks')
             _sync_directory(self.path)

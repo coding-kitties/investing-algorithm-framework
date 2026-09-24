@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Streaming storage syncs directory metadata only on POSIX, matching the
-  definition store; file flushes remain enabled on Windows.
+  definition store; file flushes remain enabled on Windows and use a writable
+  stream-index handle without truncating recorded data.
 - Windows test fixtures use UTF-8 notebook reads, portable mocked cgroup paths,
   and explicit SQLite cleanup for checkpoint, optimizer, and memory comparisons.
 - Session-index persistence uses a writable flush handle for Windows.

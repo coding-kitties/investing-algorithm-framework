@@ -310,6 +310,35 @@ os._exit(42)
         self.store.discard_run_attempt('crash/attempt', producer_stopped=True)
         self.assertFalse(path.exists())
 
+    def test_flush_uses_writable_handle_and_preserves_index(self):
+        with self.store.begin_run(
+            'run', 'writable', {'snapshot': self.schema},
+        ) as writer:
+            writer.append_batch('snapshot', self.batch)
+            index_path = writer.path / 'chunks.jsonl'
+            expected = index_path.read_bytes()
+            original_open = Path.open
+            handles = []
+
+            def checked_open(path, *args, **kwargs):
+                handle = original_open(path, *args, **kwargs)
+                if path == index_path:
+                    handles.append(handle)
+                    self.addCleanup(handle.close)
+                    self.assertTrue(handle.writable())
+                return handle
+
+            with patch.object(Path, 'open', checked_open):
+                writer.flush()
+            self.assertEqual(len(handles), 1)
+            self.assertTrue(handles[0].closed)
+            self.assertEqual(index_path.read_bytes(), expected)
+            handle = writer.commit()
+            self.assertEqual([self.batch.to_pylist()], [
+                batch.to_pylist()
+                for batch in self.store.iter_run_batches(handle)
+            ])
+
     def test_flush_failure_is_not_committable(self):
         from unittest.mock import patch
         with self.store.begin_run('run', 'flush', {'snapshot': self.schema}) as writer:
