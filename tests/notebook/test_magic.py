@@ -1,3 +1,4 @@
+from importlib import import_module
 from unittest import TestCase
 from unittest.mock import MagicMock, patch, sentinel
 
@@ -24,8 +25,9 @@ class TestIndexResultLoading(TestCase):
         app.run_backtest.return_value.iter_backtests.return_value = iter(
             [backtest],
         )
-        with patch(
-            "investing_algorithm_framework.create_app.create_app",
+        with patch.object(
+            import_module("investing_algorithm_framework.create_app"),
+            "create_app",
             return_value=app,
         ):
             result = _run_backtest(args, [MagicMock])

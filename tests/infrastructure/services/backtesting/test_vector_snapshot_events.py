@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from importlib.util import find_spec
+import sys
 from types import SimpleNamespace
 from unittest import TestCase, skipUnless
 from unittest.mock import patch
@@ -241,6 +242,8 @@ class TestNativeLoopFallback(TestCase):
 
 @skipUnless(find_spec('iaf_confluence_native'), 'Native wheel not installed')
 class TestNativeRunLoop(TestCase):
+    dynamic_modes = (False, True) if sys.version_info >= (3, 12) else (False,)
+
     def test_full_parity_with_capital_contention_and_random_signals(self):
         for randomized in (False, True):
             for percentage in (0, 20, 60):
@@ -283,7 +286,10 @@ class TestNativeRunLoop(TestCase):
         from investing_algorithm_framework.infrastructure.services \
             .backtesting.vector_native import NativeExecutionUnsupported
 
-        for variant in ('hedge',):
+        variants = ('hedge',) if sys.version_info >= (3, 12) else (
+            'hedge', 'dynamic',
+        )
+        for variant in variants:
             service, arguments = workload(32, 1)
             if variant == 'dynamic':
                 arguments['dynamic_position_sizing'] = True
@@ -310,7 +316,7 @@ class TestNativeRunLoop(TestCase):
                 )
 
     def test_costs_sizing_and_deposits_match_python(self):
-        for dynamic in (False, True):
+        for dynamic in self.dynamic_modes:
             for fixed in (False, True):
                 for fixed_fee in (0., 1.75, 20000.):
                     results = []
@@ -371,7 +377,7 @@ class TestNativeRunLoop(TestCase):
                                          result_digest(actual))
 
     def test_opposite_signal_flips_match_python(self):
-        for dynamic in (False, True):
+        for dynamic in self.dynamic_modes:
             results = []
             for backend in ('python', 'rust'):
                 service, arguments = workload(96, 3)
@@ -458,7 +464,9 @@ class TestNativeRunLoop(TestCase):
                         strategy.cooldowns = [CooldownRule(
                             trigger='any', blocks='any', bars=cooldown,
                         )]
-                        arguments['dynamic_position_sizing'] = True
+                        arguments['dynamic_position_sizing'] = (
+                            sys.version_info >= (3, 12)
+                        )
                         results.append(service.run(
                             **arguments, execution_backend=backend
                         ))
@@ -477,7 +485,7 @@ class TestNativeRunLoop(TestCase):
         )
 
         for seed in range(4):
-            for dynamic in (False, True):
+            for dynamic in self.dynamic_modes:
                 results = []
                 for backend in ('python', 'rust', 'auto'):
                     service, arguments = workload(128, 3)

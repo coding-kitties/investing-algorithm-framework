@@ -82,8 +82,12 @@ class EventWorkerProbeTask(Task):
 
 class TestBacktestMemoryOptions(TestCase):
     def setUp(self):
+        from investing_algorithm_framework.infrastructure.database \
+            .sql_alchemy import teardown_sqlalchemy
+
         self.storage = TemporaryDirectory()
         self.addCleanup(self.storage.cleanup)
+        self.addCleanup(teardown_sqlalchemy)
         self.app = create_app(
             name=f"memory-options-{uuid4().hex}",
             config={RESOURCE_DIRECTORY: self.storage.name},

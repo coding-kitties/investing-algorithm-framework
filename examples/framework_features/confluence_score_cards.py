@@ -396,7 +396,8 @@ class ConfluenceEntryStrategy(TradingStrategy):
         if not indicator_columns.issubset(data.columns):
             from pyindicators import rsi, macd, stochastic_oscillator, ema, sma
 
-            data = rsi(data, source_column="close", period=14)
+            data = rsi(data, source_column="close", period=14,
+                       result_column="rsi")
             data = macd(data, source_column="close")
             data = stochastic_oscillator(
                 data, high_column="high", low_column="low",

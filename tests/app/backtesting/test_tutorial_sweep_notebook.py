@@ -26,7 +26,10 @@ class TestTutorialSweepNotebook(TestCase):
         cls.notebook = json.loads(NOTEBOOK.read_text())
         cls.source = "".join(next(
             cell["source"] for cell in cls.notebook["cells"]
-            if cell.get("id") == "11"
+            if cell["cell_type"] == "code"
+            and "def window_metrics_filter_function(" in (
+                "".join(cell["source"])
+            )
         ))
 
     def setUp(self):

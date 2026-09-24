@@ -135,7 +135,7 @@ def persist_index(index):
     staging = destination.with_suffix(".parquet.pending")
     try:
         index.df.to_parquet(staging, index=False)
-        with staging.open("rb") as handle:
+        with staging.open("r+b") as handle:
             os.fsync(handle.fileno())
         os.replace(staging, destination)
     finally:

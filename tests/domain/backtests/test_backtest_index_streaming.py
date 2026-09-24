@@ -13,6 +13,36 @@ from investing_algorithm_framework import (
 
 
 class TestBacktestIndexStreaming(TestCase):
+    def test_persist_session_index_uses_writable_flush_handle(self):
+        from investing_algorithm_framework.infrastructure.services \
+            .backtesting.vector_session_index import (
+                persist_index, SESSION_INDEX_FILENAME,
+            )
+
+        original_open = Path.open
+        flush_handles = []
+
+        def track_open(path, mode="r", *args, **kwargs):
+            handle = original_open(path, mode, *args, **kwargs)
+            if path.suffix == ".pending":
+                flush_handles.append(handle)
+                self.assertTrue(handle.writable())
+            return handle
+
+        with TemporaryDirectory() as directory:
+            index = BacktestIndex(
+                directory, pd.DataFrame({"algorithm_id": ["saved"]}),
+            )
+            with patch.object(Path, "open", track_open):
+                persist_index(index)
+            self.assertEqual(len(flush_handles), 1)
+            self.assertTrue(flush_handles[0].closed)
+            pd.testing.assert_frame_equal(
+                pd.read_parquet(Path(directory) / SESSION_INDEX_FILENAME),
+                index.df,
+            )
+            self.assertEqual(list(Path(directory).glob("*.pending")), [])
+
     def test_open_session_index_without_changing_global_default(self):
         with TemporaryDirectory() as directory:
             pd.DataFrame({"algorithm_id": ["global"]}).to_parquet(

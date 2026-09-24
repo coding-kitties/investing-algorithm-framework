@@ -184,6 +184,10 @@ class TestMemoryRiskHookParity(TestCase):
     backends = ('sql', 'memory')
 
     def test_results_and_callback_observations_match_sql(self):
+        from contextlib import ExitStack
+        from investing_algorithm_framework.infrastructure.database \
+            .sql_alchemy import teardown_sqlalchemy
+
         for strategy_type, start, end, expected_hook in (
             (TrailingStopLossHookStrategy, SL_START_DATE, SL_END_DATE,
              'on_trade_trailing_stop_loss_triggered'),
@@ -203,7 +207,9 @@ class TestMemoryRiskHookParity(TestCase):
                         ))
 
                     strategy = strategy_type(algorithm_id='risk-parity')
-                    with TemporaryDirectory() as directory:
+                    with TemporaryDirectory() as directory, \
+                            ExitStack() as cleanup:
+                        cleanup.callback(teardown_sqlalchemy)
                         app = _create_app('RiskParity', directory)
                         with patch.object(strategy, '_record', side_effect=record):
                             backtests = app.run_backtest(

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Session-index persistence uses a writable flush handle for Windows.
+- Native parity tests respect the Python 3.12+ dynamic-sizing contract and
+  verify rejection and automatic fallback on older Python versions.
+- Temporary backtest tests release SQLite connections before directory cleanup.
+- Tutorial tests locate executable cells independently of notebook ID rewriting;
+  notebook magic mocks resolve consistently on Python 3.10.
+- The confluence example explicitly names its RSI output for compatibility with
+  the pinned indicator dependency.
+
 ## [9.0.0a18] - 2026-09-23
 
 ### Release Scope
