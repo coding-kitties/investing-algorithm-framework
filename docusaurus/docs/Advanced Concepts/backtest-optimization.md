@@ -58,19 +58,48 @@ data providers, and a compatible optimizer instance. See
 
 ## Define an objective
 
-The objective receives a `BacktestIndex` scoped to one candidate and its study
-and engine, after all required windows have completed. Return one finite
-number; `direction` determines whether larger or smaller scores are preferred.
+The developer-provided objective defines what a successful candidate means.
+The optimizer proposes parameters, the framework runs the resulting strategy
+and calculates its metrics, and then the objective converts those results into
+one finite score. The optimizer receives that score through `tell()` and can
+use it when choosing later proposals. The optimizer does not need to implement
+financial metric calculations itself.
 
-Indexes can contain both pooled and per-universe rows. Select the intended row
-explicitly rather than assuming the first row represents the whole evaluation:
+The objective receives a `BacktestIndex` scoped to one candidate algorithm
+after all its required study windows have completed. `direction` determines
+whether larger or smaller objective scores are preferred. A random optimizer
+can retain the scores for ranking without adapting its proposals; Bayesian,
+evolutionary and other adaptive optimizers can use them to influence later
+proposals.
+
+The candidate index is not the full `Backtest` object. It is a lightweight
+table containing:
+
+- The current candidate's algorithm ID and resolved parameters.
+- Study, engine and universe identity.
+- Scalar summary metrics aggregated using the study's existing semantics.
+- The bundle path needed to load the full backtest and its individual runs.
+
+An index can contain more than one row for the same algorithm, such as a pooled
+row plus per-universe rows. Select the intended study, engine and universe
+explicitly rather than assuming the first row is the desired summary.
+
+### Score from summary metrics
+
+Use the index columns when the objective only needs existing cross-window
+summary metrics. This avoids decoding the full backtest bundle:
+
 
 ```python
 import math
 
 
 def score_candidate(index):
-    pooled = index.df.loc[index.df["universe_key"].isna()]
+    pooled = index.df.loc[
+        index.df["universe_key"].isna()
+        & (index.df["study_name"] == training_study.name)
+        & (index.df["engine_type"] == "vector")
+    ]
     if len(pooled) != 1:
         raise ValueError("Expected exactly one pooled candidate row")
 
@@ -80,10 +109,59 @@ def score_candidate(index):
     return score
 ```
 
+In this example, the candidate's objective score is its existing aggregate
+Sharpe ratio. There is no separate built-in "robustness score." A developer
+who wants to optimize Sortino, Calmar, total return, drawdown or a documented
+combination selects or combines the corresponding summary columns in this
+function.
+
 Objective exceptions and non-finite scores stop the search explicitly. They are
 not silently converted to penalties. The final window's `window_*` columns are
 not a history of every window; use `summary.*` metrics for aggregate objectives.
 Reading scalar metrics does not require loading full backtest bundles.
+
+### Score from individual run metrics
+
+When the objective intentionally depends on individual windows, load the one
+backtest bundle referenced by the candidate index and select the same study and
+engine. Every run exposes its own `backtest_metrics`:
+
+```python
+import math
+from statistics import fmean, pstdev
+
+
+def score_candidate_windows(index):
+    backtest = next(index.iter_backtests())
+    completed_study = backtest.get_study(training_study.name)
+    runs = completed_study.get_runs(engine="vector")
+
+    if len(runs) != len(training_study.backtest_windows):
+        raise ValueError("Candidate did not complete every study window")
+
+    returns = []
+    for run in runs:
+        metrics = run.backtest_metrics
+        value = float(metrics.total_net_gain_percentage)
+        if not math.isfinite(value):
+            raise ValueError("Window has no finite return")
+        returns.append(value)
+
+    # Project-specific example: reward mean return and penalize instability.
+    return fmean(returns) - pstdev(returns)
+```
+
+This formula is an example policy, not a framework-defined robustness metric.
+Its units are decimal return: `0.12` means 12%. With only a few windows, avoid
+presenting a custom composite as statistically conclusive. Other objectives
+might use the weakest window, require a minimum closed-trade count, or combine
+an existing summary ratio with explicitly documented run-level diagnostics.
+
+Loading bundles is more expensive than reading summary columns, so prefer the
+summary-only objective unless the optimization decision genuinely requires
+window-specific values. Individual run metrics remain available after the
+search for comparison and diagnosis even when the objective uses only a
+summary metric.
 
 ## Mode 1: search existing algorithms
 
@@ -206,10 +284,202 @@ Factory and parameter definitions must be provided together. Factory mode
 cannot be combined with supplied algorithms or strategies. Categorical and
 log-scale parameter classes are not currently provided.
 
+## Initial candidate seed and bounded alternatives
+
+Use `initial_parameters` when a compatible optimizer must propose known
+settings before its ordinary search candidates. Initial points count toward
+the existing proposal and evaluation budgets; they are not extra evaluations.
+The number of configured initial points therefore cannot exceed either budget.
+
+Here, an **initial candidate seed** means a known parameter mapping—typically
+the strategy's current baseline settings—that must be evaluated first. It is
+different from the optimizer's random-number seed:
+
+- `initial_parameters=[baseline_search_parameters]` supplies the baseline
+  candidate to evaluate first.
+- `RandomSearchOptimizer(seed=42)` makes the later random alternatives
+  reproducible.
+
+Either concept can exist without the other. Changing the initial candidate
+changes the search identity; changing the random seed changes the optimizer's
+ordinary proposal sequence and should also use a new search ID.
+
+The optimizer must opt in by overriding `set_initial_parameters()`. It owns the
+points from then on and emits them through its normal `ask()` lifecycle. The
+framework does not inject external observations into `tell()`.
+
+This minimal random-search plugin preserves its queue and random generator in
+its checkpoint state:
+
+```python
+import random
+
+from investing_algorithm_framework import (
+    CandidateProposal,
+    FloatParameter,
+    IntegerParameter,
+    StrategyOptimizer,
+)
+
+
+def nested_tuple(value):
+    if isinstance(value, list):
+        return tuple(nested_tuple(item) for item in value)
+    return value
+
+
+class RandomSearchOptimizer(StrategyOptimizer):
+    supported_search_spaces = frozenset({"parameters"})
+
+    def __init__(self, seed):
+        self.seed = seed
+
+    def initialize(self, search_space, direction):
+        self.search_space = search_space
+        self.random = random.Random(self.seed)
+        self.initial = []
+        self.proposal_number = 0
+
+    def set_initial_parameters(self, initial_parameters):
+        self.initial = [dict(values) for values in initial_parameters]
+
+    def ask(self, max_candidates):
+        proposals = []
+        while self.initial and len(proposals) < max_candidates:
+            proposals.append(CandidateProposal(
+                proposal_id=f"candidate-{self.proposal_number}",
+                parameters=self.initial.pop(0),
+            ))
+            self.proposal_number += 1
+        while len(proposals) < max_candidates:
+            values = {}
+            for parameter in self.search_space.parameters:
+                if isinstance(parameter, IntegerParameter):
+                    values[parameter.name] = self.random.randint(
+                        parameter.lower, parameter.upper,
+                    )
+                elif isinstance(parameter, FloatParameter):
+                    values[parameter.name] = self.random.uniform(
+                        parameter.lower, parameter.upper,
+                    )
+            proposals.append(CandidateProposal(
+                proposal_id=f"candidate-{self.proposal_number}",
+                parameters=values,
+            ))
+            self.proposal_number += 1
+        return proposals
+
+    def tell(self, observations):
+        pass
+
+    def is_finished(self):
+        return False
+
+    def state_dict(self):
+        return {
+            "initial": self.initial,
+            "proposal_number": self.proposal_number,
+            "random_state": self.random.getstate(),
+        }
+
+    def load_state_dict(self, state):
+        self.initial = [dict(values) for values in state["initial"]]
+        self.proposal_number = state["proposal_number"]
+        self.random.setstate(nested_tuple(state["random_state"]))
+```
+
+Configure one baseline plus at most nine alternatives:
+
+```python
+optimization = OptimizationConfiguration(
+    search_id="exploratory-screen-v1",
+    optimizer=RandomSearchOptimizer(seed=42),
+    initial_parameters=[baseline_search_parameters],
+    parameters=search_parameters,
+    strategy_factory=build_strategy,
+    objective=score_candidate,
+    direction="maximize",
+    max_evaluations=10,
+    max_proposals=100,
+)
+
+results = app.run_backtest(
+    study=three_window_study,
+    optimization=optimization,
+    run_configuration=run_configuration,
+)
+```
+
+The baseline is the first proposal and can consume one of the ten distinct
+evaluation slots. Every admitted candidate uses the same three study windows.
+Duplicate or constraint-rejected proposals still consume proposal slots, so
+the search can finish with fewer than ten completed candidates.
+
+The baseline and every alternative use the same `score_candidate` objective.
+After each candidate completes all three windows, the framework supplies that
+candidate's index to the objective and sends the returned score to the
+optimizer. Initial candidates do not receive special scoring treatment; their
+only special behavior is guaranteed proposal order.
+
+Initial mappings must contain exactly the declared parameter names. Values use
+the same clamping, grid resolution, constraints and deduplication as ordinary
+proposals. A plugin that does not override `set_initial_parameters()` fails
+configuration explicitly. The framework also rejects a compatible plugin that
+does not emit the resolved initial points first and in order.
+
+Changing initial points changes the persisted search identity and therefore
+cannot resume an existing `search_id`. On resume, the framework reconstructs
+the initial queue before loading the optimizer snapshot; the plugin's
+`state_dict()` must preserve how far that queue and its ordinary sequence have
+advanced.
+
+Inspect the existing cross-window summaries first, scoped to the pooled row for
+the configured study and engine:
+
+```python
+pooled = results.df.loc[
+    results.df["universe_key"].isna()
+    & (results.df["study_name"] == three_window_study.name)
+    & (results.df["engine_type"] == "vector")
+]
+print(pooled[[
+    "algorithm_id",
+    "parameters",
+    "summary.total_net_gain_percentage",
+    "summary.max_drawdown",
+    "summary.number_of_trades_closed",
+]].to_string(index=False))
+```
+
+Drill into the same engine's individual windows without recomputing another
+summary:
+
+```python
+for backtest in results.iter_backtests():
+    completed_study = backtest.get_study(three_window_study.name)
+    for run in completed_study.get_runs(engine="vector"):
+        metrics = run.backtest_metrics
+        print(
+            backtest.algorithm_id,
+            run.backtest_start_date,
+            metrics.total_net_gain_percentage,
+            metrics.max_drawdown,
+            metrics.number_of_trades_closed,
+            metrics.number_of_trades_open_at_end,
+        )
+```
+
+Percentage metrics are decimals. The summary drawdown is an aggregate study
+metric, not the worst run-level drawdown, and independent window returns must
+not be presented as a compounded portfolio return. The returned index contains
+successful candidates; inspect trial statuses when diagnosing rejected,
+failed, or pruned proposals rather than silently treating them as missing data.
+
 ## Implement your optimizer
 
 Subclass the exported `StrategyOptimizer` and implement all six abstract
-methods:
+methods. Override `set_initial_parameters()` only when the plugin supports
+ordered initial parameter points:
 
 ```python
 from investing_algorithm_framework import StrategyOptimizer
@@ -217,6 +487,9 @@ from investing_algorithm_framework import StrategyOptimizer
 
 class MyOptimizer(StrategyOptimizer):
     supported_search_spaces = frozenset({"finite"})
+
+    def set_initial_parameters(self, initial_parameters):
+        raise NotImplementedError
 
     def initialize(self, search_space, direction):
         raise NotImplementedError
@@ -247,6 +520,12 @@ actually supports those modes.
 `initialize(search_space, direction)` receives an `OptimizationSearchSpace`
 with `mode`, `algorithm_ids` and `parameters`. Exactly one candidate source is
 nonempty. Initialize the search state here.
+
+When configured, `set_initial_parameters(initial_parameters)` runs immediately
+after `initialize`, including before a saved optimizer snapshot is restored.
+Compatible plugins must queue those mappings ahead of ordinary proposals and
+include the remaining queue in `state_dict()`. Finite-search plugins do not
+support initial parameter mappings.
 
 `ask(max_candidates)` returns a sequence of `CandidateProposal` objects:
 

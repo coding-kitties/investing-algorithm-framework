@@ -154,6 +154,17 @@ class OptimizationCoordinator:
             raise ValueError(
                 f"Optimizer does not support {self.space.mode!r} searches."
             )
+        specs = {
+            parameter.name: parameter
+            for parameter in self.space.parameters
+        }
+        self.initial_parameters = tuple(
+            {
+                name: specs[name].resolve(values[name])
+                for name in specs
+            }
+            for values in configuration.initial_parameters
+        )
         base = run_configuration.backtest_storage_directory
         if base is None:
             base = Path(resource_directory) / "backtests" / uuid4().hex
@@ -174,6 +185,9 @@ class OptimizationCoordinator:
             "candidate_kind": self.kind,
             "algorithm_ids": sorted(self.candidates),
             "parameters": [p.to_dict() for p in configuration.parameters],
+            "initial_parameters": [
+                dict(values) for values in configuration.initial_parameters
+            ],
             "direction": configuration.direction,
             "max_evaluations": configuration.max_evaluations,
             "max_proposals": configuration.max_proposals,
@@ -224,12 +238,12 @@ class OptimizationCoordinator:
                 or not isinstance(state.get("batch"), int)
             ):
                 raise ValueError("Invalid optimization state.")
-            self.optimizer.initialize(self.space, self.config.direction)
+            self._initialize_optimizer()
             self.optimizer.load_state_dict(
                 deepcopy(state["optimizer_state"]),
             )
             return state
-        self.optimizer.initialize(self.space, self.config.direction)
+        self._initialize_optimizer()
         state = {
             "version": 1, "manifest": self.manifest,
             "phase": "idle", "optimizer_state": self._snapshot(),
@@ -238,6 +252,13 @@ class OptimizationCoordinator:
         }
         _save_state(self.path, state)
         return state
+
+    def _initialize_optimizer(self):
+        self.optimizer.initialize(self.space, self.config.direction)
+        if self.config.initial_parameters:
+            self.optimizer.set_initial_parameters(deepcopy(
+                self.config.initial_parameters,
+            ))
 
     def _resolve(self, proposal):
         if self.space.mode == "finite":
@@ -285,6 +306,15 @@ class OptimizationCoordinator:
                 raise ValueError("Optimizer reused a proposal ID.")
             seen.add(proposal.proposal_id)
             algorithm_id, params, error = self._resolve(proposal)
+            initial_index = len(state["trials"]) + len(pending)
+            if (
+                initial_index < len(self.initial_parameters)
+                and params != self.initial_parameters[initial_index]
+            ):
+                raise ValueError(
+                    "Optimizer must propose initial_parameters first in "
+                    "their configured order."
+                )
             trial = {
                 "proposal_id": proposal.proposal_id,
                 "algorithm_id": algorithm_id, "parameters": params,
@@ -464,8 +494,14 @@ class OptimizationCoordinator:
             while state["phase"] != "done":
                 self.guard.require()
                 if state["phase"] == "idle":
+                    initial_parameters_remain = (
+                        len(state["trials"]) < len(self.initial_parameters)
+                    )
                     if (
-                        self.optimizer.is_finished()
+                        (
+                            not initial_parameters_remain
+                            and self.optimizer.is_finished()
+                        )
                         or len(state["evaluations"]) >=
                         self.config.max_evaluations
                         or len(state["trials"]) >= self.config.max_proposals

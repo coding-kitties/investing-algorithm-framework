@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.0.0a20] - 2026-09-25
+
+### Added
+
+- Parameter optimizers can opt in to ordered `initial_parameters`, allowing a
+  known baseline to be evaluated before ordinary proposals through the same
+  `ask()`/`tell()` lifecycle. Initial points use normal resolution,
+  constraints, deduplication, budgets, trial records and checkpoint recovery;
+  changed points invalidate resume context, and unsupported optimizers fail
+  explicitly.
+- The optimization guide documents baseline-first bounded searches, objective
+  scoring from candidate summary metrics, optional access to individual
+  window metrics, and the distinction between initial candidates and random
+  number generator seeds.
+
 ## [9.0.0a19] - 2026-09-25
 
 ### Fixed

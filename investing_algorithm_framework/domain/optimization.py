@@ -252,6 +252,15 @@ class StrategyOptimizer(ABC):
 
     supported_search_spaces = frozenset()
 
+    def set_initial_parameters(
+        self, initial_parameters: Sequence[Mapping[str, Number]],
+    ) -> None:
+        """Queue configured parameter points ahead of ordinary proposals."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support "
+            f"{len(initial_parameters)} initial parameter points"
+        )
+
     @abstractmethod
     def initialize(
         self, search_space: OptimizationSearchSpace, direction: str,
@@ -288,6 +297,7 @@ class OptimizationConfiguration:
     objective: Callable[[BacktestIndex], float]
     strategy_factory: Optional[Callable[[dict, str], TradingStrategy]] = None
     parameters: Sequence[Parameter] = ()
+    initial_parameters: Sequence[Mapping[str, Number]] = ()
     constraints: Sequence[Callable[[dict], bool]] = ()
     direction: str = "maximize"
     max_evaluations: int = 100
@@ -320,6 +330,36 @@ class OptimizationConfiguration:
             raise ValueError(
                 "strategy_factory and parameters must be provided together"
             )
+        if isinstance(self.initial_parameters, (str, bytes)) \
+                or not isinstance(self.initial_parameters, Sequence):
+            raise ValueError(
+                "initial_parameters must be a sequence of parameter mappings"
+            )
+        initial_parameters = tuple(
+            _parameter_values(values, finite=True)
+            for values in self.initial_parameters
+        )
+        if initial_parameters and self.strategy_factory is None:
+            raise ValueError(
+                "initial_parameters require generated parameters"
+            )
+        expected_names = {parameter.name for parameter in self.parameters}
+        if any(set(values) != expected_names for values in initial_parameters):
+            raise ValueError(
+                "initial parameter names must match the parameter space"
+            )
+        if initial_parameters and (
+            type(self.optimizer).set_initial_parameters
+            is StrategyOptimizer.set_initial_parameters
+        ):
+            raise ValueError(
+                f"{type(self.optimizer).__name__} does not support "
+                "initial_parameters"
+            )
+        object.__setattr__(
+            self, "initial_parameters",
+            tuple(dict(values) for values in initial_parameters),
+        )
         if isinstance(self.constraints, (str, bytes)) \
                 or not isinstance(self.constraints, Sequence) \
                 or any(not callable(c) for c in self.constraints):
@@ -336,3 +376,11 @@ class OptimizationConfiguration:
             if isinstance(value, bool) or not isinstance(value, int) \
                     or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
+        if len(initial_parameters) > self.max_evaluations:
+            raise ValueError(
+                "initial_parameters cannot exceed max_evaluations"
+            )
+        if len(initial_parameters) > self.max_proposals:
+            raise ValueError(
+                "initial_parameters cannot exceed max_proposals"
+            )

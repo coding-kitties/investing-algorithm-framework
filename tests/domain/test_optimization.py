@@ -31,6 +31,11 @@ class StubOptimizer(StrategyOptimizer):
         pass
 
 
+class InitialStubOptimizer(StubOptimizer):
+    def set_initial_parameters(self, initial_parameters):
+        self.initial_parameters = initial_parameters
+
+
 class TestParameters(unittest.TestCase):
     def test_integer_clamps_and_snaps_without_adding_upper_endpoint(self):
         parameter = IntegerParameter("period", 3, 10, 4)
@@ -290,6 +295,7 @@ class TestOptimizationConfiguration(unittest.TestCase):
         self.assertEqual(configuration.max_proposals, 1000)
         self.assertEqual(configuration.proposal_batch_size, 16)
         self.assertEqual(configuration.parameters, ())
+        self.assertEqual(configuration.initial_parameters, ())
         self.assertEqual(configuration.constraints, ())
         self.assertIsNone(configuration.strategy_factory)
         with self.assertRaises(FrozenInstanceError):
@@ -298,14 +304,20 @@ class TestOptimizationConfiguration(unittest.TestCase):
     def test_generated_configuration_snapshots_sequences(self):
         parameters = [IntegerParameter("x", 0, 10)]
         constraints = [lambda values: values["x"] > 0]
+        initial_parameters = [{"x": 2}]
         configuration = self.make_configuration(
+            optimizer=InitialStubOptimizer(),
             strategy_factory=lambda values, identifier: None,
-            parameters=parameters, constraints=constraints,
+            parameters=parameters, initial_parameters=initial_parameters,
+            constraints=constraints,
             direction="minimize",
         )
         parameters.clear()
+        initial_parameters[0]["x"] = 8
+        initial_parameters.clear()
         constraints.clear()
         self.assertEqual(len(configuration.parameters), 1)
+        self.assertEqual(configuration.initial_parameters, ({"x": 2},))
         self.assertEqual(len(configuration.constraints), 1)
         self.assertEqual(configuration.direction, "minimize")
 
@@ -347,10 +359,59 @@ class TestOptimizationConfiguration(unittest.TestCase):
             {"constraints": [None]},
             {"constraints": None},
             {"constraints": "not a sequence of callables"},
+            {"initial_parameters": [{"x": 1}]},
+            {
+                "optimizer": InitialStubOptimizer(),
+                "strategy_factory": lambda values, identifier: None,
+                "parameters": [parameter],
+                "initial_parameters": "not a sequence",
+            },
+            {
+                "optimizer": InitialStubOptimizer(),
+                "strategy_factory": lambda values, identifier: None,
+                "parameters": [parameter],
+                "initial_parameters": [{"wrong": 1}],
+            },
+            {
+                "optimizer": InitialStubOptimizer(),
+                "strategy_factory": lambda values, identifier: None,
+                "parameters": [parameter],
+                "initial_parameters": [{"x": float("nan")}],
+            },
         ):
             with self.subTest(values=values):
                 with self.assertRaises(ValueError):
                     self.make_configuration(**values)
+
+    def test_initial_parameters_require_optimizer_opt_in(self):
+        parameter = IntegerParameter("x", 0, 10)
+        with self.assertRaisesRegex(
+            ValueError, "does not support initial_parameters",
+        ):
+            self.make_configuration(
+                strategy_factory=lambda values, identifier: None,
+                parameters=[parameter],
+                initial_parameters=[{"x": 2}],
+            )
+        configuration = self.make_configuration(
+            optimizer=InitialStubOptimizer(),
+            strategy_factory=lambda values, identifier: None,
+            parameters=[parameter],
+            initial_parameters=[{"x": 2}],
+        )
+        self.assertEqual(configuration.initial_parameters, ({"x": 2},))
+
+    def test_initial_parameters_must_fit_search_budgets(self):
+        values = dict(
+            optimizer=InitialStubOptimizer(),
+            strategy_factory=lambda values, identifier: None,
+            parameters=[IntegerParameter("x", 0, 10)],
+            initial_parameters=[{"x": 1}, {"x": 2}],
+        )
+        with self.assertRaisesRegex(ValueError, "max_evaluations"):
+            self.make_configuration(**values, max_evaluations=1)
+        with self.assertRaisesRegex(ValueError, "max_proposals"):
+            self.make_configuration(**values, max_proposals=1)
 
     def test_objective_optimizer_direction_and_modes_are_validated(self):
         for values in (

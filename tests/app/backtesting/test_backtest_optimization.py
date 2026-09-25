@@ -71,6 +71,25 @@ class ScriptedOptimizer(StrategyOptimizer):
         ]
 
 
+class InitialParameterOptimizer(ScriptedOptimizer):
+    """Test plugin that owns and emits configured initial proposals."""
+
+    def __init__(self, proposals, crash_after_tell=False):
+        self.alternatives = tuple(proposals)
+        super().__init__([], crash_after_tell=crash_after_tell)
+
+    def initialize(self, search_space, direction):
+        self.proposals = list(self.alternatives)
+        super().initialize(search_space, direction)
+
+    def set_initial_parameters(self, initial_parameters):
+        initial = [
+            CandidateProposal(f"initial-{index}", parameters=parameters)
+            for index, parameters in enumerate(initial_parameters)
+        ]
+        self.proposals = initial + self.proposals
+
+
 def build_strategy(params, algorithm_id):
     strategy = LongCycleStrategy(algorithm_id=algorithm_id)
     strategy.parameters = dict(params)
@@ -138,14 +157,15 @@ class OptimizationFixture(TestCase):
                 CandidateProposal(f"p-{i}", algorithm_id=key)
                 for i, key in enumerate(("a", "b", "c"))
             ]
-        return OptimizationConfiguration(
+        values = dict(
             search_id="search",
-            optimizer=ScriptedOptimizer(proposals),
+            optimizer=kwargs.pop("optimizer", ScriptedOptimizer(proposals)),
             objective=window_score,
             max_evaluations=3, max_proposals=10,
             proposal_batch_size=2,
-            **kwargs,
         )
+        values.update(kwargs)
+        return OptimizationConfiguration(**values)
 
     def run_search(
         self, configuration, *, interrupt_after=None, candidates=None,
@@ -323,6 +343,119 @@ class TestEventOptimization(TestVectorOptimization):
 
 class TestOptimizationSafeguards(OptimizationFixture):
     # Keep these non-engine-specific cases separate from the event matrix.
+    def initial_configuration(
+        self, initial_parameters, proposals=(), **kwargs,
+    ):
+        return self.configuration(
+            optimizer=InitialParameterOptimizer(proposals),
+            strategy_factory=build_strategy,
+            parameters=[IntegerParameter("period", 1, 10)],
+            initial_parameters=initial_parameters,
+            **kwargs,
+        )
+
+    def test_initial_candidate_is_first_and_counts_toward_budget(self):
+        config = self.initial_configuration(
+            [{"period": 2.2}],
+            [CandidateProposal("alternative", {"period": 9})],
+            max_evaluations=1,
+        )
+        result = self.run_search(config)
+        self.assertEqual(
+            [observation.proposal_id
+             for observation in config.optimizer.observations],
+            ["initial-0"],
+        )
+        self.assertEqual(
+            [observation.parameters
+             for observation in config.optimizer.observations],
+            [{"period": 2}],
+        )
+        self.assertEqual(result.df["algorithm_id"].nunique(), 1)
+        self.assertEqual(len(self.saved), 2)
+
+    def test_initial_candidates_resolve_deduplicate_and_report_invalid(self):
+        config = self.initial_configuration(
+            [{"period": 2.1}, {"period": 2.2}, {"period": 3}],
+            constraints=[lambda parameters: parameters["period"] != 3],
+        )
+        result = self.run_search(config)
+        observations = config.optimizer.observations
+        self.assertEqual(
+            [observation.status for observation in observations],
+            ["complete", "complete", "invalid"],
+        )
+        self.assertEqual(
+            observations[0].algorithm_id, observations[1].algorithm_id,
+        )
+        self.assertEqual(result.df["algorithm_id"].nunique(), 1)
+        self.assertEqual(len(self.saved), 2)
+
+    def test_initial_candidate_resume_before_completed_evaluation(self):
+        config = self.initial_configuration(
+            [{"period": 2}],
+            [CandidateProposal("alternative", {"period": 9})],
+            max_evaluations=2, proposal_batch_size=1,
+        )
+        with self.assertRaises(KeyboardInterrupt):
+            self.run_search(config, interrupt_after=1)
+        self.saved.clear()
+        resumed = self.initial_configuration(
+            [{"period": 2}],
+            [CandidateProposal("alternative", {"period": 9})],
+            max_evaluations=2, proposal_batch_size=1,
+        )
+        self.run_search(resumed)
+        self.assertEqual(
+            [observation.proposal_id
+             for observation in resumed.optimizer.observations],
+            ["initial-0", "alternative"],
+        )
+        self.assertEqual(len(self.saved), 3)
+
+    def test_initial_candidate_resume_after_durable_evaluation(self):
+        config = self.initial_configuration(
+            [{"period": 2}],
+            [CandidateProposal("alternative", {"period": 9})],
+            max_evaluations=2, proposal_batch_size=1,
+        )
+        with self.assertRaises(KeyboardInterrupt):
+            self.run_search(config, interrupt_after=2)
+        self.saved.clear()
+        resumed = self.initial_configuration(
+            [{"period": 2}],
+            [CandidateProposal("alternative", {"period": 9})],
+            max_evaluations=2, proposal_batch_size=1,
+        )
+        self.run_search(resumed)
+        self.assertEqual(
+            [observation.proposal_id
+             for observation in resumed.optimizer.observations],
+            ["initial-0", "alternative"],
+        )
+        self.assertEqual(len(self.saved), 2)
+
+    def test_changed_initial_candidate_cannot_resume_search(self):
+        self.run_search(self.initial_configuration([{"period": 2}]))
+        with self.assertRaisesRegex(ValueError, "context mismatch"):
+            self.run_search(self.initial_configuration([{"period": 3}]))
+
+    def test_optimizer_must_emit_initial_candidates_in_order(self):
+        class MisorderedOptimizer(InitialParameterOptimizer):
+            def set_initial_parameters(self, initial_parameters):
+                pass
+
+        config = self.configuration(
+            optimizer=MisorderedOptimizer([
+                CandidateProposal("alternative", {"period": 9}),
+            ]),
+            strategy_factory=build_strategy,
+            parameters=[IntegerParameter("period", 1, 10)],
+            initial_parameters=[{"period": 2}],
+        )
+        with self.assertRaisesRegex(ValueError, "must propose"):
+            self.run_search(config)
+
     def test_context_changes_cannot_resume_an_existing_search(self):
         self.run_search(self.configuration())
         self.study.initial_capital += 1
