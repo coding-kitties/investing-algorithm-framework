@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.0.0a19] - 2026-09-25
+
 ### Fixed
 
 - Streaming storage syncs directory metadata only on POSIX, matching the
