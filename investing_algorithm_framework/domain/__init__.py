@@ -76,13 +76,14 @@ from .pipeline import Pipeline, AverageDollarVolume, AverageTradedValue, \
     StaticPerSymbol, Volatility, Factor, CustomFactor, Filter
 from .algorithm_id import generate_algorithm_id
 from .optimization import (
-    CandidateProposal, FloatParameter, IntegerParameter,
+    CandidateProposal, EvaluationEvidence, FloatParameter, IntegerParameter,
     OptimizationConfiguration, OptimizationSearchSpace,
     StrategyOptimizer, TrialObservation,
 )
 
 __all__ = [
     "CandidateProposal",
+    "EvaluationEvidence",
     "FloatParameter",
     "IntegerParameter",
     "OptimizationConfiguration",

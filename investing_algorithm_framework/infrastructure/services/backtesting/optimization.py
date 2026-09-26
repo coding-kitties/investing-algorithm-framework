@@ -7,27 +7,57 @@ import errno
 import inspect
 import json
 import logging
+import math
+from numbers import Integral, Real
 import os
 from pathlib import Path
 from uuid import uuid4
 
 from investing_algorithm_framework.domain import (
     BacktestIndex, OperationalException, generate_algorithm_id,
+    generate_backtest_summary_metrics,
 )
 from investing_algorithm_framework.domain.optimization import (
-    CandidateProposal, OptimizationSearchSpace, TrialObservation,
+    CandidateProposal, EvaluationEvidence, OptimizationSearchSpace,
+    TrialObservation,
 )
+from investing_algorithm_framework.domain.backtesting \
+    .backtest_summary_metrics import AGGREGATION_SEMANTICS_VERSION
 from .vector_resources import MemoryGuard
 from .vector_session_index import make_index, persist_index, validated_filter
 
 
 logger = logging.getLogger("investing_algorithm_framework")
 STATE_FILENAME = "optimization_state.json"
+EVIDENCE_SCHEMA_VERSION = 1
+_UNSUPPORTED = object()
 
 
 def _json_copy(value):
     """Require portable snapshots; never pickle executable plugin state."""
     return json.loads(json.dumps(value, allow_nan=False, sort_keys=True))
+
+
+def _portable_scalar(value):
+    if value is None or isinstance(value, (str, bool)):
+        return value
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, Real):
+        result = float(value)
+        return result if math.isfinite(result) else None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return _UNSUPPORTED
+
+
+def _callable_identifier(callback):
+    if callback is None:
+        return None
+    return (
+        f"{getattr(callback, '__module__', type(callback).__module__)}."
+        f"{getattr(callback, '__qualname__', type(callback).__qualname__)}"
+    )
 
 
 def _save_state(path, state):
@@ -196,6 +226,11 @@ class OptimizationCoordinator:
                 f"{type(self.optimizer).__module__}."
                 f"{type(self.optimizer).__qualname__}"
             ),
+            "objective": _callable_identifier(configuration.objective),
+            "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
+            "summary_metrics_semantics_version":
+                AGGREGATION_SEMANTICS_VERSION,
+            "window_policy": _callable_identifier(self.window_filter),
             "study": study_config,
             "evaluation": {
                 "snapshot_interval": run_configuration.snapshot_interval.value,
@@ -328,7 +363,8 @@ class OptimizationCoordinator:
                 if previous is None:
                     state["evaluations"][algorithm_id] = {
                         "parameters": params, "status": "pending",
-                        "score": None, "error": None, "rows": [],
+                        "score": None, "error": None, "evidence": None,
+                        "rows": [],
                     }
         state.update(
             pending=pending, phase="evaluate", pruned=[],
@@ -366,6 +402,166 @@ class OptimizationCoordinator:
             )
         return strategy
 
+    @staticmethod
+    def _window_key(date_range):
+        return (
+            f"{date_range.start_date.isoformat()}_"
+            f"{date_range.end_date.isoformat()}"
+        )
+
+    def _window_descriptor(self, date_range, execution_order):
+        part = self.study.window_part
+        if hasattr(part, "value"):
+            part = part.value
+        return {
+            "key": self._window_key(date_range),
+            "name": date_range.name,
+            "start": date_range.start_date.isoformat(),
+            "end": date_range.end_date.isoformat(),
+            "window_part": part,
+            "execution_order": execution_order,
+        }
+
+    def _evaluation_evidence(
+        self, algorithm_id, parameters, index, *,
+        completed_ranges=None, stop_reason=None,
+    ):
+        engine_type = None
+        if not index.df.empty:
+            engine_type = str(index.df["engine_type"].iloc[0])
+        elif self.study.engine is not None:
+            engine_type = self.study.engine.value
+            if engine_type == "event_driven":
+                engine_type = "event"
+        if engine_type is None:
+            raise ValueError("Optimization evidence requires an engine.")
+
+        order_by_range = {
+            (date_range.start_date, date_range.end_date): position
+            for position, date_range in enumerate(self.ranges)
+        }
+        backtest = None
+        slot = None
+        runs = []
+        try:
+            backtest = next(index.iter_backtests())
+        except StopIteration:
+            pass
+        if backtest is not None:
+            completed_study = backtest.get_study(self.study.name)
+            if completed_study is not None:
+                slot = completed_study.engine_results.get(engine_type)
+                if slot is not None:
+                    runs = list(slot.runs or [])
+
+        if completed_ranges is None:
+            completed_pairs = {
+                (run.backtest_start_date, run.backtest_end_date)
+                for run in runs
+                if (
+                    run.backtest_start_date, run.backtest_end_date
+                ) in order_by_range
+            }
+            completed_ranges = [
+                date_range for date_range in self.ranges
+                if (date_range.start_date, date_range.end_date)
+                in completed_pairs
+            ]
+        completed_pairs = {
+            (date_range.start_date, date_range.end_date)
+            for date_range in completed_ranges
+        }
+        runs = [
+            run for run in runs
+            if (run.backtest_start_date, run.backtest_end_date)
+            in completed_pairs
+        ]
+
+        run_metrics = []
+        for run in sorted(
+            runs,
+            key=lambda run: order_by_range[
+                (run.backtest_start_date, run.backtest_end_date)
+            ],
+        ):
+            metrics = {}
+            if run.backtest_metrics is not None:
+                for name, value in run.backtest_metrics.to_dict(
+                    materialize_history=False,
+                ).items():
+                    scalar = _portable_scalar(value)
+                    if scalar is not _UNSUPPORTED:
+                        metrics[name] = scalar
+            metadata = run.metadata or {}
+            universe_key = _portable_scalar(metadata.get("universe_key"))
+            if universe_key is _UNSUPPORTED:
+                universe_key = None
+            pair = (run.backtest_start_date, run.backtest_end_date)
+            run_metrics.append({
+                "window_key": self._window_key(
+                    self.ranges[order_by_range[pair]]
+                ),
+                "execution_order": order_by_range[pair],
+                "start": run.backtest_start_date.isoformat(),
+                "end": run.backtest_end_date.isoformat(),
+                "window_part": run.window_role,
+                "universe_key": universe_key,
+                "metrics": metrics,
+            })
+
+        summaries = []
+        summary_by_universe = {}
+        if slot is not None:
+            slot.runs = runs
+            slot.summary = generate_backtest_summary_metrics([
+                run.backtest_metrics for run in runs
+                if run.backtest_metrics is not None
+            ], expected_window_count=len(self.ranges))
+            backtest.regenerate_summaries_by_universe()
+            summary_by_universe = {
+                None: slot.summary,
+                **(slot.summaries_by_universe or {}),
+            }
+        for universe_key, summary in summary_by_universe.items():
+            if summary is None:
+                continue
+            metrics = {}
+            for name, value in summary.to_dict().items():
+                scalar = _portable_scalar(value)
+                if scalar is not _UNSUPPORTED:
+                    metrics[name] = scalar
+            if metrics:
+                summaries.append({
+                    "universe_key": universe_key,
+                    "metrics": metrics,
+                })
+
+        descriptors = tuple(
+            self._window_descriptor(date_range, order_by_range[
+                (date_range.start_date, date_range.end_date)
+            ])
+            for date_range in completed_ranges
+        )
+        return EvaluationEvidence(
+            evaluation_id=f"{self.config.search_id}:{algorithm_id}",
+            algorithm_id=algorithm_id,
+            parameters=parameters or {},
+            study_name=self.study.name,
+            engine_type=engine_type,
+            completed_window_keys=[
+                descriptor["key"] for descriptor in descriptors
+            ],
+            completed_windows=descriptors,
+            required_windows=len(self.ranges),
+            run_metrics=run_metrics,
+            summary_metrics=summaries,
+            stop_reason=stop_reason,
+            policy_identifier=(
+                _callable_identifier(self.window_filter)
+                if stop_reason == "window_filter_pruned" else None
+            ),
+        )
+
     def _evaluate(self, state):
         needed = {
             trial["algorithm_id"] for trial in state["pending"]
@@ -379,6 +575,25 @@ class OptimizationCoordinator:
             pruned = set(index.df["algorithm_id"]) - set(
                 filtered.df["algorithm_id"]
             )
+            current_position = next(
+                position for position, configured in enumerate(self.ranges)
+                if (
+                    configured.start_date, configured.end_date
+                ) == (date_range.start_date, date_range.end_date)
+            )
+            completed_ranges = self.ranges[:current_position + 1]
+            for algorithm_id in sorted(pruned):
+                evaluation = state["evaluations"][algorithm_id]
+                candidate_index = index.filter(
+                    lambda row, key=algorithm_id:
+                    row["algorithm_id"] == key
+                )
+                evidence = self._evaluation_evidence(
+                    algorithm_id, evaluation["parameters"],
+                    candidate_index, completed_ranges=completed_ranges,
+                    stop_reason="window_filter_pruned",
+                )
+                evaluation["evidence"] = evidence.to_dict()
             state["pruned"] = sorted(set(state["pruned"]) | pruned)
             _save_state(self.path, state)
             return filtered
@@ -415,9 +630,15 @@ class OptimizationCoordinator:
                         error="Window filter pruned candidate.",
                     )
                 elif not self._complete(candidate_index):
+                    evidence = self._evaluation_evidence(
+                        algorithm_id, evaluation["parameters"],
+                        candidate_index,
+                        stop_reason="incomplete_evaluation",
+                    )
                     evaluation.update(
                         status="failed",
                         error="Candidate did not complete every study window.",
+                        evidence=evidence.to_dict(),
                     )
                     logger.warning(
                         "Optimization candidate %s did not complete all "
@@ -440,9 +661,13 @@ class OptimizationCoordinator:
                             candidate_index.directory / row["bundle_path"],
                             self.directory,
                         )
+                    evidence = self._evaluation_evidence(
+                        algorithm_id, evaluation["parameters"],
+                        candidate_index, completed_ranges=self.ranges,
+                    )
                     evaluation.update(
                         status="complete", score=float(observation.score),
-                        rows=rows,
+                        evidence=evidence.to_dict(), rows=rows,
                     )
                 self.guard.require()
         observations = []
@@ -459,6 +684,10 @@ class OptimizationCoordinator:
                     parameters=trial["parameters"],
                     status=evaluation["status"], score=evaluation["score"],
                     error=evaluation["error"],
+                    evidence=(
+                        EvaluationEvidence.from_dict(evaluation["evidence"])
+                        if evaluation.get("evidence") is not None else None
+                    ),
                 )
             observations.append(observation.to_dict())
         state.update(phase="tell", observations=observations)

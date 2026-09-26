@@ -296,11 +296,11 @@ class TestSqliteIndexV4Migration(TestCase):
             conn.close()
 
         with SqliteBacktestIndex.open(self.index_path) as idx:
-            # Schema bumped to v5.
+            # Schema includes the v6 summary-semantics migration.
             v = int(
                 self._raw_user_version()
             )
-            self.assertEqual(v, 5)
+            self.assertEqual(v, 6)
 
             rows = list(idx.iter_rows())
             self.assertEqual(len(rows), 1)

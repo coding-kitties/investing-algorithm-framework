@@ -71,7 +71,9 @@ logger = logging.getLogger(__name__)
 # with ``study_name IS NULL`` are coerced to ``'default'`` — the
 # canonical sentinel for the unnamed default study (see
 # ``docs/design/multi-study-bundle.md`` §4.3).
-SCHEMA_VERSION = 5
+# v6 adds the versioned independent-window summary fields. The generic
+# additive migration below creates their promoted ``summary_*`` columns.
+SCHEMA_VERSION = 6
 
 # Columns of BacktestIndexRow that map 1:1 to typed SQL columns.
 # (parameters / strategy_ids are emitted as JSON text columns; the

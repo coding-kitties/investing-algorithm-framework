@@ -734,15 +734,28 @@ Notes:
 
 ### Summary structure
 
-A `Summary` aggregates metrics across all runs in a study's engine
-slot. It is the `BacktestSummaryMetrics` dataclass — scalar only,
-no time-series.
+A `Summary` contains scalar statistics across all independently evaluated runs
+in a study's engine slot. It is the `BacktestSummaryMetrics` dataclass and has
+no time-series. It MUST NOT present descriptive means of window CAGR, Sharpe,
+Sortino, Calmar, volatility, VaR, or CVaR as metrics of a continuous portfolio.
+
+Version 2 summaries identify `aggregation_mode = "independent_windows"`,
+the return and drawdown definitions, and available window-count provenance.
+`capital_weighted_window_return` is calculated only from complete compatible
+P&L/initial-capital pairs. `worst_window_max_drawdown` is the largest validated
+nonnegative per-window magnitude. Portfolio fields remain null unless a
+separately defined portfolio path exists. Unversioned summaries have
+legacy/unknown aggregation semantics.
 
 ```
 Summary  (= BacktestSummaryMetrics)
 ├── # capital / P&L (aggregated)
 ├── total_net_gain: float
-├── total_net_gain_percentage: float
+├── capital_weighted_window_return: float | null
+├── total_net_gain_percentage: float | null  # compatibility alias
+├── median_window_return: float
+├── worst_window_return: float
+├── best_window_return: float
 ├── total_growth: float
 ├── total_growth_percentage: float
 ├── total_loss: float
@@ -764,10 +777,11 @@ Summary  (= BacktestSummaryMetrics)
 ├── average_win_duration: float
 ├── average_loss_duration: float
 │
-├── # risk-adjusted (pooled)
-├── cagr: float
-├── sharpe_ratio: float
-├── sortino_ratio: float
+├── # descriptive window means
+├── duration_weighted_mean_window_cagr: float
+├── duration_weighted_mean_window_sharpe_ratio: float
+├── duration_weighted_mean_window_sortino_ratio: float
+├── duration_weighted_mean_window_calmar_ratio: float
 ├── calmar_ratio: float
 ├── profit_factor: float
 ├── annual_volatility: float

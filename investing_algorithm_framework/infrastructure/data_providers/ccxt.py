@@ -51,6 +51,7 @@ class CCXTOHLCVDataProvider(DataProvider):
     """
     data_type = DataType.OHLCV
     data_provider_identifier = "ccxt_ohlcv_data_provider"
+    supports_prepared_data_reuse = True
     storage_directory = None
 
     def __init__(
@@ -184,6 +185,7 @@ class CCXTOHLCVDataProvider(DataProvider):
         fill_missing_data: bool = False,
         show_progress: bool = False,
         save_filled_data_points: bool = False,
+        build_window_cache: bool = True,
     ) -> None:
         """
         Prepares backtest data for a given symbol and date range.
@@ -201,6 +203,8 @@ class CCXTOHLCVDataProvider(DataProvider):
             save_filled_data_points (bool): Persist synthetic filled candles
                 in the canonical cache when filling is enabled. Existing
                 cached candles outside this window are preserved.
+            build_window_cache (bool): Build eager per-timestamp rolling
+                windows. Full-range vector consumers disable this.
 
         Raises:
             OperationalException: If the backtest start date is before the
@@ -335,7 +339,7 @@ class CCXTOHLCVDataProvider(DataProvider):
                 TimeFrame.from_value(self.time_frame).amount_of_minutes * 60
             )
 
-        if self.window_size is not None:
+        if self.window_size is not None and build_window_cache:
             # Create cache with sliding windows
             self._precompute_sliding_windows(
                 data=data,
@@ -344,6 +348,8 @@ class CCXTOHLCVDataProvider(DataProvider):
                 start_date=backtest_start_date,
                 end_date=backtest_end_date
             )
+        elif not build_window_cache:
+            self.window_cache.clear()
 
         n_min = TimeFrame.from_value(self.time_frame).amount_of_minutes
         # Assume self.data is a Polars DataFrame with a "Datetime" column
@@ -359,6 +365,24 @@ class CCXTOHLCVDataProvider(DataProvider):
         # Find missing dates
         self.missing_data_point_dates = sorted(
             set(expected_dates) - set(actual_dates)
+        )
+
+    def prepare_backtest_data_for_access(
+        self,
+        backtest_start_date,
+        backtest_end_date,
+        fill_missing_data: bool = False,
+        show_progress: bool = False,
+        access_pattern: str = "rolling",
+        **options,
+    ) -> None:
+        self.prepare_backtest_data(
+            backtest_start_date=backtest_start_date,
+            backtest_end_date=backtest_end_date,
+            fill_missing_data=fill_missing_data,
+            show_progress=show_progress,
+            build_window_cache=access_pattern != "full_range",
+            **options,
         )
 
     def get_data(
@@ -1271,6 +1295,7 @@ class CCXTOHLCVDataProvider(DataProvider):
             pandas=data_source.pandas,
         )
         provider.data = self.data
+        provider.window_cache = self.window_cache.copy()
         provider.missing_data_point_dates = \
             self.missing_data_point_dates
         provider._start_date_data_source = \

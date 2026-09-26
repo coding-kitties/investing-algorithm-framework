@@ -1691,6 +1691,8 @@ class App:
         if optimization is not None:
             from investing_algorithm_framework.infrastructure.services \
                 .backtesting.optimization import OptimizationCoordinator
+            from investing_algorithm_framework.services.data_providers \
+                .prepared_market_data import PreparedMarketDataContext
 
             candidate_strategies = (
                 [strategy] if strategy is not None else strategies
@@ -1703,17 +1705,64 @@ class App:
                 and self._strategies
             ):
                 candidate_strategies = list(self._strategies)
-            return OptimizationCoordinator(
-                runner=self.run_backtest,
-                configuration=optimization,
-                run_configuration=run_configuration,
-                study=study,
-                resource_directory=self.resource_directory_path,
-                strategies=candidate_strategies,
-                algorithms=candidate_algorithms,
-                window_filter=window_metrics_filter_function,
-                final_filter=final_metrics_filter_function,
-            ).run()
+            data_provider_service = self.container.data_provider_service()
+            existing_context = (
+                data_provider_service.prepared_market_data_context
+            )
+            owns_context = existing_context is None
+            context = existing_context
+            if context is None:
+                cache_budget_mb = (
+                    memory_budget_mb / 2
+                    if memory_budget_mb is not None else 512
+                )
+                context = PreparedMarketDataContext(
+                    max_bytes=max(1, int(cache_budget_mb * 1024 * 1024))
+                )
+                data_provider_service.prepared_market_data_context = context
+            try:
+                result = OptimizationCoordinator(
+                    runner=self.run_backtest,
+                    configuration=optimization,
+                    run_configuration=run_configuration,
+                    study=study,
+                    resource_directory=self.resource_directory_path,
+                    strategies=candidate_strategies,
+                    algorithms=candidate_algorithms,
+                    window_filter=window_metrics_filter_function,
+                    final_filter=final_metrics_filter_function,
+                ).run()
+                return result
+            finally:
+                if owns_context:
+                    stats = context.stats
+                    logger.info(
+                        "Prepared market data: %d hits, %d misses, "
+                        "%d builds, %d evictions, %d bytes resident; "
+                        "registration %.3fs, preparation %.3fs, "
+                        "%d rolling-cache builds.",
+                        stats.hits,
+                        stats.misses,
+                        stats.builds,
+                        stats.evictions,
+                        stats.resident_bytes,
+                        stats.registration_seconds,
+                        stats.preparation_seconds,
+                        stats.rolling_cache_builds,
+                    )
+                    if show_progress:
+                        print(
+                            "Prepared market data: "
+                            f"{stats.hits} hits, {stats.misses} misses, "
+                            f"{stats.builds} builds, "
+                            f"{stats.evictions} evictions | "
+                            f"registration {stats.registration_seconds:.3f}s, "
+                            f"preparation {stats.preparation_seconds:.3f}s, "
+                            f"rolling builds {stats.rolling_cache_builds}",
+                            flush=True,
+                        )
+                    data_provider_service.prepared_market_data_context = None
+                    context.close()
 
         # Combined-algorithm mode: run every strategy on `algorithm`
         # together in ONE backtest sharing one portfolio (mirrors how

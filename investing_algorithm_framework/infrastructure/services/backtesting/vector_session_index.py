@@ -38,7 +38,10 @@ def compact_rows(
             slot.summary = generate_backtest_summary_metrics([
                 run.backtest_metrics for run in slot.runs
                 if run.backtest_metrics is not None
-            ])
+            ], expected_window_count=(
+                len(study.resolve_backtest_date_ranges())
+                if study.backtest_windows else None
+            ))
             backtest.regenerate_summaries_by_universe()
             for run in slot.runs:
                 if (

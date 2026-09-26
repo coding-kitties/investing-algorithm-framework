@@ -187,9 +187,8 @@ class TestSqliteBacktestIndexV3Schema(TestCase):
     def test_fresh_index_stamps_schema_version_3(self):
         with SqliteBacktestIndex.create(self.index_path):
             pass
-        # SCHEMA_VERSION was bumped to 5 in the multi-study rollout
-        # (composite PK extended to include ``study_name``).
-        self.assertEqual(self._user_version(), 5)
+        # Schema v6 adds versioned independent-window summary columns.
+        self.assertEqual(self._user_version(), 6)
 
     def test_composite_pk_distinguishes_engine_rows(self):
         """Two rows with the same ``bundle_path`` but different
@@ -248,7 +247,7 @@ class TestSqliteBacktestIndexV3Schema(TestCase):
 
         # Opening with the v9.0 code path must migrate to v3 in-place.
         with SqliteBacktestIndex.open(self.index_path) as idx:
-            self.assertEqual(self._user_version(), 5)
+            self.assertEqual(self._user_version(), 6)
             rows = list(idx.iter_rows())
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0].bundle_path, "legacy.iafbt")

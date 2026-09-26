@@ -6,7 +6,7 @@ sidebar_position: 13
 
 The framework records more than 80 scalar measurements for each backtest run,
 covering returns, risk, drawdowns, trades, exposure, and execution quality. It
-also stores chart-ready series and a 55-field summary for comparing performance
+also stores chart-ready series and a scalar summary for comparing performance
 across windows.
 
 Metrics are calculated at two levels:
@@ -60,8 +60,10 @@ For compatibility with single-study workflows, `Backtest` also provides
 - Durations on per-run metrics are hours unless noted otherwise.
 - Ratios such as Sharpe, Sortino, Calmar, Omega, and profit factor are
   dimensionless.
-- A missing or inapplicable value may be `None`, `NaN`, or zero depending on the
-  metric and available observations. Check before ranking or formatting.
+- A missing or inapplicable summary value is `None`; for example, portfolio
+  CAGR is unavailable for independently reset windows without an aggregate
+  equity path. Per-run producers may retain metric-specific `NaN` or zero
+  conventions.
 - `total_growth` and `total_growth_percentage` are legacy aliases for
   `total_net_gain` and `total_net_gain_percentage`.
 
@@ -168,20 +170,32 @@ account-value reporting.
 
 ## Summary metrics
 
-`BacktestSummaryMetrics` rolls up all runs in one study and engine slot. It has
-55 fields: familiar return, risk, trade, and exposure measures plus
-cross-window robustness statistics.
+`BacktestSummaryMetrics` rolls up all runs in one study and engine slot. Its
+default mode is `independent_windows`: every run is a separate experiment whose
+portfolio resets. These statistics do not create a continuous portfolio path.
+
+Version 2 summaries record `aggregation_semantics_version`,
+`aggregation_mode`, return and drawdown definitions, evaluated/expected/missing
+window counts, and completeness. Unversioned summaries remain readable as
+legacy/unknown semantics and are labelled as legacy in default tables.
 
 ### Aggregate performance
 
 | Fields | Meaning |
 | --- | --- |
-| `total_net_gain`, `total_net_gain_percentage`, `average_net_gain`, `average_net_gain_percentage` | Total and average net performance across windows. |
+| `total_net_gain` | Sum of experiment P&L in one compatible reporting currency; not continuous-account P&L. |
+| `capital_weighted_window_return`, `total_net_gain_percentage` | Sum of paired window P&L divided by paired positive initial capital. The latter is a compatibility alias. The value is unavailable when any pair is incomplete or invalid. |
+| `median_window_return`, `worst_window_return`, `best_window_return` | Descriptive statistics over valid per-window decimal returns. |
+| `average_net_gain`, `average_net_gain_percentage` | Duration-weighted means across windows. |
 | `total_growth`, `total_growth_percentage`, `average_growth`, `average_growth_percentage` | Legacy growth aliases. |
 | `total_loss`, `total_loss_percentage`, `average_loss`, `average_loss_percentage` | Total and average gross-loss magnitude. |
-| `cagr`, `annual_volatility` | Annualized growth and volatility. |
-| `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor` | Aggregate risk-adjusted and payoff ratios. |
-| `max_drawdown`, `max_drawdown_duration`, `var_95`, `cvar_95` | Aggregate drawdown and tail risk. |
+| `duration_weighted_mean_window_cagr`, `duration_weighted_mean_window_annual_volatility` | Explicitly named descriptive means of per-window annualized values. |
+| `duration_weighted_mean_window_sharpe_ratio`, `duration_weighted_mean_window_sortino_ratio`, `duration_weighted_mean_window_calmar_ratio` | Explicitly named descriptive means of per-window ratios. |
+| `cagr`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `annual_volatility` | Compatibility aliases for the corresponding duration-weighted window means; they are not portfolio metrics. |
+| `worst_window_max_drawdown`, `max_drawdown` | Largest validated nonnegative per-window drawdown magnitude. The latter is a compatibility alias. |
+| `portfolio_cagr`, `portfolio_sharpe_ratio`, `portfolio_sortino_ratio`, `portfolio_calmar_ratio`, `portfolio_annual_volatility`, `portfolio_max_drawdown`, `portfolio_var_95`, `portfolio_cvar_95` | Reserved for metrics computed from one explicitly defined portfolio path; `None` for independent-window summaries. |
+| `profit_factor` | Ratio recomputed from compatible pooled gross-profit and gross-loss totals. |
+| `max_drawdown_duration`, `var_95`, `cvar_95` | Legacy cross-window descriptive values. |
 
 ### Aggregate trades and exposure
 
@@ -201,7 +215,9 @@ cross-window robustness statistics.
 
 | Fields | Meaning |
 | --- | --- |
-| `number_of_windows` | Runs included in the summary. |
+| `number_of_windows`, `window_count_evaluated` | Runs included in the summary. |
+| `window_count_expected`, `window_count_missing`, `complete` | Evaluation-context coverage when the expected count is known. |
+| `mean_window_duration_days` | Arithmetic mean of valid positive window durations in days. |
 | `number_of_windows_with_trades` | Windows with at least one closed trade. |
 | `number_of_profitable_windows` | Windows with positive net gain. |
 | `return_consistency`, `win_rate_consistency`, `sharpe_consistency` | Variation of each measure across windows; lower is more consistent. |
@@ -224,14 +240,17 @@ import pandas as pd
 # Keep pooled rows, then require acceptable risk and repeatability.
 candidates = results.filter(lambda row: (
     pd.isna(row["universe_key"])
-    and row["summary.sharpe_ratio"] >= 1.0
-    and row["summary.max_drawdown"] <= 0.20
+    and row["summary.duration_weighted_mean_window_sharpe_ratio"] >= 1.0
+    and row["summary.worst_window_max_drawdown"] <= 0.20
     and row["summary.consistency_score"] >= 0.70
 ))
 
 leader_ids = set(
   candidates.df
-  .sort_values("summary.sharpe_ratio", ascending=False)
+  .sort_values(
+      "summary.duration_weighted_mean_window_sharpe_ratio",
+      ascending=False,
+  )
   .head(20)["algorithm_id"]
 )
 leaders = candidates.filter(
@@ -252,5 +271,5 @@ indexing across large collections.
 `BacktestMetrics` currently has 105 dataclass fields. The public `80+` claim is
 deliberately conservative: it excludes the window identity, metadata, chart
 series, rich trade/calendar objects, and legacy growth aliases, leaving more
-than 80 scalar per-run measurements. The 55 summary fields are a separate
+than 80 scalar per-run measurements. Summary fields are a separate
 cross-window view and are not added to that claim.

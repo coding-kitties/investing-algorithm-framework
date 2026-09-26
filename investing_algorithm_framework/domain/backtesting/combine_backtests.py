@@ -1,5 +1,6 @@
 import logging
 import math
+import statistics
 from typing import List, Optional
 
 from .consistency import (
@@ -7,7 +8,10 @@ from .consistency import (
     get_consistency_score, get_stability_score,
 )
 from .backtest_metrics import BacktestMetrics
-from .backtest_summary_metrics import BacktestSummaryMetrics
+from .backtest_summary_metrics import (
+    AGGREGATION_SEMANTICS_VERSION,
+    BacktestSummaryMetrics,
+)
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -370,7 +374,9 @@ def combine_multi_universe_backtest(
 
 
 def generate_backtest_summary_metrics(
-    backtest_metrics: List[BacktestMetrics]
+    backtest_metrics: List[BacktestMetrics],
+    *,
+    expected_window_count: Optional[int] = None,
 ) -> BacktestSummaryMetrics:
     """
     Combine multiple BacktestMetrics into a single BacktestSummaryMetrics
@@ -378,10 +384,10 @@ def generate_backtest_summary_metrics(
 
     The aggregation logic follows these principles:
     - Absolute values (gains, losses, growth): summed across periods
-    - Percentage returns: compounded across periods (not summed)
-    - Ratios (Sharpe, Sortino, etc.): weighted average by time period
+    - Window return: paired PnL divided by paired initial capital
+    - Window ratios: descriptive weighted averages, not portfolio metrics
     - Trade-based metrics (win rate, avg trade return): weighted by trade count
-    - Max drawdown: worst (minimum) value across all periods
+    - Max drawdown: largest nonnegative magnitude across all periods
     - Counts (number of trades): summed
 
     Args:
@@ -392,13 +398,40 @@ def generate_backtest_summary_metrics(
         BacktestSummaryMetrics: A new BacktestSummaryMetrics instance
             representing the combined results.
     """
+    if (
+        expected_window_count is not None
+        and (
+            isinstance(expected_window_count, bool)
+            or not isinstance(expected_window_count, int)
+            or expected_window_count < 0
+        )
+    ):
+        raise ValueError(
+            "expected_window_count must be a nonnegative integer or None."
+        )
+
     if not backtest_metrics:
-        return BacktestSummaryMetrics()
+        return BacktestSummaryMetrics(
+            aggregation_semantics_version=AGGREGATION_SEMANTICS_VERSION,
+            aggregation_mode="independent_windows",
+            return_definition="net_pnl_over_initial_capital",
+            drawdown_definition="worst_window_positive_magnitude",
+            window_count_expected=expected_window_count,
+            window_count_evaluated=0,
+            window_count_missing=expected_window_count,
+            complete=expected_window_count == 0
+            if expected_window_count is not None else None,
+            number_of_windows=0,
+            number_of_profitable_windows=0,
+            number_of_windows_with_trades=0,
+        )
 
     # Filter out None metrics
     valid_metrics = [b for b in backtest_metrics if b is not None]
     if not valid_metrics:
-        return BacktestSummaryMetrics()
+        return generate_backtest_summary_metrics(
+            [], expected_window_count=expected_window_count
+        )
 
     # === ABSOLUTE VALUES (summed) ===
     total_net_gain = sum(
@@ -418,7 +451,7 @@ def generate_backtest_summary_metrics(
         if b.total_growth is not None
     )
 
-    # === PERCENTAGE RETURNS ===
+    # === INDEPENDENT-WINDOW RETURNS ===
     # ``total_net_gain_percentage`` aggregates per-run returns into a
     # single bundle-level figure. We *cannot* compound the per-run
     # values via ``(1 + r1) * (1 + r2) * ...``: rolling backtest
@@ -430,35 +463,77 @@ def generate_backtest_summary_metrics(
     # PnL divided by capital deployed — but applied to the bundle:
     # ``sum(total_net_gain) / sum(initial_unallocated)``. This is
     # invariant to window overlap, agrees with the per-run formula,
-    # and stays internally consistent with ``cagr`` (which is a
-    # duration-weighted mean of per-run CAGRs).
-    total_initial_capital = 0.0
+    # Every numerator must have its own valid denominator. Do not silently
+    # mix all PnL with only the subset of windows that reports capital, and
+    # do not change the definition to a duration-weighted return on failure.
+    paired_return_inputs = []
     for b in valid_metrics:
-        iv = getattr(b, "initial_unallocated", None)
-        if isinstance(iv, (int, float)) and iv > 0:
-            total_initial_capital += iv
-    if total_initial_capital > 0 and total_net_gain is not None:
-        total_net_gain_percentage = total_net_gain / total_initial_capital
-    else:
-        # Fall back to a duration-weighted mean of per-run percentages
-        # when initial-capital figures are missing — still bounded and
-        # never inflates with overlapping windows.
-        total_net_gain_percentage = safe_weighted_mean(
-            [b.total_net_gain_percentage for b in valid_metrics],
-            [b.total_number_of_days for b in valid_metrics],
+        pnl = getattr(b, "total_net_gain", None)
+        capital = getattr(b, "initial_unallocated", None)
+        if (
+            isinstance(pnl, (int, float))
+            and not isinstance(pnl, bool)
+            and math.isfinite(pnl)
+            and isinstance(capital, (int, float))
+            and not isinstance(capital, bool)
+            and math.isfinite(capital)
+            and capital > 0
+        ):
+            paired_return_inputs.append((pnl, capital))
+
+    if len(paired_return_inputs) == len(valid_metrics):
+        total_paired_pnl = sum(pnl for pnl, _ in paired_return_inputs)
+        total_initial_capital = sum(
+            capital for _, capital in paired_return_inputs
         )
+        total_net_gain_percentage = (
+            total_paired_pnl / total_initial_capital
+        )
+        capital_weighted_return_unavailable_reason = None
+    else:
+        total_initial_capital = 0.0
+        total_net_gain_percentage = None
+        capital_weighted_return_unavailable_reason = (
+            "One or more windows lack finite net P&L paired with positive "
+            "finite initial capital."
+        )
+
+    window_returns = [
+        value for value in (
+            getattr(b, "total_net_gain_percentage", None)
+            for b in valid_metrics
+        )
+        if isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    ]
+    median_window_return = (
+        statistics.median(window_returns) if window_returns else None
+    )
+    worst_window_return = min(window_returns) if window_returns else None
+    best_window_return = max(window_returns) if window_returns else None
+
+    valid_window_durations = [
+        duration for duration in (
+            getattr(b, "total_number_of_days", None)
+            for b in valid_metrics
+        )
+        if isinstance(duration, (int, float))
+        and not isinstance(duration, bool)
+        and math.isfinite(duration)
+        and duration > 0
+    ]
+    mean_window_duration_days = (
+        statistics.mean(valid_window_durations)
+        if valid_window_durations else None
+    )
     # ``total_loss`` is a non-multiplicative magnitude (it does not
     # compound across windows). Express the aggregate as the sum of
     # gross losses divided by the sum of initial capital across
     # windows, which keeps the unit (decimal fraction) consistent
     # with the per-run definition. See issue #511 (B2).
-    total_initial_value = 0.0
-    for b in valid_metrics:
-        iv = getattr(b, "initial_unallocated", None)
-        if isinstance(iv, (int, float)) and iv > 0:
-            total_initial_value += iv
-    if total_initial_value > 0 and total_loss is not None:
-        total_loss_percentage = total_loss / total_initial_value
+    if total_initial_capital > 0 and total_loss is not None:
+        total_loss_percentage = total_loss / total_initial_capital
     else:
         total_loss_percentage = None
     # ``total_growth_percentage`` follows the same overlap-safe
@@ -466,13 +541,10 @@ def generate_backtest_summary_metrics(
     # aggregate growth by aggregate capital deployed instead of
     # compounding per-run percentages (which double-counts overlapping
     # rolling windows).
-    if total_initial_value > 0 and total_growth is not None:
-        total_growth_percentage = total_growth / total_initial_value
+    if total_initial_capital > 0 and total_growth is not None:
+        total_growth_percentage = total_growth / total_initial_capital
     else:
-        total_growth_percentage = safe_weighted_mean(
-            [b.total_growth_percentage for b in valid_metrics],
-            [b.total_number_of_days for b in valid_metrics],
-        )
+        total_growth_percentage = None
 
     # === AVERAGES (weighted by time) ===
     average_total_net_gain = safe_weighted_mean(
@@ -541,11 +613,26 @@ def generate_backtest_summary_metrics(
             [b.total_number_of_days for b in valid_metrics]
         )
 
-    # === MAX DRAWDOWN (worst value = minimum,
-    # since drawdowns are negative) ===
-    drawdowns = [b.max_drawdown for b in valid_metrics
-                 if b.max_drawdown is not None]
-    max_drawdown = min(drawdowns) if drawdowns else None
+    # === MAX DRAWDOWN ===
+    # Current producers emit nonnegative magnitudes. Consistently negative
+    # values are accepted as the documented legacy convention and migrated.
+    # Mixed signs are ambiguous and must not be normalized silently.
+    drawdowns = [
+        value for value in (
+            getattr(b, "max_drawdown", None) for b in valid_metrics
+        )
+        if isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    ]
+    has_positive_drawdown = any(value > 0 for value in drawdowns)
+    has_negative_drawdown = any(value < 0 for value in drawdowns)
+    if has_positive_drawdown and has_negative_drawdown:
+        raise ValueError(
+            "Cannot aggregate mixed max_drawdown sign conventions."
+        )
+    drawdown_magnitudes = [abs(value) for value in drawdowns]
+    max_drawdown = max(drawdown_magnitudes) if drawdown_magnitudes else None
 
     max_drawdown_duration = max(
         (b.max_drawdown_duration for b in valid_metrics
@@ -654,8 +741,7 @@ def generate_backtest_summary_metrics(
     # === WINDOW COUNTS ===
     number_of_windows = len(valid_metrics)
     number_of_profitable_windows = sum(
-        1 for b in valid_metrics
-        if b.total_net_gain is not None and b.total_net_gain > 0
+        1 for window_return in window_returns if window_return > 0
     )
     number_of_windows_with_trades = sum(
         1 for b in valid_metrics
@@ -778,9 +864,36 @@ def generate_backtest_summary_metrics(
             number_of_profitable_windows, number_of_windows,
         )
 
+    if expected_window_count is not None:
+        if expected_window_count < number_of_windows:
+            raise ValueError(
+                "expected_window_count cannot be less than evaluated windows."
+            )
+        window_count_missing = expected_window_count - number_of_windows
+        complete = window_count_missing == 0
+    else:
+        window_count_missing = None
+        complete = None
+
     return BacktestSummaryMetrics(
+        aggregation_semantics_version=AGGREGATION_SEMANTICS_VERSION,
+        aggregation_mode="independent_windows",
+        return_definition="net_pnl_over_initial_capital",
+        drawdown_definition="worst_window_positive_magnitude",
+        window_count_expected=expected_window_count,
+        window_count_evaluated=number_of_windows,
+        window_count_missing=window_count_missing,
+        complete=complete,
+        capital_weighted_return_unavailable_reason=(
+            capital_weighted_return_unavailable_reason
+        ),
         total_net_gain=total_net_gain,
         total_net_gain_percentage=total_net_gain_percentage,
+        capital_weighted_window_return=total_net_gain_percentage,
+        median_window_return=median_window_return,
+        worst_window_return=worst_window_return,
+        best_window_return=best_window_return,
+        mean_window_duration_days=mean_window_duration_days,
         average_net_gain=average_total_net_gain,
         average_net_gain_percentage=average_total_net_gain_percentage,
         total_loss=total_loss,
@@ -795,9 +908,15 @@ def generate_backtest_summary_metrics(
         sharpe_ratio=sharpe_ratio,
         sortino_ratio=sortino_ratio,
         calmar_ratio=calmar_ratio,
+        duration_weighted_mean_window_cagr=cagr,
+        duration_weighted_mean_window_sharpe_ratio=sharpe_ratio,
+        duration_weighted_mean_window_sortino_ratio=sortino_ratio,
+        duration_weighted_mean_window_calmar_ratio=calmar_ratio,
         profit_factor=profit_factor,
         annual_volatility=annual_volatility,
+        duration_weighted_mean_window_annual_volatility=annual_volatility,
         max_drawdown=max_drawdown,
+        worst_window_max_drawdown=max_drawdown,
         max_drawdown_duration=max_drawdown_duration,
         trades_per_year=trades_per_year,
         trades_per_month=trades_per_month,

@@ -6,12 +6,17 @@ from pathlib import Path
 
 logger = getLogger(__name__)
 
+AGGREGATION_SEMANTICS_VERSION = 2
+
 
 @dataclass
 class BacktestSummaryMetrics:
     """
-    Represents the summarized results of a backtest,
-    focusing on key headline performance and risk metrics.
+    Represents statistics across independently evaluated backtest windows.
+
+    Portfolio-level metrics are unavailable unless a single declared equity
+    path is supplied. Legacy fields such as ``cagr`` and ``sharpe_ratio`` are
+    retained as compatibility aliases for duration-weighted window means.
 
     .. note:: Field semantics & known duplicates (issue #511)
 
@@ -62,13 +67,18 @@ class BacktestSummaryMetrics:
         average_trade_loss_percentage (float): Average trade loss percentage.
         average_trade_gain (float): Average gain from winning trades.
         average_trade_gain_percentage (float): Average gain percentage
-        cagr (float): Compound annual growth rate of the backtest.
-        sharpe_ratio (float): Sharpe ratio, risk-adjusted return.
-        sortino_ratio (float): Sortino ratio, downside-risk adjusted return.
-        calmar_ratio (float): CAGR relative to max drawdown.
+        cagr (float): Legacy alias for
+            ``duration_weighted_mean_window_cagr``.
+        sharpe_ratio (float): Legacy alias for
+            ``duration_weighted_mean_window_sharpe_ratio``.
+        sortino_ratio (float): Legacy alias for
+            ``duration_weighted_mean_window_sortino_ratio``.
+        calmar_ratio (float): Legacy alias for
+            ``duration_weighted_mean_window_calmar_ratio``.
         profit_factor (float): Total profit / total loss.
         annual_volatility (float): Annualized volatility of returns.
-        max_drawdown (float): Maximum drawdown observed.
+        max_drawdown (float): Legacy alias for
+            ``worst_window_max_drawdown`` as a nonnegative magnitude.
         max_drawdown_duration (int): Duration of the maximum drawdown.
         trades_per_year (float): Average trades executed per year.
         win_rate (float): Percentage of winning trades.
@@ -84,8 +94,22 @@ class BacktestSummaryMetrics:
         number_of_windows_with_trades (int): Number of windows with at least
             one closed trade.
     """
+    aggregation_semantics_version: int = None
+    aggregation_mode: str = None
+    return_definition: str = None
+    drawdown_definition: str = None
+    window_count_expected: int = None
+    window_count_evaluated: int = None
+    window_count_missing: int = None
+    complete: bool = None
+    capital_weighted_return_unavailable_reason: str = None
     total_net_gain: float = None
     total_net_gain_percentage: float = None
+    capital_weighted_window_return: float = None
+    median_window_return: float = None
+    worst_window_return: float = None
+    best_window_return: float = None
+    mean_window_duration_days: float = None
     total_growth: float = None
     total_growth_percentage: float = None
     total_loss: float = None
@@ -106,10 +130,24 @@ class BacktestSummaryMetrics:
     sharpe_ratio: float = None
     sortino_ratio: float = None
     calmar_ratio: float = None
+    duration_weighted_mean_window_cagr: float = None
+    duration_weighted_mean_window_sharpe_ratio: float = None
+    duration_weighted_mean_window_sortino_ratio: float = None
+    duration_weighted_mean_window_calmar_ratio: float = None
     profit_factor: float = None
     annual_volatility: float = None
+    duration_weighted_mean_window_annual_volatility: float = None
     max_drawdown: float = None
+    worst_window_max_drawdown: float = None
     max_drawdown_duration: int = None
+    portfolio_cagr: float = None
+    portfolio_sharpe_ratio: float = None
+    portfolio_sortino_ratio: float = None
+    portfolio_calmar_ratio: float = None
+    portfolio_annual_volatility: float = None
+    portfolio_max_drawdown: float = None
+    portfolio_var_95: float = None
+    portfolio_cvar_95: float = None
     trades_per_year: float = None
     trades_per_month: float = None
     trades_per_week: float = None
@@ -145,8 +183,25 @@ class BacktestSummaryMetrics:
         Convert the BacktestSummaryMetrics instance to a dictionary.
         """
         return {
+            "aggregation_semantics_version":
+                self.aggregation_semantics_version,
+            "aggregation_mode": self.aggregation_mode,
+            "return_definition": self.return_definition,
+            "drawdown_definition": self.drawdown_definition,
+            "window_count_expected": self.window_count_expected,
+            "window_count_evaluated": self.window_count_evaluated,
+            "window_count_missing": self.window_count_missing,
+            "complete": self.complete,
+            "capital_weighted_return_unavailable_reason":
+                self.capital_weighted_return_unavailable_reason,
             "total_net_gain": self.total_net_gain,
             "total_net_gain_percentage": self.total_net_gain_percentage,
+            "capital_weighted_window_return":
+                self.capital_weighted_window_return,
+            "median_window_return": self.median_window_return,
+            "worst_window_return": self.worst_window_return,
+            "best_window_return": self.best_window_return,
+            "mean_window_duration_days": self.mean_window_duration_days,
             "total_growth": self.total_growth,
             "total_growth_percentage": self.total_growth_percentage,
             "total_loss": self.total_loss,
@@ -170,10 +225,29 @@ class BacktestSummaryMetrics:
             "sharpe_ratio": self.sharpe_ratio,
             "sortino_ratio": self.sortino_ratio,
             "calmar_ratio": self.calmar_ratio,
+            "duration_weighted_mean_window_cagr":
+                self.duration_weighted_mean_window_cagr,
+            "duration_weighted_mean_window_sharpe_ratio":
+                self.duration_weighted_mean_window_sharpe_ratio,
+            "duration_weighted_mean_window_sortino_ratio":
+                self.duration_weighted_mean_window_sortino_ratio,
+            "duration_weighted_mean_window_calmar_ratio":
+                self.duration_weighted_mean_window_calmar_ratio,
             "profit_factor": self.profit_factor,
             "annual_volatility": self.annual_volatility,
+            "duration_weighted_mean_window_annual_volatility":
+                self.duration_weighted_mean_window_annual_volatility,
             "max_drawdown": self.max_drawdown,
+            "worst_window_max_drawdown": self.worst_window_max_drawdown,
             "max_drawdown_duration": self.max_drawdown_duration,
+            "portfolio_cagr": self.portfolio_cagr,
+            "portfolio_sharpe_ratio": self.portfolio_sharpe_ratio,
+            "portfolio_sortino_ratio": self.portfolio_sortino_ratio,
+            "portfolio_calmar_ratio": self.portfolio_calmar_ratio,
+            "portfolio_annual_volatility": self.portfolio_annual_volatility,
+            "portfolio_max_drawdown": self.portfolio_max_drawdown,
+            "portfolio_var_95": self.portfolio_var_95,
+            "portfolio_cvar_95": self.portfolio_cvar_95,
             "trades_per_year": self.trades_per_year,
             "trades_per_month": self.trades_per_month,
             "trades_per_week": self.trades_per_week,

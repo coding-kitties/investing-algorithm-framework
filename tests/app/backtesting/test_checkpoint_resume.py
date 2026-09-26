@@ -147,6 +147,18 @@ class TestVectorCheckpointResume(TestCase):
         )
         pd.testing.assert_frame_equal(result.df, reopened.df)
 
+    def test_fully_checkpointed_run_skips_data_preparation(self):
+        self._run()
+
+        with patch.object(
+            BacktestService,
+            "initialize_data_sources_backtest",
+        ) as initialize:
+            result = self._run()
+
+        initialize.assert_not_called()
+        self._assert_complete(result)
+
     def test_restart_after_completed_window_runs_only_second_window(self):
         with self.assertRaisesRegex(KeyboardInterrupt, "simulated restart"):
             self._run(interrupt_after=2)

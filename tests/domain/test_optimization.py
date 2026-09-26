@@ -3,7 +3,7 @@ import unittest
 from dataclasses import FrozenInstanceError
 
 from investing_algorithm_framework.domain.optimization import (
-    CandidateProposal, FloatParameter, IntegerParameter,
+    CandidateProposal, EvaluationEvidence, FloatParameter, IntegerParameter,
     OptimizationConfiguration, OptimizationSearchSpace, StrategyOptimizer,
     TrialObservation,
 )
@@ -217,6 +217,92 @@ class TestProposalsAndObservations(unittest.TestCase):
         self.assertEqual(
             TrialObservation("p", "a", "complete", score=0).score, 0.0,
         )
+
+    def test_evidence_json_round_trip_preserves_scope_and_missing_values(self):
+        evidence = EvaluationEvidence(
+            evaluation_id="search:a",
+            algorithm_id="a",
+            parameters={"x": 2},
+            study_name="development",
+            engine_type="vector",
+            completed_window_keys=["w1", "w2"],
+            completed_windows=[
+                {
+                    "key": "w1", "start": "2026-01-01T00:00:00+00:00",
+                    "end": "2026-01-02T00:00:00+00:00",
+                    "execution_order": 0,
+                },
+                {
+                    "key": "w2", "start": "2026-02-01T00:00:00+00:00",
+                    "end": "2026-02-02T00:00:00+00:00",
+                    "execution_order": 1,
+                },
+            ],
+            required_windows=3,
+            run_metrics=[
+                {
+                    "window_key": "w1", "universe_key": None,
+                    "metrics": {"max_drawdown": None},
+                },
+            ],
+            summary_metrics=[
+                {
+                    "universe_key": None,
+                    "metrics": {"number_of_windows": 2},
+                },
+            ],
+            stop_reason="window_filter_pruned",
+            policy_identifier="tests.keep_promising",
+        )
+        observation = TrialObservation(
+            "p", "a", "pruned", parameters={"x": 2},
+            evidence=evidence,
+        )
+        payload = json.loads(json.dumps(
+            observation.to_dict(), allow_nan=False,
+        ))
+        restored = TrialObservation.from_dict(payload)
+        self.assertEqual(restored, observation)
+        self.assertEqual(restored.evidence.consumed_windows, 2)
+        self.assertIsNone(
+            restored.evidence.run_metrics[0]["metrics"]["max_drawdown"]
+        )
+        self.assertEqual(payload["evidence"]["schema_version"], 1)
+
+    def test_evidence_rejects_nonportable_or_inconsistent_values(self):
+        values = dict(
+            evaluation_id="search:a", algorithm_id="a",
+            parameters={"x": 2}, study_name="development",
+            engine_type="vector", completed_window_keys=["w1"],
+            completed_windows=[{"key": "w1"}], required_windows=1,
+            run_metrics=[], summary_metrics=[],
+        )
+        with self.assertRaisesRegex(ValueError, "JSON-safe"):
+            EvaluationEvidence(**dict(
+                values,
+                summary_metrics=[
+                    {"metrics": {"score": float("nan")}},
+                ],
+            ))
+        with self.assertRaisesRegex(ValueError, "equal length"):
+            EvaluationEvidence(
+                **dict(values, completed_window_keys=[]),
+            )
+        for name, value in (
+            ("completed_window_keys", "w1"),
+            ("completed_windows", ["w1"]),
+            ("run_metrics", "metrics"),
+            ("summary_metrics", [1]),
+        ):
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError):
+                    EvaluationEvidence(**dict(values, **{name: value}))
+        evidence = EvaluationEvidence(**values)
+        with self.assertRaisesRegex(ValueError, "algorithm IDs"):
+            TrialObservation(
+                "p", "other", "pruned", parameters={"x": 2},
+                evidence=evidence,
+            )
 
     def test_observation_rejects_invalid_fields(self):
         for values in (

@@ -217,6 +217,10 @@ class TestVectorOptimization(OptimizationFixture):
         self.assertEqual(
             [o.score for o in config.optimizer.observations], [2, 2, 2],
         )
+        self.assertTrue(all(
+            observation.evidence.consumed_windows == 2
+            for observation in config.optimizer.observations
+        ))
         self.assertEqual(len(list(result.iter_backtests())), 3)
         reopened = BacktestIndex.open(
             result.directory, filename="backtest_session_index.parquet",
@@ -257,6 +261,10 @@ class TestVectorOptimization(OptimizationFixture):
             [o.proposal_id for o in fresh.optimizer.observations],
             ["p-0", "p-1", "p-2"],
         )
+        self.assertTrue(all(
+            observation.evidence is not None
+            for observation in fresh.optimizer.observations
+        ))
 
     def test_generated_parameters_deduplicate_and_report_invalid(self):
         proposals = [
@@ -278,6 +286,10 @@ class TestVectorOptimization(OptimizationFixture):
         )
         self.assertEqual(
             observations[0].algorithm_id, observations[1].algorithm_id,
+        )
+        self.assertEqual(
+            observations[0].evidence.evaluation_id,
+            observations[1].evidence.evaluation_id,
         )
         self.assertEqual(len(set(result.df["algorithm_id"])), 2)
         self.assertEqual(len(self.saved), 4)
@@ -311,6 +323,85 @@ class TestVectorOptimization(OptimizationFixture):
         self.assertEqual(window_calls[-1], {"c"})
         self.assertEqual(
             len([key for key, _ in self.saved if key == "b"]), 1,
+        )
+        pruned = config.optimizer.observations[1]
+        self.assertEqual(pruned.evidence.stop_reason, "window_filter_pruned")
+        self.assertEqual(pruned.evidence.consumed_windows, 1)
+        self.assertIsNotNone(pruned.evidence.policy_identifier)
+
+    def test_pruned_evidence_contains_only_completed_window_metrics(self):
+        last = self.study.backtest_windows[-1].train_range.end_date
+        self.study.backtest_windows.append(BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=last,
+                end_date=last + timedelta(hours=10),
+            ),
+        ))
+
+        def prune_b_after_two_windows(index, date_range):
+            pooled = index.df.loc[index.df["universe_key"].isna()]
+            if pooled["summary.number_of_windows"].max() < 2:
+                return index
+            return index.filter(lambda row: row["algorithm_id"] != "b")
+
+        config = self.configuration()
+        self.run_search(
+            config,
+            window_metrics_filter_function=prune_b_after_two_windows,
+        )
+        evidence = config.optimizer.observations[1].evidence
+        self.assertEqual(config.optimizer.observations[1].status, "pruned")
+        self.assertEqual(evidence.consumed_windows, 2)
+        self.assertEqual(evidence.required_windows, 3)
+        self.assertEqual(len(evidence.completed_window_keys), 2)
+        self.assertEqual(len(evidence.run_metrics), 2)
+        self.assertEqual(
+            [metrics["execution_order"] for metrics in evidence.run_metrics],
+            [0, 1],
+        )
+        pooled_summary = next(
+            summary for summary in evidence.summary_metrics
+            if summary["universe_key"] is None
+        )
+        self.assertEqual(
+            pooled_summary["metrics"]["number_of_windows"], 2,
+        )
+
+    def test_evidence_excludes_later_runs_already_present_in_bundle(self):
+        last = self.study.backtest_windows[-1].train_range.end_date
+        self.study.backtest_windows.append(BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=last,
+                end_date=last + timedelta(hours=10),
+            ),
+        ))
+        config = self.configuration()
+        result = self.run_search(config)
+        coordinator = coordinator_module.OptimizationCoordinator(
+            runner=Mock(), configuration=config,
+            run_configuration=self.run_config,
+            study=deepcopy(self.study), resource_directory=self.directory,
+            strategies=[
+                LongCycleStrategy(algorithm_id=key)
+                for key in ("a", "b", "c")
+            ],
+        )
+        candidate_index = result.filter(
+            lambda row: row["algorithm_id"] == "b"
+        )
+        evidence = coordinator._evaluation_evidence(
+            "b", None, candidate_index,
+            completed_ranges=coordinator.ranges[:2],
+            stop_reason="window_filter_pruned",
+        )
+        self.assertEqual(evidence.consumed_windows, 2)
+        self.assertEqual(len(evidence.run_metrics), 2)
+        pooled_summary = next(
+            summary for summary in evidence.summary_metrics
+            if summary["universe_key"] is None
+        )
+        self.assertEqual(
+            pooled_summary["metrics"]["number_of_windows"], 2,
         )
 
     def test_existing_algorithms_keep_their_identity(self):
@@ -494,7 +585,9 @@ class TestOptimizationSafeguards(OptimizationFixture):
             self.run_search(config)
         completed = set(self.saved)
         self.saved.clear()
-        self.run_search(self.configuration())
+        objective.side_effect = None
+        objective.return_value = 2
+        self.run_search(config)
         self.assertFalse(completed & set(self.saved))
 
     def test_nonfinite_objective_is_not_reported_as_success(self):
@@ -566,3 +659,8 @@ class TestOptimizationSafeguards(OptimizationFixture):
             [o.status for o in config.optimizer.observations],
             ["failed", "failed", "failed"],
         )
+        self.assertTrue(all(
+            observation.evidence.consumed_windows == 0
+            and observation.evidence.stop_reason == "incomplete_evaluation"
+            for observation in config.optimizer.observations
+        ))

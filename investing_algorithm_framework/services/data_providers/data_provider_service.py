@@ -456,6 +456,7 @@ class DataProviderService:
         )
         self.configuration_service = configuration_service
         self.market_credential_service = market_credential_service
+        self.prepared_market_data_context = None
 
     def initialize(self, data_sources, data_providers):
         """
@@ -906,7 +907,10 @@ class DataProviderService:
         self,
         data_sources: List[DataSource],
         backtest_date_range: BacktestDateRange,
-        show_progress: bool = True
+        show_progress: bool = True,
+        access_pattern: str = "rolling",
+        fill_missing_data: bool = False,
+        save_filled_data_points: bool = False,
     ):
         """
         Index the data providers in the service.
@@ -927,6 +931,39 @@ class DataProviderService:
         # Filter out duplicate data_sources
         unique_data_sources = set(data_sources)
 
+        cache_plan = {}
+        context = self.prepared_market_data_context
+
+        def register(data_source):
+            cache_key = None
+            cached_provider = None
+            if context is not None:
+                cache_key = context.key(
+                    data_source,
+                    backtest_date_range,
+                    self.data_provider_index.data_providers,
+                    access_pattern=access_pattern,
+                    fill_missing_data=fill_missing_data,
+                    save_filled_data_points=save_filled_data_points,
+                )
+                cached_provider = context.get(cache_key)
+            if cached_provider is not None:
+                self.data_provider_index \
+                    .register_data_source_and_backtest_data_provider(
+                        data_source,
+                        cached_provider,
+                    )
+                cache_plan[data_source] = (cache_key, True)
+            else:
+                self.data_provider_index.register_backtest_data_source(
+                    data_source, backtest_date_range
+                )
+                cache_plan[data_source] = (cache_key, False)
+            logger.debug(
+                "Registered backtest data provider for data source: %s",
+                data_source,
+            )
+
         if show_progress:
 
             for data_source in tqdm(
@@ -934,24 +971,13 @@ class DataProviderService:
                 desc="Registering backtest data providers for data sources",
                 colour="green"
             ):
-                self.data_provider_index.register_backtest_data_source(
-                    data_source, backtest_date_range
-                )
-                logger.debug(
-                    "Registered backtest "
-                    f"data provider for data source: {data_source}"
-                )
+                register(data_source)
         else:
             for data_source in unique_data_sources:
-                self.data_provider_index.register_backtest_data_source(
-                    data_source, backtest_date_range
-                )
-                logger.debug(
-                    "Registered backtest "
-                    f"data provider for data source: {data_source}"
-                )
+                register(data_source)
 
         self.backtest_mode = True
+        return cache_plan
 
     def prepare_backtest_data(
         self,

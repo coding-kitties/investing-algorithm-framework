@@ -18,6 +18,7 @@ from investing_algorithm_framework.domain import (
     BacktestDateRange,
     BacktestMetrics,
     BacktestRun,
+    BacktestSummaryMetrics,
     BacktestWindow,
 )
 
@@ -309,6 +310,71 @@ class TestShowTradeInsights(unittest.TestCase):
 
 
 class TestBacktestTableHeadings(unittest.TestCase):
+    def test_summary_defaults_use_explicit_window_metric_labels(self):
+        summary = BacktestSummaryMetrics(
+            aggregation_semantics_version=2,
+            aggregation_mode="independent_windows",
+            capital_weighted_window_return=0.1259,
+            median_window_return=0.20,
+            worst_window_return=-0.10,
+            best_window_return=0.30,
+            worst_window_max_drawdown=0.40,
+            duration_weighted_mean_window_cagr=3.95,
+            portfolio_cagr=None,
+            number_of_profitable_windows=2,
+            window_count_evaluated=3,
+            window_count_expected=3,
+            mean_window_duration_days=60.333,
+        )
+
+        class Result:
+            algorithm_id = "strategy"
+
+            @staticmethod
+            def engines():
+                return ["vector"]
+
+            @staticmethod
+            def get_summary(_engine):
+                return summary
+
+        table = create_backtest_metrics_table([Result()])
+
+        self.assertIn("Capital-Weighted Window Return %", table)
+        self.assertIn("Worst-Window Max DD %", table)
+        self.assertIn("Duration-Weighted Mean Window CAGR %", table)
+        self.assertIn("Portfolio CAGR %", table)
+        self.assertIn("N/A", table)
+        self.assertIn("Mean Window Duration (days)", table)
+        self.assertNotIn("Avg Window Duration", table)
+
+    def test_unversioned_summary_uses_explicit_legacy_labels(self):
+        summary = BacktestSummaryMetrics(
+            total_net_gain_percentage=0.10,
+            cagr=0.50,
+            sharpe_ratio=1.20,
+            max_drawdown=0.05,
+            number_of_windows=2,
+        )
+
+        class Result:
+            algorithm_id = "legacy-strategy"
+
+            @staticmethod
+            def engines():
+                return ["vector"]
+
+            @staticmethod
+            def get_summary(_engine):
+                return summary
+
+        table = create_backtest_metrics_table([Result()])
+
+        self.assertIn("Legacy Aggregate Window Return %", table)
+        self.assertIn("Legacy Mean Window CAGR %", table)
+        self.assertIn("Legacy Max DD % (Uncorrected)", table)
+        self.assertNotIn("Capital-Weighted Window Return %", table)
+
     @patch(
         "investing_algorithm_framework.analysis.markdown."
         "create_backtest_metrics_table",

@@ -1,5 +1,5 @@
 from .domain.optimization import (
-    CandidateProposal, FloatParameter, IntegerParameter,
+    CandidateProposal, EvaluationEvidence, FloatParameter, IntegerParameter,
     OptimizationConfiguration, OptimizationSearchSpace,
     StrategyOptimizer, TrialObservation,
 )
@@ -176,6 +176,7 @@ except ImportError:
 
 __all__ = [
     "CandidateProposal",
+    "EvaluationEvidence",
     "FloatParameter",
     "IntegerParameter",
     "OptimizationConfiguration",

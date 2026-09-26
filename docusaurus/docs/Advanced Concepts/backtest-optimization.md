@@ -568,13 +568,85 @@ the search is exhausted.
 | `pruned` | A window filter rejected the candidate | `None` |
 
 Observations include `proposal_id`, `algorithm_id`, `parameters`, `status`,
-`score` and `error`. Do not assume every observation has a numerical score.
+`score`, `error` and optional `evidence`. Do not assume every observation has
+a numerical score.
 If an external optimizer requires penalties, translate statuses at the plugin
 boundary without pretending that a penalty was measured performance.
 
 Malformed proposals, plugin exceptions, resource errors and persistence errors
 stop execution. `continue_on_error` governs errors handled by the backtest
 runner, not arbitrary optimizer or objective exceptions.
+
+### Terminal evaluation evidence
+
+Completed, pruned and partially failed candidate observations can carry an
+`EvaluationEvidence` object. Existing optimizers remain compatible because the
+field is optional and they can ignore it. This is terminal feedback delivered
+through the ordinary `tell()` call; the framework does not call the optimizer
+after each individual window.
+
+Evidence contains:
+
+- `schema_version`, a stable `evaluation_id`, `algorithm_id` and resolved
+  `parameters`.
+- `study_name`, `engine_type`, and per-run `universe_key` scope.
+- Ordered `completed_window_keys` and descriptors with start/end timestamps,
+  window part and execution order.
+- Scalar metrics for each completed run.
+- Existing framework summary metrics over exactly those completed windows,
+  separated by pooled or per-universe scope.
+- `consumed_windows`, `required_windows`, `stop_reason`, and the window
+  policy identifier when pruning caused the stop.
+
+```python
+def tell(self, observations):
+    for observation in observations:
+        evidence = observation.evidence
+        if observation.status == "pruned" and evidence is not None:
+            for run in evidence.run_metrics:
+                metrics = run["metrics"]
+                print(
+                    run["window_key"],
+                    metrics.get("total_net_gain_percentage"),
+                    metrics.get("max_drawdown"),
+                    metrics.get("number_of_trades_closed"),
+                )
+
+            pooled = next(
+                (
+                    summary["metrics"]
+                    for summary in evidence.summary_metrics
+                    if summary["universe_key"] is None
+                ),
+                None,
+            )
+            print("partial summary", pooled)
+```
+
+`evaluation_id` identifies distinct market evidence and is shared when
+multiple proposals resolve to the same cached candidate. `proposal_id` remains
+the identity of the optimizer proposal. Do not count duplicate proposal
+observations as independent market evidence.
+
+A pruned or failed observation still has `score=None`. Its partial summary and
+run metrics are evidence, not a final objective score comparable with a
+candidate that completed every required window. A plugin can use that evidence
+in a budget-aware model, but the framework does not invent a penalty or partial
+utility. If an application computes one, keep its objective identity and
+evaluated window set explicit.
+
+Evidence is captured at the window-filter decision boundary. Completed-window
+identity is persisted, and run loading is restricted to that set, so a bundle
+containing later cached windows cannot leak them into earlier partial feedback.
+The framework reuses its normal summary aggregation rather than asking plugins
+to average individual metrics. Missing or undefined scalar metrics remain
+missing or `None`; they are not converted to successful zero values.
+
+Window filters currently return only a subset `BacktestIndex`, so pruned
+evidence uses the generic `window_filter_pruned` stop reason and records the
+policy callable's identifier. Execution that ends without all required windows
+uses `incomplete_evaluation`. Rich application-specific reason values and
+non-terminal window callbacks are outside this lifecycle.
 
 ### Save and restore state
 
@@ -699,11 +771,37 @@ Worker counts and memory limits can change on resume. Recorded experiment
 context mismatches fail explicitly. An existing search cannot be overwritten
 with `use_checkpoints=False`; choose a new search ID instead.
 
+### Prepared market-data reuse
+
+Within one optimization process, sequential proposal batches share a bounded
+prepared market-data context. The runner resolves matching candidate/window
+checkpoints first and prepares only data sources needed by work that remains.
+Consequently:
+
+- A fully checkpointed window performs no provider registration or data
+  preparation.
+- Pruning after an earlier window does not prepare later windows.
+- Built-in CCXT OHLCV vector runs retain the required warmup range but do not
+  eagerly construct per-timestamp rolling windows that the full-range vector
+  path never reads.
+- Prepared CCXT datasets can be reused by later proposal batches while they fit
+  within the context's memory bound. Cache hits, misses, builds, evictions and
+  resident bytes are logged when the search ends.
+- Custom providers keep their existing preparation behavior unless their
+  implementation explicitly opts into prepared-data reuse.
+
+This context is intentionally search-scoped and in-memory. It complements the
+canonical on-disk OHLCV cache; it does not create a second persistent candle
+store or claim reproducible data revisions across process restarts. Use a new
+search ID when provider code or source data changes.
+
 :::warning Keep evaluation meaning unchanged
 
-Strategy code, data providers, factories, objectives and filters are not
-fingerprinted. Use a new search ID or storage root when their meaning changes.
-Stable algorithm IDs and window IDs do not detect changed source code or data.
+Objective and window-policy callable identities are recorded, but their source
+code is not fingerprinted. Strategy code, data providers, factories and final
+filters are also not fingerprinted. Use a new search ID or storage root when
+their meaning or implementation changes. Stable algorithm IDs, callable names
+and window IDs do not detect changed source code or data.
 
 :::
 

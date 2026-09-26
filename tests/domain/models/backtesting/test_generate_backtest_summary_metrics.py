@@ -34,7 +34,7 @@ def create_mock_backtest_metrics(
     calmar_ratio=1.2,
     profit_factor=2.0,
     annual_volatility=0.15,
-    max_drawdown=-0.10,
+    max_drawdown=0.10,
     max_drawdown_duration=30,
     trades_per_year=50,
     win_rate=60.0,
@@ -447,6 +447,10 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
 
         # Equal weights: (0.20 + 0.10) / 2 = 0.15
         self.assertAlmostEqual(result.cagr, 0.15, places=5)
+        self.assertAlmostEqual(
+            result.duration_weighted_mean_window_cagr, 0.15, places=5
+        )
+        self.assertIsNone(result.portfolio_cagr)
 
     def test_sortino_ratio_weighted_by_time(self):
         """Test that Sortino ratio is weighted by time."""
@@ -466,16 +470,14 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
     # ==========================================================
 
     def test_max_drawdown_takes_minimum(self):
-        """Test that max drawdown takes the worst (minimum) value."""
-        # Drawdowns are negative, so -30% is worse than -10%
-        metrics1 = create_mock_backtest_metrics(max_drawdown=-0.10)
-        metrics2 = create_mock_backtest_metrics(max_drawdown=-0.30)
-        metrics3 = create_mock_backtest_metrics(max_drawdown=-0.15)
+        """Test that max drawdown takes the largest positive magnitude."""
+        metrics1 = create_mock_backtest_metrics(max_drawdown=0.10)
+        metrics2 = create_mock_backtest_metrics(max_drawdown=0.30)
+        metrics3 = create_mock_backtest_metrics(max_drawdown=0.15)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2, metrics3])
 
-        # Should be the worst (most negative): -30%
-        self.assertEqual(result.max_drawdown, -0.30)
+        self.assertEqual(result.max_drawdown, 0.30)
 
     def test_max_drawdown_duration_takes_maximum(self):
         """Test that max drawdown duration takes the longest."""
@@ -585,7 +587,7 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
             total_net_gain=1000,
             total_net_gain_percentage=0.10,
             sharpe_ratio=1.5,
-            max_drawdown=-0.15,
+            max_drawdown=0.15,
             number_of_trades=20,
             number_of_trades_closed=18,
             win_rate=60,
@@ -595,7 +597,7 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
             total_net_gain=500,
             total_net_gain_percentage=0.05,
             sharpe_ratio=1.0,
-            max_drawdown=-0.10,
+            max_drawdown=0.10,
             number_of_trades=10,
             number_of_trades_closed=8,
             win_rate=50,
@@ -620,7 +622,8 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         self.assertAlmostEqual(result.sharpe_ratio, 1.25, places=5)
 
         # Verify worst drawdown
-        self.assertEqual(result.max_drawdown, -0.15)
+        self.assertEqual(result.max_drawdown, 0.15)
+        self.assertEqual(result.worst_window_max_drawdown, 0.15)
 
         # Verify win rate weighted by trades
         # (60 * 18 + 50 * 8) / 26 = 1480 / 26 ≈ 56.92%
@@ -707,16 +710,113 @@ class TestGenerateBacktestSummaryMetricsCalculationValidity(unittest.TestCase):
         """
         Verify that taking worst drawdown makes financial sense.
 
-        If one period had -30% drawdown and another had -10%,
-        the combined worst case is -30%, not an average.
+        If one period had 30% drawdown and another had 10%,
+        the combined worst case is 30%, not an average.
         """
-        metrics1 = create_mock_backtest_metrics(max_drawdown=-0.30)
-        metrics2 = create_mock_backtest_metrics(max_drawdown=-0.10)
+        metrics1 = create_mock_backtest_metrics(max_drawdown=0.30)
+        metrics2 = create_mock_backtest_metrics(max_drawdown=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
         # Should be the worst case
-        self.assertEqual(result.max_drawdown, -0.30)
+        self.assertEqual(result.max_drawdown, 0.30)
+
+    def test_positive_drawdown_magnitudes_select_largest_value(self):
+        metrics = [
+            create_mock_backtest_metrics(max_drawdown=value)
+            for value in (0.10, 0.40, 0.20)
+        ]
+
+        result = generate_backtest_summary_metrics(metrics)
+
+        self.assertEqual(result.max_drawdown, 0.40)
+        self.assertEqual(result.worst_window_max_drawdown, 0.40)
+
+    def test_consistently_signed_legacy_drawdowns_are_migrated(self):
+        metrics = [
+            create_mock_backtest_metrics(max_drawdown=value)
+            for value in (-0.10, -0.40, -0.20)
+        ]
+
+        result = generate_backtest_summary_metrics(metrics)
+
+        self.assertEqual(result.worst_window_max_drawdown, 0.40)
+
+    def test_mixed_drawdown_sign_conventions_are_rejected(self):
+        metrics = [
+            create_mock_backtest_metrics(max_drawdown=0.10),
+            create_mock_backtest_metrics(max_drawdown=-0.20),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "mixed max_drawdown"):
+            generate_backtest_summary_metrics(metrics)
+
+    def test_saved_three_window_example_uses_independent_window_semantics(self):
+        metrics = [
+            create_mock_backtest_metrics(
+                total_net_gain=-357.6371548259061,
+                total_net_gain_percentage=-0.3576371548259061,
+                initial_unallocated=1000.0,
+                cagr=-0.9322882280,
+                max_drawdown=0.4847104799801503,
+                total_number_of_days=60,
+            ),
+            create_mock_backtest_metrics(
+                total_net_gain=262.8139376550828,
+                total_net_gain_percentage=0.2628139376550828,
+                initial_unallocated=1000.0,
+                cagr=2.9499778284,
+                max_drawdown=0.3043275888,
+                total_number_of_days=62,
+            ),
+            create_mock_backtest_metrics(
+                total_net_gain=472.54325839797843,
+                total_net_gain_percentage=0.47254325839797843,
+                initial_unallocated=1000.0,
+                cagr=9.9582976849,
+                max_drawdown=0.1793435908,
+                total_number_of_days=59,
+            ),
+        ]
+
+        result = generate_backtest_summary_metrics(
+            metrics, expected_window_count=3
+        )
+
+        self.assertAlmostEqual(
+            result.capital_weighted_window_return,
+            0.1259066804090517,
+        )
+        self.assertAlmostEqual(result.median_window_return, 0.2628139376550828)
+        self.assertAlmostEqual(result.worst_window_return, -0.3576371548259061)
+        self.assertAlmostEqual(result.best_window_return, 0.47254325839797843)
+        self.assertAlmostEqual(
+            result.worst_window_max_drawdown, 0.4847104799801503
+        )
+        self.assertEqual(result.number_of_profitable_windows, 2)
+        self.assertAlmostEqual(result.mean_window_duration_days, 181 / 3)
+        self.assertEqual(result.aggregation_semantics_version, 2)
+        self.assertEqual(result.aggregation_mode, "independent_windows")
+        self.assertEqual(result.window_count_evaluated, 3)
+        self.assertEqual(result.window_count_expected, 3)
+        self.assertTrue(result.complete)
+        self.assertIsNone(result.portfolio_cagr)
+
+    def test_missing_capital_makes_capital_weighted_return_unavailable(self):
+        metrics1 = create_mock_backtest_metrics(
+            total_net_gain=100.0, initial_unallocated=1000.0
+        )
+        metrics2 = create_mock_backtest_metrics(
+            total_net_gain=50.0, initial_unallocated=None
+        )
+
+        result = generate_backtest_summary_metrics([metrics1, metrics2])
+
+        self.assertIsNone(result.total_net_gain_percentage)
+        self.assertIsNone(result.capital_weighted_window_return)
+        self.assertIsNotNone(
+            result.capital_weighted_return_unavailable_reason
+        )
 
     def test_win_rate_weighted_by_trades_makes_sense(self):
         """

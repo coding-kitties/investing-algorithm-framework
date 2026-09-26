@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.0.0a21] - 2026-09-26
+
+### Added
+
+- Backtest summaries now persist versioned independent-window aggregation
+  semantics, explicit capital-weighted/median/best/worst window returns,
+  evaluated-window counts, mean window duration, and explicitly named
+  duration-weighted window statistics. Portfolio metrics remain unavailable
+  unless a portfolio path exists, and legacy ratio fields remain readable as
+  compatibility aliases.
+- Sequential optimization batches now share a bounded, search-scoped prepared
+  market-data context for providers that explicitly opt in. CCXT OHLCV vector
+  runs reuse prepared full-range frames without rebuilding per-timestamp
+  rolling windows, while custom providers retain their existing lifecycle.
+- Terminal optimizer observations now include optional, versioned evaluation
+  evidence for completed, pruned and partially failed candidates. Evidence
+  records stable evaluation identity, resolved parameters, study/engine scope,
+  exact completed windows, scalar run metrics, framework-generated cumulative
+  summaries, consumed/required window counts and structured stop reasons.
+  Pruned and failed trials retain `score=None`; existing optimizer plugins can
+  ignore the additive field.
+
+### Fixed
+
+- Multi-window summaries now report the largest positive drawdown magnitude as
+  worst-window maximum drawdown instead of selecting the smallest magnitude.
+- Percentage drawdown keeps nonpositive equity observations after a positive
+  high-water mark, so leveraged losses can exceed 100% instead of being hidden.
+- Summary tables no longer label averaged window ratios as portfolio CAGR,
+  Sharpe, Sortino, or Calmar, and now use a real mean-window-duration field.
+- Vector and event runners select matching result checkpoints before data
+  registration and preparation, so fully checkpointed windows perform no
+  market-data preparation and pruned searches do not prepare later windows.
+
 ## [9.0.0a20] - 2026-09-25
 
 ### Added

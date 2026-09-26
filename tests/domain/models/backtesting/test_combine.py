@@ -188,9 +188,8 @@ class TestCombine(TestCase):
         self.assertAlmostEqual(summary.win_rate, (0.7 * 10 + 0.3 * 20) / 30, places=2)
 
         # Extreme metrics
-        # max_drawdown uses min() - since values are positive here, min(0.15, 0.2) = 0.15
-        # Note: If drawdowns were negative (e.g., -0.15, -0.2), min would correctly pick -0.2 as worst
-        self.assertEqual(summary.max_drawdown, 0.15)
+        # Drawdowns use positive magnitudes, so the largest value is worst.
+        self.assertEqual(summary.max_drawdown, 0.2)
         self.assertEqual(summary.max_drawdown_duration, 30)  # longest
 
     def test_add_from_storage(self):

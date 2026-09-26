@@ -3,6 +3,7 @@ import json
 import logging
 import multiprocessing
 import os
+from time import perf_counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -696,6 +697,7 @@ class BacktestService:
         show_progress: bool = False,
         fill_missing_data: bool = False,
         save_filled_data_points: bool = False,
+        access_pattern: str = "rolling",
     ):
         """
         Function to initialize the data sources for the app in backtest mode.
@@ -714,6 +716,8 @@ class BacktestService:
                 backtest data.
             save_filled_data_points (bool): Persist synthetic filled candles
                 for CCXT OHLCV providers; other providers are unchanged.
+            access_pattern (str): ``"full_range"`` for vector consumers or
+                ``"rolling"`` for timestamp-oriented consumers.
 
         Returns:
             None
@@ -723,9 +727,22 @@ class BacktestService:
             return
 
         # Initialize all data sources
-        self._data_provider_service.index_backtest_data_providers(
-            data_sources, backtest_date_range, show_progress=show_progress
+        context = self._data_provider_service.prepared_market_data_context
+        registration_started = perf_counter()
+        cache_plan = self._data_provider_service.index_backtest_data_providers(
+            data_sources,
+            backtest_date_range,
+            show_progress=show_progress,
+            access_pattern=access_pattern,
+            fill_missing_data=fill_missing_data,
+            save_filled_data_points=save_filled_data_points,
         )
+        if context is not None:
+            context.record_registration(
+                perf_counter() - registration_started
+            )
+        if not isinstance(cache_plan, dict):
+            cache_plan = {}
         identifiers = ', '.join(ds.get_identifier() for ds in data_sources)
         logger.info(
             f"Data sources initialized ({len(data_sources)}): {identifiers}"
@@ -742,19 +759,40 @@ class BacktestService:
 
         # Prepare the backtest data for each data provider
         # Fill missing data is handled inside prepare_backtest_data
-        for _, data_provider in data_providers:
+        for data_source, data_provider in data_providers:
+            cache_key, cache_hit = cache_plan.get(
+                data_source, (None, False)
+            )
+            if cache_hit:
+                continue
             preparation_options = {}
             if save_filled_data_points and isinstance(
                 data_provider, CCXTOHLCVDataProvider
             ):
                 preparation_options["save_filled_data_points"] = True
-            data_provider.prepare_backtest_data(
+            preparation_started = perf_counter()
+            data_provider.prepare_backtest_data_for_access(
                 backtest_start_date=backtest_date_range.start_date,
                 backtest_end_date=backtest_date_range.end_date,
                 fill_missing_data=fill_missing_data,
                 show_progress=show_progress,
+                access_pattern=access_pattern,
                 **preparation_options,
             )
+            if context is not None:
+                context.record_preparation(
+                    perf_counter() - preparation_started,
+                    rolling_cache_built=bool(
+                        access_pattern == "rolling"
+                        and getattr(data_provider, "window_cache", None)
+                    ),
+                )
+            if (
+                context is not None
+                and cache_key is not None
+                and data_provider.supports_prepared_data_reuse
+            ):
+                context.put(cache_key, data_provider)
 
     def run_vector_backtests(
         self,
@@ -924,12 +962,6 @@ class BacktestService:
                 "A Study object must be provided"
             )
 
-        # Collect all data sources
-        data_sources = []
-
-        for strategy in strategies:
-            data_sources.extend(strategy.data_sources)
-
         # --- Derive everything needed from the Study object -----------
         risk_free_rate = study.risk_free_rate
         if risk_free_rate is None:
@@ -1079,26 +1111,24 @@ class BacktestService:
         # Validate algorithm IDs
         self._validate_algorithm_ids(strategies)
 
-        for backtest_date_range in tqdm(
+        window_progress = tqdm(
             backtest_date_ranges,
             colour="green",
             desc="Running backtests for all date ranges",
             disable=not show_progress
-        ):
+        )
+        for backtest_date_range in window_progress:
             if not active_strategies:
+                window_progress.set_postfix_str(
+                    "remaining windows skipped: no active strategies"
+                )
+                window_progress.update(
+                    window_progress.total - window_progress.n
+                )
                 break
             evaluated_ranges.add((
                 backtest_date_range.start_date, backtest_date_range.end_date
             ))
-            memory_guard.require()
-            if not skip_data_sources_initialization:
-                self.initialize_data_sources_backtest(
-                    data_sources,
-                    backtest_date_range,
-                    show_progress=show_progress,
-                    fill_missing_data=fill_missing_data,
-                    save_filled_data_points=save_filled_data_points,
-                )
             memory_guard.require()
 
             start_date = backtest_date_range.start_date.strftime('%Y-%m-%d')
@@ -1154,6 +1184,22 @@ class BacktestService:
             else:
                 # Run all strategies when checkpoints are disabled
                 strategies_to_run = active_strategies
+
+            if strategies_to_run and not skip_data_sources_initialization:
+                pending_data_sources = [
+                    data_source
+                    for strategy in strategies_to_run
+                    for data_source in strategy.data_sources
+                ]
+                self.initialize_data_sources_backtest(
+                    pending_data_sources,
+                    backtest_date_range,
+                    show_progress=show_progress,
+                    fill_missing_data=fill_missing_data,
+                    save_filled_data_points=save_filled_data_points,
+                    access_pattern="full_range",
+                )
+            memory_guard.require()
 
             all_backtests = []
             batch_buffer = []
@@ -2709,12 +2755,6 @@ class BacktestService:
                 "must be provided"
             )
 
-        # Collect all data sources from all algorithms
-        data_sources = []
-        for algorithm in algorithms:
-            if hasattr(algorithm, 'data_sources') and algorithm.data_sources:
-                data_sources.extend(algorithm.data_sources)
-
         # Get risk-free rate if not provided
         if risk_free_rate is None:
             if show_progress:
@@ -2770,26 +2810,24 @@ class BacktestService:
             len(algorithms) == 1 and len(backtest_date_ranges) == 1
         )
 
-        for backtest_date_range in tqdm(
+        window_progress = tqdm(
             backtest_date_ranges,
             colour="green",
             desc="Running event backtests for all date ranges",
             disable=not show_progress or is_single_backtest
-        ):
+        )
+        for backtest_date_range in window_progress:
             if not active_algorithms:
+                window_progress.set_postfix_str(
+                    "remaining windows skipped: no active algorithms"
+                )
+                window_progress.update(
+                    window_progress.total - window_progress.n
+                )
                 break
             evaluated_ranges.add((
                 backtest_date_range.start_date, backtest_date_range.end_date,
             ))
-            memory_guard.require()
-            if not skip_data_sources_initialization:
-                self.initialize_data_sources_backtest(
-                    data_sources,
-                    backtest_date_range,
-                    show_progress=show_progress,
-                    fill_missing_data=fill_missing_data,
-                    save_filled_data_points=save_filled_data_points,
-                )
             memory_guard.require()
 
             active_algorithm_ids = []
@@ -2876,6 +2914,21 @@ class BacktestService:
                     )
             else:
                 algorithms_to_run = active_algorithms
+
+            if algorithms_to_run and not skip_data_sources_initialization:
+                pending_data_sources = [
+                    data_source
+                    for algorithm in algorithms_to_run
+                    for data_source in getattr(algorithm, "data_sources", [])
+                ]
+                self.initialize_data_sources_backtest(
+                    pending_data_sources,
+                    backtest_date_range,
+                    show_progress=show_progress,
+                    fill_missing_data=fill_missing_data,
+                    save_filled_data_points=save_filled_data_points,
+                )
+            memory_guard.require()
 
             all_backtests = []
             batch_buffer = []

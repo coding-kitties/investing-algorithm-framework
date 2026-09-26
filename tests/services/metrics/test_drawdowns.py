@@ -540,3 +540,12 @@ class TestMaxDrawdownReturnConvention(unittest.TestCase):
             [datetime(2024, 1, 1), datetime(2024, 1, 2)], [100.0, 110.0]
         )
         self.assertEqual(get_max_drawdown(snapshots), 0.0)
+
+    def test_negative_equity_is_not_capped_at_total_capital(self):
+        snapshots = _make_snapshots(
+            [datetime(2024, 1, 1), datetime(2024, 1, 2)],
+            [100.0, -20.0],
+        )
+
+        self.assertAlmostEqual(get_max_drawdown(snapshots), 1.2)
+        self.assertEqual(get_drawdown_series(snapshots)[-1][0], -1.2)

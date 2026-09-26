@@ -34,7 +34,10 @@ def create_markdown_table(data: List[Union[Dict[str, Any], Any]]):
         ]
 
     # Generate header titles
-    header_titles = [col.replace("_", " ").title() for col in columns]
+    header_titles = [
+        col.replace("_", " ").title() if col == col.lower() else col
+        for col in columns
+    ]
 
     # Collect and format all row data
     all_rows_data = []
@@ -123,28 +126,60 @@ _PERCENT_RATIO_ATTRS = {
     "max_drawdown",
     "win_rate",
     "annual_volatility",
+    "capital_weighted_window_return",
+    "median_window_return",
+    "worst_window_return",
+    "best_window_return",
+    "duration_weighted_mean_window_cagr",
+    "duration_weighted_mean_window_annual_volatility",
+    "worst_window_max_drawdown",
+    "portfolio_cagr",
+    "portfolio_annual_volatility",
+    "portfolio_max_drawdown",
 }
 
 
 DEFAULT_SUMMARY_METRIC_COLUMNS = [
-    ("total_net_gain_percentage", "Net Gain %", "{:.2f}"),
-    ("cagr", "CAGR %", "{:.2f}"),
-    ("sharpe_ratio", "Sharpe", "{:.2f}"),
-    ("sortino_ratio", "Sortino", "{:.2f}"),
-    ("calmar_ratio", "Calmar", "{:.2f}"),
-    ("profit_factor", "Profit Factor", "{:.2f}"),
-    ("max_drawdown", "Max DD %", "{:.2f}"),
-    ("annual_volatility", "Volatility %", "{:.2f}"),
-    ("win_rate", "Win Rate %", "{:.2f}"),
-    ("number_of_trades", "Trades", ""),
-    ("stability_score", "Stability", "{:.2f}"),
-    ("consistency_score", "Consistency", "{:.2f}"),
-    ("number_of_windows", "Windows", ""),
     (
-        "average_window_duration (days)",
-        "Avg Window Duration (days)",
+        "capital_weighted_window_return",
+        "Capital-Weighted Window Return %",
         "{:.2f}",
     ),
+    ("median_window_return", "Median Window Return %", "{:.2f}"),
+    ("worst_window_return", "Worst Window Return %", "{:.2f}"),
+    ("best_window_return", "Best Window Return %", "{:.2f}"),
+    (
+        "worst_window_max_drawdown",
+        "Worst-Window Max DD %",
+        "{:.2f}",
+    ),
+    (
+        "duration_weighted_mean_window_cagr",
+        "Duration-Weighted Mean Window CAGR %",
+        "{:.2f}",
+    ),
+    ("portfolio_cagr", "Portfolio CAGR %", "{:.2f}"),
+    ("profit_factor", "Profit Factor", "{:.2f}"),
+    ("win_rate", "Win Rate %", "{:.2f}"),
+    ("number_of_trades", "Trades", ""),
+    ("number_of_profitable_windows", "Profitable Windows", ""),
+    ("window_count_evaluated", "Windows Evaluated", ""),
+    ("window_count_expected", "Windows Expected", ""),
+    ("mean_window_duration_days", "Mean Window Duration (days)", "{:.2f}"),
+]
+
+DEFAULT_LEGACY_SUMMARY_METRIC_COLUMNS = [
+    (
+        "total_net_gain_percentage",
+        "Legacy Aggregate Window Return %",
+        "{:.2f}",
+    ),
+    ("cagr", "Legacy Mean Window CAGR %", "{:.2f}"),
+    ("sharpe_ratio", "Legacy Mean Window Sharpe", "{:.2f}"),
+    ("sortino_ratio", "Legacy Mean Window Sortino", "{:.2f}"),
+    ("calmar_ratio", "Legacy Mean Window Calmar", "{:.2f}"),
+    ("max_drawdown", "Legacy Max DD % (Uncorrected)", "{:.2f}"),
+    ("number_of_windows", "Windows", ""),
 ]
 
 # Default trade-focused metrics shown by
@@ -161,25 +196,6 @@ DEFAULT_TRADE_METRIC_COLUMNS = [
     ("average_trade_return_percentage", "Avg Return %", "{:.2f}"),
     ("average_trade_duration", "Avg Duration", "{:.2f}"),
     ("trades_per_week", "Trades/Week", "{:.2f}"),
-]
-
-DEFAULT_METRIC_COLUMNS = [
-    ("total_net_gain_percentage", "Net Gain %", "{:.2f}"),
-    ("cagr", "CAGR %", "{:.2f}"),
-    ("sharpe_ratio", "Sharpe", "{:.2f}"),
-    ("sortino_ratio", "Sortino", "{:.2f}"),
-    ("calmar_ratio", "Calmar", "{:.2f}"),
-    ("profit_factor", "Profit Factor", "{:.2f}"),
-    ("max_drawdown", "Max DD %", "{:.2f}"),
-    ("annual_volatility", "Volatility %", "{:.2f}"),
-    ("win_rate", "Win Rate %", "{:.2f}"),
-    ("number_of_trades", "Trades", ""),
-    ("number_of_windows", "Windows", ""),
-    (
-        "average_window_duration (days)",
-        "Avg Window Duration (days)",
-        "{:.2f}",
-    ),
 ]
 
 
@@ -284,17 +300,9 @@ def create_backtest_metrics_table(
         if (window is not None and level == "run") else None
 
     # Normalise the column spec.
-    if metrics is None:
-        columns = DEFAULT_METRIC_COLUMNS
-        if level == "run":
-            # ``stability_score`` / ``consistency_score`` are
-            # cross-window aggregates that only exist on the summary
-            # metrics; drop them from per-run tables where they would
-            # always render as ``N/A``.
-            columns = [
-                col for col in columns
-                if col[0] not in ("stability_score", "consistency_score")
-            ]
+    using_default_columns = metrics is None
+    if using_default_columns:
+        columns = None
     else:
         columns = []
         for entry in metrics:
@@ -340,6 +348,17 @@ def create_backtest_metrics_table(
 
     if not triples:
         return create_markdown_table([])
+
+    if using_default_columns:
+        if level == "run":
+            columns = DEFAULT_METRIC_COLUMNS
+        elif all(
+            getattr(summary, "aggregation_semantics_version", None) is None
+            for _, summary, _ in triples
+        ):
+            columns = DEFAULT_LEGACY_SUMMARY_METRIC_COLUMNS
+        else:
+            columns = DEFAULT_SUMMARY_METRIC_COLUMNS
 
     # Optional sort by a metric attribute (``None`` placed last).
     if sort_by is not None:

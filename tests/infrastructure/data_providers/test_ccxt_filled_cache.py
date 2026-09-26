@@ -15,6 +15,42 @@ from investing_algorithm_framework.services.data_providers.data import (
 
 
 class TestCCXTFilledCache(TestCase):
+    def test_full_range_preparation_skips_rolling_window_cache(self):
+        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        end = start + timedelta(hours=1)
+        provider = CCXTOHLCVDataProvider(
+            symbol="BTC/EUR",
+            market="BITVAVO",
+            time_frame="15m",
+            window_size=2,
+        )
+        frame = pl.DataFrame({
+            "Datetime": [
+                start + timedelta(minutes=15 * position)
+                for position in range(-2, 5)
+            ],
+            **{
+                column: [float(value) for value in range(7)]
+                for column in ("Open", "High", "Low", "Close", "Volume")
+            },
+        })
+
+        with (
+            patch.object(provider, "get_ohlcv", return_value=frame),
+            patch.object(provider, "_precompute_sliding_windows") as rolling,
+        ):
+            provider.prepare_backtest_data_for_access(
+                start,
+                end,
+                access_pattern="full_range",
+            )
+
+        rolling.assert_not_called()
+        self.assertEqual(provider.data["Datetime"].min(), start - timedelta(
+            minutes=30
+        ))
+        self.assertEqual(provider.window_cache, {})
+
     def test_initialization_forwards_persistence_only_to_ccxt(self):
         for persist in (False, True):
             with self.subTest(persist=persist):
@@ -36,15 +72,14 @@ class TestCCXTFilledCache(TestCase):
                     backtest_start_date=date_range.start_date,
                     backtest_end_date=date_range.end_date,
                     fill_missing_data=True, show_progress=False,
+                    access_pattern="rolling",
                 )
-                custom_provider.prepare_backtest_data.assert_called_once_with(
-                    **expected,
-                )
+                custom_provider.prepare_backtest_data_for_access \
+                    .assert_called_once_with(**expected)
                 if persist:
                     expected["save_filled_data_points"] = True
-                cached_provider.prepare_backtest_data.assert_called_once_with(
-                    **expected,
-                )
+                cached_provider.prepare_backtest_data_for_access \
+                    .assert_called_once_with(**expected)
 
     def test_filled_cache_is_opt_in_and_preserves_other_windows(self):
         start = datetime(2025, 1, 1, tzinfo=timezone.utc)
@@ -88,8 +123,12 @@ class TestCCXTFilledCache(TestCase):
                         gaps = get_missing_timeseries_data_entries(
                             cached, start=start, end=end, freq="15min",
                         )
-                        self.assertEqual(len(gaps), 0 if persist and fill else 1)
-                        self.assertEqual(len(cached), 7 if persist and fill else 6)
+                        self.assertEqual(
+                            len(gaps), 0 if persist and fill else 1
+                        )
+                        self.assertEqual(
+                            len(cached), 7 if persist and fill else 6
+                        )
                         original_rows = cached.filter(
                             pl.col("Datetime") != start + timedelta(minutes=15)
                         )

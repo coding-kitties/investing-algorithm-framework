@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import re
 from abc import ABC, abstractmethod
@@ -174,6 +175,130 @@ class CandidateProposal:
             ))
 
 
+def _json_data(value, name: str):
+    try:
+        return json.loads(json.dumps(
+            value, allow_nan=False, sort_keys=True,
+        ))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must contain JSON-safe values") from exc
+
+
+def _json_mappings(values, name: str) -> tuple[dict, ...]:
+    if isinstance(values, (str, bytes)) \
+            or not isinstance(values, Sequence) \
+            or any(not isinstance(value, Mapping) for value in values):
+        raise ValueError(f"{name} must be a sequence of mappings")
+    return tuple(
+        _json_data(dict(value), name) for value in values
+    )
+
+
+@dataclass(frozen=True)
+class EvaluationEvidence:
+    """Versioned terminal evidence for one distinct candidate evaluation."""
+
+    evaluation_id: str
+    algorithm_id: str
+    parameters: Mapping[str, Number]
+    study_name: str
+    engine_type: str
+    completed_window_keys: Sequence[str]
+    completed_windows: Sequence[Mapping]
+    required_windows: int
+    run_metrics: Sequence[Mapping]
+    summary_metrics: Sequence[Mapping]
+    stop_reason: Optional[str] = None
+    policy_identifier: Optional[str] = None
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        for name in (
+            "evaluation_id", "algorithm_id", "study_name", "engine_type",
+        ):
+            _validate_name(getattr(self, name), name)
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise ValueError("unsupported evidence schema_version")
+        if isinstance(self.required_windows, bool) \
+                or not isinstance(self.required_windows, int) \
+                or self.required_windows < 0:
+            raise ValueError("required_windows must be a nonnegative integer")
+        if isinstance(self.completed_window_keys, (str, bytes)) \
+                or not isinstance(self.completed_window_keys, Sequence):
+            raise ValueError(
+                "completed_window_keys must be a sequence of strings"
+            )
+        keys = tuple(self.completed_window_keys)
+        if any(not isinstance(key, str) or not key for key in keys):
+            raise ValueError(
+                "completed_window_keys must contain nonempty strings"
+            )
+        if len(set(keys)) != len(keys):
+            raise ValueError("completed_window_keys must be unique")
+        windows = _json_mappings(
+            self.completed_windows, "completed_windows",
+        )
+        if len(keys) != len(windows):
+            raise ValueError(
+                "completed window keys and descriptors must have equal length"
+            )
+        if len(windows) > self.required_windows:
+            raise ValueError(
+                "completed windows cannot exceed required_windows"
+            )
+        object.__setattr__(
+            self, "parameters",
+            _parameter_values(self.parameters, finite=True),
+        )
+        object.__setattr__(self, "completed_window_keys", keys)
+        object.__setattr__(self, "completed_windows", windows)
+        object.__setattr__(
+            self, "run_metrics",
+            _json_mappings(self.run_metrics, "run_metrics"),
+        )
+        object.__setattr__(
+            self, "summary_metrics",
+            _json_mappings(self.summary_metrics, "summary_metrics"),
+        )
+        for name in ("stop_reason", "policy_identifier"):
+            value = getattr(self, name)
+            if value is not None and (
+                not isinstance(value, str) or not value
+            ):
+                raise ValueError(f"{name} must be a nonempty string or None")
+
+    @property
+    def consumed_windows(self) -> int:
+        return len(self.completed_windows)
+
+    def to_dict(self) -> dict:
+        return {
+            "schema_version": self.schema_version,
+            "evaluation_id": self.evaluation_id,
+            "algorithm_id": self.algorithm_id,
+            "parameters": dict(self.parameters),
+            "study_name": self.study_name,
+            "engine_type": self.engine_type,
+            "completed_window_keys": list(self.completed_window_keys),
+            "completed_windows": list(self.completed_windows),
+            "required_windows": self.required_windows,
+            "consumed_windows": self.consumed_windows,
+            "run_metrics": list(self.run_metrics),
+            "summary_metrics": list(self.summary_metrics),
+            "stop_reason": self.stop_reason,
+            "policy_identifier": self.policy_identifier,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> EvaluationEvidence:
+        values = dict(data)
+        consumed = values.pop("consumed_windows", None)
+        evidence = cls(**values)
+        if consumed is not None and consumed != evidence.consumed_windows:
+            raise ValueError("consumed_windows does not match evidence")
+        return evidence
+
+
 @dataclass(frozen=True)
 class TrialObservation:
     """Serializable feedback; only completed trials carry a finite score."""
@@ -184,6 +309,7 @@ class TrialObservation:
     score: Optional[float] = None
     parameters: Optional[Mapping[str, Number]] = None
     error: Optional[str] = None
+    evidence: Optional[EvaluationEvidence] = None
 
     def __post_init__(self) -> None:
         _validate_name(self.proposal_id, "proposal_id")
@@ -203,6 +329,21 @@ class TrialObservation:
             ))
         if self.error is not None and not isinstance(self.error, str):
             raise ValueError("error must be a string or None")
+        if self.evidence is not None \
+                and not isinstance(self.evidence, EvaluationEvidence):
+            raise ValueError("evidence must be EvaluationEvidence or None")
+        if self.evidence is not None:
+            if self.algorithm_id != self.evidence.algorithm_id:
+                raise ValueError(
+                    "observation and evidence algorithm IDs must match"
+                )
+            if self.parameters is not None \
+                    and dict(self.parameters) != dict(
+                        self.evidence.parameters
+                    ):
+                raise ValueError(
+                    "observation and evidence parameters must match"
+                )
 
     def to_dict(self) -> dict:
         return {
@@ -214,11 +355,19 @@ class TrialObservation:
                 dict(self.parameters) if self.parameters is not None else None
             ),
             "error": self.error,
+            "evidence": (
+                self.evidence.to_dict()
+                if self.evidence is not None else None
+            ),
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> TrialObservation:
-        return cls(**data)
+        values = dict(data)
+        evidence = values.get("evidence")
+        if evidence is not None:
+            values["evidence"] = EvaluationEvidence.from_dict(evidence)
+        return cls(**values)
 
 
 @dataclass(frozen=True)

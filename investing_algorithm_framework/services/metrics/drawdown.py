@@ -2,22 +2,24 @@
 Max Drawdown (MDD) — a key risk metric that shows the worst
 peak-to-trough decline of a portfolio:
 
-| **Max Drawdown (%)** | **Interpretation**                                                   |
-|-----------------------|----------------------------------------------------------------------|
-| **0% to -5%**         | 🟢 Excellent — Very low risk, typical for conservative strategies     |
-| **-5% to -10%**       | ✅ Good — Moderate volatility, acceptable for balanced portfolios     |
-| **-10% to -20%**      | ⚠️ Elevated Risk — Common in growth or actively managed strategies    |
-| **-20% to -40%**      | 🔻 High Risk — Significant drawdown, typical of aggressive strategies |
-| **> -40%**            | 🚨 Very High Risk — Risk of capital loss or strategy failure          |
+| Max drawdown | Interpretation |
+|---|---|
+| 0% to -5% | Excellent: very low risk |
+| -5% to -10% | Good: moderate volatility |
+| -10% to -20% | Elevated risk |
+| -20% to -40% | High risk |
+| > -40% | Very high risk |
 """
 from typing import List, Tuple
 import pandas as pd
 from datetime import datetime
-from investing_algorithm_framework.domain import PortfolioSnapshot, Trade
+from investing_algorithm_framework.domain import PortfolioSnapshot
 from .equity_curve import get_equity_curve, get_twr_equity_curve
 
 
-def get_drawdown_series(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, datetime]]:
+def get_drawdown_series(
+    snapshots: List[PortfolioSnapshot],
+) -> List[Tuple[float, datetime]]:
     """
     Calculate the drawdown series of a backtest report.
 
@@ -40,15 +42,18 @@ def get_drawdown_series(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
     max_value = None
 
     for value, timestamp in equity_curve:
-        # Skip zero or negative values to avoid division by zero
-        if value <= 0:
+        if max_value is None:
+            if value <= 0:
+                # No positive high-water mark exists yet.
+                drawdown_series.append((0.0, timestamp))
+                continue
+            max_value = value
+        if max_value <= 0:
             drawdown_series.append((0.0, timestamp))
             continue
 
-        if max_value is None or max_value <= 0:
-            max_value = value
         max_value = max(max_value, value)
-        drawdown = (value - max_value) / max_value  # This will be <= 0
+        drawdown = (value - max_value) / max_value
         drawdown_series.append((drawdown, timestamp))
 
     return drawdown_series
@@ -92,18 +97,13 @@ def get_max_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
     max_drawdown_pct = 0.0
 
     for equity, _ in equity_curve:
-        # Skip non-positive values
-        if equity <= 0:
-            continue
-
         if equity > peak:
             peak = equity
 
-        # Avoid division by zero (shouldn't happen now but extra safety)
         if peak <= 0:
             continue
 
-        drawdown_pct = (equity - peak) / peak  # Will be 0 or negative
+        drawdown_pct = (equity - peak) / peak
         max_drawdown_pct = min(max_drawdown_pct, drawdown_pct)
 
     return abs(max_drawdown_pct)
@@ -152,6 +152,7 @@ def get_max_daily_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
 
     return abs(negative_returns.min())
 
+
 def get_max_drawdown_duration(snapshots: List[PortfolioSnapshot]) -> int:
     """
     Calculate the maximum duration of drawdown in days.
@@ -199,14 +200,14 @@ def get_max_drawdown_absolute(snapshots: List[PortfolioSnapshot]) -> float:
     """
     Calculate the maximum absolute drawdown of the portfolio.
 
-    This is the largest drop in equity (in currency units) from a peak to a trough
-    during the backtest period.
+    This is the largest drop in equity (in currency units) from a peak to a
+    trough during the backtest period.
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
 
     Returns:
-        float: The maximum absolute drawdown as a positive number (e.g., €10,000).
+        float: The maximum absolute drawdown as a positive number.
     """
     equity_curve = get_equity_curve(snapshots)
     if not equity_curve:
@@ -329,4 +330,3 @@ def get_twr_max_drawdown_duration(
         max_duration = max(max_duration, elapsed)
 
     return max_duration
-

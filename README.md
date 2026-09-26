@@ -44,7 +44,7 @@ dashboard, and run the same strategy in paper or live trading.
 > **v9.0.0 alpha is available.** Install the prerelease explicitly:
 >
 > ```bash
-> pip install investing-algorithm-framework==9.0.0a20
+> pip install investing-algorithm-framework==9.0.0a21
 > ```
 >
 > See the [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md)

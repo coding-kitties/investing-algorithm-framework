@@ -43,6 +43,7 @@ class DataProvider(ABC):
     """
     data_type: DataType = None
     data_provider_identifier: str = None
+    supports_prepared_data_reuse = False
 
     def __init__(
         self,
@@ -243,6 +244,24 @@ class DataProvider(ABC):
             None
         """
         raise NotImplementedError("Subclasses should implement this method.")
+
+    def prepare_backtest_data_for_access(
+        self,
+        backtest_start_date,
+        backtest_end_date,
+        fill_missing_data: bool = False,
+        show_progress: bool = False,
+        access_pattern: str = "rolling",
+        **options,
+    ) -> None:
+        """Prepare data while preserving legacy custom-provider behavior."""
+        self.prepare_backtest_data(
+            backtest_start_date=backtest_start_date,
+            backtest_end_date=backtest_end_date,
+            fill_missing_data=fill_missing_data,
+            show_progress=show_progress,
+            **options,
+        )
 
     @abstractmethod
     def get_backtest_data(
