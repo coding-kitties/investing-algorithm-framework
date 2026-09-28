@@ -117,10 +117,6 @@ class FXMacroDataOHLCVDataProvider(OHLCVDataProviderBase):
             "start_date": _format_date(start_date),
             "end_date": _format_date(end_date),
         }
-        api_key = self._get_optional_api_key()
-        if api_key:
-            params["api_key"] = api_key
-
         url = (
             f"{self.base_url.rstrip('/')}/forex/"
             f"{base_currency.lower()}/{quote_currency.lower()}"
@@ -129,7 +125,12 @@ class FXMacroDataOHLCVDataProvider(OHLCVDataProviderBase):
         if query:
             url = f"{url}?{query}"
 
-        request = Request(url, headers={"Accept": "application/json"})
+        headers = {"Accept": "application/json"}
+        api_key = self._get_optional_api_key()
+        if api_key:
+            headers["X-API-Key"] = api_key
+
+        request = Request(url, headers=headers)
         try:
             with urlopen(request, timeout=self.timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))

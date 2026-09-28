@@ -152,7 +152,8 @@ class TestFXMacroDataGetData(TestCase):
         )
 
         request = mock_urlopen.call_args[0][0]
-        self.assertIn("api_key=test-key", request.full_url)
+        self.assertEqual(request.get_header("X-api-key"), "test-key")
+        self.assertNotIn("api_key", request.full_url)
 
     @patch(
         "investing_algorithm_framework.infrastructure"
