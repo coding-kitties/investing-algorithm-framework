@@ -15,6 +15,9 @@ from .ohlcv_base import OHLCVDataProviderBase
 logger = logging.getLogger("investing_algorithm_framework")
 
 FXMACRODATA_API_BASE_URL = "https://api.fxmacrodata.com/v1"
+# List endpoints return at most 100 rows per request, newest first.
+FXMACRODATA_PAGE_SIZE = 100
+FXMACRODATA_MAX_PAGES = 1000
 TIMEFRAME_TO_FXMACRODATA = {
     "1d": "daily",
 }
@@ -113,38 +116,49 @@ class FXMacroDataOHLCVDataProvider(OHLCVDataProviderBase):
         self._get_provider_interval()
         base_currency, quote_currency = _split_fx_pair(symbol)
 
-        params = {
-            "start_date": _format_date(start_date),
-            "end_date": _format_date(end_date),
-        }
         url = (
             f"{self.base_url.rstrip('/')}/forex/"
             f"{base_currency.lower()}/{quote_currency.lower()}"
         )
-        query = urlencode(params)
-        if query:
-            url = f"{url}?{query}"
 
         headers = {"Accept": "application/json"}
         api_key = self._get_optional_api_key()
         if api_key:
             headers["X-API-Key"] = api_key
 
-        request = Request(url, headers=headers)
-        try:
-            with urlopen(request, timeout=self.timeout) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except HTTPError as error:
-            raise OperationalException(_read_http_error(error)) from error
-        except Exception as error:
-            logger.error(f"Error downloading FXMacroData data: {error}")
-            return _empty_ohlcv_frame()
+        rows = []
+        offset = 0
+        for _ in range(FXMACRODATA_MAX_PAGES):
+            params = {
+                "start_date": _format_date(start_date),
+                "end_date": _format_date(end_date),
+                "limit": FXMACRODATA_PAGE_SIZE,
+                "offset": offset,
+            }
+            request = Request(f"{url}?{urlencode(params)}", headers=headers)
+            try:
+                with urlopen(request, timeout=self.timeout) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+            except HTTPError as error:
+                raise OperationalException(_read_http_error(error)) from error
+            except Exception as error:
+                logger.error(f"Error downloading FXMacroData data: {error}")
+                return _empty_ohlcv_frame()
 
-        rows = payload.get("data") if isinstance(payload, dict) else None
-        if not isinstance(rows, list):
-            raise OperationalException(
-                "FXMacroData response did not include a data list"
+            page = payload.get("data") if isinstance(payload, dict) else None
+            if not isinstance(page, list):
+                raise OperationalException(
+                    "FXMacroData response did not include a data list"
+                )
+            rows.extend(page)
+
+            pagination = payload.get("pagination")
+            has_more = (
+                isinstance(pagination, dict) and pagination.get("has_more")
             )
+            if not page or not has_more:
+                break
+            offset = pagination.get("next_offset") or offset + len(page)
 
         records = []
         for row in rows:
@@ -176,6 +190,7 @@ class FXMacroDataOHLCVDataProvider(OHLCVDataProviderBase):
             return _empty_ohlcv_frame()
 
         df = pd.DataFrame(records)
+        df = df.drop_duplicates("Datetime")
         df = df.sort_values("Datetime").reset_index(drop=True)
         return pl.from_pandas(
             df[["Datetime", "Open", "High", "Low", "Close", "Volume"]]

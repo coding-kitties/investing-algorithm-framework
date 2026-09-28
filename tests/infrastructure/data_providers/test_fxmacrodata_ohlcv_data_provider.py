@@ -127,10 +127,51 @@ class TestFXMacroDataGetData(TestCase):
         self.assertEqual(
             captured["url"],
             "https://api.fxmacrodata.com/v1/forex/eur/usd"
-            "?start_date=2024-01-01&end_date=2024-01-31",
+            "?start_date=2024-01-01&end_date=2024-01-31&limit=100&offset=0",
         )
         self.assertEqual(captured["accept"], "application/json")
         self.assertEqual(captured["timeout"], 12)
+
+    @patch(
+        "investing_algorithm_framework.infrastructure"
+        ".data_providers.fxmacrodata.urlopen"
+    )
+    def test_get_data_follows_pagination(self, mock_urlopen):
+        pages = {
+            "0": {
+                "data": [
+                    {"date": "2024-01-03", "val": 1.092},
+                    {"date": "2024-01-02", "val": 1.095},
+                ],
+                "pagination": {"has_more": True, "next_offset": 2},
+            },
+            "2": {
+                "data": [{"date": "2024-01-01", "val": 1.1038}],
+                "pagination": {"has_more": False, "next_offset": None},
+            },
+        }
+        urls = []
+
+        def fake_urlopen(request, timeout):
+            urls.append(request.full_url)
+            offset = request.full_url.rsplit("offset=", 1)[1]
+            return FakeResponse(json.dumps(pages[offset]))
+
+        mock_urlopen.side_effect = fake_urlopen
+
+        provider = FXMacroDataOHLCVDataProvider(
+            symbol="EURUSD",
+            market="FXMACRODATA",
+            time_frame="1d",
+        )
+        data = provider.get_data(
+            start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2024, 1, 31, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(len(urls), 2)
+        self.assertTrue(urls[1].endswith("limit=100&offset=2"))
+        self.assertEqual(data["Close"].to_list(), [1.1038, 1.095, 1.092])
 
     @patch.dict("os.environ", {"FXMACRODATA_API_KEY": "test-key"})
     @patch(
