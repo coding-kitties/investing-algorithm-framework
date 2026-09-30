@@ -3,7 +3,11 @@ use pyo3::prelude::*;
 
 type DrawdownResult = (Vec<f64>, f64, f64, i64, usize, usize);
 
-fn calculate(values: &[f64], elapsed_us: &[i64]) -> DrawdownResult {
+fn calculate(
+    values: &[f64],
+    elapsed_us: &[i64],
+    include_nonpositive_drawdown: bool,
+) -> DrawdownResult {
     let mut series = Vec::with_capacity(values.len());
     let mut positive_peak: Option<f64> = None;
     let mut peak = values.first().copied().unwrap_or(0.0);
@@ -14,7 +18,8 @@ fn calculate(values: &[f64], elapsed_us: &[i64]) -> DrawdownResult {
     let mut peak_row = 0;
     let mut absolute_rows = (0, 0);
     for (row, (&value, &timestamp)) in values.iter().zip(elapsed_us).enumerate() {
-        let drawdown = if value <= 0.0 {
+        let drawdown = if value <= 0.0 && (!include_nonpositive_drawdown || positive_peak.is_none())
+        {
             0.0
         } else {
             let high = positive_peak.unwrap_or(value).max(value);
@@ -67,7 +72,7 @@ pub fn drawdown_metrics(
             "Expected finite equity and matching nonnegative ordered timestamps",
         ));
     }
-    Ok(py.allow_threads(|| calculate(&values, &elapsed_us)))
+    Ok(py.allow_threads(|| calculate(&values, &elapsed_us, true)))
 }
 
 #[pyfunction]
@@ -101,8 +106,8 @@ pub fn risk_metrics(
             }
             growth.push(equity);
         }
-        let raw = calculate(&values, &elapsed_us);
-        let adjusted = calculate(&growth, &elapsed_us);
+        let raw = calculate(&values, &elapsed_us, true);
+        let adjusted = calculate(&growth, &elapsed_us, false);
         Ok((raw, growth, adjusted))
     })
 }
@@ -117,13 +122,30 @@ mod tests {
         assert_eq!(
             calculate(
                 &[100.0, 80.0, 0.0, -10.0, 100.0],
-                &[0, day, 2 * day, 3 * day, 4 * day]
+                &[0, day, 2 * day, 3 * day, 4 * day],
+                true
             ),
-            (vec![0.0, -0.2, 0.0, 0.0, 0.0], 0.2, 110.0, 3, 0, 3)
+            (vec![0.0, -0.2, -1.0, -1.1, 0.0], 1.1, 110.0, 3, 0, 3)
         );
-        assert_eq!(calculate(&[], &[]), (vec![], 0.0, 0.0, 0, 0, 0));
         assert_eq!(
-            calculate(&[100.0, 50.0, 60.0], &[0, day, 3 * day]),
+            calculate(&[-2.0, -4.0, 0.0], &[0, day, 2 * day], true),
+            (vec![0.0, 0.0, 0.0], 0.0, 2.0, 1, 0, 1)
+        );
+        let twenty_percent = (0.8_f64 - 1.0) / 1.0;
+        assert_eq!(
+            calculate(&[1.0, 0.8, 0.0], &[0, day, 2 * day], false),
+            (
+                vec![0.0, twenty_percent, 0.0],
+                twenty_percent.abs(),
+                1.0,
+                1,
+                0,
+                2
+            )
+        );
+        assert_eq!(calculate(&[], &[], true), (vec![], 0.0, 0.0, 0, 0, 0));
+        assert_eq!(
+            calculate(&[100.0, 50.0, 60.0], &[0, day, 3 * day], true),
             (vec![0.0, -0.5, -0.4], 0.5, 50.0, 2, 0, 1)
         );
     }

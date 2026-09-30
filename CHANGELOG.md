@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.0.0a22] - 2026-09-30
+
+### Fixed
+
+- Native raw-equity drawdown calculations now preserve losses at zero or
+  negative equity after a positive high-water mark, while cash-flow-adjusted
+  TWR drawdowns retain their existing nonpositive-value handling. The Rust
+  backend now matches the Python reference implementation across supported
+  platforms and Python versions.
+
 ## [9.0.0a21] - 2026-09-26
 
 ### Added
