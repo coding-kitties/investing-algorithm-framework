@@ -47,6 +47,7 @@ The framework ships with these OHLCV data providers:
 | Provider | Market | API Key Required | Supported Assets |
 |----------|--------|-----------------|------------------|
 | `CCXTOHLCVDataProvider` | Any CCXT exchange (e.g. `BINANCE`, `BITVAVO`) | Depends on exchange | Crypto |
+| `FXMacroDataOHLCVDataProvider` | `FXMACRODATA` | Optional | Daily FX reference rates |
 | `YahooOHLCVDataProvider` | `YAHOO` | No | Stocks, ETFs, indices, forex, crypto |
 | `AlphaVantageOHLCVDataProvider` | `ALPHA_VANTAGE` | Yes | Stocks, forex, crypto |
 | `PolygonOHLCVDataProvider` | `POLYGON` | Yes | US stocks, options, forex, crypto |
