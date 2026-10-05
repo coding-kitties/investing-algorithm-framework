@@ -51,6 +51,18 @@ def _split_fx_pair(symbol: str) -> tuple[str, str]:
     return normalized[:3], normalized[3:]
 
 
+def _clean_api_key(api_key):
+    if not api_key:
+        return None
+    api_key = str(api_key).strip()
+    if any(char.isspace() or not char.isprintable() for char in api_key):
+        # Keep the key itself out of the message.
+        raise OperationalException(
+            "FXMacroData API key contains whitespace or control characters"
+        )
+    return api_key or None
+
+
 def _read_http_error(error: HTTPError) -> str:
     try:
         body = error.read().decode("utf-8").strip()
@@ -122,9 +134,7 @@ class FXMacroDataOHLCVDataProvider(OHLCVDataProviderBase):
         )
 
         headers = {"Accept": "application/json"}
-        api_key = self._get_optional_api_key()
-        if api_key:
-            headers["X-API-Key"] = api_key
+        api_key = _clean_api_key(self._get_optional_api_key())
 
         rows = []
         offset = 0
@@ -136,6 +146,10 @@ class FXMacroDataOHLCVDataProvider(OHLCVDataProviderBase):
                 "offset": offset,
             }
             request = Request(f"{url}?{urlencode(params)}", headers=headers)
+            if api_key:
+                # Unredirected, so urllib never forwards the key if the
+                # API answers with a redirect to another host.
+                request.add_unredirected_header("X-API-Key", api_key)
             try:
                 with urlopen(request, timeout=self.timeout) as response:
                     payload = json.loads(response.read().decode("utf-8"))

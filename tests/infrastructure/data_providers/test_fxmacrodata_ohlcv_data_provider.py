@@ -6,7 +6,10 @@ from unittest.mock import patch
 import pandas as pd
 import polars as pl
 
-from investing_algorithm_framework.domain import DataSource
+from investing_algorithm_framework.domain import (
+    DataSource,
+    OperationalException,
+)
 from investing_algorithm_framework.infrastructure import (
     FXMacroDataOHLCVDataProvider,
 )
@@ -195,6 +198,51 @@ class TestFXMacroDataGetData(TestCase):
         request = mock_urlopen.call_args[0][0]
         self.assertEqual(request.get_header("X-api-key"), "test-key")
         self.assertNotIn("api_key", request.full_url)
+
+    @patch.dict("os.environ", {"FXMACRODATA_API_KEY": "test-key"})
+    @patch(
+        "investing_algorithm_framework.infrastructure"
+        ".data_providers.fxmacrodata.urlopen"
+    )
+    def test_api_key_is_not_forwarded_on_redirect(self, mock_urlopen):
+        mock_urlopen.return_value = FakeResponse(
+            json.dumps({"data": [{"date": "2024-01-01", "val": 1.1038}]})
+        )
+        provider = FXMacroDataOHLCVDataProvider(
+            symbol="EUR/USD",
+            market="FXMACRODATA",
+            time_frame="1d",
+        )
+        provider.get_data(
+            start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+
+        # urllib copies request.headers onto a redirected request, but not
+        # unredirected headers.
+        request = mock_urlopen.call_args[0][0]
+        self.assertEqual(request.unredirected_hdrs["X-api-key"], "test-key")
+        self.assertNotIn("X-api-key", request.headers)
+
+    @patch.dict("os.environ", {"FXMACRODATA_API_KEY": "test\nkey"})
+    @patch(
+        "investing_algorithm_framework.infrastructure"
+        ".data_providers.fxmacrodata.urlopen"
+    )
+    def test_invalid_api_key_error_does_not_include_key(self, mock_urlopen):
+        provider = FXMacroDataOHLCVDataProvider(
+            symbol="EUR/USD",
+            market="FXMACRODATA",
+            time_frame="1d",
+        )
+        with self.assertRaises(OperationalException) as context:
+            provider.get_data(
+                start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                end_date=datetime(2024, 1, 2, tzinfo=timezone.utc),
+            )
+
+        self.assertNotIn("test", str(context.exception))
+        mock_urlopen.assert_not_called()
 
     @patch(
         "investing_algorithm_framework.infrastructure"
