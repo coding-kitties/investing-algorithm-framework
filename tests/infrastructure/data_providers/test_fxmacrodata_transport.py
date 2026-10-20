@@ -43,6 +43,8 @@ def load_provider():
     module = importlib.util.module_from_spec(spec)
     with patch.dict(sys.modules, modules):
         spec.loader.exec_module(module)
+    assert module.pd is pandas
+    assert module.pl is polars
     return module
 
 
