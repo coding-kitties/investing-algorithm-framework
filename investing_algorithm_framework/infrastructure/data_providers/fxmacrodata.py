@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -64,14 +64,7 @@ def _clean_api_key(api_key):
 
 
 def _read_http_error(error: HTTPError) -> str:
-    try:
-        body = error.read().decode("utf-8").strip()
-    except Exception:
-        body = ""
-    message = f"FXMacroData API error {error.code}"
-    if body:
-        message = f"{message}: {body}"
-    return message
+    return f"FXMacroData API error {error.code}"
 
 
 class FXMacroDataOHLCVDataProvider(OHLCVDataProviderBase):
@@ -154,25 +147,40 @@ class FXMacroDataOHLCVDataProvider(OHLCVDataProviderBase):
                 with urlopen(request, timeout=self.timeout) as response:
                     payload = json.loads(response.read().decode("utf-8"))
             except HTTPError as error:
-                raise OperationalException(_read_http_error(error)) from error
-            except Exception as error:
-                logger.error(f"Error downloading FXMacroData data: {error}")
-                return _empty_ohlcv_frame()
+                error.close()
+                raise OperationalException(_read_http_error(error)) from None
+            except (URLError, OSError, ValueError):
+                raise OperationalException("Unable to download FXMacroData data") from None
 
             page = payload.get("data") if isinstance(payload, dict) else None
-            if not isinstance(page, list):
+            if (not isinstance(page, list)
+                    or not all(isinstance(row, dict) for row in page)
+                    or payload.get("error") or payload.get("detail")):
                 raise OperationalException(
                     "FXMacroData response did not include a data list"
                 )
             rows.extend(page)
 
             pagination = payload.get("pagination")
-            has_more = (
-                isinstance(pagination, dict) and pagination.get("has_more")
-            )
-            if not page or not has_more:
+            if pagination is None:
                 break
-            offset = pagination.get("next_offset") or offset + len(page)
+            if not isinstance(pagination, dict):
+                raise OperationalException("FXMacroData returned invalid pagination")
+            has_more = pagination.get("has_more", False)
+            if type(has_more) is not bool:
+                raise OperationalException("FXMacroData returned invalid pagination")
+            if not has_more:
+                break
+            if not page:
+                raise OperationalException("FXMacroData returned an empty page with more rows pending")
+            next_offset = pagination.get("next_offset")
+            if next_offset is None:
+                next_offset = offset + len(page)
+            if type(next_offset) is not int or next_offset <= offset:
+                raise OperationalException("FXMacroData pagination did not advance")
+            offset = next_offset
+        else:
+            raise OperationalException("FXMacroData pagination exceeded the page limit")
 
         records = []
         for row in rows:
