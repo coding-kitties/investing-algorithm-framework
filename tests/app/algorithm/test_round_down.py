@@ -63,3 +63,27 @@ class Test(TestCase):
             9, self.count_decimals(new_value)
         )
         self.assertEqual(1.987654321, new_value)
+
+    def test_round_down_scientific_notation(self):
+        for value, decimals, expected in [
+            (1e-7, 6, 0.0),
+            (1.234e-7, 8, 1.2e-7),
+            (1.234e-7, 9, 1.23e-7),
+            (-1.234e-7, 8, -1.2e-7),
+            (1e-7, 7, 1e-7),
+            (1.234e-7, 10, 1.234e-7),
+        ]:
+            with self.subTest(value=value, decimals=decimals):
+                self.assertEqual(
+                    RoundingService.round_down(value, decimals), expected
+                )
+
+    def test_count_decimals_scientific_notation(self):
+        for value, expected in [
+            (1e-7, 7), (1.234e-7, 10), (-1.234e-7, 10),
+            (1e20, 0), (1.23e20, 0), (1.23, 2), (1, 0),
+        ]:
+            with self.subTest(value=value):
+                self.assertEqual(
+                    RoundingService.count_decimals(value), expected
+                )
