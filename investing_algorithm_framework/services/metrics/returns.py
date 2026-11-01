@@ -42,6 +42,12 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
     })
 
     prev_value = monthly_df['total_value'].shift(1)
+
+    # Measure the first month from the initial snapshot, as
+    # get_yearly_returns does for the first year, instead of dropping it.
+    if len(df) > 1 and df['total_value'].resample('ME').count().iloc[0] > 1:
+        prev_value.iloc[0] = df['total_value'].iloc[0]
+
     monthly_df['return'] = (
         (monthly_df['total_value'] - monthly_df['cash_flow']) / prev_value - 1
     )
