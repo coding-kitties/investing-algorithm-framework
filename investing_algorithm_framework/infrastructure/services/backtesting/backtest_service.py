@@ -92,6 +92,85 @@ def _print_progress(message: str, show_progress: bool = False):
         print(message, flush=True)
 
 
+def prepare_backtest_data_sources(
+    data_provider_service: DataProviderService,
+    data_sources: List[DataSource],
+    backtest_date_range: BacktestDateRange,
+    show_progress: bool = False,
+    fill_missing_data: bool = False,
+    save_filled_data_points: bool = False,
+    access_pattern: str = "rolling",
+) -> None:
+    """Register and prepare providers, reusing cached data when available.
+
+    Preparation errors propagate to the caller. This is shared by framework
+    backtests and standalone consumers of the configured provider service.
+    """
+    if data_sources is None or len(data_sources) == 0:
+        logger.info("No data sources were configured")
+        return
+
+    context = data_provider_service.prepared_market_data_context
+    registration_started = perf_counter()
+    cache_plan = data_provider_service.index_backtest_data_providers(
+        data_sources,
+        backtest_date_range,
+        show_progress=show_progress,
+        access_pattern=access_pattern,
+        fill_missing_data=fill_missing_data,
+        save_filled_data_points=save_filled_data_points,
+    )
+    if context is not None:
+        context.record_registration(perf_counter() - registration_started)
+    if not isinstance(cache_plan, dict):
+        cache_plan = {}
+    identifiers = ', '.join(ds.get_identifier() for ds in data_sources)
+    logger.info(
+        f"Data sources initialized ({len(data_sources)}): {identifiers}"
+    )
+
+    data_providers = data_provider_service.data_provider_index.get_all()
+    if show_progress:
+        data_providers = tqdm(
+            data_providers,
+            desc="Preparing backtest data for all data sources",
+            colour="green",
+        )
+
+    for data_source, data_provider in data_providers:
+        cache_key, cache_hit = cache_plan.get(data_source, (None, False))
+        if cache_hit:
+            continue
+        preparation_options = {}
+        if save_filled_data_points and isinstance(
+            data_provider, CCXTOHLCVDataProvider
+        ):
+            preparation_options["save_filled_data_points"] = True
+        preparation_started = perf_counter()
+        data_provider.prepare_backtest_data_for_access(
+            backtest_start_date=backtest_date_range.start_date,
+            backtest_end_date=backtest_date_range.end_date,
+            fill_missing_data=fill_missing_data,
+            show_progress=show_progress,
+            access_pattern=access_pattern,
+            **preparation_options,
+        )
+        if context is not None:
+            context.record_preparation(
+                perf_counter() - preparation_started,
+                rolling_cache_built=bool(
+                    access_pattern == "rolling"
+                    and getattr(data_provider, "window_cache", None)
+                ),
+            )
+        if (
+            context is not None
+            and cache_key is not None
+            and data_provider.supports_prepared_data_reuse
+        ):
+            context.put(cache_key, data_provider)
+
+
 def _fill_missing_data_for_data_sources(
     data_sources: List[DataSource],
     backtest_date_range: BacktestDateRange,
@@ -214,6 +293,27 @@ class BacktestService:
         self._portfolio_configuration_service: PortfolioConfigurationService \
             = portfolio_configuration_service
         self._data_provider_service = data_provider_service
+
+    def _create_event_loop_service(
+        self, *, context, algorithm_id, backtest_date_range, study,
+    ):
+        """Construct an event loop with its isolated algorithm/window scope.
+
+        Subclasses can supply an alternative loop without replacing the
+        backtest preparation, execution evaluator or result lifecycle.
+        """
+        from investing_algorithm_framework.app.eventloop import \
+            EventLoopService
+
+        return EventLoopService(
+            configuration_service=self._configuration_service,
+            portfolio_snapshot_service=self._portfolio_snapshot_service,
+            context=context,
+            order_service=self._order_service,
+            portfolio_service=self._portfolio_service,
+            data_provider_service=self._data_provider_service,
+            trade_service=self._trade_service,
+        )
 
     def _validate_algorithm_ids(
         self,
@@ -722,77 +822,15 @@ class BacktestService:
         Returns:
             None
         """
-        if data_sources is None or len(data_sources) == 0:
-            logger.info("No data sources were configured")
-            return
-
-        # Initialize all data sources
-        context = self._data_provider_service.prepared_market_data_context
-        registration_started = perf_counter()
-        cache_plan = self._data_provider_service.index_backtest_data_providers(
+        prepare_backtest_data_sources(
+            self._data_provider_service,
             data_sources,
             backtest_date_range,
             show_progress=show_progress,
-            access_pattern=access_pattern,
             fill_missing_data=fill_missing_data,
             save_filled_data_points=save_filled_data_points,
+            access_pattern=access_pattern,
         )
-        if context is not None:
-            context.record_registration(
-                perf_counter() - registration_started
-            )
-        if not isinstance(cache_plan, dict):
-            cache_plan = {}
-        identifiers = ', '.join(ds.get_identifier() for ds in data_sources)
-        logger.info(
-            f"Data sources initialized ({len(data_sources)}): {identifiers}"
-        )
-
-        description = "Preparing backtest data for all data sources"
-        data_providers = self._data_provider_service\
-            .data_provider_index.get_all()
-
-        if show_progress:
-            data_providers = tqdm(
-                data_providers, desc=description, colour="green"
-            )
-
-        # Prepare the backtest data for each data provider
-        # Fill missing data is handled inside prepare_backtest_data
-        for data_source, data_provider in data_providers:
-            cache_key, cache_hit = cache_plan.get(
-                data_source, (None, False)
-            )
-            if cache_hit:
-                continue
-            preparation_options = {}
-            if save_filled_data_points and isinstance(
-                data_provider, CCXTOHLCVDataProvider
-            ):
-                preparation_options["save_filled_data_points"] = True
-            preparation_started = perf_counter()
-            data_provider.prepare_backtest_data_for_access(
-                backtest_start_date=backtest_date_range.start_date,
-                backtest_end_date=backtest_date_range.end_date,
-                fill_missing_data=fill_missing_data,
-                show_progress=show_progress,
-                access_pattern=access_pattern,
-                **preparation_options,
-            )
-            if context is not None:
-                context.record_preparation(
-                    perf_counter() - preparation_started,
-                    rolling_cache_built=bool(
-                        access_pattern == "rolling"
-                        and getattr(data_provider, "window_cache", None)
-                    ),
-                )
-            if (
-                context is not None
-                and cache_key is not None
-                and data_provider.supports_prepared_data_reuse
-            ):
-                context.put(cache_key, data_provider)
 
     def run_vector_backtests(
         self,
@@ -2592,6 +2630,8 @@ class BacktestService:
         event_fill_backend='python',
         event_schedule_backend='python',
         event_state_backend='sql',
+        capture_run_reports: bool = False,
+        persist_run_reports: bool = False,
     ) -> Union[List[Backtest], BacktestIndex]:
         """
         Run event-driven backtests with checkpointing and bounded workers.
@@ -2637,11 +2677,24 @@ class BacktestService:
             List[Backtest]: List of backtest results.
         """
         from .event_backtest_service import EventBacktestService
-        from investing_algorithm_framework.app.eventloop import \
-            EventLoopService
         from investing_algorithm_framework.services import (
             BacktestTradeOrderEvaluator,
         )
+
+        if not isinstance(persist_run_reports, bool):
+            raise OperationalException("persist_run_reports must be a bool.")
+        if persist_run_reports and not capture_run_reports:
+            raise OperationalException(
+                "persist_run_reports requires capture_run_reports=True."
+            )
+        if capture_run_reports:
+            if result_mode != "index" or n_workers not in (None, 0):
+                raise OperationalException(
+                    "capture_run_reports requires index results and "
+                    "sequential execution (n_workers=None or 0)."
+                )
+            force_rerun = True
+        run_reports = []
 
         if result_mode not in ("list", "index"):
             raise OperationalException(
@@ -3076,20 +3129,13 @@ class BacktestService:
                             )
 
                             # Create event loop service
-                            event_loop_service = EventLoopService(
-                                configuration_service=(
-                                    self._configuration_service
-                                ),
-                                portfolio_snapshot_service=(
-                                    self._portfolio_snapshot_service
-                                ),
-                                context=context,
-                                order_service=self._order_service,
-                                portfolio_service=self._portfolio_service,
-                                data_provider_service=(
-                                    self._data_provider_service
-                                ),
-                                trade_service=self._trade_service,
+                            event_loop_service = (
+                                self._create_event_loop_service(
+                                    context=context,
+                                    algorithm_id=algorithm_id,
+                                    backtest_date_range=backtest_date_range,
+                                    study=study,
+                                )
                             )
 
                             # Create trade order evaluator
@@ -3136,6 +3182,71 @@ class BacktestService:
                                 algorithm=algorithm,
                                 trade_order_evaluator=trade_order_evaluator
                             )
+                            event_backtest_service.prepare_indicators(
+                                algorithm, backtest_date_range,
+                            )
+                            if capture_run_reports:
+                                from investing_algorithm_framework.domain \
+                                    import RunReport
+                                from investing_algorithm_framework.services \
+                                    .run_reports.snapshot \
+                                    import run_report_snapshot
+
+                                def capture_iteration(
+                                    timestamp, signals, **outcome,
+                                ):
+                                    payload = run_report_snapshot(
+                                        algorithm_id=algorithm_id,
+                                        strategy_ids=[
+                                            strategy.strategy_id
+                                            for strategy
+                                            in algorithm.strategies
+                                        ],
+                                        started_at=timestamp,
+                                        completed_at=timestamp,
+                                        signal_log=signals,
+                                        config=(
+                                            self._configuration_service
+                                            .get_config()
+                                        ),
+                                        order_service=self._order_service,
+                                        position_service=(
+                                            self._position_repository
+                                        ),
+                                        portfolio_service=(
+                                            self._portfolio_service
+                                        ),
+                                        trade_service=self._trade_service,
+                                        portfolio_configuration_service=(
+                                            self._portfolio_configuration_service
+                                        ),
+                                        number_of_iterations=1,
+                                        **outcome,
+                                    )
+                                    report = RunReport(**payload).to_dict()
+                                    report.update(
+                                        timestamp=report["started_at"],
+                                        backtest_start_date=(
+                                            backtest_date_range.start_date
+                                            .isoformat()
+                                        ),
+                                        backtest_end_date=(
+                                            backtest_date_range.end_date
+                                            .isoformat()
+                                        ),
+                                        backtest_date_range_name=(
+                                            backtest_date_range.name
+                                        ),
+                                        study_name=study.name,
+                                        engine="event",
+                                    )
+                                    run_reports.append(report)
+                                    return report
+
+                                event_loop_service \
+                                    .on_historical_iteration_report = (
+                                        capture_iteration
+                                    )
                             if signal_storage_directory is not None:
                                 from investing_algorithm_framework.services \
                                     .backtest_store.recording import (
@@ -3498,8 +3609,17 @@ class BacktestService:
             self._save_session_cache(
                 session_cache, backtest_storage_directory,
             )
+            if persist_run_reports:
+                from investing_algorithm_framework.domain.backtesting \
+                    .run_report_storage import (
+                        RUN_REPORTS_PATH_COLUMN, save_run_reports,
+                    )
+                index.df[RUN_REPORTS_PATH_COLUMN] = save_run_reports(
+                    index.directory, run_reports,
+                )
             persist_index(index)
             memory_guard.require()
+            index.run_reports = run_reports if capture_run_reports else None
             return index
 
         loaded_from_storage = False

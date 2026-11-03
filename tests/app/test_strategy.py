@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import pandas as pd
 from investing_algorithm_framework import Algorithm, TradingStrategy, \
     DataSource, DataType, OperationalException, TimeUnit, Schedule, \
@@ -80,7 +80,11 @@ class TestSignalCards(TestCase):
         self.assertEqual(4, len(batches))
         for index in range(len(frame)):
             strategy.prepare_signal_data.reset_mock()
-            events = list(strategy.generate_signals(None, {
+            context = Mock(
+                get_open_trades=Mock(return_value=[]),
+                has_position=Mock(return_value=True),
+            )
+            events = list(strategy.generate_signals(context, {
                 "BTC": frame.iloc[:index + 1], "ETH": frame.iloc[:index + 1],
             }))
             strategy.prepare_signal_data.assert_called_once()
@@ -179,6 +183,34 @@ class TestSignalCards(TestCase):
             "BTC", strategy.record_decision_trace.call_args.kwargs["symbol"]
         )
 
+    def test_default_exit_hook_skips_both_card_evaluation_paths_when_flat(self):
+        strategy = self.strategy({SignalSide.CLOSE_LONG: self.card("exit")})
+        strategy.prepare_signal_data = Mock(return_value={
+            "BTC": pd.DataFrame({"exit": [True], "Close": [100.]}),
+        })
+        context = Mock(
+            get_open_trades=Mock(return_value=[]),
+            has_position=Mock(return_value=False),
+        )
+        with patch.object(
+            ConfluenceCard, "evaluate", side_effect=AssertionError("Must skip scoring"),
+        ), patch.object(
+            ConfluenceCard, "evaluate_series",
+            side_effect=AssertionError("Must skip availability evaluation"),
+        ):
+            self.assertEqual([], list(strategy.generate_signals(context, {})))
+        capture, = strategy._pending_confluence_scores
+        self.assertEqual("skipped", capture["evaluation_status"])
+        self.assertEqual(
+            "confluence.long_exit_requires_position", capture["signal_reason"],
+        )
+        self.assertNotIn("score", capture)
+        context.has_position.return_value = True
+        self.assertEqual(
+            [SignalSide.CLOSE_LONG],
+            [signal.side for signal in strategy.generate_signals(context, {})],
+        )
+
     def test_all_signal_sides_can_be_mapped_without_combining_decisions(self):
         strategy = self.strategy({
             side: self.card(side.value) for side in SignalSide
@@ -235,9 +267,17 @@ class TestSignalCards(TestCase):
         strategy.run_strategy(context, {"entry": False, "exit": False})
         self.assertEqual(2, len(strategy.last_score_cards))
         self.assertEqual([], strategy.last_signals)
+        self.assertEqual(2, len(strategy._pending_confluence_scores))
+        self.assertTrue(all(
+            not card["qualified"] for card in strategy._pending_confluence_scores
+        ))
         strategy.run_strategy(context, {"entry": True, "exit": True})
         self.assertEqual([], strategy.last_score_cards)
         self.assertEqual(2, len(strategy.last_signals))
+        self.assertEqual(2, len(strategy._pending_confluence_scores))
+        self.assertTrue(all(
+            card["qualified"] for card in strategy._pending_confluence_scores
+        ))
 
 
 class TestPositionSizeAndScalingRuleDefaults(TestCase):

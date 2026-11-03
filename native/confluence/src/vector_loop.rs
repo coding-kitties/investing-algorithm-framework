@@ -13,6 +13,8 @@ fn execute(
 ) -> Vec<Event> {
     let mut positions = vec![0_u8; capitals.len()];
     let mut costs = vec![0.0; capitals.len()];
+    let mut amounts = vec![0.0; capitals.len()];
+    let mut cash = initial;
     let mut allocated = 0.0;
     let mut events = Vec::new();
     for row in 0..rows {
@@ -24,6 +26,7 @@ fn execute(
             let cover = mask & 8 != 0;
             if sell {
                 if positions[symbol] == 1 {
+                    cash += amounts[symbol] * prices[symbol][row];
                     allocated -= costs[symbol];
                     positions[symbol] = 0;
                     events.push((row, symbol, 1, 0));
@@ -34,6 +37,7 @@ fn execute(
             }
             if cover {
                 if positions[symbol] == 2 {
+                    cash -= amounts[symbol] * prices[symbol][row];
                     allocated -= costs[symbol];
                     positions[symbol] = 0;
                     events.push((row, symbol, 3, 0));
@@ -49,13 +53,21 @@ fn execute(
                     2 => 5,
                     _ => {
                         let capital = capitals[symbol] * 100.0 / 100.0;
-                        if capital <= 0.0 || allocated + capital > initial {
+                        if capital <= 0.0 || crate::cash::exceeds_cash(allocated + capital, initial)
+                        {
                             3
                         } else {
-                            allocated += capital;
-                            costs[symbol] = capital;
-                            positions[symbol] = 1;
-                            0
+                            let funded = capital.min(cash.max(0.0));
+                            if funded <= 0.0 {
+                                3
+                            } else {
+                                cash -= funded;
+                                allocated += funded;
+                                costs[symbol] = funded;
+                                amounts[symbol] = funded / prices[symbol][row];
+                                positions[symbol] = 1;
+                                0
+                            }
                         }
                     }
                 };
@@ -66,13 +78,20 @@ fn execute(
                     4
                 } else {
                     let capital = capitals[symbol] * 100.0 / 100.0;
-                    if capital <= 0.0 || allocated + capital > initial {
+                    if capital <= 0.0 || crate::cash::exceeds_cash(allocated + capital, initial) {
                         3
                     } else {
-                        allocated += capital;
-                        costs[symbol] = (capital / prices[symbol][row]) * prices[symbol][row];
-                        positions[symbol] = 2;
-                        0
+                        let funded = capital.min(cash.max(0.0));
+                        if funded <= 0.0 {
+                            3
+                        } else {
+                            cash += funded;
+                            allocated += funded;
+                            costs[symbol] = funded;
+                            amounts[symbol] = funded / prices[symbol][row];
+                            positions[symbol] = 2;
+                            0
+                        }
                     }
                 };
                 events.push((row, symbol, 2, reason));
@@ -173,5 +192,19 @@ mod tests {
             execute(&[vec![10.; 3]], &[vec![4, 12, 1]], &[50.], 100., 3),
             vec![(0, 0, 2, 0), (1, 0, 3, 0), (2, 0, 0, 0)]
         );
+    }
+
+    #[test]
+    fn three_equal_allocations_are_not_rejected_by_roundoff() {
+        let third = 1000.0 * ((100.0 / 3.0) / 100.0);
+        let events = execute(
+            &[vec![100.0], vec![100.0], vec![100.0]],
+            &[vec![1], vec![1], vec![1]],
+            &[third, third, third],
+            1000.0,
+            1,
+        );
+        assert!(events.iter().all(|event| event.3 == 0));
+        assert_eq!(events.len(), 3);
     }
 }

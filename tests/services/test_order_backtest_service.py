@@ -3,12 +3,66 @@ from copy import deepcopy
 from itertools import product
 import random
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential, INDEX_DATETIME, BacktestDateRange
 from investing_algorithm_framework.services import OrderBacktestService
 from tests.resources import TestBase
+
+
+class TestFifoQuantityBoundaries(TestCase):
+    def test_python_fifo_accepts_roundoff_but_not_real_shortages(self):
+        from math import ulp
+        from investing_algorithm_framework.domain import OperationalException
+        from investing_algorithm_framework.services.trade_service \
+            .trade_service import TradeService
+
+        for available in (0.03818035927340444, 3.818035927340444e-14):
+            for excess_ulps in (0, 4, 64):
+                with self.subTest(available=available, excess=excess_ulps):
+                    trade = SimpleNamespace(
+                        id=1, is_short=False, available_amount=available)
+                    service = SimpleNamespace(
+                        position_repository=Mock(),
+                        get_all=Mock(return_value=[trade]),
+                        _allocate_sell_to_trade=Mock(),
+                    )
+                    order = SimpleNamespace(
+                        id=2, target_symbol='BTC',
+                        amount=available + excess_ulps * ulp(available))
+                    with patch(
+                        'investing_algorithm_framework.services.trade_service.'
+                        'trade_service.native_event_engine', return_value=None,
+                    ):
+                        if excess_ulps == 64:
+                            with self.assertRaisesRegex(
+                                OperationalException, 'Not enough',
+                            ):
+                                TradeService._create_trade_allocations_fifo(
+                                    service, order)
+                            service._allocate_sell_to_trade.assert_not_called()
+                        else:
+                            TradeService._create_trade_allocations_fifo(
+                                service, order)
+                            service._allocate_sell_to_trade \
+                                .assert_called_once_with(1, order, available)
+
+    def test_python_fifo_never_closes_a_missing_position(self):
+        from math import ulp
+        from investing_algorithm_framework.domain import OperationalException
+        from investing_algorithm_framework.services.trade_service \
+            .trade_service import TradeService
+
+        service = SimpleNamespace(
+            position_repository=Mock(), get_all=Mock(return_value=[]))
+        order = SimpleNamespace(id=1, target_symbol='BTC', amount=ulp(0.0))
+        with patch(
+            'investing_algorithm_framework.services.trade_service.'
+            'trade_service.native_event_engine', return_value=None,
+        ), self.assertRaisesRegex(OperationalException, 'Not enough'):
+            TradeService._create_trade_allocations_fifo(service, order)
 
 
 class TestNativeEventTransitions(TestCase):
@@ -59,6 +113,37 @@ class TestNativeEventTransitions(TestCase):
         self.assertEqual(self.native.event_reservation_plan(
             [(0, 5.0, False)], 3.0, [(0, 1.0), (0, 2.0)]),
             [(0, 1.0, 4.0), (0, 2.0, 2.0)])
+
+    def test_fifo_reservation_accepts_only_quantity_roundoff(self):
+        from math import fsum, ulp
+
+        for scale in (1.0, 1e-12):
+            with self.subTest(scale=scale):
+                amounts = [scale * value for value in (
+                    0.007550870649923891,
+                    0.015163607511242152,
+                    0.015465881112238396,
+                )]
+                rows = [(index, amount, False)
+                        for index, amount in enumerate(amounts)]
+                total = fsum(amounts)
+                for requested in (total, total + 4 * ulp(total)):
+                    plan = self.native.event_reservation_plan(
+                        rows, requested, None)
+                    self.assertEqual([row[0] for row in plan], [0, 1, 2])
+                    for (_, portion, remaining), available in zip(plan, amounts):
+                        self.assertLessEqual(portion, available)
+                        self.assertLessEqual(
+                            available - portion, 16 * ulp(total))
+                        self.assertLessEqual(remaining, 16 * ulp(total))
+                    self.assertLessEqual(
+                        abs(fsum(row[1] for row in plan) - requested),
+                        16 * ulp(total))
+                with self.assertRaisesRegex(ValueError, 'Not enough'):
+                    self.native.event_reservation_plan(
+                        rows, total + 64 * ulp(total), None)
+        with self.assertRaisesRegex(ValueError, 'Not enough'):
+            self.native.event_reservation_plan([], ulp(0.0), None)
 
     def test_batch_exit_plans_match_sequential_python_exactly(self):
         randomizer = random.Random(20260922)
@@ -387,6 +472,70 @@ class TestOrderBacktestService(TestBase):
                 self.test_native_entry_reservation_and_fill_parity()
         finally:
             event.remove(Engine, 'before_cursor_execute', reject_sql)
+
+    def test_full_fifo_exit_after_three_fractional_entries(self):
+        from math import fsum
+        from investing_algorithm_framework.infrastructure.repositories \
+            .event_memory import event_memory_scope
+        from investing_algorithm_framework.domain.native_event import \
+            load_native_event_accounting
+
+        backends = ['python']
+        try:
+            load_native_event_accounting()
+        except ImportError:
+            pass
+        else:
+            backends.append('rust')
+        service = self.app.container.order_service()
+        base_amounts = (
+            0.007550870649923891,
+            0.015163607511242152,
+            0.015465881112238396,
+        )
+        for backend, scale in product(backends, (1.0, 1e-12)):
+            amounts = tuple(scale * amount for amount in base_amounts)
+            with self.subTest(backend=backend, scale=scale), \
+                    event_memory_scope(accounting_backend=backend):
+                self.app.container.portfolio_service().create({
+                    'identifier': 'test_portfolio', 'market': 'binance',
+                    'trading_symbol': 'EUR', 'unallocated': 1000,
+                    'initialized': True,
+                })
+                for amount, price in zip(amounts, (8329.4, 8293.0, 8078.8)):
+                    buy = service.create({
+                        'target_symbol': 'BTC', 'trading_symbol': 'EUR',
+                        'amount': amount, 'order_side': 'BUY',
+                        'price': price / scale,
+                        'order_type': 'LIMIT', 'portfolio_id': 1,
+                    })
+                    service.update(buy.id, {
+                        'filled': amount, 'remaining': 0, 'status': 'CLOSED',
+                    })
+                sell = service.create({
+                    'target_symbol': 'BTC', 'trading_symbol': 'EUR',
+                    'amount': fsum(amounts), 'order_side': 'SELL',
+                    'price': 8212.2 / scale, 'order_type': 'LIMIT',
+                    'portfolio_id': 1,
+                })
+                allocations = service.trade_service \
+                    .trade_allocation_repository.get_all({'order_id': sell.id})
+                self.assertEqual(len(allocations), 3)
+                self.assertEqual(fsum(a.amount for a in allocations),
+                                 sell.amount)
+                self.assertTrue(all(t.available_amount == 0 for t in
+                                    service.trade_service.get_all()))
+                service.update(sell.id, {
+                    'filled': sell.amount, 'remaining': 0, 'status': 'CLOSED',
+                })
+                self.assertEqual(service.position_service.find({
+                    'symbol': 'BTC', 'portfolio': 1,
+                }).amount, 0)
+                self.assertEqual(
+                    service.trade_service.get_all({'status': 'OPEN'}), [])
+                self.assertTrue(all(a.amount_pending == 0 for a in
+                                    service.trade_service
+                                    .trade_allocation_repository.get_all()))
 
     def test_rust_archive_accounting(self):
         from investing_algorithm_framework.infrastructure.repositories \

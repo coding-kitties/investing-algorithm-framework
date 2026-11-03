@@ -21,6 +21,14 @@ class NativeExecutionUnsupported(ValueError):
 def native_events(symbol_data, rows, initial_amount, strategy, *,
                   dynamic_position_sizing, hedge_mode, deposit_events,
                   index=None):
+    if any(data.get('position_exit_evaluators') for data in symbol_data.values()):
+        raise NativeExecutionUnsupported(
+            "Position-scoped confluence lookbacks require Python vector execution"
+        )
+    if any(data.get('staged_scale_in') for data in symbol_data.values()):
+        raise NativeExecutionUnsupported(
+            "Staged SCALE_IN metadata requires Python execution"
+        )
     if hedge_mode:
         raise NativeExecutionUnsupported(
             "Native execution currently requires netting"
@@ -118,7 +126,7 @@ def native_events(symbol_data, rows, initial_amount, strategy, *,
             if not math.isfinite(threshold) or threshold < 0:
                 raise NativeExecutionUnsupported("Unsupported risk threshold")
             for symbol, slot in symbols.items():
-                if rule.symbol is None or rule.symbol == symbol:
+                if rule.symbols is None or symbol in rule.symbols:
                     risks[slot].append((take_profit, threshold))
     sides = {'buy': 0, 'sell': 1, 'any': 2}
     for rule in getattr(strategy, 'cooldowns', None) or ():
@@ -143,7 +151,7 @@ def native_events(symbol_data, rows, initial_amount, strategy, *,
     import iaf_confluence_native as native
 
     if getattr(native, 'NETTING_SEMANTICS_VERSION', None) != (
-        'netting-accounting-v5'
+        'netting-accounting-v6'
     ):
         raise NativeExecutionUnsupported("Native execution version mismatch")
     return native.run_netting(

@@ -50,6 +50,7 @@ struct Position {
     amount: f64,
     cost: f64,
     fees: f64,
+    reserved_capital: f64,
 }
 
 struct ReplayTrade {
@@ -60,6 +61,7 @@ struct ReplayTrade {
     amount: f64,
     cost: f64,
     gain: f64,
+    opening_fee: f64,
 }
 
 #[pyclass(frozen)]
@@ -107,6 +109,7 @@ fn snapshots(
                 amount: event.amount,
                 cost: event.cost,
                 gain: 0.0,
+                opening_fee: event.fee,
             });
         } else {
             let slot = current[event.symbol].take().unwrap();
@@ -147,6 +150,8 @@ fn snapshots(
             result.cash_start_row = result.cash_start_row.min(row);
             let trade = &trades[*slot];
             if trade.opened == row {
+                cash -= trade.opening_fee;
+                realized -= trade.opening_fee;
                 if trade.short {
                     cash += trade.cost;
                 } else {
@@ -301,10 +306,10 @@ impl Engine<'_> {
         let capital = base * 100.0 / 100.0;
         if self.dynamic {
             capital.min(self.cash)
-        } else if self.allocated + capital > self.initial {
+        } else if crate::cash::exceeds_cash(self.allocated + capital, self.initial) {
             0.0
         } else {
-            capital
+            capital.min(self.cash.max(0.0))
         }
     }
 
@@ -350,9 +355,10 @@ impl Engine<'_> {
             amount,
             cost,
             fees: fee,
+            reserved_capital: capital,
         };
+        self.cash += if short { cost - fee } else { -capital };
         if self.dynamic {
-            self.cash += if short { cost - fee } else { -capital };
             self.values.push((symbol, if short { 0.0 } else { cost }));
         } else {
             self.allocated += capital;
@@ -389,15 +395,15 @@ impl Engine<'_> {
         } else {
             gross - fee - position.cost
         };
+        if short {
+            self.cash -= gross + fee;
+        } else {
+            self.cash += position.cost + gain;
+        }
         if self.dynamic {
-            if short {
-                self.cash -= gross + fee;
-            } else {
-                self.cash += position.cost + gain;
-            }
             self.values.retain(|(slot, _)| *slot != symbol);
         } else {
-            self.allocated -= position.cost;
+            self.allocated -= position.reserved_capital;
         }
         self.events.push(Execution {
             row,
@@ -660,6 +666,94 @@ mod tests {
         assert_eq!(events[0].cost, 99.0);
         assert!((events[1].net_gain - 97.02).abs() < 1e-12);
         assert!((events[2].fee - 1.9801).abs() < 1e-12);
+    }
+
+    #[test]
+    fn static_thirds_fill_but_real_overspend_is_rejected() {
+        let third = 1000.0 * ((100.0 / 3.0) / 100.0);
+        for mask in [1, 4] {
+            for (percentage, rejected) in [(100.0, 0), (120.0, 1)] {
+                let specs = vec![
+                    (
+                        third * percentage / 100.0,
+                        Some(percentage),
+                        None,
+                        0.0,
+                        0.0,
+                        0.0
+                    );
+                    3
+                ];
+                let engine = Engine {
+                    specs: &specs,
+                    dynamic: false,
+                    flip: false,
+                    initial: 1000.0,
+                    cash: 1000.0,
+                    cooldowns: &[],
+                    risks: &[vec![], vec![], vec![]],
+                    last_cooldown: vec![],
+                    allocated: 0.0,
+                    positions: vec![Position::default(); 3],
+                    values: vec![],
+                    events: vec![],
+                };
+                let events = engine
+                    .run(
+                        &[vec![100.0], vec![100.0], vec![100.0]],
+                        &[vec![mask], vec![mask], vec![mask]],
+                        1,
+                        &[],
+                    )
+                    .unwrap();
+                assert_eq!(events.len(), 3);
+                assert_eq!(
+                    events.iter().filter(|event| !event.has_fill).count(),
+                    rejected
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn static_cash_caps_reentries_after_losses_including_fees() {
+        for short in [false, true] {
+            for fee in [0.0, 1.0] {
+                let specs = [(1000.0, None, Some(100.0), fee, 0.0, 0.0)];
+                let engine = Engine {
+                    specs: &specs,
+                    dynamic: false,
+                    flip: false,
+                    initial: 1000.0,
+                    cash: 1000.0,
+                    cooldowns: &[],
+                    risks: &[vec![]],
+                    last_cooldown: vec![],
+                    allocated: 0.0,
+                    positions: vec![Position::default()],
+                    values: vec![],
+                    events: vec![],
+                };
+                let (signals, exit) = if short {
+                    (vec![4, 8, 4], 110.0)
+                } else {
+                    (vec![1, 2, 1], 90.0)
+                };
+                let events = engine
+                    .run(&[vec![100.0, exit, 100.0]], &[signals], 3, &[])
+                    .unwrap();
+                let available = if short {
+                    1000.0 + events[0].cost
+                        - events[0].fee
+                        - (events[0].amount * exit) * (1.0 + fee / 100.0)
+                } else {
+                    (events[0].amount * exit) * (1.0 - fee / 100.0)
+                };
+                let expected_cost = available * if short { 1.0 } else { 1.0 - fee / 100.0 };
+                assert_eq!(events.len(), 3);
+                assert!((events[2].cost - expected_cost).abs() < 1e-8);
+            }
+        }
     }
 
     #[test]

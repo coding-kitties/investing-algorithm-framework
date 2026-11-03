@@ -5,7 +5,7 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
 
-const FIELDS: [&str; 13] = [
+const FIELDS: [&str; 14] = [
     "status",
     "order_id",
     "trade_id",
@@ -19,6 +19,7 @@ const FIELDS: [&str; 13] = [
     "amount",
     "external_id",
     "created_at",
+    "opened_at",
 ];
 type SharedConnection = Arc<Mutex<Option<Connection>>>;
 type Location = (String, u64, u64);
@@ -79,7 +80,8 @@ impl EventArchiveIndex {
              CREATE INDEX by_order_id ON locations(order_id);
              CREATE INDEX by_trade_id ON locations(trade_id);
              CREATE INDEX by_position_id ON locations(position_id);
-             CREATE INDEX by_created_at ON locations(created_at);",
+             CREATE INDEX by_created_at ON locations(created_at);
+             CREATE INDEX by_opened_at ON locations(opened_at);",
                 FIELDS.join(", ")
             ))
             .map_err(failure)?;
@@ -154,7 +156,10 @@ impl EventArchiveIndex {
         let parameters = values(encoded)?;
         if fields.len() != parameters.len()
             || fields.iter().any(|field| {
-                field != "identity" && field != "created_at_gt" && !FIELDS.contains(&field.as_str())
+                field != "identity"
+                    && field != "created_at_gt"
+                    && field != "opened_at_gte"
+                    && !FIELDS.contains(&field.as_str())
             })
         {
             return Err(PyValueError::new_err("Invalid archive query fields"));
@@ -167,6 +172,8 @@ impl EventArchiveIndex {
         clauses.extend(fields.iter().map(|field| {
             if field == "created_at_gt" {
                 "created_at>?".to_owned()
+            } else if field == "opened_at_gte" {
+                "opened_at>=?".to_owned()
             } else {
                 format!("{field}=?")
             }
@@ -304,6 +311,44 @@ impl Drop for EventArchiveCursor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opened_since_is_inclusive_and_excludes_prior_cycles() {
+        let mut index = EventArchiveIndex::new().unwrap();
+        for (identity, opened_at) in [
+            ("1", Some("2026-01-01T00:00:00.000000+00:00")),
+            ("2", Some("2026-01-02T00:00:00.000000+00:00")),
+            ("3", Some("2026-01-03T00:00:00.000000+00:00")),
+            ("4", None),
+        ] {
+            let mut metadata = vec![serde_json::Value::Null; FIELDS.len()];
+            let slot = FIELDS
+                .iter()
+                .position(|field| *field == "opened_at")
+                .unwrap();
+            metadata[slot] = serde_json::to_value(opened_at).unwrap();
+            index.insert(identity).unwrap();
+            index
+                .write(
+                    identity,
+                    0,
+                    10,
+                    Some(&serde_json::to_string(&metadata).unwrap()),
+                )
+                .unwrap();
+        }
+        let mut cursor = index
+            .select(
+                vec!["opened_at_gte".to_owned()],
+                r#"["2026-01-02T00:00:00.000000+00:00"]"#,
+                0,
+                false,
+            )
+            .unwrap();
+        assert_eq!(cursor.__next__().unwrap().unwrap().0, "2");
+        assert_eq!(cursor.__next__().unwrap().unwrap().0, "3");
+        assert!(cursor.__next__().unwrap().is_none());
+    }
 
     #[test]
     fn bounded_queries_preserve_snapshot_and_spill_at_boundary() {

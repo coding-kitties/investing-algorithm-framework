@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+from math import fsum
 from queue import PriorityQueue
 from typing import Union
 
@@ -11,8 +12,18 @@ from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 from investing_algorithm_framework.domain.native_event import \
     native_event_engine
+from investing_algorithm_framework.domain.utils.amounts import \
+    amount_roundoff_tolerance
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_amount_residual(residual: float, *amounts: float) -> float:
+    tolerance = amount_roundoff_tolerance(residual, *amounts)
+    if residual != 0 and abs(residual) <= tolerance:
+        logger.debug("Normalizing trade allocation roundoff: %r", residual)
+        return 0.0
+    return residual
 
 
 def _safe_order_fee(order):
@@ -550,6 +561,11 @@ class TradeService(RepositoryService):
         sell_order_id = sell_order.id
         sell_updated_at = sell_order.updated_at
         current_available = trade.available_amount
+        remaining_available = _normalize_amount_residual(
+            current_available - amount_to_close
+            if next_available is None else next_available,
+            current_available, amount_to_close, sell_order.amount,
+        )
         allocation = self.trade_allocation_repository.create({
             "order_id": sell_order_id,
             "trade_id": trade_id,
@@ -570,9 +586,7 @@ class TradeService(RepositoryService):
         self.repository.add_order_to_trade(trade, sell_order)
 
         self.repository.update(trade_id, {
-            "available_amount": (
-                current_available - amount_to_close
-                if next_available is None else next_available),
+            "available_amount": remaining_available,
             "updated_at": sell_updated_at,
         })
         return allocation
@@ -627,16 +641,24 @@ class TradeService(RepositoryService):
         })
         if native_event_engine() is not None:
             return self._reserve_native_trades(sell_order, matching_trades)
-        total_available_to_close = 0
         amount_to_close = sell_order.amount
         trade_queue = PriorityQueue()
 
         for trade in matching_trades:
             if not trade.is_short and trade.available_amount > 0:
-                total_available_to_close += trade.available_amount
                 trade_queue.put(trade)
 
-        if total_available_to_close < amount_to_close:
+        total_available_to_close = fsum(
+            trade.available_amount for trade in matching_trades
+            if not trade.is_short and trade.available_amount > 0
+        )
+        shortage = _normalize_amount_residual(
+            amount_to_close - total_available_to_close,
+            amount_to_close, total_available_to_close,
+        )
+        if shortage > 0 or (
+            amount_to_close > 0 and total_available_to_close <= 0
+        ):
             raise OperationalException(
                 "Not enough amount to close in trades."
             )
@@ -947,10 +969,13 @@ class TradeService(RepositoryService):
             allocation for allocation in allocations
             if allocation.trade_id is not None
         ]
-        total_amount_in_allocations = sum(
+        total_amount_in_allocations = fsum(
             allocation.amount for allocation in trade_allocations
         )
-        excess = total_amount_in_allocations - sell_order.amount
+        excess = _normalize_amount_residual(
+            total_amount_in_allocations - sell_order.amount,
+            total_amount_in_allocations, sell_order.amount,
+        )
         for allocation in reversed(trade_allocations):
             if excess <= 0:
                 break
@@ -1044,6 +1069,10 @@ class TradeService(RepositoryService):
                     trade_fees = (trade.total_fees or 0) + buy_fee + sell_fee
                     cost += realized_cost
                     net_gain += gain
+                allocation.amount_pending = _normalize_amount_residual(
+                    allocation.amount_pending, allocation.amount,
+                    sell_order.amount,
+                )
                 self.trade_allocation_repository.save(allocation)
                 self.repository.update(allocation.trade_id, {
                     'net_gain': trade_gain,
@@ -1067,6 +1096,10 @@ class TradeService(RepositoryService):
                     stop_loss_filled_difference -= amount
 
                 allocation.amount_pending -= amount
+                allocation.amount_pending = _normalize_amount_residual(
+                    allocation.amount_pending, allocation.amount,
+                    sell_order.amount,
+                )
                 self.trade_allocation_repository.save(allocation)
 
             if allocation.take_profit_id is not None \
@@ -1083,6 +1116,10 @@ class TradeService(RepositoryService):
                     take_profit_filled_difference -= amount
 
                 allocation.amount_pending -= amount
+                allocation.amount_pending = _normalize_amount_residual(
+                    allocation.amount_pending, allocation.amount,
+                    sell_order.amount,
+                )
                 self.trade_allocation_repository.save(allocation)
 
         if native is not None:
@@ -1091,7 +1128,9 @@ class TradeService(RepositoryService):
                 portfolio=portfolio)
         else:
             self.position_repository.update(position.id, {
-                'long_cost': position.long_cost - cost,
+                'long_cost': _normalize_amount_residual(
+                    position.long_cost - cost, position.long_cost, cost,
+                ),
             })
             self.portfolio_repository.update(portfolio.id, {
                 'total_net_gain': portfolio.total_net_gain + net_gain,
@@ -1401,6 +1440,8 @@ class TradeService(RepositoryService):
         stop_losses_by_target_symbol = {}
 
         for open_trade in open_trades:
+            if open_trade.available_amount == 0:
+                continue
             triggered_stop_losses = []
 
             for stop_loss in open_trade.stop_losses:

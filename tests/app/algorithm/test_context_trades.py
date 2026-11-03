@@ -8,14 +8,49 @@ Merged from:
 - test_close_trade.py
 """
 from decimal import Decimal
-from unittest.mock import patch
+from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest import TestCase
+from unittest.mock import Mock, patch
 
 from investing_algorithm_framework import OperationalException
+from investing_algorithm_framework.app.context import Context
 from tests.resources import BitvavoTestBase
 from tests.resources.strategies_for_testing import StrategyOne
 
 
 class TestGetTrades(BitvavoTestBase):
+
+    def test_filtered_history_includes_closed_filled_lots(self):
+        context = self.app.context
+        context.create_limit_order(
+            target_symbol="BTC", price=10, order_side="BUY", amount=20,
+        )
+        context.order_service.check_pending_orders()
+        portfolio = context.portfolio_service.get_all()[0]
+        filters = {
+            "target_symbol": "BTC", "trading_symbol": "EUR",
+            "market": portfolio.market, "portfolio": portfolio.id,
+        }
+        self.assertEqual(len(context.get_trades(**filters)), 1)
+        self.assertEqual(context.get_trades(target_symbol="ETH"), [])
+        self.assertEqual(context.get_trades(trading_symbol="USD"), [])
+        self.assertEqual(context.get_trades(status="CLOSED"), [])
+
+        context.create_limit_order(
+            target_symbol="BTC", price=10, order_side="SELL", amount=20,
+        )
+        context.order_service.check_pending_orders()
+        history = context.get_trades(**filters)
+        self.assertEqual(len(history), 1)
+        self.assertFalse(history[0].is_short)
+        self.assertGreater(history[0].filled_amount, 0)
+        self.assertIsNotNone(history[0].opened_at)
+        self.assertIsNotNone(history[0].closed_at)
+        self.assertEqual(context.get_trades(status="OPEN"), [])
+        self.assertEqual(
+            context.get_trades(status="CLOSED")[0].id, history[0].id,
+        )
 
     def test_get_trades(self):
         order = self.app.context.create_limit_order(
@@ -44,6 +79,56 @@ class TestGetTrades(BitvavoTestBase):
         self.assertEqual("BTC", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
         self.assertIsNotNone(trade.closed_at)
+
+
+class TestGetTradesFilterForwarding(TestCase):
+    def setUp(self):
+        self.context = Context.__new__(Context)
+        self.context.trade_service = Mock()
+        self.context.portfolio_service = Mock()
+        self.portfolio = SimpleNamespace(id=7, market="BITVAVO")
+        self.context.portfolio_service.get.return_value = self.portfolio
+        self.context.portfolio_service.find.return_value = self.portfolio
+
+    def test_forwards_all_supported_filters(self):
+        opened_since = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        result = self.context.get_trades(
+            target_symbol="BTC", trading_symbol="EUR", market="BITVAVO",
+            portfolio=7, status="CLOSED", opened_since=opened_since,
+        )
+        self.context.trade_service.get_all.assert_called_once_with({
+            "portfolio_id": 7, "target_symbol": "BTC",
+            "trading_symbol": "EUR", "status": "CLOSED",
+            "opened_at_gte": opened_since,
+        })
+        self.assertIs(result, self.context.trade_service.get_all.return_value)
+
+    def test_market_resolves_to_portfolio_id(self):
+        self.context.get_trades(target_symbol="BTC", market="BITVAVO")
+        self.context.portfolio_service.find.assert_called_once_with({
+            "market": "BITVAVO",
+        })
+        self.context.trade_service.get_all.assert_called_once_with({
+            "portfolio_id": 7, "target_symbol": "BTC",
+        })
+
+    def test_accepts_portfolio_object_without_market_lookup(self):
+        self.context.get_trades(portfolio=self.portfolio)
+        self.context.portfolio_service.find.assert_not_called()
+        self.context.portfolio_service.get.assert_not_called()
+        self.context.trade_service.get_all.assert_called_once_with({
+            "portfolio_id": 7,
+        })
+
+    def test_conflicting_market_and_portfolio_do_not_leak_history(self):
+        self.assertEqual(self.context.get_trades(
+            market="OTHER", portfolio=7,
+        ), [])
+        self.context.trade_service.get_all.assert_not_called()
+
+    def test_no_filters_preserves_unrestricted_history(self):
+        self.context.get_trades()
+        self.context.trade_service.get_all.assert_called_once_with({})
 
 
 class TestGetOpenTrades(BitvavoTestBase):

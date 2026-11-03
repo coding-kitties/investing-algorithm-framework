@@ -314,7 +314,7 @@ class TradeStopLoss(BaseModel):
             "open_price": self.open_price,
             "sell_percentage": self.sell_percentage,
             "high_water_mark": self.high_water_mark,
-            "high_water_mark_date": self.high_water_mark_date,
+            "high_water_mark_date": ensure_iso(self.high_water_mark_date),
             "triggered": self.triggered,
             "triggered_at": ensure_iso(getattr(self, "triggered_at", None)),
             "stop_loss_price": self.stop_loss_price,

@@ -146,7 +146,8 @@ class TestBacktestMemoryOptions(TestCase):
         self.assertEqual(run.call_args.kwargs["result_mode"], "index")
         for name, value in vars(configuration).items():
             if name in ('event_fill_backend', 'event_schedule_backend',
-                        'event_state_backend'):
+                        'event_state_backend', 'capture_run_reports',
+                        'persist_run_reports'):
                 self.assertNotIn(name, run.call_args.kwargs)
                 continue
             if name == "backtest_storage_directory":

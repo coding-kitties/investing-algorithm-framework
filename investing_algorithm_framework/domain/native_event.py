@@ -20,7 +20,7 @@ def load_native_event_accounting():
             'event-lifecycle-v1':
         raise ValueError('Native event lifecycle version mismatch')
     for name, version in (
-        ('EVENT_ARCHIVE_SEMANTICS_VERSION', 'event-archive-v2'),
+        ('EVENT_ARCHIVE_SEMANTICS_VERSION', 'event-archive-v3'),
         ('EVENT_FILL_SEMANTICS_VERSION', 'event-fill-v1'),
         ('EVENT_SCHEDULE_SEMANTICS_VERSION', 'event-schedule-v1'),
     ):

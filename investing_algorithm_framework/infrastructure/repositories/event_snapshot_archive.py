@@ -54,6 +54,9 @@ class EventSnapshotArchive(MutableMapping):
         if len(payload) != size:
             raise OSError('Truncated event snapshot archive')
         fields, relations = pickle.loads(payload)
+        return self._restore(fields, relations)
+
+    def _restore(self, fields, relations):
         mapper = inspect(self.model)
         value = mapper.class_manager.new_instance()
         value.__dict__.update(fields)
@@ -105,13 +108,16 @@ class EventSnapshotArchive(MutableMapping):
                     'joined', 'selectin', 'subquery')
                 and relation.key in value.__dict__
             }
-            payload = pickle.dumps((fields, relations),
-                                   protocol=pickle.HIGHEST_PROTOCOL)
-            self.records.seek(0, 2)
-            offset = self.records.tell()
-            self.records.write(payload)
-            self._write_location(identity, offset, len(payload))
+            self._write_record(identity, fields, relations)
         self.pending.clear()
+
+    def _write_record(self, identity, fields, relations):
+        payload = pickle.dumps((fields, relations),
+                               protocol=pickle.HIGHEST_PROTOCOL)
+        self.records.seek(0, 2)
+        offset = self.records.tell()
+        self.records.write(payload)
+        self._write_location(identity, offset, len(payload))
 
     def close(self):
         self.pending.clear()
@@ -122,17 +128,18 @@ class EventSnapshotArchive(MutableMapping):
 
 
 class EventAccountingArchive(EventSnapshotArchive):
-    """Disk-backed accounting rows without retained lazy back-references."""
+    """Resident active rows and disk-backed history, without object graphs."""
 
     _query_fields = (
         'status', 'order_id', 'trade_id', 'position_id', 'target_symbol',
         'trading_symbol', 'strategy_id', 'order_side', 'order_type',
-        'price', 'amount', 'external_id', 'created_at',
+        'price', 'amount', 'external_id', 'created_at', 'opened_at',
     )
 
     def __init__(self, model, state):
         super().__init__(model, state)
         self.revision = 0
+        self.resident = {}
         self.locations = None
         from investing_algorithm_framework.domain.native_event import \
             native_event_engine
@@ -149,9 +156,10 @@ class EventAccountingArchive(EventSnapshotArchive):
             self.locations.execute(
                 'CREATE TABLE locations (sequence INTEGER PRIMARY KEY, '
                 'identity TEXT UNIQUE, offset INTEGER, size INTEGER, '
+                'resident INTEGER NOT NULL DEFAULT 0, '
                 + ', '.join(self._query_fields) + ')')
             for field in ('status', 'order_id', 'trade_id', 'position_id',
-                          'created_at'):
+                          'created_at', 'opened_at'):
                 self.locations.execute(
                     f'CREATE INDEX by_{field} ON locations ({field})')
         except BaseException:
@@ -171,7 +179,39 @@ class EventAccountingArchive(EventSnapshotArchive):
         ).fetchone()
         return row or (0, 0)
 
-    def _write_location(self, identity, offset, size):
+    def __contains__(self, identity):
+        return (type(identity) is int and identity in self.resident) \
+            or super().__contains__(identity)
+
+    def __getitem__(self, identity):
+        if type(identity) is not int or identity in self.pending \
+                or identity not in self.resident:
+            return super().__getitem__(identity)
+        fields, relations = self.resident[identity]
+        return self._restore(self.state._clone(fields), relations)
+
+    def __delitem__(self, identity):
+        super().__delitem__(identity)
+        self.resident.pop(identity, None)
+
+    def _is_active(self, fields):
+        if self.model.__name__ in ('SQLOrder', 'SQLTrade'):
+            return fields.get('status') in ('CREATED', 'OPEN')
+        if self.model.__name__ in ('SQLTradeStopLoss', 'SQLTradeTakeProfit'):
+            return bool(fields.get('active'))
+        if self.model.__name__ == 'SQLTradeAllocation':
+            return (fields.get('amount_pending') or 0) > 0
+        return False
+
+    def _write_record(self, identity, fields, relations):
+        if not self.native_index and self._is_active(fields):
+            self.resident[identity] = (self.state._clone(fields), relations)
+            self._write_location(identity, 0, 0, resident=True)
+        else:
+            super()._write_record(identity, fields, relations)
+            self.resident.pop(identity, None)
+
+    def _write_location(self, identity, offset, size, resident=False):
         self.revision += 1
         value = self.pending.get(identity)
         if self.native_index:
@@ -191,8 +231,9 @@ class EventAccountingArchive(EventSnapshotArchive):
                 (*fields, str(identity)),
             )
         self.locations.execute(
-            'UPDATE locations SET offset = ?, size = ? WHERE identity = ?',
-            (offset, size, str(identity)),
+            'UPDATE locations SET offset = ?, size = ?, resident = ? '
+            'WHERE identity = ?',
+            (offset, size, resident, str(identity)),
         )
 
     def __setitem__(self, identity, value):
@@ -228,12 +269,15 @@ class EventAccountingArchive(EventSnapshotArchive):
 
     def select(self, params, *, order=False, ascending=False):
         self.flush()
-        clauses = ['size > 0']
+        clauses = ['(size > 0 OR resident = 1)']
         fields = []
         parameters = []
         columns = inspect(self.model).columns
         for key in params:
-            column = 'created_at' if key == 'created_at_gt' else key
+            column = {
+                'created_at_gt': 'created_at',
+                'opened_at_gte': 'opened_at',
+            }.get(key, key)
             if (column not in columns
                     or (column not in self._query_fields and key != 'id')):
                 continue
@@ -242,8 +286,12 @@ class EventAccountingArchive(EventSnapshotArchive):
                 continue
             field = 'identity' if key == 'id' else key
             fields.append(field)
-            clauses.append('created_at > ?' if key == 'created_at_gt'
-                           else f'{field} = ?')
+            if key == 'created_at_gt':
+                clauses.append('created_at > ?')
+            elif key == 'opened_at_gte':
+                clauses.append('opened_at >= ?')
+            else:
+                clauses.append(f'{field} = ?')
             parameters.append(str(value) if key == 'id'
                               else self._query_value(value))
         ordering = 'sequence'
@@ -266,12 +314,16 @@ class EventAccountingArchive(EventSnapshotArchive):
         revision = self.revision
         try:
             for identity, offset, size in cursor:
-                yield (self._read(offset, size) if revision == self.revision
-                       else self[int(identity)])
+                identity = int(identity)
+                yield (self._read(offset, size)
+                       if revision == self.revision
+                       and identity not in self.resident
+                       else self[identity])
         finally:
             cursor.close()
 
     def close(self):
+        self.resident.clear()
         try:
             self.locations.close()
         finally:

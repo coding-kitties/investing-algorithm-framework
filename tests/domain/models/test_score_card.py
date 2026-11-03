@@ -132,7 +132,7 @@ class TestSignalWithScoreCard(TestCase):
         strategy.run_strategy(Mock(config={INDEX_DATETIME: None}), {
             "indicators": {"rsi_14": 55, "close": 41500, "ema_200": 41230},
         })
-        report = _build_signal_report(strategy)
+        report = _build_signal_report(strategy, timestamp=None)
         self.assertEqual([], report["signals"])
         self.assertEqual(1, len(report["decision_traces"]))
         self.assertEqual(report["decision_traces"], report["score_cards"])

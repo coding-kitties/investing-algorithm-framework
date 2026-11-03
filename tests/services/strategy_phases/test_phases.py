@@ -17,7 +17,9 @@ from unittest.mock import MagicMock
 from investing_algorithm_framework import (
     ConflictPolicy,
     ConflictResolution,
+    CooldownRule,
     ExposureRule,
+    ScalingRule,
     Signal,
     SignalSide,
 )
@@ -347,6 +349,44 @@ class TestCollectSignalsPhase(TestCase):
 # ResolveConflictsPhase
 # --------------------------------------------------------------------- #
 class TestResolveConflictsPhase(TestCase):
+    def test_cooldown_rejection_reports_configured_and_remaining_bars(self):
+        from investing_algorithm_framework.app.eventloop import _build_signal_report
+
+        for scaling in (False, True):
+            with self.subTest(scaling=scaling):
+                strategy = _StubStrategy(
+                    symbols=["BTC"],
+                    positions={"BTC": _StubPosition()} if scaling else {},
+                    scaling_rules={"BTC": _StubScalingRule(cooldown_in_bars=12)},
+                )
+                sig = Signal("BTC", SignalSide.SCALE_IN if scaling else SignalSide.OPEN_LONG)
+                if scaling:
+                    strategy._positions["BTC"].amount = 1
+                    strategy._cooldown_remaining["BTC"] = 5
+                else:
+                    strategy.cooldowns = [CooldownRule(
+                        trigger="sell", blocks="buy", bars=12,
+                    )]
+                    strategy._cooldown_tracker.record(
+                        symbol="BTC", order_side="sell", bar_index=1,
+                    )
+                state = _make_state(strategy, _StubContext())
+                state.bar_index = 8
+                state.raw_signals = [sig]
+                ResolveConflictsPhase().run(state)
+                self.assertEqual([], state.approved_signals)
+                strategy.last_signals = [sig]
+                strategy.last_decision_traces = []
+                strategy.traces = state.traces
+                record, = _build_signal_report(strategy, None)["signals"]
+                self.assertEqual("rejected", record["status"])
+                self.assertEqual(12, record["reason_details"]["cooldown_bars"])
+                self.assertEqual(5, record["reason_details"]["remaining_bars"])
+                self.assertEqual(
+                    "resolve_conflicts.scaling_cooldown" if scaling
+                    else "resolve_conflicts.cooldown_rule", record["reason"],
+                )
+
 
     def _resolve(self, strategy, context, signals):
         state = _make_state(strategy, context)
@@ -478,6 +518,60 @@ class TestSizePositionsPhase(TestCase):
         self.assertAlmostEqual(out[0].price, 200.0)
         self.assertEqual(out[0].order_reason, "buy_signal")
         self.assertEqual(out[0].full_symbol, "BTC/EUR")
+
+    def test_staged_scale_in_uses_cumulative_stage_after_lot_closes(self):
+        strategy = _StubStrategy(
+            symbols=["BTC"],
+            position_sizes={"BTC": _StubPositionSize(1_000.0)},
+            scaling_rules={"BTC": ScalingRule(
+                symbol="BTC", max_entries=3,
+                scale_in_percentage=[75, 25],
+            )},
+        )
+        # Two entries filled, but the latest lot has since been closed.
+        context = _StubContext(open_trades={"BTC": [_StubTrade(1)]})
+        signal = Signal(
+            "BTC", SignalSide.SCALE_IN, metadata={"scale_in_stage": 1},
+        )
+        out = self._size(strategy, context, [signal])
+        self.assertEqual(len(out), 1)
+        self.assertAlmostEqual(out[0].quote_amount, 250)
+        self.assertEqual(out[0].extra_metadata["scale_in_stage"], 1)
+
+        unstaged = self._size(
+            strategy, context, [Signal("BTC", SignalSide.SCALE_IN)],
+        )
+        self.assertAlmostEqual(unstaged[0].quote_amount, 750)
+
+    def test_staged_scale_in_enforces_cumulative_max_entries(self):
+        strategy = _StubStrategy(
+            symbols=["BTC"],
+            position_sizes={"BTC": _StubPositionSize(1_000.0)},
+            scaling_rules={"BTC": ScalingRule(
+                symbol="BTC", max_entries=3, scale_in_percentage=[75, 25],
+            )},
+        )
+        out = self._size(
+            strategy, _StubContext(open_trades={"BTC": [_StubTrade(1)]}),
+            [Signal(
+                "BTC", SignalSide.SCALE_IN, metadata={"scale_in_stage": 2},
+            )],
+        )
+        self.assertEqual(out, [])
+
+    def test_staged_scale_in_rejects_invalid_stage(self):
+        strategy = _StubStrategy(
+            symbols=["BTC"],
+            position_sizes={"BTC": _StubPositionSize(1_000.0)},
+            scaling_rules={"BTC": ScalingRule(symbol="BTC", max_entries=3)},
+        )
+        for stage in (-1, True, False, 1.0, "0", None):
+            with self.subTest(stage=stage):
+                with self.assertRaisesRegex(ValueError, "nonnegative integer"):
+                    self._size(strategy, _StubContext(), [Signal(
+                        "BTC", SignalSide.SCALE_IN,
+                        metadata={"scale_in_stage": stage},
+                    )])
 
     def test_open_long_without_position_size_raises(self):
         strategy = _StubStrategy(symbols=["BTC"])

@@ -201,6 +201,43 @@ For each consumed trade, a `TradeAllocation` row is written
 `net_gain_contribution`) so the close is fully reversible if the
 sell order is later canceled.
 
+Long allocation reservation and fill settlement normalize residuals within
+sixteen floating-point ULPs of the participating amounts. This prevents a
+fully consumed trade from remaining open with phantom available/pending
+units after fractional scale-ins. There is no fixed asset-unit cutoff:
+genuine small positions and meaningful partial closes are retained.
+FIFO eligibility uses accurate summation and the same sixteen-ULP policy
+in Python and native accounting. A rounded total cannot reject a valid
+full-position exit after fractional scale-ins. Allocation portions never
+exceed the available units of their trade; genuine shortages and exits
+without available long trades remain errors.
+Non-finite allocation amounts are rejected. Stop-loss generation skips
+trades with zero available units, including trades reserved by a pending
+close; it does not create zero-quantity orders.
+
+SELL/COVER validation uses the same precision policy: a roundoff-sized
+excess over a **positive** available position is capped to that position
+before constructing the order or reserving any units. This applies to
+netting positions and the matching leg in hedge mode, and to every SELL
+order type. It does not merely waive validation while reserving too much.
+Meaningful oversells and any sell against a zero position remain errors.
+
+Order creation and fill/cancellation updates also reconcile precision-sized
+position drift against the remaining open trade ledger, using accurate
+summation. For example, `(1 + 0.005414754029673499) - 1` evaluates to
+`0.0054147540296733965`: the error is small at the original position's
+scale but 118 ULPs of the remaining lot. Reconciliation uses the transition's
+scale rather than widening closing-order validation. It preserves the
+remaining lot's quantity, including genuinely tiny lots, for both long and
+short legs in Python and native accounting.
+
+Cost basis is reconciled separately from quantity. Reserved but unfilled
+SELL allocations still contribute their pending entry cost, although their
+units are no longer available to sell again. Precision-sized cost-subtraction
+residuals are normalized before persistence to avoid negative basis dust.
+Larger differences from the trade ledger are not overwritten, so untracked
+or externally held balances are not replaced by tracked inventory.
+
 ### 6.2 Short path: `close_short_trade_with_filled_cover_order`
 
 The short close uses the same FIFO-with-explicit-override pattern

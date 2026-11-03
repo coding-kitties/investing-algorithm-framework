@@ -5,7 +5,7 @@ from investing_algorithm_framework.services.repository_service import \
 class RunReportService(RepositoryService):
     """
     Service to persist and retrieve :class:`RunReport` snapshots — one
-    per successful, bounded ``App.run()`` invocation.
+    per bounded ``App.run()`` invocation or continuous execution tick.
     """
 
     def get_latest(self, algorithm_id=None):

@@ -123,7 +123,6 @@ def _apply_forward_only_migrations(bind):
         "ALTER TABLE run_reports ADD COLUMN status VARCHAR "
         "NOT NULL DEFAULT 'completed'",
         "ALTER TABLE run_reports ADD COLUMN error TEXT",
-        "ALTER TABLE run_reports ADD COLUMN reason TEXT",
         # Broker-native mirror stop-loss / take-profit safety net.
         # ``mirror_on_exchange`` is the opt-in flag copied from the
         # rule at attach time; the rest track the live exchange-side
@@ -155,6 +154,17 @@ def _apply_forward_only_migrations(bind):
 
     _migrate_position_legs(bind, "positions")
     _migrate_position_legs(bind, "position_snapshots")
+    inspector = inspect(bind)
+    if "run_reports" in inspector.get_table_names():
+        columns = {
+            column["name"] for column in inspector.get_columns("run_reports")
+        }
+        for column in ("stop_losses_json", "take_profits_json"):
+            if column not in columns:
+                with bind.begin() as conn:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE run_reports ADD COLUMN {column} TEXT"
+                    )
 
 
 def _migrate_position_legs(bind, table_name):

@@ -29,8 +29,9 @@ preserving atomicity without cloning unrelated broker history. Fee corrections
 still scan historical allocations, and retained history remains unbounded.
 Do not infer bounded memory or speed improvements from these kernel tests.
 
-The Python event backend separately archives orders, trades, allocations and
-risk rules using temporary payload files and bounded-cache SQLite indexes.
+The Python event memory backend keeps active accounting records resident and
+archives completed orders, trades, allocations and risk rules using temporary
+payload files and bounded-cache SQLite indexes.
 That storage change does not integrate this native broker or bound its history.
 See the [archive scope and validation](../../docs/design/backtest-streaming-storage-todo.md#python-accounting-archive-2026-09-21).
 
@@ -273,15 +274,18 @@ This strict, event-only option requires the native extension with
 `EVENT_ACCOUNTING_SEMANTICS_VERSION="event-accounting-v1"` and
 `EVENT_SETTLEMENT_SEMANTICS_VERSION="event-settlement-v1"`, plus
 `EVENT_LIFECYCLE_SEMANTICS_VERSION="event-lifecycle-v1"` and
-`EVENT_ARCHIVE_SEMANTICS_VERSION="event-archive-v2"`. Rebuild older local
+`EVENT_ARCHIVE_SEMANTICS_VERSION="event-archive-v3"`. Rebuild older local
 extensions before using this backend. Configuration also
 accepts `IAF_BACKTEST_EVENT_STATE_BACKEND=rust` through `from_env()`. It is
 forwarded to spawned workers; a missing or incompatible extension fails before
 execution. SQL remains the default. Runtime errors propagate without replaying
 an event through Python. Use fresh checkpoints to compare backends.
 
-Archive v2 supports indexed exclusive `created_at_gt` order queries used by
-cooldown tracking. Python and Rust archives normalize aware query timestamps
+Archive v3 retains indexed exclusive `created_at_gt` order queries used by
+cooldown tracking and adds indexed inclusive `opened_at_gte` trade queries.
+`Context.get_trades(opened_since=...)` forwards this trade bound before
+history hydration, including closed fills from the current position cycle.
+Python and Rust archives normalize aware query timestamps
 to UTC with fixed microsecond precision before scalar comparison. Older native
 extensions fail preflight rather than silently skipping cooldown recording.
 
@@ -338,6 +342,9 @@ results but do not establish an end-to-end speedup. See the
 
 The independent `BacktestRunConfiguration(event_state_backend="memory")` option
 uses Python accounting and archive-backed repositories across event services.
+Active orders/trades, risk rules and pending allocations now remain in a
+run-local hot set; completed history is still archived. See the current
+[memory accounting configuration and measurements](../../docs/architecture/backtest/backtesting_workflow.md#opt-in-in-memory-event-accounting).
 Verified cases avoid ORM tick queries; the sparse archive index still uses
 SQLite. Historical measurements below predate the archive and native-accounting
 integration above. The stateful native broker remains a separate prototype;

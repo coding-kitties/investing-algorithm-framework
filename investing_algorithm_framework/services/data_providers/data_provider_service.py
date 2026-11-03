@@ -87,7 +87,7 @@ class DataProviderIndex:
         time_frame = data_source.time_frame
 
         if DataType.OHLCV.equals(data_source.data_type):
-            if symbol not in self.ohlcv_data_providers:
+            if (symbol, market) not in self.ohlcv_data_providers:
                 self.ohlcv_data_providers[(symbol, market)] = best_provider
                 self.ohlcv_data_providers_no_market[symbol] = best_provider
                 self.ohlcv_data_providers_with_timeframe[
@@ -153,7 +153,7 @@ class DataProviderIndex:
         time_frame = data_source.time_frame
 
         if DataType.OHLCV.equals(data_source.data_type):
-            if symbol not in self.ohlcv_data_providers:
+            if (symbol, market) not in self.ohlcv_data_providers:
                 self.ohlcv_data_providers[(symbol, market)] = data_provider
                 self.ohlcv_data_providers_no_market[symbol] = data_provider
                 self.ohlcv_data_providers_with_timeframe[
@@ -248,7 +248,7 @@ class DataProviderIndex:
 
         if DataType.OHLCV.equals(data_source.data_type):
 
-            if symbol not in self.ohlcv_data_providers:
+            if (symbol, market) not in self.ohlcv_data_providers:
                 self.ohlcv_data_providers[(symbol, market)] = best_provider
                 self.ohlcv_data_providers_no_market[symbol] = best_provider
                 self.ohlcv_data_providers_with_timeframe[
@@ -811,8 +811,9 @@ class DataProviderService:
             end_date (datetime): The end date for the backtest data.
 
         Returns:
-            Dict[str, Any]: The vectorized backtest data for the
-                given data sources.
+            Dict[str, Any]: Native-timeframe data keyed by each source's
+                ``get_identifier()``. Named sources for the same pair
+                retain their own frames; no pair-key alias is added.
         """
         vectorized_data = {}
 

@@ -8,6 +8,450 @@ traces.
 
 ## Strategy usage
 
+### Declarative indicator-driven strategies
+
+Use `ConfluenceScoringStrategy` when named `IndicatorConfig` declarations
+should drive signals without a custom preparation or signal-generation hook.
+The [two-hour reference strategy](../../../examples/framework_features/two_hour_confluence_strategy.py)
+demonstrates a callable Z-score indicator, three entry tranches, and ordinary
+strategy risk rules.
+
+Each `ConfluenceScoreConfig` declares an explicit `side`. Scale-in cards also
+declare a zero-based `scale_in_stage`: `0` is the first addition after the
+initial entry. IDs are descriptive only; they never determine trading actions.
+Stages must be contiguous from zero, unique per symbol, and match the scaling
+rule's `max_entries` (including the initial entry).
+
+```python
+ConfluenceScoreConfig(
+    id="long_scale_in_one",
+    side=SignalSide.SCALE_IN,
+    scale_in_stage=0,
+    symbols=["BTC"],
+    rules={"oversold": IndicatorRule(
+        indicator_id="z_score_long", output_column="zscore",
+        threshold=-2.2, comparison="le",
+        group_weights={"primary": 1}, lookback_period=1,
+    )},
+    group_thresholds={"primary": 1},
+)
+```
+
+`symbols` is optional: an empty list/tuple applies the card to all configured
+strategy targets. Card symbols are normalized to uppercase. Indicator
+templates can use `data_source={"BTC": "btc_2h", "ETH": "eth_2h"}` or resolve
+unambiguously by symbol/timeframe. Each symbol has isolated indicator history
+and scoring state. A fixed source identifier is appropriate for a card scoped
+to that source's symbol. Existing `PositionSize` and `ScalingRule` still use
+singular `symbol="BTC"`; `symbol=None` supplies their all-symbol default.
+
+For a 20/40/40 ladder within a 40%-of-portfolio sizing budget, configure:
+
+```python
+PositionSize(symbol="BTC", percentage_of_portfolio=40)
+ScalingRule(
+    symbol="BTC", max_entries=3, initial_entry_percentage=20,
+    scale_in_percentage=[40, 40], cooldown_in_bars=2,
+)
+```
+
+This requests 8%, 16%, and 16% of portfolio value if the sizing base is
+unchanged. Cash, exposure and other applicable execution limits can reduce
+actual orders. `initial_entry_percentage` affects only the initial long
+entry and defaults to 100, preserving existing strategies. Scale-in percentages
+continue to refer to the full `PositionSize`, not the first tranche.
+
+`lookback_period=1` checks the latest completed native candle. Larger windows
+retain their existing "any match within the window" semantics. Neither card
+qualification nor generating a signal advances the entry stage: event
+progression observes filled trade lots, and vector progression uses accepted
+fills. Cooldown rules retain priority. After cooldown expires the current
+threshold is evaluated again; previously blocked signals are not queued.
+Partial lot exits do not rewind progression; becoming fully flat resets it.
+
+### Named required and blocking rules
+
+Use `required_rules` and `gates` on `ConfluenceScoreConfig` to gate a
+card using its named `IndicatorRule` matches:
+
+- Every `required_rules` member must match.
+- No `gates` member may match: any matching gate disables the card.
+- These gates apply to both normal qualification and score overrides. More
+  confirmation points cannot compensate for a failed required rule or a blocker.
+- Both fields default to empty tuples and accept lists or tuples of unique,
+  existing rule names. A rule cannot be both required and blocking.
+
+For example, after registering `z_score_long` and `supertrend_filter`, a
+trend-aligned long card can keep Z-score mandatory without awarding points for
+the direction filter:
+
+```python
+long_entry = ConfluenceScoreConfig(
+    id="long_entry",
+    side=SignalSide.OPEN_LONG,
+    symbols=["BTC", "ETH"],
+    rules={
+        "z_score_oversold": IndicatorRule(
+            indicator_id="z_score_long",
+            output_column="zscore",
+            threshold=-2.0,
+            comparison="lt",
+            group_weights={"primary": 1.0},
+            lookback_period=1,
+        ),
+        "supertrend_bearish": IndicatorRule(
+            indicator_id="supertrend_filter",
+            output_column="supertrend_trend",
+            threshold=0.0,
+            comparison="eq",
+            lookback_period=1,
+        ),
+    },
+    group_thresholds={"primary": 1.0},
+    required_rules=["z_score_oversold"],
+    gates=["supertrend_bearish"],
+)
+```
+
+The external `indicators.supertrend` function encodes persistent bullish trend
+as `1` and bearish trend as `0`. Use `supertrend_trend`, not the flip-only
+`supertrend_signal`. For a short-entry card, require its positive Z-score trigger
+(`gt 2.0`) and block bullish direction (`eq 1.0`). Apply the bearish blocker
+to long scale-in cards too; do not attach directional gates to exit cards unless
+blocking exits is explicitly intended.
+
+`gates=["volatility_breakout"]`, for example, adds a hard veto when the
+card's separately declared `volatility_breakout` rule matches. Gate references
+do not change rule weights: omit `group_weights` or set it to `None` for
+gate-only rules. These normalize to an immutable empty mapping and add no
+scoring groups or points. An explicit empty mapping is also supported. They still
+participate in the existing native-history readiness checks. Required rules
+that are missing or unready do not match; unready blockers prevent signal
+emission through card readiness. Use `lookback_period=1` and no rule delay for a
+current directional regime, rather than retaining or delaying an older match.
+
+Gate strings reference keys in the card's `rules` mapping, not standalone
+Python variables. Unweighted rules keep their native comparisons, lookbacks,
+delays, readiness checks and match evidence in inspection and persisted reports.
+Required rules may be unweighted too. Omitting weights alone does not make a
+rule a blocker: reference its name in `gates` to block on a match. Existing
+zero-weight mappings such as `{"direction": 0.0}` remain supported.
+With only a Z-score scoring rule,
+`group_aggregation={"primary": "sum"}` and
+`group_thresholds={"primary": 1.0}` suffice; no ADX, volume, or other entry
+filters are implicit.
+
+`blocking_rules` remains supported for compatibility. If both fields are
+supplied, their names are combined in declaration order (`gates` first), with
+overlapping names evaluated as a single veto. Each individual field must
+still contain unique names.
+
+Named gates supplement, rather than replace, explicit `requirements` and
+`vetoes`. They compile into ordinary requirements named `required_rule:<name>`
+and vetoes named `blocking_rule:<name>`, so inspection, decision evidence,
+serialization and event/precomputed vector evaluation use the same scoring
+contract. Those generated names must not collide with explicitly declared
+gates in the corresponding category.
+
+### Independent qualification-path readiness
+
+`ConfluenceScoreConfig.readiness_policy` defaults to `"all_rules"`: every
+declared indicator rule must be ready before the card can emit a signal,
+including rules used only by overrides. This preserves existing behavior.
+
+Opt into `"qualification_paths"` when an independent exit path should not
+wait for unrelated indicator history. For example:
+
+```python
+from investing_algorithm_framework import Rule
+
+long_exit = ConfluenceScoreConfig(
+    id="long_exit",
+    side=SignalSide.CLOSE_LONG,
+    rules={
+        "z_score": IndicatorRule(
+            indicator_id="z_score_long",
+            output_column="zscore",
+            threshold=0.0,
+            comparison="ge",
+            group_weights={"primary": 1.0},
+            lookback_period=14,
+            lookback_scope="position",
+        ),
+        "supertrend_bearish": IndicatorRule(
+            indicator_id="supertrend_filter",
+            output_column="supertrend_trend",
+            threshold=0.0,
+            comparison="eq",
+            lookback_period=1,
+        ),
+    },
+    group_thresholds={"primary": 1.0},
+    override_triggers=Rule("supertrend_bearish"),
+    readiness_policy="qualification_paths",
+)
+```
+
+The Z-score scoring path may close the position normally. Independently, a
+ready bearish Supertrend rule may close it even while Z-score is warming up or
+currently missing. Conversely, a ready normal exit need not wait for missing
+Supertrend data. This tests the persistent bearish state, not just the flip
+event. A position-scoped card still requires an actual entry-fill timestamp.
+Execution remains scheduled and uses completed native candles; this does not
+introduce intrabar execution or bypass rule/card delays.
+
+Path readiness evaluates qualification using three states: known true, known
+false, or unknown. Unknown data is never interpreted as a known non-match:
+`Not(Rule("missing_rule"))` cannot become a ready override. `AnyOf` and `AtLeast`
+can establish a path from enough known matches without waiting for unrelated
+branches; `AllOf` requires all necessary matches. Conditions comparing two rule
+matches require both operands to be ready.
+
+Scoring thresholds, including `Threshold(...)` override references, require all
+rules contributing to their group to be ready, preserving sum/max and signed
+weight semantics. Optional groups do not hold up an otherwise established
+qualification path. Hard requirements and vetoes still apply: an unknown gate
+cannot permit a signal, and a known blocker always prevents it.
+
+The card payload's `ready` flag now means the qualification decision is known,
+not that every rule is ready. `passed`/`qualified` retain the existing boolean
+scoring evidence; emission and decision traces require both `ready` and
+`passed`. Per-rule readiness remains available separately. No historical data,
+lookback, or match evidence is fabricated to make a path ready.
+
+This policy belongs to indicator-driven evaluation, including event,
+precomputed and fill-driven vector execution. A compiled `ConfluenceScoreCard`
+still evaluates supplied match booleans; its standalone `evaluate_series`
+does not infer native indicator readiness. Inspection snapshots retain and
+display the configured readiness policy.
+
+### Inspecting symbol-bound scoring cards
+
+```python
+for card in strategy.get_confluence_score_cards():
+    print(card)
+```
+
+`ConfluenceScoringStrategy.get_confluence_score_cards()` returns one
+`ConfluenceScoreCard` inspection snapshot per signal side and scale-in stage,
+merging identical definitions across configured symbols by default. Card IDs,
+rules, thresholds, delays, scoring policy, indicator settings and non-symbol
+source settings must match; only target-symbol labels and concrete source
+identifiers are ignored when comparing definitions. Different timeframes or
+indicator parameters remain separate. No market data or evaluation is required.
+Opaque parameter objects are compared by identity; independently copied values
+whose equivalence cannot be established safely remain separate.
+
+Merged cards print `Symbols: ETH, BTC` in strategy-symbol order and retain
+separately labelled source details for every symbol. Single-symbol cards still
+print `Symbol: BTC`. Symbol-scoped cards appear only for applicable targets.
+Use `strategy.get_confluence_score_cards(merge_symbols=False)` to return one
+card per symbol, side and stage without merging.
+
+The boxed representation includes the card ID, symbol, side, stage, delay
+mode, actual indicator comparisons and bounds, native lookbacks and scope,
+weights, group aggregation/thresholds/capacities, requirements, vetoes and
+overrides. Each scoring group has its own section with its aggregation,
+threshold and capacity, followed by its member rules in declaration order.
+Rules belonging to multiple groups appear in every applicable section with
+that group's weight, including negative weights and synthetic total groups.
+Indicator parameters and the resolved source's identifier, trading
+pair, market and timeframe are included, so different ladder thresholds or
+symbol bindings remain visible.
+
+Inspection cards expose `symbols`, `side` and `scale_in_stage`. Merged cards
+have `symbol=None` and a `symbol_cards` tuple of the individual, independent
+inspection snapshots; their configuration and source metadata lives on those
+snapshots rather than misleadingly selecting one symbol's binding.
+Single-symbol cards additionally expose `symbol`, `configuration`
+(the original `ConfluenceScoreConfig` snapshot), `indicator_configs` and
+`data_sources`. The indicator registry contains only referenced calculations,
+with source selectors resolved to concrete identifiers. Metadata mappings are
+read-only; their contents are independent copies of the engine declarations.
+Each call creates fresh snapshots, not a cached or live view. Merging changes
+representation only, never per-symbol indicator history or execution state.
+
+This API is strictly on demand: strategy construction and event/vector
+evaluation do not create or format inspection snapshots. The engine continues
+using its existing compiled scoring cards and native indicator state, with no
+predicate evaluation or state mutation during inspection. The scoring behavior
+of returned cards is unchanged; their `evaluate` methods still consume
+compiled rule-match booleans, not raw indicator values. Inspection does not
+make them an alternative execution engine.
+
+Ordinary `ConfluenceScoreCard` objects retain their existing text format.
+Scoring equality and `to_dict()`/`from_dict()` remain unchanged and exclude
+inspection metadata; pickle preserves the inspection snapshot. Use the
+exposed configuration and indicator registrations when exporting declarations.
+
+### Delayed confirmation and bounded indicator rules
+
+Set `initial_delay=N` on each `IndicatorRule` to wait N **scheduled strategy
+evaluations** after that rule first matches and is ready. For example, a trigger at
+t with `initial_delay=3` can first emit at t+3, not t+2. The default is 0,
+preserving immediate signals.
+
+`initial_delay_mode="continuous"` (default) requires the rule to match on every
+evaluation; losing the match or readiness resets the countdown.
+`initial_delay_mode="recheck"` ignores intermediate match changes and
+checks again at t+N. A failed deadline resets the countdown, and a later trigger
+starts a new one. After confirmation, a still-matching rule contributes its weight
+on subsequent evaluations; losing the match rearms the delay. Delays filter rule
+matches after their lookback and before weights, group scoring, requirements,
+vetoes and overrides. Undelayed rules contribute immediately; a pending rule does
+not block the whole group.
+Repeated evaluation at the same timestamp never advances the countdown.
+
+State is isolated per rule, card and symbol and reset for each backtest run. Skipped
+cards reset their delays; a new filled position starts fresh. Entry and
+scale-in countdowns track rule matches independently of position
+eligibility and cooldowns: confirmation does not queue orders or consume stages.
+Event evidence records each delayed rule under `rule_delays`, including
+`raw_matched`, `matched`, `initial_delay`, `initial_delay_mode`, `delay_elapsed`
+and `delay_pending`. Rule evaluations and decision traces include this evidence.
+`ConfluenceScoreConfig` also supports `initial_delay` and `initial_delay_mode`:
+they delay whole-card qualification after rule-level scoring. Both levels may be
+enabled together, with independent delay lengths and modes. For a continuously
+matching rule, a rule delay of 1 followed by a card delay of 2 confirms at t+3.
+Card evidence uses `raw_passed` for qualification before the card delay;
+`passed`/`qualified` reflect the final delayed result.
+
+For an inclusive interval, add `lower_bound` and/or `upper_bound` to an
+`IndicatorRule`. These are ANDed with its existing comparison **on the same
+native observation**, before the rolling-any lookback, and contribute the
+rule's weight only once:
+
+```python
+ConfluenceScoreConfig(
+    id="bounded_entry", side=SignalSide.OPEN_LONG,
+    rules={"oversold": IndicatorRule(
+        indicator_id="zscore", output_column="zscore",
+        threshold=-2, comparison="le", lower_bound=-3,
+        group_weights={"primary": 1},
+        initial_delay=3, initial_delay_mode="continuous",
+    )},
+    group_thresholds={"primary": 1},
+)
+```
+
+This accepts exactly `-3 <= zscore <= -2`. Bounds must be finite and ordered;
+missing indicator values never match. Recorded conditions include both bounds.
+
+Both event and vector backtests support delay modes and bounds. With delayed
+rules or cards, vector masks use the actual backtest schedule, not candle counts or
+warm-up rows, including evaluations between candle completions. Delayed exits
+use fill-driven vector evaluation, like position-scoped exits, and share its
+Python-backend requirement. For direct `generate_signal_series(data)` calls
+outside a backtest, the schedule spans the supplied native history; supply
+`data["_confluence_decision_index"]` to specify the intended evaluation window.
+The existing engines' order-fill timing differences remain unchanged.
+Existing schedule validation still requires at least one OHLCV source as
+granular as the strategy schedule. Delayed exits, like position-scoped rules,
+require a recorded entry fill rather than asset holdings alone.
+
+For `CLOSE_LONG` and `CLOSE_SHORT`, opt into a position-bounded rule window:
+
+```python
+IndicatorRule(
+    indicator_id="zscore", output_column="zscore",
+    threshold=0, comparison="ge", group_weights={"primary": 1},
+    lookback_period=14, lookback_scope="position",
+)
+```
+
+The default `lookback_scope="market"` preserves the original rolling-any
+behavior. `"position"` intersects that same latest-14-native-observation window
+with observations completed **strictly after the leg's first actual entry fill**.
+The entry-time observation and all earlier matches are excluded. Pending or
+rejected entry signals do not start a window. Scale-ins and partial closes keep
+the initial boundary; fully closing and reopening starts a new one. Long and
+short legs use independent boundaries in hedge mode. Continuous indicator
+history and warm-up are unchanged: this does not wait for 14 post-entry candles
+or restart a 14-period indicator calculation.
+
+Event evaluation resolves the continuously held leg from filled trade history,
+including overlapping lots that have since closed. An OPEN filled trade remains
+part of that leg while a pending exit reserves its entire available quantity:
+zero `available_amount` does not erase the entry boundary or reset scale-in
+progression. Only a fully closed position resets progression. Existing asset holdings
+without a recorded entry trade cannot establish this boundary and raise an
+explicit error. Saved card evidence includes `position_opened_at`, and scored
+indicator rules record `lookback_scope` and the boundary in their condition.
+Nested trade stop-loss watermark dates are exported as ISO-8601 timestamps,
+including when trailing stops update during a captured event backtest.
+
+The subclass reuses `IndicatorEngine`, including run-local caches, shared
+built-in calculations, continuous native history, and candle-completion
+alignment. Event backtests prepare a fresh engine per run. Vector generation
+uses ready-and-qualified masks from prepared card caches, with stage metadata,
+without constructing per-row decision traces or simulating positions.
+Callable indicators used by vector cards must declare `execution="precompute"`
+and be causal at every output row. Event signals carry scalar decision traces,
+including indicator values and readiness; rejected decisions are recorded.
+Position-scoped vector cards instead mark readiness candidates with
+`metadata["position_scoped_lookback"] = True` and rescore rule
+matches in the execution loop against the accepted first fill. This preserves
+mixed market/position rules, signed weights, requirements, vetoes and overrides;
+masking a final precomputed card result would not. Direct static
+`card_signal_series()` rejects position-scoped cards unless explicitly requesting
+internal candidates; candidates are not executable signals by themselves.
+
+This separation does not extend an execution engine's risk-rule coverage.
+In particular, the existing vector loop skips trailing stops and does not
+run the phased portfolio exposure budget. Use the event engine to exercise
+those settings in the reference strategy. Staged vector execution currently
+uses the Python execution backend (`auto` falls back; strict Rust rejects it).
+Position-scoped vector exits have the same execution-backend restriction,
+with an explicit logged fallback or strict error rather than unbounded execution.
+
+Existing `TradingStrategy` subclasses remain compatible: imperative signal
+hooks, concrete `signal_cards`, and `generate_signals_from_cards()` still work.
+Their concrete-card preparation/evaluation helpers now live in a compatibility
+support class; generic lifecycle, execution and decision-trace recording remain
+on `TradingStrategy`.
+
+### Performance and verification
+
+The shared indicator engine stores prepared card states only at changes in
+matches, input readiness, or full-lookback readiness. NumPy detects these
+boundaries and groups identical boolean states; scalar scoring runs once per
+distinct state, rather than walking every candle in Python. Backward alignment
+still returns the exact state at each decision time, and indicator snapshots
+continue to use the latest completed candle, even between card-state changes.
+
+Prepared event evaluation returns detached copies of the known card-payload
+containers instead of recursively deep-copying scalar evidence. Mutating a
+returned group, evaluation, match, or readiness mapping cannot alter cached
+results. Strategies without scale-in cards also avoid the stage tracker's trade
+queries. Staged strategies retain the inclusive, incremental fill-history
+query, so a lot filled and closed between strategy ticks still advances its
+stage correctly.
+
+Run the offline benchmark from the repository root:
+
+```bash
+python -m scripts.bench_confluence_strategy \
+  --rows 50000 --ticks 500 --repeats 3 --profile
+```
+
+Local medians before/after this optimization (Python 3.12.16, pandas 2.3.3,
+NumPy 2.2.6, macOS arm64; three repetitions):
+
+| Signal-generation workload | Before | After | Speedup |
+|---|---:|---:|---:|
+| Vector preparation, 50,000 native candles and three cards | 146.0 ms | 16.9 ms | 8.65x |
+| 500 prepared, flat-position event decisions | 71.3 ms | 32.5 ms | 2.19x |
+
+Before/after digests of the complete masks and event signals/decision traces
+matched exactly. The benchmark reports timings, repeat parity, output digests,
+and optional profiles. These are signal-generation measurements, not complete
+backtest speedups: the event sample excludes provider ingestion and database/
+broker execution, and the vector sample excludes trade execution and metrics.
+Re-measure on the target workload; no Rust backend is required or enabled by
+these optimizations. Existing native backend eligibility limits still apply.
+
+### Manual card evaluation
+
 Define the card on the strategy and evaluate it from `generate_signals` after
 computing indicator values:
 
@@ -175,6 +619,106 @@ expose each scored group's matches, subtotal, thresholds, and pass/fail state;
 the decision trace includes these diagnostics too. Definitions round-trip
 through JSON with their groups and thresholds intact. Evaluation uses the
 current context only; it does not accumulate matches across a lookback window.
+
+## Named multi-group score cards
+
+Use `ConfluenceScoreCard` when rules contribute to several groups, nested
+thresholds should not double-count, or exceptional evidence can bypass normal
+group thresholds. This is additive: existing `ConfluenceCard` definitions and
+their primary/secondary semantics are unchanged.
+
+```python
+from investing_algorithm_framework import (
+    AnyOf, ConfluenceScoreCard, ConfluenceScoreRule, EvaluationContext,
+    Requirement, Rule, Threshold, condition,
+)
+
+entry_card = ConfluenceScoreCard(
+    name="Z-score with confirmation",
+    rules={
+        "normal_z": ConfluenceScoreRule(
+            condition("z_score", "lte", value=-2),
+            group_weights={"primary": 1},
+        ),
+        "extreme_z": ConfluenceScoreRule(
+            condition("z_score", "lte", value=-3),
+            group_weights={"primary": 3},
+        ),
+        "rsi_confirmation": ConfluenceScoreRule(
+            condition("rsi", "lte", value=30),
+            group_weights={"secondary": 1},
+        ),
+    },
+    group_aggregation={"primary": "max", "secondary": "sum"},
+    group_thresholds={"primary": 1, "secondary": 1},
+    override_triggers=AnyOf(
+        Rule("extreme_z"), Threshold("primary", 3),
+    ),
+    requirements=(
+        Requirement("Position available", condition("can_enter", "eq", value=True)),
+    ),
+)
+result = entry_card.evaluate(EvaluationContext({
+    "z_score": -3.2, "rsi": 50, "can_enter": True,
+}))
+assert result.qualified
+assert result.score == 3
+```
+
+The framework evaluates prepared inputs; it does not calculate indicators.
+An application can adapt its own indicator configurations into
+`ConfluenceScoreRule(expression, group_weights)` without duplicating scoring.
+Named cards work in `TradingStrategy.signal_cards`, decision traces, and compact
+backtest records alongside legacy cards.
+
+Qualification is:
+
+```text
+all requirements AND no veto AND (normal group thresholds OR override)
+```
+
+The normal path requires **every** configured group threshold, inclusively
+with `>=`. An empty threshold mapping disables this path and requires an
+override. Overrides bypass group thresholds only, never requirements, vetoes,
+or external position/risk controls. `Rule(name)` references a raw observed
+match, even if that rule earns zero points under `max`. `Threshold(group, value)`
+compares the aggregated group score with `>=`. Combine these references and
+ordinary conditions using `AnyOf`, `AllOf`, `Not`, or `AtLeast`. References are
+allowed only in overrides, not rule predicates or mandatory gates.
+
+Groups default to `sum`. With `max`, only the largest matching contribution
+is credited; equal maxima credit the first rule in declaration order. Signed,
+finite weights are supported: `max` selects among matched rules, including
+negative weights, rather than introducing an unmatched zero. No matches yield
+zero. A rule can contribute independently to multiple groups. The total is
+the sum of group scores, not an additional qualification threshold.
+
+For the example, normal Z plus RSI scores 2; extreme Z alone scores 3 and
+qualifies by override; extreme Z plus RSI scores 4, not 5. The two overrides
+are equivalent for this configuration but illustrate both reference types.
+Rule predicates are evaluated once per scalar evaluation regardless of how
+many groups or override references use them.
+
+Results preserve raw matches and credited points separately. Score groups
+have category `"score"`; an overridden, failed group threshold remains visible
+without being treated as a mandatory secondary rejection. `normal_path` and
+`override_path` evidence explain qualification. Requirements and vetoes retain
+their ordinary evidence categories.
+
+Definitions round-trip through `ConfluenceScoreCard.to_dict()` and
+`ConfluenceScoreCard.from_dict()` using `confluence_score_card_version: 1`.
+The explicit `rule_order` list preserves tie attribution through sorted JSON
+and canonical backtest records. Do not remove it when transforming definitions.
+Unknown references, invalid weights, unsupported aggregation, and thresholds
+above the maximum possible score are rejected at construction.
+
+`evaluate_series(frame, backend="python")` and `backend="auto"` use the pandas
+evaluator. All configured rule, requirement, veto, and override inputs must be
+available, including when an override could otherwise qualify. Crossings also
+require the previous bar. Missing inputs fail closed.
+Explicit `backend="rust"` raises `NativeConfluenceUnsupported`: named-card
+semantics are not implemented in the native kernel yet. Existing legacy native
+evaluation is unchanged.
 
 ## Printing cards
 

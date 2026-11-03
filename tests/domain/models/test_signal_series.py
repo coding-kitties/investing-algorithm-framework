@@ -1,4 +1,6 @@
 """Tests for the SignalSeries vector-mode signal bundle (v9.0)."""
+from dataclasses import asdict, fields
+from inspect import signature
 import unittest
 
 import pandas as pd
@@ -28,6 +30,16 @@ class TestSignalSeries(unittest.TestCase):
         self.assertEqual(ss.source, "")
         self.assertEqual(dict(ss.metadata), {})
         self.assertIsNone(ss.strength_series)
+
+    def test_staged_capability_is_excluded_from_signal_fields(self):
+        self.assertIs(SignalSeries.supports_staged_scale_in, True)
+        series = SignalSeries("BTC", SignalSide.OPEN_LONG, self._series())
+        self.assertIs(series.supports_staged_scale_in, True)
+        marker = "supports_staged_scale_in"
+        self.assertNotIn(marker, {item.name for item in fields(SignalSeries)})
+        self.assertNotIn(marker, asdict(series))
+        self.assertNotIn(marker, signature(SignalSeries).parameters)
+        self.assertNotIn(marker, repr(series))
 
     def test_coerces_string_side(self):
         ss = SignalSeries(

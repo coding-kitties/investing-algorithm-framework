@@ -1,6 +1,7 @@
 import logging
 
-from investing_algorithm_framework.domain import ApiException
+from investing_algorithm_framework.domain import ApiException, \
+    OperationalException
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,13 @@ class PortfolioConfigurationService:
         self.portfolio_configurations = []
 
     def add(self, portfolio_configuration):
+        if any(
+            existing.paper_trading != portfolio_configuration.paper_trading
+            for existing in self.portfolio_configurations
+        ):
+            raise OperationalException(
+                "Mixed real and paper portfolios are not supported."
+            )
         self.portfolio_configurations.append(portfolio_configuration)
 
     def get(self, identifier):

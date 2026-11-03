@@ -92,8 +92,8 @@ class CooldownRule:
 
         The semantics intentionally mirror
         :attr:`ScalingRule.cooldown_in_bars`: the bar on which the order
-        is placed *is* the start of the cooldown, so a rule with
-        ``bars=3`` blocks the next 3 bars and allows the 4th.
+        is placed is bar 0 of the cooldown. A rule with ``bars=3``
+        blocks bars 0, 1 and 2, and allows a signal at bar 3.
     """
 
     def __init__(
@@ -161,7 +161,7 @@ class CooldownTracker:
     def __init__(self) -> None:
         # key: (scope_symbol_or_None, CooldownTrigger) -> bar_index
         self._last_event: dict[
-            tuple[Optional[str], CooldownTrigger], int
+            tuple[Optional[str], CooldownTrigger, Optional[str]], int
         ] = {}
 
     def reset(self) -> None:
@@ -188,6 +188,24 @@ class CooldownTracker:
                 if prev is None or prev < bar_index:
                     self._last_event[key] = bar_index
 
+    def remaining_bars(
+        self,
+        rule: CooldownRule,
+        *,
+        symbol: str,
+        bar_index: int,
+        position_side: Optional[str] = None,
+    ) -> int:
+        """Return the active rule's remaining ticks, including this tick.
+
+        A signal at ``last_event + rule.bars`` is no longer blocked.
+        """
+        if rule.bars <= 0 or not rule.applies_to_symbol(symbol):
+            return 0
+        scope = None if rule.is_portfolio_scoped else symbol
+        last = self._last_event.get((scope, rule.trigger, position_side))
+        return 0 if last is None else max(0, rule.bars - (bar_index - last))
+
     def is_blocked(
         self,
         rules: "list[CooldownRule]",
@@ -205,18 +223,9 @@ class CooldownTracker:
                 continue
             if not rule.blocks_signal(signal_side):
                 continue
-            scope = None if rule.is_portfolio_scoped else symbol
-            last = self._last_event.get(
-                (scope, rule.trigger, position_side)
-            )
-            if last is None:
-                continue
-            # The trigger bar counts as bar 0 of the cooldown, so the
-            # rule blocks bars [last + 1, last + bars) — i.e. the
-            # ``bars - 1`` bars immediately after the trigger. With
-            # ``bars=N`` a signal exactly ``N`` ticks after the
-            # trigger is therefore allowed; set ``bars=N+1`` if you
-            # want to also block the Nth tick.
-            if bar_index - last < rule.bars:
+            if self.remaining_bars(
+                rule, symbol=symbol, bar_index=bar_index,
+                position_side=position_side,
+            ) > 0:
                 return True, rule
         return False, None

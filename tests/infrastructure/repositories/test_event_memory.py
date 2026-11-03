@@ -8,10 +8,10 @@ import weakref
 
 from sqlalchemy import inspect
 
-from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
-    OrderType
+from investing_algorithm_framework.domain import OperationalException, \
+    OrderSide, OrderStatus, OrderType
 from investing_algorithm_framework.infrastructure.models import \
-    SQLOrder, SQLTradeAllocation
+    SQLOrder, SQLTrade, SQLTradeAllocation
 from investing_algorithm_framework.infrastructure.repositories.event_memory \
     import event_memory_scope
 from investing_algorithm_framework.infrastructure.repositories \
@@ -23,6 +23,167 @@ from investing_algorithm_framework.infrastructure.repositories \
 
 
 class TestEventMemoryState(TestCase):
+    def test_open_orders_stay_resident_until_terminal(self):
+        orders = SQLOrderRepository()
+        with event_memory_scope() as state:
+            table = state._table(SQLOrder)
+            with patch.object(
+                table.records, 'write', side_effect=AssertionError(
+                    'Open orders must not be serialized to disk'),
+            ):
+                order = orders.create({
+                    'target_symbol': 'BTC', 'trading_symbol': 'EUR',
+                    'amount': 2.0, 'price': 10.0,
+                    'status': OrderStatus.OPEN,
+                    'order_type': OrderType.LIMIT, 'order_side': OrderSide.BUY,
+                    'metadata': {'nested': {'value': 1}},
+                })
+                with patch.object(table.records, 'read',
+                                  side_effect=AssertionError(
+                                      'Open orders must be read from memory')):
+                    orders.update(order.id, {'filled': 1.0, 'remaining': 1.0})
+                    copied = orders.get(order.id)
+                    copied.metadata['nested']['value'] = 99
+                    self.assertEqual(
+                        orders.get(order.id).metadata['nested']['value'], 1)
+                    self.assertEqual(orders.get(order.id).filled, 1.0)
+                    for invalid_id in (True, float(order.id), str(order.id)):
+                        with self.assertRaises(OperationalException):
+                            orders.get(invalid_id)
+                    self.assertEqual(orders.count({
+                        'status': OrderStatus.OPEN,
+                    }), 1)
+                    self.assertEqual(table.records.seek(0, 2), 0)
+            orders.update(order.id, {'status': OrderStatus.CLOSED})
+            self.assertGreater(table.records.seek(0, 2), 0)
+            self.assertEqual(table.resident, {})
+            self.assertEqual(orders.count({'status': OrderStatus.OPEN}), 0)
+            self.assertEqual(orders.get(order.id).status,
+                             OrderStatus.CLOSED.value)
+            orders.update(order.id, {'price': 11.0})
+            self.assertEqual(orders.get(order.id).price, 11.0)
+            orders.delete(order.id)
+            self.assertEqual(orders.count(), 0)
+
+    def test_open_trades_stay_resident_and_close_without_losing_orders(self):
+        orders = SQLOrderRepository()
+        trades = SQLTradeRepository()
+        with event_memory_scope() as state:
+            order = orders.create({
+                'target_symbol': 'BTC', 'trading_symbol': 'EUR',
+                'amount': 1.0, 'price': 10.0,
+                'status': OrderStatus.CLOSED,
+                'order_type': OrderType.LIMIT, 'order_side': OrderSide.BUY,
+            })
+            table = state._table(SQLTrade)
+            with patch.object(
+                table.records, 'write', side_effect=AssertionError(
+                    'Open trades must not be serialized to disk'),
+            ):
+                trade = trades.create({
+                    'buy_order': order, 'target_symbol': 'BTC',
+                    'trading_symbol': 'EUR', 'opened_at': order.created_at,
+                    'amount': 1.0, 'available_amount': 1.0,
+                    'filled_amount': 1.0, 'remaining': 0.0, 'status': 'OPEN',
+                })
+                trades.update(trade.id, {'available_amount': .5})
+                self.assertEqual(trades.get(trade.id).available_amount, .5)
+                self.assertEqual(
+                    [item.id for item in trades.get(trade.id).orders],
+                    [order.id])
+            trades.update(trade.id, {
+                'status': 'CLOSED', 'available_amount': 0.0,
+            })
+            self.assertGreater(table.records.seek(0, 2), 0)
+            self.assertEqual(table.resident, {})
+            self.assertEqual(trades.get(trade.id).status, 'CLOSED')
+            self.assertEqual(
+                [item.id for item in trades.get(trade.id).orders], [order.id])
+            self.assertEqual(trades.count({'opened_at_gte': order.created_at}),
+                             1)
+
+    def test_terminal_orders_leave_memory_and_can_be_reopened(self):
+        orders = SQLOrderRepository()
+        with event_memory_scope() as state:
+            for status in (OrderStatus.CANCELED, OrderStatus.EXPIRED,
+                           OrderStatus.REJECTED):
+                with self.subTest(status=status):
+                    order = orders.create({
+                        'target_symbol': 'BTC', 'trading_symbol': 'EUR',
+                        'amount': 1.0, 'price': 10.0,
+                        'status': OrderStatus.CREATED,
+                        'order_type': OrderType.LIMIT,
+                        'order_side': OrderSide.BUY,
+                    })
+                    table = state.rows[SQLOrder]
+                    self.assertIn(order.id, table.resident)
+                    orders.update(order.id, {'status': status})
+                    self.assertNotIn(order.id, table.resident)
+                    self.assertEqual(orders.get(order.id).status, status.value)
+                    orders.update(order.id, {'status': OrderStatus.OPEN})
+                    self.assertIn(order.id, table.resident)
+                    self.assertEqual(orders.get(order.id).status, 'OPEN')
+                    orders.delete(order.id)
+                    self.assertEqual(table.resident, {})
+
+    def test_active_rules_and_pending_allocations_archive_on_settlement(self):
+        from investing_algorithm_framework.infrastructure.repositories \
+            .trade_allocation_repository import SQLTradeAllocationRepository
+        from investing_algorithm_framework.infrastructure.repositories \
+            .trade_stop_loss_repository import SQLTradeStopLossRepository
+        from investing_algorithm_framework.infrastructure.repositories \
+            .trade_take_profit_repository import SQLTradeTakeProfitRepository
+
+        with event_memory_scope() as state:
+            for repository in (SQLTradeStopLossRepository(),
+                               SQLTradeTakeProfitRepository()):
+                table = state._table(repository.base_class)
+                with self.subTest(model=repository.base_class.__name__):
+                    with patch.object(
+                        table.records, 'write', side_effect=AssertionError(
+                            'Active risk rules must stay in memory'),
+                    ):
+                        rule = repository.create({
+                            'trade_id': 1, 'percentage': 5.,
+                            'open_price': 10., 'total_amount_trade': 1.,
+                        })
+                        self.assertTrue(repository.get(rule.id).active)
+                    repository.update(rule.id, {'active': False})
+                    self.assertEqual(table.resident, {})
+                    self.assertFalse(repository.get(rule.id).active)
+
+            allocations = SQLTradeAllocationRepository()
+            table = state._table(allocations.base_class)
+            with patch.object(
+                table.records, 'write', side_effect=AssertionError(
+                    'Pending allocations must stay in memory'),
+            ):
+                allocation = allocations.create({
+                    'order_id': 1, 'trade_id': 1, 'amount': 1.,
+                    'amount_pending': 1., 'open_price': 8., 'close_price': 10.,
+                })
+                self.assertEqual(
+                    allocations.get(allocation.id).amount_pending, 1.)
+            allocations.update(allocation.id, {'amount_pending': 0.})
+            self.assertEqual(table.resident, {})
+            self.assertEqual(
+                allocations.get(allocation.id).amount_pending, 0.)
+
+    def test_resident_state_is_released_after_failure(self):
+        orders = SQLOrderRepository()
+        with self.assertRaisesRegex(RuntimeError, 'abort'):
+            with event_memory_scope() as state:
+                orders.create({
+                    'target_symbol': 'BTC', 'trading_symbol': 'EUR',
+                    'amount': 1., 'price': 10.,
+                    'order_type': OrderType.LIMIT, 'order_side': OrderSide.BUY,
+                })
+                table = state.rows[SQLOrder]
+                self.assertTrue(table.resident)
+                raise RuntimeError('abort')
+        self.assertEqual(table.resident, {})
+        self.assertTrue(table.records.closed)
+
     def test_created_after_filters_before_decode_in_both_archives(self):
         from investing_algorithm_framework.infrastructure.repositories \
             .event_snapshot_archive import EventAccountingArchive
@@ -49,6 +210,7 @@ class TestEventMemoryState(TestCase):
                             'id': identity, 'target_symbol': 'BTC',
                             'trading_symbol': 'EUR',
                             'amount': 1., 'price': 10.,
+                            'status': OrderStatus.CLOSED,
                             'order_type': OrderType.LIMIT,
                             'order_side': OrderSide.BUY,
                             'created_at': created_at,
@@ -229,7 +391,7 @@ class TestEventMemoryState(TestCase):
 
             with patch.object(EventAccountingArchive, '_read', decode):
                 self.assertEqual(orders.count({'status': OrderStatus.OPEN}), 1)
-                self.assertEqual(len(references), 1)
+                self.assertEqual(len(references), 0)
                 self.assertEqual(orders.count({'portfolio_id': 7}), 1001)
                 self.assertEqual(sum(1 for _ in orders.iter_all({
                     'portfolio_id': 7, 'position': [position.id],
@@ -248,6 +410,7 @@ class TestEventMemoryState(TestCase):
                     order = orders.create({
                         'id': identity, 'target_symbol': 'BTC',
                         'trading_symbol': 'EUR', 'amount': 1.0, 'price': 10.0,
+                        'status': OrderStatus.CLOSED,
                         'order_type': OrderType.LIMIT,
                         'order_side': OrderSide.BUY,
                     })
@@ -256,6 +419,7 @@ class TestEventMemoryState(TestCase):
                         'trading_symbol': 'EUR', 'opened_at': order.created_at,
                         'amount': 1.0, 'available_amount': 0.0,
                         'filled_amount': 1.0, 'remaining': 0.0,
+                        'status': 'CLOSED',
                     })
                     del order
                     if identity in (100, 1000):
@@ -265,6 +429,9 @@ class TestEventMemoryState(TestCase):
                 self.assertTrue(all(not table.pending
                                     for table in state.rows.values()
                                     if not isinstance(table, dict)))
+                self.assertTrue(all(not table.resident
+                                    for table in state.rows.values()
+                                    if hasattr(table, 'resident')))
                 table = state.rows[SQLOrder]
             finally:
                 tracemalloc.stop()
@@ -500,8 +667,13 @@ class TestEventMemoryState(TestCase):
                 'amount': 1.0, 'available_amount': 1.0,
                 'filled_amount': 1.0, 'remaining': 0.0,
             })
-            with patch.object(state, '_clone', side_effect=AssertionError(
-                    'Decoded archive rows must not be copied again')):
+            clone = state._clone
+
+            def copy_fields_only(value, *args, **kwargs):
+                self.assertNotIsInstance(value, (SQLOrder, SQLTrade))
+                return clone(value, *args, **kwargs)
+
+            with patch.object(state, '_clone', side_effect=copy_fields_only):
                 copied = trades.get(trade.id)
                 self.assertEqual(trades.get_all()[0].id, trade.id)
                 self.assertEqual(next(trades.iter_all()).id, trade.id)

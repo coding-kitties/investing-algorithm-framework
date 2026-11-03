@@ -1,7 +1,11 @@
 import unittest
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
+
+import pandas as pd
 
 from investing_algorithm_framework.app.app import _apply_study_to_backtests
 from investing_algorithm_framework.domain.backtesting.study import Study
@@ -15,11 +19,13 @@ from investing_algorithm_framework.analysis.markdown import (
 )
 from investing_algorithm_framework.domain import (
     Backtest,
+    BacktestIndex,
     BacktestDateRange,
     BacktestMetrics,
     BacktestRun,
     BacktestSummaryMetrics,
     BacktestWindow,
+    OperationalException,
 )
 
 
@@ -418,6 +424,315 @@ class TestBacktestTableHeadings(unittest.TestCase):
         self.assertIn("- **Page:** 2 of 3 (26 runs; 10 per page)", result)
         self.assertEqual(mock_table.call_args.kwargs["row_offset"], 10)
         self.assertEqual(mock_table.call_args.kwargs["row_limit"], 10)
+
+
+class TestShowBacktestRunsFromIndex(unittest.TestCase):
+    def setUp(self):
+        self.window = BacktestWindow(
+            name="inspection",
+            train_range=BacktestDateRange(
+                start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
+                end_date=datetime(2020, 6, 30, tzinfo=timezone.utc),
+            ),
+        )
+        self.run = BacktestRun(
+            backtest_window=self.window,
+            number_of_orders=7,
+            backtest_metrics=BacktestMetrics(
+                backtest_window=self.window,
+                cagr=0.1853, sharpe_ratio=0.54, total_net_gain=1800,
+                initial_unallocated=10000, final_value=11800,
+                number_of_trades=4, number_of_trades_closed=3,
+                number_of_trades_open_at_end=1,
+            ),
+        )
+        self.backtest = Backtest(
+            algorithm_id="index-strategy",
+            event_runs=[self.run], study_name="inspection-study",
+        )
+        self.index = BacktestIndex("/unused", pd.DataFrame({
+            "bundle_path": ["one.obtf", "one.obtf"],
+        }))
+        self.options = {
+            "study": "inspection-study",
+            "run": self.window,
+            "engine": "event",
+            "columns": [
+                ("cagr", "CAGR", ".2%"),
+                ("sharpe_ratio", "Sharpe", ".2f"),
+                ("total_net_gain", "Net gain (EUR)", ",.2f"),
+            ],
+        }
+
+    def test_index_renders_same_metrics_as_existing_list_api(self):
+        expected = show_backtest_runs([self.backtest], **self.options)
+        with patch.object(
+            BacktestIndex, "load_backtests", return_value=[self.backtest],
+        ) as load:
+            actual = show_backtest_runs(
+                backtest_index=self.index, workers=1, **self.options,
+            )
+        load.assert_called_once_with(workers=1)
+        self.assertEqual(actual, expected)
+        self.assertIn("18.53%", actual)
+        self.assertIn("0.54", actual)
+        self.assertIn("1,800.00", actual)
+        self.assertIn("index-strategy", actual)
+
+    def test_run_columns_include_activity_counts_and_initial_balance(self):
+        options = {
+            **self.options,
+            "columns": [
+                ("initial_unallocated", "Initial balance", ",.2f"),
+                ("final_value", "Final balance", ",.2f"),
+                ("number_of_trades", "Trades", "d"),
+                ("number_of_trades_closed", "Closed", "d"),
+                ("number_of_trades_open_at_end", "Open at end", "d"),
+                ("number_of_orders", "Orders", "d"),
+            ],
+        }
+        with patch.object(
+            BacktestIndex, "load_backtests", return_value=[self.backtest],
+        ):
+            rendered = show_backtest_runs(
+                backtest_index=self.index, workers=1, **options,
+            )
+        values = [
+            cell.strip() for cell in rendered.splitlines()[-1].split("|")
+            if cell.strip()
+        ]
+        self.assertEqual(values, [
+            "index-strategy", "event", "inspection",
+            "10,000.00", "11,800.00", "4", "3", "1", "7",
+        ])
+
+    def test_sorting_uses_run_fields_when_not_present_on_metrics(self):
+        second = Backtest(
+            algorithm_id="fewer-orders",
+            event_runs=[BacktestRun(
+                backtest_window=self.window,
+                backtest_metrics=BacktestMetrics(backtest_window=self.window),
+                number_of_orders=2,
+            )],
+            study_name="inspection-study",
+        )
+        rendered = create_backtest_metrics_table(
+            [second, self.backtest],
+            level="run", engine="event", study="inspection-study",
+            metrics=[("number_of_orders", "Orders", "d")],
+            sort_by="number_of_orders", row_limit=1,
+        )
+        self.assertIn("index-strategy", rendered)
+        self.assertNotIn("fewer-orders", rendered)
+
+    def test_order_counts_are_scoped_to_each_window_including_zero(self):
+        second_window = BacktestWindow(
+            name="no-orders", train_range=self.window.train_range,
+        )
+        backtest = Backtest(
+            algorithm_id="two-windows",
+            event_runs=[
+                self.run,
+                BacktestRun(
+                    backtest_window=second_window,
+                    backtest_metrics=BacktestMetrics(
+                        backtest_window=second_window,
+                    ),
+                    number_of_orders=0,
+                ),
+            ],
+            study_name="inspection-study",
+        )
+        rendered = show_backtest_runs(
+            backtests=[backtest], engine="event", study="inspection-study",
+            columns=[("number_of_orders", "Orders", "d")],
+        )
+        rows = [
+            [cell.strip() for cell in line.split("|") if cell.strip()]
+            for line in [
+                line for line in rendered.splitlines() if line.startswith("|")
+            ][2:]
+        ]
+        self.assertEqual(
+            [(row[2], row[3]) for row in rows],
+            [("inspection", "7"), ("no-orders", "0")],
+        )
+
+    def test_legacy_templates_keep_percentage_point_scaling(self):
+        rendered = show_backtest_runs(
+            [self.backtest], study="inspection-study", engine="event",
+            columns=[
+                ("cagr", "CAGR %", "{:.2f}"),
+                ("sharpe_ratio", "Sharpe", "{:.2f}"),
+                ("total_net_gain", "Net gain", "{:,.2f}"),
+            ],
+        )
+        self.assertIn("18.53", rendered)
+        self.assertIn("0.54", rendered)
+        self.assertIn("1,800.00", rendered)
+
+    def test_bare_format_specs_use_raw_ratios_without_double_scaling(self):
+        rendered = show_backtest_runs(
+            [self.backtest], study="inspection-study", engine="event",
+            columns=[
+                ("cagr", "Annual return", ".2%"),
+                ("cagr", "Raw ratio", ".4f"),
+            ],
+        )
+        self.assertIn("18.53%", rendered)
+        self.assertIn("0.1853", rendered)
+        self.assertNotIn("1853.00%", rendered)
+
+    def test_invalid_bare_format_spec_raises(self):
+        with self.assertRaises(ValueError):
+            show_backtest_runs(
+                [self.backtest], study="inspection-study", engine="event",
+                columns=[("cagr", "CAGR", ".not-a-format")],
+            )
+
+    def test_missing_metric_with_bare_format_is_na(self):
+        rendered = show_backtest_runs(
+            [self.backtest], study="inspection-study", engine="event",
+            columns=[("missing_metric", "Unavailable", ".2f")],
+        )
+        self.assertIn("N/A", rendered)
+
+    def test_worker_selection_is_forwarded_and_bundles_load_only_once(self):
+        for workers in (None, 1, 2):
+            with self.subTest(workers=workers), patch.object(
+                BacktestIndex, "load_backtests", return_value=[self.backtest],
+            ) as load:
+                show_backtest_runs(
+                    backtest_index=self.index, workers=workers, **self.options,
+                )
+                load.assert_called_once_with(workers=workers)
+
+    def test_index_keeps_pagination_sorting_and_window_filtering(self):
+        second = Backtest(
+            algorithm_id="second",
+            event_runs=[BacktestRun(
+                backtest_window=self.window,
+                backtest_metrics=BacktestMetrics(
+                    backtest_window=self.window, cagr=0.5,
+                ),
+            )],
+            study_name="inspection-study",
+        )
+        index = BacktestIndex("/unused", pd.DataFrame({
+            "bundle_path": ["one.obtf", "two.obtf"],
+        }))
+        with patch.object(
+            BacktestIndex, "load_backtests",
+            return_value=[self.backtest, second],
+        ):
+            rendered = show_backtest_runs(
+                backtest_index=index, workers=1, page=2, page_size=1,
+                sort_by="cagr", **self.options,
+            )
+        self.assertIn("Page:** 2 of 2 (2 runs; 1 per page)", rendered)
+        self.assertIn("index-strategy", rendered)
+        self.assertNotIn("| second ", rendered)
+
+    def test_empty_index_displays_no_data_without_loading(self):
+        with patch.object(BacktestIndex, "load_backtests") as load:
+            rendered = show_backtest_runs(
+                backtest_index=BacktestIndex("/unused", pd.DataFrame()),
+                workers=1,
+            )
+        load.assert_not_called()
+        self.assertIn("No Data Available", rendered)
+        self.assertIn("0 runs", rendered)
+
+    def test_conflicting_or_missing_sources_raise_before_loading(self):
+        with patch.object(BacktestIndex, "load_backtests") as load:
+            for kwargs in (
+                {},
+                {"backtests": [], "backtest_index": self.index},
+                {"backtests": [], "workers": 1},
+            ):
+                with self.subTest(kwargs=kwargs):
+                    with self.assertRaises(ValueError):
+                        show_backtest_runs(**kwargs)
+        load.assert_not_called()
+
+    def test_invalid_index_type_raises_explicit_error(self):
+        with self.assertRaisesRegex(TypeError, "must be a BacktestIndex"):
+            show_backtest_runs(backtest_index=[])
+
+    def test_invalid_index_paths_raise_before_loading(self):
+        for frame in (
+            pd.DataFrame({"algorithm_id": ["one"]}),
+            pd.DataFrame({"bundle_path": [None]}),
+            pd.DataFrame({"bundle_path": [""]}),
+        ):
+            with self.subTest(frame=frame), patch.object(
+                BacktestIndex, "load_backtests",
+            ) as load:
+                with self.assertRaisesRegex(
+                    OperationalException, "bundle_path",
+                ):
+                    show_backtest_runs(
+                        backtest_index=BacktestIndex("/unused", frame),
+                        workers=1,
+                    )
+                load.assert_not_called()
+
+    def test_partial_bundle_load_cannot_render_successful_table(self):
+        with patch.object(
+            BacktestIndex, "load_backtests", return_value=[],
+        ), patch(
+            "investing_algorithm_framework.analysis.markdown."
+            "create_backtest_metrics_table",
+        ) as render:
+            with self.assertRaisesRegex(OperationalException, "No partial"):
+                show_backtest_runs(
+                    backtest_index=self.index, workers=1, **self.options,
+                )
+        render.assert_not_called()
+
+    def test_missing_bundle_raises_instead_of_showing_no_data(self):
+        with TemporaryDirectory() as directory:
+            index = BacktestIndex(directory, self.index.df.copy())
+            with self.assertLogs(
+                "investing_algorithm_framework", level="ERROR",
+            ), self.assertRaisesRegex(OperationalException, "No partial"):
+                show_backtest_runs(
+                    backtest_index=index, workers=1, **self.options,
+                )
+
+    def test_real_loader_deduplicates_index_rows(self):
+        with patch(
+            "investing_algorithm_framework.domain.backtesting."
+            "backtest_utils._load_one_bundle",
+            return_value=self.backtest,
+        ) as load:
+            rendered = show_backtest_runs(
+                backtest_index=self.index, workers=1, **self.options,
+            )
+        load.assert_called_once_with(str(Path("/unused") / "one.obtf"))
+        self.assertIn("1 runs", rendered)
+
+    def test_persisted_bundle_renders_through_index(self):
+        with TemporaryDirectory() as directory:
+            self.backtest.save(Path(directory) / "one.obtf")
+            index = BacktestIndex(directory, self.index.df.copy())
+            rendered = show_backtest_runs(
+                backtest_index=index, workers=1,
+                **{
+                    **self.options,
+                    "columns": [
+                        *self.options["columns"],
+                        ("number_of_orders", "Orders", "d"),
+                        ("initial_unallocated", "Initial balance", ",.2f"),
+                    ],
+                },
+            )
+        self.assertIn("18.53%", rendered)
+        self.assertIn("0.54", rendered)
+        self.assertIn("1,800.00", rendered)
+        self.assertIn("Orders", rendered)
+        self.assertIn("10,000.00", rendered)
+        self.assertIn("| 7 ", rendered)
 
 
 class TestBacktestRunWindowMatching(unittest.TestCase):

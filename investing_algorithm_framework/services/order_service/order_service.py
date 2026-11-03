@@ -1,34 +1,25 @@
 import logging
 
 from investing_algorithm_framework.domain.native_event import native_order
+from investing_algorithm_framework.domain.utils.amounts import (
+    amount_roundoff_tolerance,
+)
+from investing_algorithm_framework.domain.utils.cash import (
+    cash_tolerance as _cash_tolerance,
+)
 import math
 from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
     OperationalException, OrderStatus, Order, PositionMode, random_number, \
-    INDEX_DATETIME, Environment, ENVIRONMENT
+    INDEX_DATETIME, Environment, ENVIRONMENT, TradeStatus
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
 logger = logging.getLogger("investing_algorithm_framework")
-
-# Cash/collateral checks compare a recomputed ``amount * price`` against
-# the portfolio's unallocated balance. Upstream risk-budget scaling
-# (``ApplyRiskBudgetPhase``) derives ``amount`` from ``quote_amount /
-# price`` and then this check recomputes ``amount * price`` — the
-# divide/multiply round-trip can leave the result a few ULPs above the
-# actual unallocated cash even when the intent was scaled to fit
-# exactly. A tiny relative tolerance absorbs that float noise without
-# masking genuine overspend.
-_CASH_TOLERANCE_REL = 1e-9
-_CASH_TOLERANCE_ABS = 1e-8
-
-
-def _cash_tolerance(*values):
-    return max(
-        _CASH_TOLERANCE_ABS,
-        _CASH_TOLERANCE_REL * max(abs(v) for v in values),
-    )
+_PROTECTIVE_EXIT_REASONS = (
+    "stop_loss", "take_profit", "stop_loss_mirror", "take_profit_mirror",
+)
 
 
 class OrderService(RepositoryService):
@@ -281,6 +272,14 @@ class OrderService(RepositoryService):
         if explicit_status is not None:
             order.set_status(explicit_status)
 
+        self._append_protective_fill(
+            order.metadata, 0, order.get_filled(), order.get_price(),
+            order.updated_at, order.status,
+        )
+        if hasattr(order, "metadata_json") and order.metadata.get("protective_fills"):
+            import json
+            order.metadata_json = json.dumps(order.metadata)
+
         position = self._create_position_if_not_exists(symbol, portfolio)
         order.position_id = position.id
         order = self.order_repository.save(order)
@@ -367,8 +366,37 @@ class OrderService(RepositoryService):
                 if create_allocations:
                     self._sync_portfolio_with_created_sell_order(order)
 
+            if (
+                (OrderSide.SELL.equals(order_side) and create_allocations)
+                or (
+                    not OrderSide.SELL.equals(order_side)
+                    and (order.filled or 0) > 0
+                )
+            ):
+                self._reconcile_position_balances(order)
+
         order = self.get(order_id)
         return order
+
+    @staticmethod
+    def _append_protective_fill(
+        metadata, previous_filled, filled, price, timestamp, status,
+    ):
+        if metadata.get("order_reason") not in _PROTECTIVE_EXIT_REASONS \
+                or filled <= previous_filled:
+            return
+        if timestamp is None:
+            raise OperationalException("Protective fills require a timestamp")
+        metadata["protective_fills"] = [
+            *metadata.get("protective_fills", []),
+            {
+                "timestamp": timestamp.isoformat()
+                if isinstance(timestamp, datetime) else timestamp,
+                "amount": filled - previous_filled,
+                "filled_amount": filled, "price": price,
+                "order_status": status,
+            },
+        ]
 
     def update(self, object_id, data):
         """
@@ -394,6 +422,18 @@ class OrderService(RepositoryService):
             Order: Order object that has been updated
         """
         previous_order = self.order_repository.get(object_id)
+        if data.get("filled", previous_order.get_filled()) \
+                > previous_order.get_filled():
+            metadata = dict(data.get("metadata", previous_order.metadata) or {})
+            if metadata.get("order_reason") in _PROTECTIVE_EXIT_REASONS:
+                self._append_protective_fill(
+                    metadata, previous_order.get_filled(), data["filled"],
+                    data.get("price", previous_order.price),
+                    data.get("updated_at")
+                    or self.configuration_service.config[INDEX_DATETIME],
+                    data.get("status", previous_order.status),
+                )
+                data["metadata"] = metadata
         self._validate_order_fee(
             data.get('order_fee', previous_order.order_fee),
             data.get('order_fee_currency', previous_order.order_fee_currency),
@@ -460,7 +500,59 @@ class OrderService(RepositoryService):
                 else:
                     self._sync_with_sell_order_expired(new_order)
 
+        if filled_difference > 0 or "status" in data:
+            self._reconcile_position_balances(new_order)
         return new_order
+
+    def _reconcile_position_balances(self, order):
+        """Repair cancellation roundoff using the remaining trade ledger."""
+        short = any(side.equals(order.order_side) for side in (
+            OrderSide.SHORT, OrderSide.COVER,
+        ))
+        position = self.position_service.get(order.position_id)
+        trades = self.trade_service.get_all({
+            "portfolio_id": position.portfolio_id,
+            "target_symbol": order.target_symbol,
+            "trading_symbol": order.trading_symbol,
+            "status": TradeStatus.OPEN.value,
+        })
+        trades = [
+            trade for trade in trades
+            if bool(trade.is_short) == short
+        ]
+        if not trades:
+            return
+        remaining = math.fsum(trade.available_amount for trade in trades)
+        costs = []
+        for trade in trades:
+            costs.append(trade.available_amount * trade.open_price)
+            costs.extend(
+                allocation.amount_pending * allocation.open_price
+                for allocation in (
+                    self.trade_service.trade_allocation_repository.get_all({
+                        "trade_id": trade.id,
+                    })
+                )
+            )
+        leg = "short" if short else "long"
+        price = order.price or order.reservation_price or 0
+        updates = {}
+        for field, expected, reference in (
+            (f"{leg}_amount", remaining, order.amount),
+            (f"{leg}_cost", math.fsum(costs), order.amount * price),
+        ):
+            current = getattr(position, field)
+            tolerance = amount_roundoff_tolerance(
+                current, expected, reference,
+            )
+            if current != expected and abs(current - expected) <= tolerance:
+                logger.debug(
+                    "Reconciling position %s %s roundoff from %r to %r",
+                    position.id, field, current, expected,
+                )
+                updates[field] = expected
+        if updates:
+            self.position_service.update(position.id, updates)
 
     @staticmethod
     def _validate_order_fee(fee, currency, trading_symbol):
@@ -589,6 +681,20 @@ class OrderService(RepositoryService):
         amount = position.get_amount()
         return max(amount if amount is not None else 0, 0)
 
+    @staticmethod
+    def _cap_close_amount_roundoff(order_data, position_amount):
+        requested = order_data["amount"]
+        tolerance = amount_roundoff_tolerance(requested, position_amount)
+        if (
+            0 < position_amount < requested
+            and requested - position_amount <= tolerance
+        ):
+            logger.debug(
+                "Capping close-order roundoff from %r to %r",
+                requested, position_amount,
+            )
+            order_data["amount"] = position_amount
+
     def validate_sell_order(self, order_data, portfolio):
 
         if not self.position_service.exists(
@@ -612,6 +718,7 @@ class OrderService(RepositoryService):
         position_amount = self._closing_position_amount(
             position, OrderSide.SELL, portfolio
         )
+        self._cap_close_amount_roundoff(order_data, position_amount)
         if position_amount < order_data["amount"]:
             position_label = "open long position" \
                 if self._position_mode(portfolio) == PositionMode.HEDGE \
@@ -732,6 +839,7 @@ class OrderService(RepositoryService):
         position_amount = self._closing_position_amount(
             position, OrderSide.COVER, portfolio
         )
+        self._cap_close_amount_roundoff(order_data, position_amount)
 
         if position_amount <= 0:
             raise OperationalException(
@@ -772,6 +880,8 @@ class OrderService(RepositoryService):
         position_amount = self._closing_position_amount(
             position, OrderSide.SELL, portfolio
         )
+        self._cap_close_amount_roundoff(order_data, position_amount)
+        amount = order_data["amount"]
         if amount > position_amount:
             raise OperationalException(
                 f"Order amount: {amount} {position.symbol}, is "
@@ -1747,6 +1857,13 @@ class OrderService(RepositoryService):
                         "_mirror_trade_id": trade.id,
                         "_mirror_rule_id": rule.id,
                         "_mirror_rule_kind": rule_kind,
+                        "strategy_id": trade.strategy_id,
+                        "protective_rules": [{
+                            "rule_id": rule.id,
+                            "amount": rule.get_sell_amount(),
+                            "threshold_price": trigger_price,
+                            "trailing": bool(getattr(rule, "trailing", False)),
+                        }],
                     },
                 },
                 create_allocations=False,

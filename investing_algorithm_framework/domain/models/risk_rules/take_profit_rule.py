@@ -1,3 +1,6 @@
+from ...utils.rule_symbols import normalize_rule_symbols
+
+
 class TakeProfitRule:
     """
     A rule that defines when to trigger a take profit based
@@ -41,6 +44,16 @@ class TakeProfitRule:
         - symbol (str): The symbol of the asset the take profit rule
             applies to. Symbol is defined as only the target symbol.
             So for example, 'BTC' in 'BTC-EUR' or 'META' in 'META-USD'.
+        - symbols (list[str] | tuple[str, ...] | None): Apply the rule to
+            multiple target symbols instead of one ``symbol``. The selectors
+            are mutually exclusive. Explicit lists must be non-empty and
+            unique; names are normalized to uppercase.
+        - side (str, optional): The position direction this rule applies
+            to: "long" or "short". Used in hedge mode to select different
+            rules for long and short positions on the same symbol.
+            Defaults to None, providing a symbol-wide fallback when no
+            side-specific rule exists. Outside hedge mode, leave this
+            as None. This is not the buy/sell side of the exit order.
         - mirror_on_exchange (bool): When True, also places a real
             broker-native TAKE_PROFIT/LIMIT order alongside the
             client-side tracked take profit, as a safety net against
@@ -52,21 +65,25 @@ class TakeProfitRule:
         self,
         percentage_threshold: float,
         sell_percentage: float,
-        symbol: str,
+        symbol: str = None,
         trailing: bool = False,
         side: str = None,
         mirror_on_exchange: bool = False,
+        *,
+        symbols: list[str] | tuple[str, ...] | None = None,
     ):
         self.percentage_threshold = percentage_threshold
         self.trailing = trailing
         self.sell_percentage = sell_percentage
         self.symbol = symbol
+        self.symbols = normalize_rule_symbols(symbol, symbols)
         self.side = side
         self.mirror_on_exchange = mirror_on_exchange
 
     def __repr__(self) -> str:
         return (
             f"TakeProfitRule(symbol={self.symbol!r}, "
+            f"symbols={self.symbols!r}, "
             f"percentage_threshold={self.percentage_threshold}, "
             f"sell_percentage={self.sell_percentage}, "
             f"trailing={self.trailing}, side={self.side!r}, "

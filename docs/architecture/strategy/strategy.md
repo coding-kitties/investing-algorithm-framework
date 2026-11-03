@@ -13,6 +13,316 @@ signal is produced see [`orders.md`](orders.md) and
 
 ## 1. Mental model
 
+### Shared sizing and risk rules
+
+`ScalingRule`, `PositionSize`, `StopLossRule` and `TakeProfitRule` accept
+`symbols=[...]` to apply the same settings independently to several target
+symbols. Existing `symbol="BTC"` declarations and positional arguments remain
+supported.
+
+```python
+from investing_algorithm_framework import (
+    PositionSize, ScalingRule, StopLossRule, TakeProfitRule,
+)
+
+targets = ["BTC", "ETH"]
+position_sizes = [
+    PositionSize(symbols=targets, percentage_of_portfolio=40),
+]
+scaling_rules = [
+    ScalingRule(
+        symbols=targets, max_entries=3, initial_entry_percentage=20,
+        scale_in_percentage=[40, 40], cooldown_in_bars=2,
+    ),
+]
+stop_losses = [
+    StopLossRule(symbols=targets, percentage_threshold=7,
+                 sell_percentage=100, trailing=True),
+]
+take_profits = [
+    TakeProfitRule(symbols=targets, percentage_threshold=15,
+                   sell_percentage=100),
+]
+```
+
+Pass these lists into the strategy constructor. Each 40% position allocation
+is **per symbol**, not a shared 40% allocation across the list. Scaling stages,
+cooldowns and trade risk state remain independent for each symbol.
+
+Use either `symbol` or `symbols`, not both. An explicit `symbols` list/tuple
+must be non-empty and contain unique target names, not trading pairs. Names
+are normalized to uppercase and stored as a tuple; duplicates after
+normalization are rejected. The caller's list is not retained.
+Omitting both selectors on `PositionSize` or `ScalingRule` preserves the
+existing default for otherwise unconfigured symbols; an explicitly targeted
+rule takes precedence over that default. Risk-rule `side`, `trailing` and
+`mirror_on_exchange` settings retain their existing meaning. Existing vector
+limitations still apply: trailing risk rules require event execution and
+scaling uses Python rather than native vector accounting.
+
+### Optional native indicator declarations
+
+For a fully declarative strategy, inherit `ConfluenceScoringStrategy` and
+declare indicator configs plus cards with explicit `side`, optional `symbols`,
+and `scale_in_stage` for additions. Both signal hooks are provided. See
+[declarative confluence strategies](confluence_cards.md#declarative-indicator-driven-strategies)
+for the reference strategy, 20/40/40 sizing, cooldown semantics and execution
+engine limitations. `TradingStrategy` remains the general-purpose base for
+imperative strategies and retains its existing concrete-card compatibility API.
+
+Strategies may declare `indicator_configs` and `confluence_cards` instead of
+repeating indicator calculations inside `generate_signals`. Existing imperative
+strategies remain unchanged: the extra `EvaluateIndicatorsPhase` is a no-op
+without declarations. The default order is now pipeline evaluation → indicator
+evaluation → signal collection → the existing execution phases. Custom phase
+lists should insert `EvaluateIndicatorsPhase` before `CollectSignalsPhase`.
+
+Event backtests create a fresh indicator engine for every algorithm/window.
+Built-in indicators and callables explicitly declaring `execution="precompute"`
+are prepared before the event loop; default per-decision callables still
+receive only completed history at each decision. Live execution uses the same
+phase with incrementally accumulated source history (this does not turn an
+arbitrary batch function into an incremental formula).
+
+Use the framework's `IndicatorConfig` directly. Built-in declarations support
+`to_dict()` / `from_dict()` for configuration persistence; arbitrary Python
+callables must be reconstructed from their code, not deserialized. A
+`data_source` mapping may select identifiers by uppercase base symbol or pair.
+Such a declaration requires an explicit `symbol` when passed directly to
+`IndicatorEngine`; multi-symbol strategies can expand templates into concrete
+per-source declarations first.
+Indicator and scoring declarations retain their immutable mappings when sent
+to spawned backtest workers. Callable implementations used with multiprocessing
+must be importable, picklable functions; exporting built-in configurations as
+JSON is separate from transferring trusted Python objects to a worker.
+
+Use `data_sources` to apply one indicator declaration independently to
+multiple sources in a `ConfluenceScoringStrategy`:
+
+```python
+indicator_configs = [
+    IndicatorConfig(
+        id="z_score_long",
+        data_sources=["btc_2h", "eth_2h"],
+        calculate=zscore,
+        parameters={"source_column": "Close", "period": 14,
+                    "result_column": "zscore"},
+        output_columns=["zscore"],
+        minimum_history=14,
+        history="continuous",
+        execution="precompute",
+    ),
+]
+```
+
+Declare/import `zscore` as the caller-provided function and register both source
+identifiers in the strategy's `data_sources`. A list or tuple of `DataSource`
+objects is also accepted; it references their identifiers rather than
+registering new strategy sources. Each symbol gets its own history and
+calculation; the callable still receives **one DataFrame**, not a collection.
+Cards must include the corresponding symbols to evaluate/trade them.
+
+Use either `data_source` or `data_sources`, not both. The explicit list must
+be non-empty and contain unique, non-empty identifiers. Unknown identifiers
+raise an error. Each symbol/timeframe binding must select exactly one OHLCV
+source; ambiguous selections raise rather than choosing the first source.
+For a standalone `IndicatorEngine`, use an explicit `symbol` (the full pair)
+and, if needed, `timeframe` to disambiguate a plural selection. Multi-symbol
+fan-out is provided by `ConfluenceScoringStrategy`.
+Legacy `data_source=` strings, objects, mappings and positional arguments
+remain supported. Built-in declarations round-trip plural identifiers through
+`to_dict()` / `from_dict()`; callable declarations remain Python-only.
+
+```python
+from investing_algorithm_framework import (
+    TradingStrategy, DataSource, IndicatorConfig, IndicatorRule,
+    ConfluenceScoreConfig,
+)
+
+class MyStrategy(TradingStrategy):
+    # Also declare the strategy's normal schedule and sizing/risk settings.
+    data_sources = [DataSource(
+        identifier="btc_2h", symbol="BTC/EUR", data_type="ohlcv",
+        time_frame="2h", warmup_window=100,
+    )]
+    indicator_configs = (
+        IndicatorConfig("oversold", "wilders_rsi", period=14,
+                        timeframe="2h", data_source="btc_2h"),
+    )
+    confluence_cards = {
+        "entry": ConfluenceScoreConfig(
+            rules={"low_rsi": IndicatorRule(
+                "oversold", threshold=30, comparison="le",
+                lookback_period=3, group_weights={"entry": 2},
+            )},
+            group_aggregation={"entry": "sum"},
+            group_thresholds={"entry": 2},
+        ),
+    }
+
+    def generate_signals(self, context, data):
+        evaluation = data["indicators"]
+        rsi = evaluation.values["oversold"]["value"]
+        qualified = evaluation.cards["entry"]["passed"]
+        # Use these observations in the strategy's normal Signal generation.
+        return ()
+```
+
+The phase calls `strategy.create_indicator_engine()` to construct instance-local
+state. The general-purpose base returns `IndicatorEngine(configs, cards,
+data_sources)`; the confluence subclass binds isolated engines per symbol.
+An execution engine may instead install a fresh engine as
+`strategy._indicator_engine`. `prepare({source_identifier: full_raw_frame})`
+resets previous run history and caches. Built-in calculations and callable
+calculations explicitly opting into precomputation are computed once; cards
+depending only on these calculations are scored at native candle-completion
+boundaries and selected by backward alignment. Cards involving per-decision
+callables are scored afresh. `evaluate(data, as_of)` also works without
+preparation, retaining completed supplied bars across rolling provider windows.
+Built-ins are recomputed only when completed observations arrive. There is no
+global cache; built-in aliases share computations by source, kind, timeframe
+and numerical parameters, not by rule/id. Arbitrary callable declarations do
+not share calculations or state implicitly.
+
+**Caller-provided indicator functions**
+
+Use `calculate` instead of `indicator` to control the numerical implementation.
+Any compatible function can be used, including a function from an optional
+third-party library; the framework does not require or substitute that library.
+
+```python
+def cumulative_range(frame, multiplier=1):
+    # This example accepts pandas. A Polars source requires a compatible
+    # callable (or an implementation handling both DataFrame types).
+    frame["range_total"] = (frame["High"] - frame["Low"]).cumsum() * multiplier
+    return frame
+
+indicator_configs = [
+    IndicatorConfig(
+        id="range", data_source="btc_2h",
+        calculate=cumulative_range, parameters={"multiplier": 2},
+        output_columns=["range_total"], minimum_history=14,
+        history="continuous",
+        execution="per_decision",  # Default; called on every decision.
+    ),
+]
+confluence_cards = [
+    ConfluenceScoreConfig(
+        id="entry",  # Required, unique and non-empty for list declarations.
+        rules={"range_large": IndicatorRule(
+            indicator_id="range", output_column="range_total",
+            threshold=50, comparison="ge", lookback_period=3,
+            group_weights={"entry": 1},
+        )},
+        group_thresholds={"entry": 1},
+    ),
+]
+```
+
+Callable timeframes are inferred from the exactly resolved OHLCV source unless
+explicitly constrained. The function receives a defensive DataFrame copy in
+the source's pandas/Polars backend, including **all original columns** (and the
+Polars `Datetime` column). Its input is the accumulated completed native history
+from the run origin, not just the current provider window. `parameters` are
+passed as keyword arguments. It must return a pandas or Polars **DataFrame**,
+not a Series, with the same timestamps, order and row count. Every declared
+`output_columns` name must exist and be numeric; names are used verbatim, never
+aliased to `value`. Rules must explicitly select an `output_column` declared by
+the callable. Legacy built-in `output=...` rules remain supported.
+
+`minimum_history` must be positive. Before that many completed rows exist, the
+callable is not invoked and its observations are NaN/not ready. Outputs for
+earlier initialization rows are also unavailable. Missing-data handling and all
+other numerical initialization are the callable's responsibility; the framework
+does not replace its formula. Exceptions and invalid returned schemas raise
+errors identifying the indicator and source, with the original error chained.
+`history="continuous"` is currently the only supported history policy.
+
+**Execution is caller-controlled.** The default `execution="per_decision"`
+invokes each callable on every decision once minimum history exists, even when
+there is no newly completed candle. This remains true after `prepare`: the
+function receives only the prefix completed at that decision, never the
+prepared future rows. Stateful functions should use this mode. Explicitly set
+`execution="precompute"` only when you, the caller, know the function is causal
+and suitable for one full-history computation. The framework makes no automatic
+causality or safe-precomputation claim. With preparation, such a function runs
+once per fresh `prepare`; without preparation it runs when history grows.
+For causal functions with the same history origin, prepared and accumulated
+event evaluation have matching outputs. Access results as
+`evaluation.values["range"]["range_total"]` and
+`evaluation.cards["entry"]["passed"]`.
+
+**Native contract and readiness**
+
+* A candle timestamp is its **open**. It becomes available at open + timeframe;
+  monthly/yearly candles use calendar offsets rather than fixed-day estimates.
+  `as_of` must be timezone-aware; naive provider candle timestamps mean UTC.
+  Supplied incomplete/future candles never affect the current observation.
+* Select exactly one OHLCV source at the declared timeframe using `data_source`
+  (identifier or `DataSource`), optionally constrained by `symbol`. Without an
+  explicit identifier, source resolution must still be unambiguous. There is
+  no implicit symbol expansion, first-symbol selection, or resampling.
+* `IndicatorEvaluation.values[id]` is the latest native output mapping.
+  Scalar indicators expose `value`, MACD exposes `macd`, `signal`, `histogram`,
+  and stochastic exposes `k`, `d`. Multi-output rules require `output=...`.
+  Comparisons are explicit `le/ge/lt/gt/eq/ne`, never inferred from rule names.
+* Rule matching applies comparison **on native bars**, then rolling-any over
+  the last `lookback_period` native observations, including the current bar.
+  Partial lookback windows are allowed. Current output must be finite, even
+  when an older bar matched; NaN/inf never matches, including `ne`.
+  The default `lookback_scope="market"` includes pre-entry observations.
+  Close-long/close-short rules may use `lookback_scope="position"` to exclude
+  observations completed at or before the leg's first entry fill, without
+  resetting continuous indicator history. See [position-scoped exits](./confluence_cards.md).
+* `evaluation.ready[id]` means all that indicator's latest outputs are finite.
+  `rule_readiness[card][rule]` checks its selected current output.
+  `cards[card]["lookback_ready"][rule]` additionally requires a complete finite
+  lookback. `cards[card]["ready"]` combines selected current readiness; it is
+  diagnostic, not an extra scoring rule. `passed` is the existing card's
+  qualification, with its normal group weights, sum/max aggregation, negative
+  evidence, requirements/vetoes, and overrides.
+* Missing **rows** are not invented or forward-filled into price data: periods
+  and lookbacks count observed native rows.   For built-ins, missing numerical inputs produce
+  unavailable outputs. Finite rolling windows recover after the missing value
+  leaves their window; recursive indicators reset and warm up a fresh segment.
+  Omitting a source on a tick retains its last known completed observation.
+* Overlapping changed computation inputs, inserted old observations and
+  backward `as_of` evaluations fail explicitly. Prepared engines also reject
+  supplied completed bars outside their prepared history; start a fresh run or
+  call `prepare` again. Input frames are never mutated.
+
+**Indicator definitions and initialization**
+
+| Kind | Definition / initialization |
+|---|---|
+| `z_score` | `(close - rolling_mean) / rolling_std`, population standard deviation (`ddof=0`); zero dispersion is unavailable |
+| `willr` | `-100 * (rolling_high - close) / (rolling_high - rolling_low)` |
+| `rsi` | Simple rolling average gains/losses over `period` close changes |
+| `wilders_rsi` | First `period` changes seed an SMA, then Wilder recursion with alpha `1/period` |
+| `ema` | First finite close seeds recursion, alpha `2/(period+1)`; hidden until `period` contiguous observations |
+| `macd` | Short EMA minus long EMA; signal EMA starts at first finite MACD; histogram is MACD minus signal |
+| `stochastic` | Raw `%K = 100*(close-low)/(high-low)`; `k` is its `k_slowing` SMA, `d` is the `d_period` SMA of `k` |
+
+All outputs are multiplied by config `scale`. Zero gain and loss gives RSI 50;
+positive gains with zero loss gives 100. Zero high-low ranges are unavailable.
+Recursive values use the run's original accumulated history, not a reseeded
+provider window, ensuring event-prefix/prepared parity.
+
+`config.required_window(output=None)` and `engine.required_windows` expose
+finite initialization requirements. RSI needs `period+1` closes, stochastic
+needs `period+k_slowing+d_period-2` rows for both outputs, and MACD needs
+`long_period+signal_period-1`. A rule's full lookback needs its selected
+initialization plus `lookback_period-1`. Explicit source `warmup_window` below
+the required maximum is rejected; reaching the count does not guarantee finite
+outputs when inputs are missing. Increasing recursive warmup changes the
+history origin and therefore can change its numerical values.
+
+These native, potentially multi-output calculations are deliberately separate
+from cross-sectional `Factor.compute_panel`/`Pipeline`. Scoring is not separate:
+declarations compile native rule-match booleans to the existing
+`ConfluenceScoreCard`. Optional requirements/vetoes use independent conditions
+on named rule booleans; overrides can use existing `Rule`/`Threshold` expressions.
+
 A `TradingStrategy` is a small object that the framework drives in
 one of two execution modes:
 
@@ -35,8 +345,8 @@ Strategies declare **intent** (where they want to be long / short)
 and **rules** (how to size, when to bail out). They do **not**
 place orders directly in the common case — the engine resolves
 signals through the rule lists and into orders via the
-**eight-phase pipeline**
-(`Evaluate → Collect → Resolve → Size → Budget → Emit → AttachRisk → RecordCooldown`)
+**nine-phase pipeline**
+(`Pipelines → Indicators → Collect → Resolve → Size → Budget → Emit → AttachRisk → RecordCooldown`)
 described in §4.
 
 ---
@@ -187,6 +497,80 @@ class SignalSeries:
 present, is used by `SizePositionsPhase` for ranking-aware sizing
 in cross-sectional strategies.
 
+#### Staged scale-in cards
+
+`SignalSeries.supports_staged_scale_in: ClassVar[bool] = True` declares
+framework support for the execution contract below. It is a class-level
+capability marker, not a constructor argument, dataclass field, or serialized
+signal field. Before yielding staged masks, strategies supporting older
+framework installations should fail explicitly:
+
+```python
+if not getattr(SignalSeries, "supports_staged_scale_in", False):
+    raise RuntimeError(
+        "Staged scale-in vector backtests require updated framework support"
+    )
+```
+
+For a long position, emit multiple `SignalSeries(side=SignalSide.SCALE_IN)`
+for the same symbol with `metadata={"scale_in_stage": 0,
+"require_lower_price": True}` (then stages `1`, `2`, ...). Each series must
+contain the **raw card-qualified mask**: indicators, history availability and
+thresholds only, not a simulated position state. Entry and exit series can
+also be raw masks. A `ScalingRule` still controls sizing, maximum entries
+(including the initial entry) and cooldowns.
+
+The vector executor selects only the next unfilled stage, starting at `0`
+after the initial entry. Missing stages mean no further additions. Only a
+successful fill advances the stage; cooldowns, capital denials and failed
+opens do not consume it. At most one addition occurs per bar, never on the
+initial-entry bar, and exits take priority. Partial exits do not rearm stages;
+becoming fully flat resets them. With `require_lower_price=True`, the current
+close must be strictly below the latest accepted entry's actual fill price,
+even if that entry has since been partially or fully trimmed.
+
+Stage numbers must be nonnegative integers (not booleans), unique per symbol.
+Mixing staged and unstaged `SCALE_IN` series for one symbol is invalid.
+Unstaged series retain their existing last-series-wins behavior. Staged
+execution uses Python: `execution_backend="auto"` logs a Python fallback;
+strict `"rust"` raises `NativeExecutionUnsupported` rather than ignoring
+stage metadata. Card batch evaluation and execution backend are independent.
+
+In event mode, `Signal(side=SignalSide.SCALE_IN,
+metadata={"scale_in_stage": stage})` also selects the corresponding
+`ScalingRule` percentage and enforces cumulative `max_entries` in sizing.
+The strategy supplies this fill-derived stage and resets it only when fully
+flat; the number of still-open lots is not a substitute after partial exits.
+Unstaged event signals continue to size from the current open-trade count.
+
+To recover additions that filled and closed between event evaluations, query
+`context.get_trades(target_symbol=symbol, trading_symbol=quote,
+portfolio=portfolio.id, opened_since=position_started_at)` without a status
+filter. `opened_since` is inclusive and is applied before history is loaded,
+including in Python/Rust event archives. Symbol and quote filters
+are forwarded to the repository; portfolio scope uses its `portfolio_id`
+filter. `market=` resolves that market's portfolio, or verifies an explicit
+portfolio belongs to the market. Filter the returned history for
+`not trade.is_short`, `trade.filled_amount > 0`, and
+`trade.opened_at >= position_started_at`, retaining IDs until fully flat.
+Use consistent timezone handling for timestamps. Direct service queries use
+`trade_service.get_all({"opened_at_gte": position_started_at, ...})`.
+New SQL schemas and event archives index `opened_at`; existing persistent SQL
+databases need the equivalent `ix_trades_opened_at` index for indexed lookups.
+For an existing SQL database, apply this idempotent schema upgrade:
+
+```sql
+CREATE INDEX IF NOT EXISTS ix_trades_opened_at ON trades (opened_at);
+```
+
+Native event accounting requires the rebuilt `event-archive-v3` extension;
+older archives fail the capability check rather than scanning all history.
+Default SQL accounting and explicit Python `event_state_backend="memory"`
+do not load the native extension and remain usable without rebuilding it.
+Event accounting has no `"auto"` backend; explicit `"rust"` is strict.
+`Trade` has no direct market/portfolio field: scope is determined through its
+orders' positions.
+
 ### 3.3 `SignalSide`
 
 ```
@@ -224,6 +608,9 @@ generate_signal[_series]
 │ 0. EvaluatePipelinesPhase       │  materialise factor frames from
 │                                 │  strategy.pipelines (universe-refresh
 │                                 │  cache, live-mode resilience)
+├─────────────────────────────────┤
+│ 0b. EvaluateIndicatorsPhase      │  optional native indicator/card
+│                                 │  evaluation → data["indicators"]
 ├─────────────────────────────────┤
 │ 1. CollectSignalsPhase          │  tick cooldown counters, advance
 │                                 │  bar index, gather strategy +
@@ -313,6 +700,12 @@ cache. In live / paper mode a single pipeline exception is logged
 and the iteration continues with an empty output; in backtest
 mode it raises. This phase exists so the eventloop no longer
 contains strategy-shaped logic.
+
+**Phase 0b — `EvaluateIndicatorsPhase`**
+Evaluates native declarations, using an installed `_indicator_engine` or a
+lazy instance-local engine, and injects `IndicatorEvaluation` as
+`state.data["indicators"]`. Without declarations this phase has no effect.
+See the native contract in §1.
 
 **Phase 1 — `CollectSignalsPhase`**
 Performs the per-iteration bookkeeping that used to live at the
@@ -434,6 +827,7 @@ can:
   class MyStrategy(TradingStrategy):
       phases = [
           EvaluatePipelinesPhase(),
+          EvaluateIndicatorsPhase(),
           CollectSignalsPhase(),
           MyCustomResolveConflicts(),   # ← replaces default
           SizePositionsPhase(),

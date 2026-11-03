@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime, timezone
 from concurrent.futures import Future
 from threading import Event, Lock
@@ -11,15 +12,18 @@ from investing_algorithm_framework.domain import Environment, ENVIRONMENT, \
     LAST_SNAPSHOT_DATETIME, INDEX_DATETIME, Signal, DATETIME_FORMAT, \
     DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE
 from investing_algorithm_framework.services import TradeOrderEvaluator
+from investing_algorithm_framework.services.run_reports.snapshot import \
+    indicator_snapshots, data_source_snapshots, confluence_score_snapshots, \
+    confluence_position_snapshots
 from .algorithm import Algorithm
 from .strategy import TradingStrategy
 
 logger = getLogger("investing_algorithm_framework")
 
 
-def _build_signal_report(strategy: TradingStrategy) -> Dict:
+def _build_signal_report(strategy: TradingStrategy, timestamp) -> Dict:
     """Summarize one strategy's signals for this tick: every signal it
-    emitted, and whether it was approved (turned into an order) or
+    emitted, and whether it was approved by the phase pipeline or
     rejected (with the phase-pipeline reason it was dropped).
 
     Best-effort: a rejection is detected by matching a raw signal's
@@ -32,6 +36,7 @@ def _build_signal_report(strategy: TradingStrategy) -> Dict:
     traces = getattr(strategy, "traces", None) or []
 
     rejection_reasons = {}
+    rejection_details = {}
     for tag, payload in traces:
         candidates = (
             payload if isinstance(payload, (list, tuple)) else [payload]
@@ -39,13 +44,22 @@ def _build_signal_report(strategy: TradingStrategy) -> Dict:
         for item in candidates:
             if isinstance(item, Signal):
                 key = (item.symbol, item.side.value, item.source)
-                rejection_reasons.setdefault(key, tag)
+                if key not in rejection_reasons:
+                    rejection_reasons[key] = tag
+                    details = next((
+                        part["reason_details"] for part in candidates
+                        if isinstance(part, dict) and "reason_details" in part
+                    ), None)
+                    if details is not None:
+                        if not isinstance(details, dict):
+                            raise TypeError("Signal reason_details must be a mapping")
+                        rejection_details[key] = deepcopy(details)
 
     signals = []
     for sig in raw_signals:
         key = (sig.symbol, sig.side.value, sig.source)
         reason = rejection_reasons.get(key)
-        signals.append({
+        record = {
             "symbol": sig.symbol,
             "side": sig.side.value,
             "strength": sig.strength,
@@ -53,11 +67,15 @@ def _build_signal_report(strategy: TradingStrategy) -> Dict:
             "metadata": dict(sig.metadata),
             "status": "rejected" if reason else "approved",
             "reason": reason,
-        })
+        }
+        if key in rejection_details:
+            record["reason_details"] = rejection_details[key]
+        signals.append(record)
 
     decision_traces = list(strategy.last_decision_traces or [])
     return {
         "strategy_id": strategy.strategy_id,
+        "timestamp": timestamp,
         "signals": signals,
         "decision_traces": decision_traces,
         "score_cards": decision_traces,
@@ -132,6 +150,9 @@ class EventLoopService:
         self._task_last_runs = {}
         self.history = {}
         self.signal_log = []
+        self.indicator_log = []
+        self.confluence_score_log = []
+        self.data_source_log = []
 
         # Thread-safe inbox for "run now" requests (e.g. from the web
         # API's POST /api/algorithm/invoke), consumed by the loop's
@@ -151,6 +172,8 @@ class EventLoopService:
         # every tick, not just once when the loop eventually stops.
         self.on_iteration_complete = None
         self.on_iteration_report = None
+        self.on_historical_iteration_report = None
+        self._iteration_signal_log = None
 
         # One-shot flag: live-mode envelope validation runs once per
         # process. Reset by ``cleanup`` so a new run re-validates.
@@ -662,12 +685,14 @@ class EventLoopService:
                 self._immediate_run_ids = set()
             if pending:
                 self.signal_log = []
+                self.indicator_log = []
+                self.confluence_score_log = []
+                self.data_source_log = []
                 try:
                     report = None
                     if self.on_iteration_report is not None:
                         report = self.on_iteration_report(
-                            datetime.now(timezone.utc), status="skipped",
-                            reason="loop_stopped",
+                            datetime.now(timezone.utc), status="loop_stopped",
                         )
                     self._complete_immediate_requests(pending, report)
                 except Exception as error:
@@ -802,7 +827,7 @@ class EventLoopService:
                             INDEX_DATETIME, current_time
                         )
                     except KeyboardInterrupt:
-                        break
+                        raise
                     # Wakes up immediately if a stop is requested
                     # instead of always waiting out the full second.
                     if self._stop_event.wait(1):
@@ -832,7 +857,7 @@ class EventLoopService:
                             )
                             sleep(1)
                         except KeyboardInterrupt:
-                            exit(0)
+                            raise
 
                 for _ in range(number_of_iterations):
                     try:
@@ -853,7 +878,7 @@ class EventLoopService:
                         )
                         sleep(1)
                     except KeyboardInterrupt:
-                        exit(0)
+                        raise
 
         self.cleanup()
 
@@ -1000,6 +1025,39 @@ class EventLoopService:
         tasks: List = None,
         scheduled_function_calls=None,
     ):
+        if self.on_historical_iteration_report is not None:
+            self._iteration_signal_log = []
+            self.indicator_log = []
+            self.confluence_score_log = []
+            self.data_source_log = []
+            timestamp = (
+                self._configuration_service.get_config()[INDEX_DATETIME]
+            )
+            try:
+                self._execute_iteration(
+                    strategies, tasks, scheduled_function_calls,
+                )
+            except (Exception, KeyboardInterrupt) as error:
+                self.on_historical_iteration_report(
+                    timestamp, self._iteration_signal_log,
+                    indicators=self.indicator_log,
+                    confluence_scores=self.confluence_score_log,
+                    data_sources=self.data_source_log,
+                    status="interrupted" if isinstance(
+                        error, KeyboardInterrupt) else "execution_error",
+                    error=str(error) or "Interrupted",
+                )
+                raise
+            else:
+                return self.on_historical_iteration_report(
+                    timestamp, self._iteration_signal_log,
+                    indicators=self.indicator_log,
+                    confluence_scores=self.confluence_score_log,
+                    data_sources=self.data_source_log,
+                    status="completed" if strategies else "no_strategy_due",
+                )
+            finally:
+                self._iteration_signal_log = None
         if self.on_iteration_report is None \
                 and not self._active_immediate_requests:
             return self._execute_iteration(
@@ -1007,6 +1065,9 @@ class EventLoopService:
         requests = self._active_immediate_requests
         self._active_immediate_requests = []
         self.signal_log = []
+        self.indicator_log = []
+        self.confluence_score_log = []
+        self.data_source_log = []
         started_at = datetime.now(timezone.utc)
         try:
             self._execute_iteration(
@@ -1015,9 +1076,9 @@ class EventLoopService:
             try:
                 if self.on_iteration_report is not None:
                     report = self.on_iteration_report(
-                        started_at, status="failed",
+                        started_at, status="interrupted" if isinstance(
+                            error, KeyboardInterrupt) else "execution_error",
                         error=str(error) or "Interrupted",
-                        reason="execution_error",
                     )
                     self._complete_immediate_requests(requests, report)
                 else:
@@ -1032,8 +1093,7 @@ class EventLoopService:
                     and (strategies or requests):
                 report = self.on_iteration_report(
                     started_at,
-                    status="completed" if strategies else "skipped",
-                    reason=None if strategies else "no_strategy_due",
+                    status="completed" if strategies else "no_strategy_due",
                 )
             self._complete_immediate_requests(requests, report)
             return report
@@ -1190,14 +1250,68 @@ class EventLoopService:
             source.get_identifier(): state['data'][source.get_identifier()]
             for source in strategy.data_sources or []
         }
+        capture_report = (
+            self.on_historical_iteration_report is not None
+            or not Environment.BACKTEST.equals(state["environment"])
+        )
+        if capture_report:
+            self.data_source_log.extend(data_source_snapshots(
+                strategy_id=strategy.strategy_id,
+                timestamp=state["date"], sources=strategy.data_sources,
+                data=data,
+            ))
+        positions_before = (
+            confluence_position_snapshots(strategy, self.context)
+            if capture_report and (strategy.confluence_cards or strategy.signal_cards)
+            else None
+        )
         self.context._current_strategy_id = strategy.strategy_id
         try:
             for hook in self._algorithm.on_strategy_run_hooks:
                 hook.execute(
                     strategy=strategy, context=self.context, data=data)
             logger.debug(f"Running strategy {strategy.strategy_id}")
-            strategy.run_strategy(context=self.context, data=data)
-            self.signal_log.append(_build_signal_report(strategy))
+            signal_report = None
+            try:
+                strategy.run_strategy(context=self.context, data=data)
+                signal_report = _build_signal_report(strategy, state["date"])
+                self.signal_log.append(signal_report)
+                if self._iteration_signal_log is not None:
+                    self._iteration_signal_log.append(signal_report)
+            finally:
+                if capture_report:
+                    engine = getattr(strategy, "_indicator_engine", None)
+                    evaluation = data.get("indicators")
+                    score_snapshot = getattr(engine, "confluence_snapshot", None)
+                    scores = (
+                        score_snapshot(evaluation)
+                        if score_snapshot is not None and evaluation is not None else []
+                    )
+                    self.confluence_score_log.extend({
+                        **record, "strategy_id": strategy.strategy_id,
+                        "timestamp": state["date"],
+                    } for record in confluence_score_snapshots(
+                        evaluated=[
+                            *scores, *strategy._pending_confluence_scores,
+                        ],
+                        signals=(
+                            signal_report["signals"] if signal_report else None
+                        ),
+                        positions_before=positions_before,
+                    ))
+                    self.indicator_log.extend(indicator_snapshots(
+                        strategy_id=strategy.strategy_id,
+                        timestamp=state["date"],
+                        evaluated=(
+                            engine.snapshot(evaluation)
+                            if engine is not None and evaluation is not None
+                            else []
+                        ),
+                        decision_traces=strategy._pending_decision_traces,
+                        signals=(
+                            signal_report["signals"] if signal_report else []
+                        ),
+                    ))
         finally:
             self.context._current_strategy_id = None
 

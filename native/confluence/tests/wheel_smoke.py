@@ -23,8 +23,8 @@ class TestInstalledWheels(unittest.TestCase):
     def test_native_contract_and_broker(self):
         expected = {
             'SEMANTICS_VERSION': 'confluence-vector-v1',
-            'NETTING_SEMANTICS_VERSION': 'netting-accounting-v5',
-            'EXECUTION_SEMANTICS_VERSION': 'static-netting-v1',
+            'NETTING_SEMANTICS_VERSION': 'netting-accounting-v6',
+            'EXECUTION_SEMANTICS_VERSION': 'static-netting-v2',
             'DRAWDOWN_SEMANTICS_VERSION': 'drawdown-v1',
             'EVENT_FILL_SEMANTICS_VERSION': 'event-fill-v1',
             'EVENT_SCHEDULE_SEMANTICS_VERSION': 'event-schedule-v1',

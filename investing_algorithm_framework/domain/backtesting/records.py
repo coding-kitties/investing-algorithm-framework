@@ -16,6 +16,9 @@ from investing_algorithm_framework.domain.models.confluence import (
 from investing_algorithm_framework.domain.models.decision_trace import (
     DecisionTrace, DecisionTraceEntry,
 )
+from investing_algorithm_framework.domain.models.confluence_score import (
+    ConfluenceScoreCard,
+)
 
 
 RECORD_VERSION = 1
@@ -150,6 +153,11 @@ class CardDefinition:
 
     def __post_init__(self):
         data = decode_canonical(self.payload)
+        if isinstance(data, dict) and "confluence_score_card_version" in data:
+            card = ConfluenceScoreCard.from_dict(data)
+            if canonical_bytes(card.to_dict()) != self.payload:
+                raise ValueError("Definition is not a complete named score card")
+            return
         if not isinstance(data, dict) or (
             type(data.get("confluence_card_version")) is not int
             or data["confluence_card_version"] != 1
@@ -160,19 +168,44 @@ class CardDefinition:
             raise ValueError("Definition is not a complete v1 card")
 
     @classmethod
-    def from_card(cls, card: ConfluenceCard) -> CardDefinition:
+    def from_card(cls, card: ConfluenceCard | ConfluenceScoreCard) -> CardDefinition:
         return cls(canonical_bytes(card.to_dict()))
 
     @property
     def card_id(self) -> str:
         return content_id("card", decode_canonical(self.payload))
 
-    def to_card(self) -> ConfluenceCard:
-        return ConfluenceCard.from_dict(decode_canonical(self.payload))
+    def to_card(self) -> ConfluenceCard | ConfluenceScoreCard:
+        data = decode_canonical(self.payload)
+        constructor = ConfluenceScoreCard if "confluence_score_card_version" in data else ConfluenceCard
+        return constructor.from_dict(data)
 
     def slots(self) -> tuple[RuleSlot, ...]:
         card = self.to_card()
         slots = []
+        if isinstance(card, ConfluenceScoreCard):
+            from investing_algorithm_framework.domain.models.confluence import ScoreType
+
+            for index, (name, rule) in enumerate(card.rules.items()):
+                if not rule.group_weights:
+                    slots.append(RuleSlot(
+                        f"rules/{index}/match", name, "score", None,
+                        0.0, ScoreType.POSITIVE,
+                    ))
+                for offset, (group, weight) in enumerate(rule.group_weights.items()):
+                    slots.append(RuleSlot(
+                        f"rules/{index}/groups/{offset}", name, "score", group,
+                        weight, ScoreType.NEGATIVE if weight < 0 else ScoreType.POSITIVE,
+                    ))
+            for category, items in (("requirement", card.requirements), ("veto", card.vetoes)):
+                for index, item in enumerate(items):
+                    slots.append(RuleSlot(f"{category}/{index}", item.name, category))
+            slots.extend((
+                RuleSlot("primary", "qualification", "primary"),
+                RuleSlot("normal_path", "normal_path", "score", "qualification"),
+                RuleSlot("override_path", "override_path", "score", "qualification"),
+            ))
+            return tuple(slots)
 
         def scoring(rules, prefix, group=None):
             for index, rule in enumerate(rules):
@@ -277,7 +310,7 @@ class ConfluenceEvaluation:
     def _validate_definition(self, definition):
         slots = definition.slots()
         card = definition.to_card()
-        group_count = len(card.secondary) + int(
+        group_count = len(card.group_aggregation) if isinstance(card, ConfluenceScoreCard) else len(card.secondary) + int(
             card.primary.expression is None
         )
         if self.card_id != definition.card_id or (
@@ -293,6 +326,35 @@ class ConfluenceEvaluation:
         card, slots = self._validate_definition(definition)
         if any(value >= Outcome.SKIPPED for value in self.outcomes):
             raise ValueError("Incomplete evidence is not a ConfluenceResult")
+        if isinstance(card, ConfluenceScoreCard):
+            by_path = dict(zip((slot.path for slot in slots), self.outcomes))
+            matches = {}
+            for index, (name, rule) in enumerate(card.rules.items()):
+                if not rule.group_weights:
+                    matches[name] = bool(by_path[f"rules/{index}/match"])
+                    continue
+                values = {
+                    bool(by_path[f"rules/{index}/groups/{offset}"])
+                    for offset in range(len(rule.group_weights))
+                }
+                if len(values) != 1:
+                    raise ValueError("Multi-group rule matches must agree")
+                matches[name] = values.pop()
+            result = card.result_from_evidence(
+                matches,
+                tuple(bool(by_path[f"requirement/{index}"]) for index in range(len(card.requirements))),
+                tuple(bool(by_path[f"veto/{index}"]) for index in range(len(card.vetoes))),
+                bool(by_path["override_path"]),
+            )
+            normal = next(item.matched for item in result.evaluations if item.group == "qualification" and item.name == "normal_path")
+            if (
+                result.score != self.score or result.qualified != self.qualified
+                or tuple(group.score for group in result.groups) != self.group_scores
+                or result.primary_triggered != bool(by_path["primary"])
+                or normal != bool(by_path["normal_path"])
+            ):
+                raise ValueError("Named scoring evidence contradicts recorded totals or paths")
+            return result
         evaluations = tuple(RuleEvaluation(
             name=slot.name, matched=bool(outcome), category=slot.category,
             points=slot.points if outcome else 0.0, group=slot.group,

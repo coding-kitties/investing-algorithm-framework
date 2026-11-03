@@ -73,6 +73,13 @@ class BacktestRunConfiguration:
     Rust requires a compatible extension; it never falls back mid-run.
     Python retains orchestration, allocation selection, persistence and hooks.
     Active result sets and individual records are not memory bounded.
+
+    capture_run_reports retains event-iteration snapshots on the returned
+    BacktestIndex. persist_run_reports additionally saves compressed,
+    session-scoped sidecars for explicit loading after reopening the index.
+    Persistence requires capture. Capture requires sequential execution and
+    replays checkpointed runs. Use bounded date ranges: report snapshots
+    are retained in memory even when persisted.
     """
 
     continue_on_error: bool = True
@@ -94,8 +101,23 @@ class BacktestRunConfiguration:
     event_fill_backend: str = 'python'
     event_schedule_backend: str = 'python'
     event_state_backend: str = 'sql'
+    capture_run_reports: bool = False
+    persist_run_reports: bool = False
 
     def __post_init__(self):
+        if not isinstance(self.persist_run_reports, bool):
+            raise ValueError("persist_run_reports must be a bool")
+        if self.persist_run_reports and not self.capture_run_reports:
+            raise ValueError(
+                "persist_run_reports requires capture_run_reports=True"
+            )
+        if not isinstance(self.capture_run_reports, bool):
+            raise ValueError("capture_run_reports must be a bool")
+        if self.capture_run_reports and self.n_workers not in (None, 0):
+            raise ValueError(
+                "capture_run_reports requires sequential execution "
+                "(n_workers=None or 0)"
+            )
         if self.event_state_backend not in ('sql', 'memory', 'rust'):
             raise ValueError('event_state_backend must be sql, memory or rust')
         if self.event_schedule_backend not in ('python', 'rust', 'auto'):
@@ -186,6 +208,12 @@ class BacktestRunConfiguration:
             event_schedule_backend=env.get(
                 f'{prefix}EVENT_SCHEDULE_BACKEND', 'python'),
             event_state_backend=env.get(f'{prefix}EVENT_STATE_BACKEND', 'sql'),
+            capture_run_reports=_environment_bool(
+                env, f"{prefix}CAPTURE_RUN_REPORTS", False
+            ),
+            persist_run_reports=_environment_bool(
+                env, f"{prefix}PERSIST_RUN_REPORTS", False
+            ),
             hard_memory_limit_mb=_environment_int(
                 env, f'{prefix}HARD_MEMORY_LIMIT_MB', None
             ),

@@ -74,12 +74,165 @@ ticks that emit no signals. Idle polling does not create reports. Signals and
 decision traces are tick-local; positions, portfolios, trades, and pending
 orders describe current state and can legitimately appear in multiple reports.
 
-Reports have `status` (`completed`, `failed`, or `skipped`), `error`, and
-`reason`. Disabled invocations and accepted manual requests interrupted by
-shutdown are skipped. A synchronous failure persists a fresh failed report
+Every report has a string `id` formatted as
+`<algorithm_id>_<UTC-start-datetime>_<unique-suffix>`, including transient
+backtest reports. The suffix distinguishes separate executions at the same
+timestamp. Reports remain algorithm-level: `strategy_ids` lists the configured
+strategies covered by the invocation; per-tick signals, orders, trades and
+decision traces retain their individual `strategy_id` attribution.
+
+`signals` is a flat list, not a list of per-strategy wrappers. Each emitted
+signal has `strategy_id`, evaluation `timestamp`, `symbol`, `side`, `strength`,
+`source`, `metadata`, pipeline `status`, and rejection `reason` (otherwise
+`null`). Sides remain `open_long`, `close_long`, `open_short`, `close_short`,
+`scale_in`, and `scale_out`. A no-signal tick has `signals: []`.
+
+`stop_losses` and `take_profits` are independent protective-execution lists,
+also populated on no-signal ticks. Each event has `event_type` (`trigger` or
+`fill`), UTC `timestamp`, `order_id`, owning `strategy_id`, `symbol`, `direction`,
+`amount`, `order_amount`, cumulative `filled_amount`, `price`, `price_source`,
+`order_status`, and recorded `rules`/`trades` references. Rules retain their
+threshold and trailing flag. Trigger prices preserve the triggering observation,
+even when execution changes the order price. Each fill update records its own
+time, price, delta amount and sequence; cancellations do not create extra fills.
+Snapshots can repeat these events: consumers should deduplicate by order/event
+type and fill sequence, not sum snapshots.
+
+Resting broker-mirror placement is not a protective trigger. A reported broker
+trigger (or an actual fill when the broker omits a separate trigger notification)
+is required; its trigger price source is the recorded stop `threshold`, not an
+invented market observation. Legacy orders with an explicit protective
+`order_reason` can provide creation/update-time evidence, marked with
+`legacy_order_price` for fills, but unavailable rule details are not reconstructed.
+Lists default to empty for old reports and survive JSON, SQL and API serialization.
+
+`confluence_scores` contains every evaluated confluence card, whether or not
+it produced a signal. Each entry has `strategy_id`, `timestamp`, `symbol`,
+`card_id`, `side`, readiness and qualification flags, total/minimum scores,
+group scores and rule evaluations, and a portable `decision_trace`. Native
+evaluation includes inactive scale-in stages, since those cards were scored
+too. Qualification is kept separate from the signal outcome: `signal_status`
+is `approved`, `rejected`, `not_emitted`, `not_triggered`, or `unknown`, and `signal_reason`
+contains the blocking reason (otherwise `null`). For example, a qualified
+long-entry card may have `signal_status: "rejected"` and
+`signal_reason: "resolve_conflicts.state_block_open"`. Unready/unqualified
+cards use `confluence.indicators_not_ready`/`confluence.not_qualified`.
+Qualified scale-in cards that are not emitted distinguish
+`confluence.scale_in_requires_position`, `confluence.scale_in_stage_inactive`,
+and `confluence.scale_in_stage_completed`. Failed/interrupted execution uses
+`unknown` with `strategy.execution_incomplete` when no final pipeline outcome
+is available. Approval is not proof of an order fill or trade execution.
+Generic explanations remain in `decision_traces`.
+
+`resolve_conflicts.state_block_open` means an existing position prevents a
+new-position entry; it does not identify a cooldown. Actual cooldown gates
+capture `signals[].reason_details`, copied to
+`confluence_scores[].signal_reason_details`, with `cooldown_bars` (when the
+configured duration is known) and `remaining_bars`. CooldownRule details also
+record scope, trigger and blocked side. Counts use evaluation ticks and preserve
+the existing release boundary: a rule triggered at tick `t` releases at
+`t + bars`. Older reports without these details do not imply any duration or
+remaining count; charts must not borrow current configuration to fill them.
+
+Stateful event evaluation checks the position before scoring exit cards. With
+no matching long/short position, native and default concrete exit cards have
+`evaluation_status: "skipped"`, `signal_status: "not_triggered"` and reason
+`confluence.long_exit_requires_position`/`confluence.short_exit_requires_position`.
+Their score, readiness, qualification, groups and rule results are absent, not
+fabricated as zero or false. No exit signal is emitted. Shared indicators and
+lookback histories continue updating so cards evaluate normally once a position
+opens. A long asset holding without an open trade still qualifies as a position.
+Pure `generate_signals_from_cards(EvaluationContext(...))` calls and vector
+masks have no portfolio context and remain state-independent.
+Prepared backtests still precompute their score caches; the position gate skips
+per-tick cache copies/scoring and detailed scoring-report construction. It does
+not claim to eliminate shared indicator computations or all backtest preparation.
+
+New captures also include configured `maximum_score`, per-group
+`maximum_score`/`aggregation`, and per-rule `weight`, `maximum_points`,
+`condition`, and explicit `required` flags. Native rules retain their observed
+`value`, indicator/output binding, timeframe, threshold, comparison and lookback
+so a rolling trigger is not mistaken for a current-value threshold crossing.
+Capacities respect sum/max aggregation and signed weights; credited `points`
+are unchanged. `overall_minimum_score` is null for group-threshold cards, which
+instead carry `qualification_description` including any override path.
+`signal_strength` is the actual emitted signal's strength, or null when no
+signal was emitted. It is not score divided by maximum.
+`position_before` records flat/long/short/hedged state, filled open-lot counts
+(`long_entries`/`short_entries`), and the configured scaling `maximum_entries`
+before strategy execution. These counts describe open lots, not remaining
+ladder capacity. Older captures remain unchanged; missing details must not be
+reconstructed from current strategy settings.
+
+`data_sources` contains one latest completed row per source per strategy/tick:
+`identifier`, `strategy_id`, `symbol`, `data_type`, `time_frame`, `market`,
+evaluation `timestamp`, `source_timestamp`, and a `values` object (for example
+`Open`, `High`, `Low`, `Close`, `Volume`). OHLCV rows are eligible only when
+their opening timestamp plus the timeframe is at or before evaluation time.
+Calendar month/year frames use calendar completion boundaries. Custom frame
+rows are available at their recorded timestamp. Empty/unready sources have
+`source_timestamp: null` and `values: {}`. Non-tabular source observations
+retain their mapping/scalar values; unavailable observation times remain
+`null`. Full history windows, provider credentials and source HTTP headers
+are not copied. Inputs are captured before strategy code can mutate them.
+
+Every report has an `indicators` list, independent of whether signals fired:
+
+```json
+{
+  "indicators": [
+    {
+      "strategy_id": "mean_reversion",
+      "symbol": "BTC",
+      "timestamp": "2025-01-01T12:00:00+00:00",
+      "name": "z_score_long.zscore",
+      "value": -2.4
+    }
+  ]
+}
+```
+
+It contains every evaluated indicator output (`<indicator_id>.<output_column>`)
+and explicitly recorded decision-trace entries with `group="indicators"`,
+including traces attached to approved or rejected signals. Values are
+deduplicated per strategy/symbol/tick/name; evaluated outputs take precedence
+over duplicate trace entries. Decision traces themselves are unchanged.
+Warm-up and other non-finite numeric values are represented as `null`.
+`context.record()` remains separate because it can contain arbitrary metrics.
+
+Bounded invocations retain observations from every tick, with each observation's
+own timestamp. Continuous reports contain only the current tick's observations,
+including values evaluated before a strategy failure. Reports that evaluated
+no indicators and recorded no indicator trace entries contain `indicators: []`.
+The same tick-local lifecycle applies to confluence scores and source rows.
+The list is persisted in SQL and exposed by the run-report API. Custom indicator
+engines should implement `snapshot(evaluation)` returning flat
+`symbol`/`name`/`value` records, as the built-in engines do.
+
+Reports have `status` (`completed`, `algorithm_disabled`, `execution_error`,
+`interrupted`, `no_strategy_due`, or `loop_stopped`) and optional `error` text.
+There is no top-level `reason`; signal rejection reasons are unchanged.
+Disabled invocations use `algorithm_disabled`, and accepted manual requests
+stopped before execution use `loop_stopped`.
+A synchronous failure persists a fresh `execution_error` or `interrupted` report
 before re-raising its original exception. `app.get_last_run_report()` exposes
 the latest outcome; `app.get_run_reports()` reads persisted history. Storage
 failures cannot guarantee persistence and never substitute an earlier report.
+
+`Environment` has `PROD` (real trading), `PAPER` (simulated trading), `BACKTEST`
+(historical simulation), and `TEST` (automated tests). `DEV` has been removed;
+use `PROD` or `PAPER` according to how orders execute. There is no report-level
+`is_paper`. Existing all-paper portfolio configurations resolve to `PAPER`
+unless running in `TEST` or `BACKTEST`. Setting `ENVIRONMENT="PAPER"` makes
+`add_market()` default to paper trading; directly supplied portfolio
+configurations must use `paper_trading=True`. Mixed real/paper portfolios
+are rejected. Paper mode uses `paper-database.sqlite3`, separate from
+`prod-database.sqlite3`.
+Existing database files are not moved automatically; set
+`SQLALCHEMY_DATABASE_URI` explicitly to reuse an earlier paper-only database.
+
+Legacy run reports are not migrated or backfilled. Use a fresh database
+when switching from the previous report schema.
 
 For a running web algorithm, use
 `app.container.algorithm_runner().invoke_now(wait=True, timeout=30)` or
