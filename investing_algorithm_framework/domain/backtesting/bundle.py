@@ -486,29 +486,70 @@ def _encode_payload(doc: dict, *, format_version: int) -> bytes:
 def _iter_msgpack_chunks(value, packer, depth=0):
     from .history import SerializedHistory
 
-    if depth > 256:
-        raise ValueError('Bundle nesting exceeds 256 levels')
-    if isinstance(value, dict):
-        yield packer.pack_map_header(len(value))
-        for key, item in value.items():
-            yield from _iter_msgpack_chunks(key, packer, depth + 1)
-            yield from _iter_msgpack_chunks(item, packer, depth + 1)
-    elif isinstance(value, (list, tuple, SerializedHistory)):
-        yield packer.pack_array_header(len(value))
-        for item in value:
-            yield from _iter_msgpack_chunks(item, packer, depth + 1)
-    elif isinstance(value, _FileBlob):
-        yield struct.pack('>BI', 0xc6, value.size)
-        value.source.seek(0)
-        while chunk := value.source.read(65536):
-            yield chunk
-    elif isinstance(value, (bytes, bytearray)):
-        yield struct.pack('>BI', 0xc6, len(value))
-        view = memoryview(value)
-        for offset in range(0, len(view), 65536):
-            yield view[offset:offset + 65536]
-    else:
-        yield packer.pack(value)
+    pack = packer.pack
+    scalar_types = (str, int, float, bool, type(None))
+    # Small values collect in one bounded buffer that is emitted once it
+    # holds about 64 KiB, so each scalar costs no generator round trip.
+    buffer = bytearray()
+    write = buffer.extend
+    limit = 65536
+
+    def flush():
+        chunk = bytes(buffer)
+        buffer.clear()
+        return chunk
+
+    def walk(value, depth):
+        if depth > 256:
+            raise ValueError('Bundle nesting exceeds 256 levels')
+        if isinstance(value, dict):
+            write(packer.pack_map_header(len(value)))
+            child_depth = depth + 1
+            if value and child_depth > 256:
+                raise ValueError('Bundle nesting exceeds 256 levels')
+            for key, item in value.items():
+                if type(key) in scalar_types:
+                    write(pack(key))
+                else:
+                    yield from walk(key, child_depth)
+                if type(item) in scalar_types:
+                    write(pack(item))
+                else:
+                    yield from walk(item, child_depth)
+                if len(buffer) >= limit:
+                    yield flush()
+        elif isinstance(value, (list, tuple, SerializedHistory)):
+            write(packer.pack_array_header(len(value)))
+            child_depth = depth + 1
+            for item in value:
+                if child_depth > 256:
+                    raise ValueError('Bundle nesting exceeds 256 levels')
+                if type(item) in scalar_types:
+                    write(pack(item))
+                else:
+                    yield from walk(item, child_depth)
+                if len(buffer) >= limit:
+                    yield flush()
+        elif isinstance(value, _FileBlob):
+            if buffer:
+                yield flush()
+            yield struct.pack('>BI', 0xc6, value.size)
+            value.source.seek(0)
+            while chunk := value.source.read(65536):
+                yield chunk
+        elif isinstance(value, (bytes, bytearray)):
+            if buffer:
+                yield flush()
+            yield struct.pack('>BI', 0xc6, len(value))
+            view = memoryview(value)
+            for offset in range(0, len(view), 65536):
+                yield view[offset:offset + 65536]
+        else:
+            write(pack(value))
+
+    yield from walk(value, depth)
+    if buffer:
+        yield flush()
 
 
 def _atomic_write_document(target, doc, *, format_version):
