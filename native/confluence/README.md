@@ -184,9 +184,11 @@ for environment, cold-call costs and remaining gates.
 
 ## Shared Risk Metrics
 
-Rebuild the wheel to enable the `drawdown-v1` kernel. It computes raw and
+Rebuild the wheel to enable the `drawdown-v2` kernel. It computes raw and
 cash-flow-adjusted drawdown series, maximum losses and durations, plus TWR equity
-compounding. Other metrics stay Python; the event loop is not rewritten in Rust.
+compounding. Drawdowns retain nonpositive equity after a positive high-water
+mark, allowing losses beyond 100%. Other metrics stay Python; the event loop is
+not rewritten in Rust.
 
 ```python
 from investing_algorithm_framework.services.metrics.generate import create_backtest_metrics

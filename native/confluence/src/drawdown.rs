@@ -14,12 +14,17 @@ fn calculate(values: &[f64], elapsed_us: &[i64]) -> DrawdownResult {
     let mut peak_row = 0;
     let mut absolute_rows = (0, 0);
     for (row, (&value, &timestamp)) in values.iter().zip(elapsed_us).enumerate() {
-        let drawdown = if value <= 0.0 {
-            0.0
-        } else {
-            let high = positive_peak.unwrap_or(value).max(value);
-            positive_peak = Some(high);
-            (value - high) / high
+        let drawdown = match positive_peak {
+            None if value <= 0.0 => 0.0,
+            None => {
+                positive_peak = Some(value);
+                0.0
+            }
+            Some(high) => {
+                let high = high.max(value);
+                positive_peak = Some(high);
+                (value - high) / high
+            }
         };
         series.push(drawdown);
         minimum = minimum.min(drawdown);
@@ -119,7 +124,14 @@ mod tests {
                 &[100.0, 80.0, 0.0, -10.0, 100.0],
                 &[0, day, 2 * day, 3 * day, 4 * day]
             ),
-            (vec![0.0, -0.2, 0.0, 0.0, 0.0], 0.2, 110.0, 3, 0, 3)
+            (
+                vec![0.0, -0.2, -1.0, -1.1, 0.0],
+                1.1,
+                110.0,
+                3,
+                0,
+                3
+            )
         );
         assert_eq!(calculate(&[], &[]), (vec![], 0.0, 0.0, 0, 0, 0));
         assert_eq!(

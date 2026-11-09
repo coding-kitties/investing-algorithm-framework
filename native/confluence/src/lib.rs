@@ -423,7 +423,7 @@ fn iaf_confluence_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<CompiledCard>()?;
     module.add("EXECUTION_SEMANTICS_VERSION", "static-netting-v1")?;
     module.add("NETTING_SEMANTICS_VERSION", "netting-accounting-v5")?;
-    module.add("DRAWDOWN_SEMANTICS_VERSION", "drawdown-v1")?;
+    module.add("DRAWDOWN_SEMANTICS_VERSION", "drawdown-v2")?;
     module.add("EVENT_FILL_SEMANTICS_VERSION", "event-fill-v1")?;
     module.add("EVENT_SCHEDULE_SEMANTICS_VERSION", "event-schedule-v1")?;
     module.add_function(wrap_pyfunction!(

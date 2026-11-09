@@ -25,7 +25,7 @@ class TestInstalledWheels(unittest.TestCase):
             'SEMANTICS_VERSION': 'confluence-vector-v1',
             'NETTING_SEMANTICS_VERSION': 'netting-accounting-v5',
             'EXECUTION_SEMANTICS_VERSION': 'static-netting-v1',
-            'DRAWDOWN_SEMANTICS_VERSION': 'drawdown-v1',
+            'DRAWDOWN_SEMANTICS_VERSION': 'drawdown-v2',
             'EVENT_FILL_SEMANTICS_VERSION': 'event-fill-v1',
             'EVENT_SCHEDULE_SEMANTICS_VERSION': 'event-schedule-v1',
             'EVENT_ACCOUNTING_SEMANTICS_VERSION': 'event-accounting-v1',
