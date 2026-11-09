@@ -1,4 +1,5 @@
 import logging
+from math import isfinite
 from datetime import datetime, timezone
 from typing import List, Union
 
@@ -86,6 +87,27 @@ class Context:
         order_data["metadata"] = metadata
         metadata.setdefault("strategy_id", strategy_id)
 
+    @staticmethod
+    def _round_order_amount(amount, precision, allow_zero=False):
+        if precision is None:
+            return amount
+        if isinstance(precision, bool) or not isinstance(precision, int) \
+                or precision < 0:
+            raise OperationalException(
+                "`precision` must be a non-negative integer."
+            )
+        if amount is None or not isfinite(amount) or amount < 0:
+            raise OperationalException(
+                "Order amount must be finite and non-negative before rounding."
+            )
+        amount = RoundingService.round_down(amount, precision)
+        if amount == 0 and not allow_zero:
+            raise OperationalException(
+                "Order amount is zero after rounding to the requested "
+                "precision."
+            )
+        return amount
+
     def _validate_target_symbol(self, target_symbol, market=None):
         """
         Validate the target_symbol for order creation:
@@ -167,6 +189,7 @@ class Context:
         sync=True,
         validate_symbol=False,
         stop_price=None,
+        precision=None,
     ) -> Order:
         """
         Function to create an order. This function will create an order
@@ -188,6 +211,7 @@ class Context:
               validates that target_symbol is not the trading_symbol.
             stop_price: Required for STOP and STOP_LIMIT order types.
               The trigger price at which the order activates.
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             The order created
@@ -195,6 +219,7 @@ class Context:
         if validate_symbol:
             self._validate_target_symbol(target_symbol, market=market)
 
+        amount = self._round_order_amount(amount, precision)
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
             "target_symbol": target_symbol,
@@ -336,9 +361,6 @@ class Context:
             size = net_size * (percentage / 100)
             amount = size / price
 
-        if precision is not None:
-            amount = RoundingService.round_down(amount, precision)
-
         if amount_trading_symbol is not None:
             amount = amount_trading_symbol / price
 
@@ -350,6 +372,7 @@ class Context:
                 "parameter must be specified."
             )
 
+        amount = self._round_order_amount(amount, precision)
         logger.info(
             f"Creating limit order: {target_symbol} "
             f"{order_side} {amount} @ {price}"
@@ -472,9 +495,6 @@ class Context:
             size = net_size * (percentage / 100)
             amount = size / estimated_price
 
-        if precision is not None:
-            amount = RoundingService.round_down(amount, precision)
-
         if amount_trading_symbol is not None:
             amount = amount_trading_symbol / estimated_price
 
@@ -486,6 +506,7 @@ class Context:
                 "parameter must be specified."
             )
 
+        amount = self._round_order_amount(amount, precision)
         logger.info(
             f"Creating market order: {target_symbol} "
             f"{order_side} {amount} @ estimated {estimated_price}"
@@ -542,6 +563,7 @@ class Context:
         validate=True,
         sync=True,
         metadata=None,
+        precision=None,
     ) -> Order:
         """
         Create a SHORT (short-entry) order.
@@ -566,6 +588,7 @@ class Context:
             sync (bool): Whether to sync the portfolio/position state
                 with the created order (default True).
             metadata (dict, optional): Order metadata.
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The created order.
@@ -588,6 +611,7 @@ class Context:
             collateral = net_size * (percentage_of_portfolio / 100)
             amount = collateral / price
 
+        amount = self._round_order_amount(amount, precision)
         order_data = {
             "target_symbol": target_symbol,
             "price": price,
@@ -626,6 +650,7 @@ class Context:
         validate=True,
         sync=True,
         metadata=None,
+        precision=None,
     ) -> Order:
         """
         Create a COVER (short-close) order.
@@ -649,6 +674,7 @@ class Context:
             sync (bool): Whether to sync the portfolio/position state
                 with the created order (default True).
             metadata (dict, optional): Order metadata.
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The created order.
@@ -677,6 +703,7 @@ class Context:
                 )
             amount = abs(position_amount) * (percentage_of_position / 100)
 
+        amount = self._round_order_amount(amount, precision)
         order_data = {
             "target_symbol": target_symbol,
             "price": price,
@@ -710,7 +737,8 @@ class Context:
         percentage_of_portfolio=None,
         market=None,
         portfolio_id=None,
-        metadata=None
+        metadata=None,
+        precision=None,
     ) -> Order:
         """
         Function to create a market buy order.
@@ -725,6 +753,7 @@ class Context:
             portfolio_id (str, optional): The ID of the portfolio to buy
                 the asset from.
             metadata (dict, optional): Additional metadata for the order
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The order created
@@ -742,7 +771,8 @@ class Context:
             amount=amount,
             percentage_of_portfolio=percentage_of_portfolio,
             market=market,
-            metadata=metadata
+            metadata=metadata,
+            precision=precision,
         )
 
     def create_market_sell_order(
@@ -752,7 +782,8 @@ class Context:
         percentage_of_position=None,
         market=None,
         portfolio_id=None,
-        metadata=None
+        metadata=None,
+        precision=None,
     ) -> Order:
         """
         Function to create a market sell order.
@@ -767,6 +798,7 @@ class Context:
             portfolio_id (str, optional): The ID of the portfolio to sell
                 the asset from.
             metadata (dict, optional): Additional metadata for the order
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The order created
@@ -784,7 +816,8 @@ class Context:
             amount=amount,
             percentage_of_position=percentage_of_position,
             market=market,
-            metadata=metadata
+            metadata=metadata,
+            precision=precision,
         )
 
     def create_limit_sell_order(
@@ -794,7 +827,8 @@ class Context:
         amount=None,
         percentage_of_position=None,
         market=None,
-        portfolio_id=None
+        portfolio_id=None,
+        precision=None,
     ) -> Order:
         """
         Function to create a limit sell order. This function will create
@@ -815,6 +849,7 @@ class Context:
                 to sell the asset
             portfolio_id: (str, optional): The ID of the portfolio to sell
                 the asset from.
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The order created
@@ -832,6 +867,7 @@ class Context:
             amount=amount,
             percentage_of_position=percentage_of_position,
             market=market,
+            precision=precision,
         )
 
     def create_limit_buy_order(
@@ -841,7 +877,8 @@ class Context:
         amount=None,
         percentage_of_portfolio=None,
         market=None,
-        portfolio_id=None
+        portfolio_id=None,
+        precision=None,
     ) -> Order:
         """
         Function to create a limit buy order. This function will create
@@ -862,6 +899,7 @@ class Context:
                 to buy the asset
             portfolio_id (str, optional): The ID of the portfolio to buy
                 the asset from.
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The order created
@@ -880,6 +918,7 @@ class Context:
             amount=amount,
             percentage_of_portfolio=percentage_of_portfolio,
             market=market,
+            precision=precision,
         )
 
     def order_value(
@@ -919,8 +958,6 @@ class Context:
                 "`price` must be a positive number."
             )
         amount = value / price
-        if precision is not None:
-            amount = RoundingService.round_down(amount, precision)
         return self.create_limit_order(
             target_symbol=target_symbol,
             price=price,
@@ -928,6 +965,7 @@ class Context:
             amount=amount,
             market=market,
             metadata=metadata,
+            precision=precision,
         )
 
     def order_percent(
@@ -1023,7 +1061,9 @@ class Context:
         diff = target_amount - current_amount
         if precision is not None:
             sign = 1 if diff >= 0 else -1
-            diff = sign * RoundingService.round_down(abs(diff), precision)
+            diff = sign * self._round_order_amount(
+                abs(diff), precision, allow_zero=True
+            )
         if diff == 0:
             return None
         order_side = OrderSide.BUY if diff > 0 else OrderSide.SELL
@@ -2008,6 +2048,7 @@ class Context:
                 "trading symbol of the portfolio."
             )
 
+        amount = self._round_order_amount(position.get_amount(), precision)
         for order in self.order_service \
                 .get_all(
                     {
@@ -2035,10 +2076,9 @@ class Context:
         )
         return self.create_limit_order(
             target_symbol=position.symbol,
-            amount=position.get_amount(),
+            amount=amount,
             order_side=OrderSide.SELL.value,
             price=price,
-            precision=precision,
         )
 
     def get_allocated(self, market=None, identifier=None) -> float:
@@ -2727,17 +2767,12 @@ class Context:
         if trade.available_amount <= 0:
             raise OperationalException("Trade has no amount to close.")
 
-        self.order_service.cancel_mirror_orders_for_trade(trade.id)
-
         position_id = trade.orders[0].position_id
         portfolio = self.portfolio_service.find({"position": position_id})
         position = self.position_service.find(
             {"portfolio": portfolio.id, "symbol": trade.target_symbol}
         )
         amount = trade.available_amount
-
-        if precision is not None:
-            amount = RoundingService.round_down(amount, precision)
 
         if position.get_amount() < amount:
             logger.warning(
@@ -2747,6 +2782,9 @@ class Context:
                 f"changing order amount to size of position"
             )
             amount = position.get_amount()
+
+        amount = self._round_order_amount(amount, precision)
+        self.order_service.cancel_mirror_orders_for_trade(trade.id)
 
         ticker = self.data_provider_service.get_ticker_data(
             symbol=trade.symbol,

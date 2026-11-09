@@ -12,6 +12,34 @@ Orders are instructions to open or close long and short positions. The framework
 supports buy, sell, short, and cover sides across market, limit, stop, and
 stop-limit order types.
 
+## Amount Precision
+
+Context order-creation methods, including the buy/sell convenience methods,
+short/cover orders, and generic stop/stop-limit orders, accept an optional
+`precision` parameter. Value/percentage/target helpers and
+`close_position`/`close_trade` also support it.
+
+```python
+context.create_market_buy_order(
+    target_symbol="BTC",
+    amount=0.0123456789,
+    precision=6,  # Submit 0.012345 BTC
+)
+```
+
+Precision must be a non-negative integer. The shared rounding service truncates
+the final asset quantity after value or percentage sizing, before submission
+and balance reservation. Scientific notation is supported. Omitting precision
+leaves the amount unchanged.
+
+An amount rounded to zero raises `OperationalException`; target helpers instead
+place no order when the rounded adjustment is zero. Closing a trade applies
+precision after limiting the amount to the available position.
+
+This option does not round prices, stop prices, accounting calculations, or
+reported metrics. It is not a substitute for exchange-specific quantity steps,
+price ticks, minimum quantities, or minimum order values.
+
 ## Order Types
 
 ### Market Orders

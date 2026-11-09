@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Order-amount rounding now handles scientific notation (#634).
+- Optional amount precision is consistent across generic, short/cover and
+  buy/sell convenience order APIs. Value-based sizing is rounded after
+  conversion, and trade closing rounds after clamping to the position.
+  Orders rounded to zero fail explicitly; zero target adjustments remain
+  no-ops. Omitting precision preserves existing sizing.
+
 ## [9.0.0a22] - 2026-09-30
 
 ### Fixed

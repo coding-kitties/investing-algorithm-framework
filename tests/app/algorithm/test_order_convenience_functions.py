@@ -48,6 +48,31 @@ class TestOrderConvenienceFunctions(TestBase):
         self.assertEqual(10, order.get_price())
         self.assertEqual("LIMIT", order.get_order_type())
 
+    @patch(
+        "investing_algorithm_framework.services.data_providers"
+        ".DataProviderService.get_ticker_data"
+    )
+    def test_trading_symbol_precision_matches_reserved_balance(
+        self, mock_get_ticker
+    ):
+        mock_get_ticker.return_value = {
+            "symbol": "BTCEUR", "bid": 10, "ask": 10, "last": 10,
+        }
+        self.app.add_strategy(StrategyOne)
+        self.app.run(number_of_iterations=1)
+        order = self.app.context.create_limit_order(
+            target_symbol="BTC",
+            amount_trading_symbol=12.3456789,
+            price=10,
+            order_side=OrderSide.BUY,
+            precision=6,
+        )
+        self.assertAlmostEqual(float(order.get_amount()), 1.234567)
+        self.assertAlmostEqual(
+            float(self.app.context.get_portfolio().get_unallocated()),
+            1000 - 12.34567,
+        )
+
     def test_order_value_rejects_non_positive_value(self):
         self.app.add_strategy(StrategyOne)
         self.app.run(number_of_iterations=1)
