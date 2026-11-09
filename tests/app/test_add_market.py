@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from investing_algorithm_framework import create_app, OperationalException, \
-    PaperTradingMode, PositionMode, RESOURCE_DIRECTORY
+    PaperTradingMode, PositionMode, RESOURCE_DIRECTORY, PortfolioConfiguration
 from investing_algorithm_framework.domain import ImproperlyConfigured
 from investing_algorithm_framework.domain import ENVIRONMENT, Environment
 from investing_algorithm_framework.infrastructure import CCXTOrderExecutor, \
@@ -33,6 +33,59 @@ class Test(TestCase):
         self.resource_dir = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "resources"
         )
+
+    def test_paper_environment_defaults_markets_to_paper_trading(self):
+        app = create_app(config={
+            RESOURCE_DIRECTORY: self.resource_dir,
+            ENVIRONMENT: Environment.PAPER.value,
+        })
+        app.add_market(
+            market="BINANCE", trading_symbol="EUR", initial_balance=1000,
+            paper_trading_mode=PaperTradingMode.LOCAL,
+        )
+        self.assertTrue(app.get_portfolio_configurations()[0].paper_trading)
+        app.initialize_config()
+        self.assertEqual("PAPER", app.config[ENVIRONMENT])
+        self.assertEqual("paper-database.sqlite3", app.config["DATABASE_NAME"])
+
+    def test_mixed_portfolio_modes_are_rejected_before_registration(self):
+        for first_mode in (True, False):
+            app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+            app.add_portfolio_configuration(PortfolioConfiguration(
+                market="BINANCE", trading_symbol="EUR", initial_balance=1000,
+                paper_trading=first_mode,
+            ))
+            with self.assertRaisesRegex(OperationalException, "Mixed"):
+                app.add_portfolio_configuration(PortfolioConfiguration(
+                    market="KRAKEN", trading_symbol="EUR",
+                    initial_balance=1000, paper_trading=not first_mode,
+                ))
+            self.assertEqual(1, len(app.get_portfolio_configurations()))
+
+    def test_paper_environment_rejects_live_portfolio_configuration(self):
+        app = create_app(config={
+            RESOURCE_DIRECTORY: self.resource_dir, ENVIRONMENT: "PAPER",
+        })
+        app.add_portfolio_configuration(PortfolioConfiguration(
+            market="BINANCE", trading_symbol="EUR",
+        ))
+        with self.assertRaisesRegex(OperationalException, "PAPER requires"):
+            app.initialize_config()
+
+    def test_test_environment_is_preserved_and_dev_is_rejected(self):
+        app = create_app(config={
+            RESOURCE_DIRECTORY: self.resource_dir, ENVIRONMENT: "TEST",
+        })
+        app.add_portfolio_configuration(PortfolioConfiguration(
+            market="BINANCE", trading_symbol="EUR", initial_balance=1000,
+            paper_trading=True,
+        ))
+        app.initialize_config()
+        self.assertEqual("TEST", app.config[ENVIRONMENT])
+        self.assertEqual("test-database.sqlite3", app.config["DATABASE_NAME"])
+        app.set_config(ENVIRONMENT, "DEV")
+        with self.assertRaises(OperationalException):
+            app.initialize_config()
 
     def test_add_market_from_environment_variables(self):
         with patch.dict(

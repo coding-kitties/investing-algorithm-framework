@@ -26,6 +26,10 @@ class SQLTradeRepository(Repository):
         )
         trading_symbol = self.get_query_param("trading_symbol", query_params)
         order_id_query_param = self.get_query_param("order_id", query_params)
+        opened_at_gte = self.get_query_param("opened_at_gte", query_params)
+
+        if opened_at_gte is not None:
+            query = query.filter(SQLTrade.opened_at >= opened_at_gte)
 
         if order_id_query_param:
             query = query.filter(SQLTrade.orders.any(id=order_id_query_param))

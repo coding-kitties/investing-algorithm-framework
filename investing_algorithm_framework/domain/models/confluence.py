@@ -160,14 +160,19 @@ def condition(
     ))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class AllOf(Expression):
     expressions: tuple[Expression, ...]
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "expressions", tuple(self.expressions))
-        if not self.expressions:
+    def __init__(self, expressions=(), *additional: Expression) -> None:
+        children = (
+            (expressions, *additional)
+            if isinstance(expressions, Expression)
+            else (*expressions, *additional)
+        )
+        if not children or not all(isinstance(item, Expression) for item in children):
             raise ValueError("AllOf requires at least one expression")
+        object.__setattr__(self, "expressions", children)
 
     def evaluate(self, context: EvaluationContext) -> bool:
         return all(
@@ -175,14 +180,19 @@ class AllOf(Expression):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class AnyOf(Expression):
     expressions: tuple[Expression, ...]
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "expressions", tuple(self.expressions))
-        if not self.expressions:
+    def __init__(self, expressions=(), *additional: Expression) -> None:
+        children = (
+            (expressions, *additional)
+            if isinstance(expressions, Expression)
+            else (*expressions, *additional)
+        )
+        if not children or not all(isinstance(item, Expression) for item in children):
             raise ValueError("AnyOf requires at least one expression")
+        object.__setattr__(self, "expressions", children)
 
     def evaluate(self, context: EvaluationContext) -> bool:
         return any(
@@ -307,7 +317,7 @@ def _validate_group(group) -> None:
 @dataclass(frozen=True)
 class GroupEvaluation:
     name: str
-    category: Literal["primary", "secondary"]
+    category: Literal["primary", "secondary", "score"]
     matches: int
     score: float
     minimum_matches: int
@@ -453,6 +463,30 @@ class ConfluenceResult:
         }
 
 
+def _render_card_box(lines: list[str]) -> str:
+    lines = [
+        part.expandtabs(4)
+        for line in lines
+        for part in (line.splitlines() or [""])
+    ]
+    width = min(74, max(48, max(map(len, lines))))
+    border = "+" + "=" * (width + 2) + "+"
+    separator = "+" + "-" * (width + 2) + "+"
+    rendered = [border]
+    for line in lines:
+        if not line:
+            rendered.append(separator)
+            continue
+        indentation = len(line) - len(line.lstrip())
+        for part in wrap(
+            line, width=width,
+            subsequent_indent=" " * min(indentation, width // 2),
+        ):
+            rendered.append(f"| {part:<{width}} |")
+    rendered.append(border)
+    return "\n".join(rendered)
+
+
 @dataclass(frozen=True)
 class ConfluenceCard:
     """A pure decision model; execution and position sizing remain external."""
@@ -528,27 +562,7 @@ class ConfluenceCard:
             for veto in self.vetoes:
                 lines.append(f"  {veto.name}")
                 lines.append(f"      {_format_expression(veto.expression)}")
-        lines = [
-            part.expandtabs(4)
-            for line in lines
-            for part in (line.splitlines() or [""])
-        ]
-        width = min(74, max(48, max(map(len, lines))))
-        border = "+" + "=" * (width + 2) + "+"
-        separator = "+" + "-" * (width + 2) + "+"
-        rendered = [border]
-        for line in lines:
-            if not line:
-                rendered.append(separator)
-                continue
-            indentation = len(line) - len(line.lstrip())
-            for part in wrap(
-                line, width=width,
-                subsequent_indent=" " * min(indentation, width // 2),
-            ):
-                rendered.append(f"| {part:<{width}} |")
-        rendered.append(border)
-        return "\n".join(rendered)
+        return _render_card_box(lines)
 
     def to_dict(self) -> dict[str, Any]:
         """Return the canonical, versioned strategy definition."""
@@ -736,6 +750,12 @@ class ConfluenceCard:
 
 
 def _format_expression(expression: Expression) -> str:
+    from .confluence_score import Rule, Threshold
+
+    if isinstance(expression, Rule):
+        return f"Rule({expression.name})"
+    if isinstance(expression, Threshold):
+        return f"Score({expression.group}) >= {expression.value:g}"
     if isinstance(expression, ConditionExpression):
         predicate = expression.condition
         prefix = f"{predicate.timeframe}:" if predicate.timeframe else ""
@@ -775,6 +795,15 @@ def _format_expression(expression: Expression) -> str:
 
 
 def _expression_to_dict(expression: Expression) -> dict[str, Any]:
+    from .confluence_score import Rule, Threshold
+
+    if isinstance(expression, Rule):
+        return {"type": "rule", "name": expression.name}
+    if isinstance(expression, Threshold):
+        return {
+            "type": "group_threshold",
+            "group": expression.group, "value": expression.value,
+        }
     if isinstance(expression, ConditionExpression):
         condition = expression.condition
         return {
@@ -819,7 +848,13 @@ def _expression_to_dict(expression: Expression) -> dict[str, Any]:
 
 
 def _expression_from_dict(data: Mapping[str, Any]) -> Expression:
+    from .confluence_score import Rule, Threshold
+
     expression_type = data.get("type")
+    if expression_type == "rule":
+        return Rule(data["name"])
+    if expression_type == "group_threshold":
+        return Threshold(data["group"], data["value"])
     if expression_type == "condition":
         return ConditionExpression(Condition(
             indicator=data["indicator"],

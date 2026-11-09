@@ -29,6 +29,46 @@ agree? This document answers that with data, not assumption.
 
 ## Methodology
 
+### Cash-boundary regression coverage
+
+Static vector allocation uses the same cash-tolerance policy as the
+shared live/event order validator: `max(1e-8, 1e-9 * cash_scale)`.
+Three equal entries can otherwise total `1000.0000000000001` against
+a 1000 budget and spuriously reject the last entry. The tolerance
+also applies to both native vector implementations and native
+`EventBroker` cash reservations; genuine overspend remains rejected.
+Static target sizes still derive from initial capital, but actual
+entries are capped to current available cash after losses, fees, and
+deposits. An entry that breaches the initial allocation ceiling is
+still rejected rather than partially approved against that ceiling.
+Exits release their original gross reservation (including entry
+fees), and snapshots debit opening fees when the entry occurs.
+These checks do not reserve future exit fees or guarantee
+broker-specific lot/precision rules.
+
+This is an intentional no-borrowing change to legacy static execution,
+not dynamic/compounding sizing. It can reduce an entry after losses.
+Native accounting requires `netting-accounting-v6`; older compiled
+extensions are rejected by strict Rust execution or fall back to
+Python under `execution_backend="auto"`.
+
+Offline regressions cover small/large capital, normalized vector
+equity, live/event shared buy and short validators, risk-budget
+scale-in round trips, and native reservation cancellation/settlement:
+
+```bash
+python -m unittest \
+  tests.infrastructure.services.backtesting.test_vector_capital_roundoff \
+  tests.services.test_order_cash_roundoff
+cd native/confluence && cargo test --lib
+```
+
+These boundary tests do not establish full live/vector/event parity
+for every stateful scale-in strategy. The study below concerns the
+specific crossover strategy and fixtures described here.
+
+### Crossover study
+
 Both engines were run against `CrossOverStrategyV1` (a real EMA-50/
 EMA-100/EMA-200 crossover strategy — not a toy/synthetic strategy),
 on the same fixed, real BTC/EUR (BITVAVO, 2-hour) CSV fixture used

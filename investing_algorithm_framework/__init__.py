@@ -1,3 +1,7 @@
+from .domain.indicators import (
+    IndicatorConfig, IndicatorRule, ConfluenceScoreConfig, IndicatorEvaluation,
+)
+from .services.indicator_engine import IndicatorEngine
 from .domain.optimization import (
     CandidateProposal, EvaluationEvidence, FloatParameter, IntegerParameter,
     OptimizationConfiguration, OptimizationSearchSpace,
@@ -19,7 +23,8 @@ from .analysis import generate_rolling_backtest_windows, \
     create_cross_study_metrics_table, \
     rank_by_cross_study_robustness  # noqa: F401
 from .app import App, Algorithm, \
-    TradingStrategy, StatelessAction, Task, AppHook, Context, \
+    TradingStrategy, ConfluenceScoringStrategy, StatelessAction, Task, \
+    AppHook, Context, \
     add_html_report, BacktestReport, \
     pretty_print_trades, pretty_print_positions, \
     pretty_print_orders, pretty_print_backtest, \
@@ -64,7 +69,7 @@ from .domain import ApiException, combine_backtests, Study, \
     AllOf, AnyOf, AtLeast, Condition, ConditionExpression, condition, \
     ConfluenceCard, ConfluenceResult, EvaluationContext, Expression, Not, \
     Operator, PrimaryGroup, EvidenceGroup, GroupEvaluation, Requirement, \
-    RuleEvaluation, ScoreRule, \
+    RuleEvaluation, ScoreRule, ConfluenceScoreCard, ConfluenceScoreRule, Rule, Threshold, \
     ScoreType, Veto, CONFLUENCE_CARD_VERSION  # noqa: F401
 from .domain import Pipeline, Factor, CustomFactor, Filter, \
     AverageDollarVolume, AverageTradedValue, CrossSectionalMean, \
@@ -175,6 +180,11 @@ except ImportError:
 
 
 __all__ = [
+    "IndicatorConfig",
+    "IndicatorRule",
+    "ConfluenceScoreConfig",
+    "IndicatorEvaluation",
+    "IndicatorEngine",
     "CandidateProposal",
     "EvaluationEvidence",
     "FloatParameter",
@@ -215,6 +225,10 @@ __all__ = [
     "ConditionExpression",
     "condition",
     "ConfluenceCard",
+    "ConfluenceScoreCard",
+    "ConfluenceScoreRule",
+    "Rule",
+    "Threshold",
     "ConfluenceResult",
     "EvaluationContext",
     "Expression",
@@ -243,6 +257,7 @@ __all__ = [
     "MarketOrderExecutor",
     "TimeInterval",
     "TradingStrategy",
+    "ConfluenceScoringStrategy",
     "Order",
     "Portfolio",
     "Position",

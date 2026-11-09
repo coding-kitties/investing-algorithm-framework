@@ -143,6 +143,12 @@ class SizePositionsPhase(StrategyPhase):
             )
         portfolio = state.context.get_portfolio()
         quote_amount = position_size.get_size(portfolio, price)
+        if not is_short:
+            scaling_rule = strategy.get_scaling_rule(sig.symbol)
+            if scaling_rule is not None:
+                quote_amount *= getattr(
+                    scaling_rule, "initial_entry_percentage", 100
+                ) / 100
         amount = quote_amount / price
         return SizedIntent(
             signal=sig,
@@ -168,13 +174,26 @@ class SizePositionsPhase(StrategyPhase):
         if scaling_rule is None:
             return None  # pragma: no cover
 
-        # Determine which entry index this is (0-based across
-        # already-open long trades for the symbol).
-        open_trades = state.context.get_open_trades(target_symbol=sig.symbol)
-        num_entries = len(
-            [t for t in open_trades if not getattr(t, "is_short", False)]
-        )
-        scale_in_index = max(0, num_entries - 1)
+        staged = "scale_in_stage" in sig.metadata
+        if staged:
+            scale_in_index = sig.metadata["scale_in_stage"]
+            if (not isinstance(scale_in_index, int)
+                    or isinstance(scale_in_index, bool) or scale_in_index < 0):
+                raise ValueError(
+                    "scale_in_stage must be a nonnegative integer"
+                )
+            # Closed lots must not reduce cumulative stage progression.
+            if scale_in_index + 1 >= scaling_rule.max_entries:
+                state.trace("size_positions.scale_in_max_entries", sig)
+                return None
+        else:
+            open_trades = state.context.get_open_trades(
+                target_symbol=sig.symbol
+            )
+            num_entries = len(
+                [t for t in open_trades if not getattr(t, "is_short", False)]
+            )
+            scale_in_index = max(0, num_entries - 1)
         pct = scaling_rule.get_scale_in_percentage(scale_in_index)
 
         position_size = strategy.get_position_size(sig.symbol)
@@ -210,6 +229,7 @@ class SizePositionsPhase(StrategyPhase):
             quote_amount=quote_amount,
             full_symbol=full_symbol,
             order_reason=_ORDER_REASON[sig.side],
+            extra_metadata=dict(sig.metadata) if staged else {},
         )
 
     def _size_close_long(

@@ -2353,6 +2353,7 @@ class Context:
         market=None,
         portfolio=None,
         status=None,
+        opened_since: datetime = None,
     ) -> List[Trade]:
         """
         Function to get all trades. This function will return all trades
@@ -2360,11 +2361,14 @@ class Context:
         is specified, the trades with the specified market will be returned.
 
         Args:
-            market: The market of the asset
-            portfolio: The portfolio of the asset
+            market: Resolve this market's portfolio before querying trades.
+            portfolio: Portfolio instance or portfolio id. When supplied
+                with market, the portfolio must belong to that market.
             status: The status of the trade
             target_symbol: The symbol of the asset
             trading_symbol: The trading symbol of the asset
+            opened_since: Inclusive lower bound on trade.opened_at,
+                applied by the repository before loading trade history.
 
         Returns:
             List[Trade]: A list of trades that match the query parameters
@@ -2372,11 +2376,17 @@ class Context:
 
         query_params = {}
 
-        if market is not None:
-            query_params["market"] = market
-
         if portfolio is not None:
-            query_params["portfolio"] = portfolio
+            portfolio_id = getattr(portfolio, "id", portfolio)
+            if market is not None:
+                scoped_portfolio = self.portfolio_service.get(portfolio_id)
+                if scoped_portfolio.market != market:
+                    return []
+            query_params["portfolio_id"] = portfolio_id
+        elif market is not None:
+            query_params["portfolio_id"] = self.portfolio_service.find({
+                "market": market,
+            }).id
 
         if status is not None:
             query_params["status"] = status
@@ -2387,7 +2397,10 @@ class Context:
         if trading_symbol is not None:
             query_params["trading_symbol"] = trading_symbol
 
-        return self.trade_service.get_all({"market": market})
+        if opened_since is not None:
+            query_params["opened_at_gte"] = opened_since
+
+        return self.trade_service.get_all(query_params)
 
     def get_closed_trades(self) -> List[Trade]:
         """

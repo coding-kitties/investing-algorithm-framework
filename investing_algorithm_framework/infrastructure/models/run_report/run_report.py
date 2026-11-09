@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Text
 from sqlalchemy.orm import reconstructor, synonym
 
 from investing_algorithm_framework.domain import RunReport
@@ -24,18 +24,23 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
     and ``SQLTrade`` persist their ``metadata`` dict.
     """
     __tablename__ = "run_reports"
-    id = Column(Integer, primary_key=True, unique=True)
+    storage_id = Column("id", Integer, primary_key=True, unique=True)
+    id = Column("report_id", String, unique=True, nullable=False)
+    strategy_ids_json = Column(Text, default=None)
     algorithm_id = Column(String, default=None)
     status = Column(String, default="completed")
     error = Column(Text, default=None)
-    reason = Column(Text, default=None)
     environment = Column(String, default=None)
-    is_paper = Column(Boolean, default=None)
     number_of_iterations = Column(Integer, default=None)
     started_at = Column(DateTime(timezone=True), default=None)
     completed_at = Column(DateTime(timezone=True), default=utcnow)
     orders_json = Column(Text, default=None)
     signals_json = Column(Text, default=None)
+    stop_losses_json = Column(Text, default=None)
+    take_profits_json = Column(Text, default=None)
+    indicators_json = Column(Text, default=None)
+    confluence_scores_json = Column(Text, default=None)
+    data_sources_json = Column(Text, default=None)
     positions_json = Column(Text, default=None)
     portfolios_json = Column(Text, default=None)
     trades_json = Column(Text, default=None)
@@ -48,8 +53,14 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
 
     def _sync_json_columns(self):
         payload = self.to_dict()
+        self.strategy_ids_json = json.dumps(self.strategy_ids)
         self.orders_json = json.dumps(payload["orders"])
         self.signals_json = json.dumps(payload["signals"])
+        self.stop_losses_json = json.dumps(payload["stop_losses"])
+        self.take_profits_json = json.dumps(payload["take_profits"])
+        self.indicators_json = json.dumps(payload["indicators"])
+        self.confluence_scores_json = json.dumps(payload["confluence_scores"])
+        self.data_sources_json = json.dumps(payload["data_sources"])
         self.positions_json = json.dumps(self.positions or [])
         self.portfolios_json = json.dumps(self.portfolios or [])
         self.trades_json = json.dumps(payload["trades"])
@@ -57,10 +68,18 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
 
     @reconstructor
     def init_on_load(self):
+        self.strategy_ids = json.loads(self.strategy_ids_json) \
+            if self.strategy_ids_json else []
         self.orders = json.loads(self.orders_json) \
             if self.orders_json else []
         self.signals = json.loads(self.signals_json) \
             if self.signals_json else []
+        self.indicators = json.loads(self.indicators_json) \
+            if self.indicators_json else []
+        self.confluence_scores = json.loads(self.confluence_scores_json) \
+            if self.confluence_scores_json else []
+        self.data_sources = json.loads(self.data_sources_json) \
+            if self.data_sources_json else []
         self.positions = json.loads(self.positions_json) \
             if self.positions_json else []
         self.portfolios = json.loads(self.portfolios_json) \
@@ -69,6 +88,14 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
             if self.trades_json else []
         restored = RunReport(
             orders=self.orders, signals=self.signals, trades=self.trades,
+            strategy_ids=self.strategy_ids or None,
+            indicators=self.indicators,
+            confluence_scores=self.confluence_scores,
+            data_sources=self.data_sources,
+            stop_losses=json.loads(self.stop_losses_json)
+            if self.stop_losses_json else [],
+            take_profits=json.loads(self.take_profits_json)
+            if self.take_profits_json else [],
             decision_traces=json.loads(self.decision_traces_json)
             if self.decision_traces_json else [],
         )
@@ -76,6 +103,12 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
         self.signals = restored.signals
         self.trades = restored.trades
         self.decision_traces = restored.decision_traces
+        self.strategy_ids = restored.strategy_ids
+        self.indicators = restored.indicators
+        self.confluence_scores = restored.confluence_scores
+        self.data_sources = restored.data_sources
+        self.stop_losses = restored.stop_losses
+        self.take_profits = restored.take_profits
 
     def update(self, data):
         data = dict(data)
@@ -83,7 +116,9 @@ class SQLRunReport(RunReport, SQLBaseModel, SQLAlchemyModelExtension):
             data.pop("score_cards", None)
         json_fields = (
             "orders", "signals", "positions", "portfolios", "trades",
-            "score_cards", "decision_traces",
+            "score_cards", "decision_traces", "indicators",
+            "confluence_scores", "data_sources",
+            "stop_losses", "take_profits",
         )
         for field_name in json_fields:
             if field_name in data:

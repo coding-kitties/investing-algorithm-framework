@@ -28,6 +28,7 @@ Public surface:
 from .base import StrategyPhase
 from .phase_state import EmittedOrder, PhaseState, SizedIntent
 from .evaluate_pipelines import EvaluatePipelinesPhase
+from .evaluate_indicators import EvaluateIndicatorsPhase
 from .collect_signals import CollectSignalsPhase
 from .resolve_conflicts import ResolveConflictsPhase
 from .size_positions import SizePositionsPhase
@@ -43,6 +44,7 @@ __all__ = [
     "SizedIntent",
     "EmittedOrder",
     "EvaluatePipelinesPhase",
+    "EvaluateIndicatorsPhase",
     "CollectSignalsPhase",
     "ResolveConflictsPhase",
     "SizePositionsPhase",

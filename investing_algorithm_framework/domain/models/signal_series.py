@@ -8,8 +8,8 @@ equivalent consumed by the vectorised backtest engine
 
 A strategy that wants to be vector-backtested overrides
 :py:meth:`TradingStrategy.generate_signal_series` and yields one
-:class:`SignalSeries` per (symbol, side) pair, each carrying a
-boolean pandas/polars Series indexed by timestamp. The vector
+:class:`SignalSeries` per (symbol, side) pair (or per scale-in stage),
+each carrying a boolean pandas/polars Series indexed by timestamp. The vector
 engine then walks the master timeline once and reads each side's
 flag per bar — no Python-level per-bar callbacks required.
 
@@ -22,7 +22,7 @@ DataFrame column to a :class:`SignalSeries`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any, ClassVar, Mapping
 
 from .signal import SignalSide
 
@@ -39,6 +39,9 @@ class SignalSeries:
     per-bar state machine.
 
     Attributes:
+        supports_staged_scale_in: Class-level capability marker declaring
+            fill-driven staged SCALE_IN execution support. Not a dataclass
+            field or part of serialized signal data.
         symbol: Target symbol of the signal (e.g. ``"BTC"``).
         side: The directional intent. See :class:`SignalSide`.
         series: A boolean Series (pandas or polars) indexed by
@@ -53,6 +56,15 @@ class SignalSeries:
             signal (rule name, factor name, ``"ema_cross"``, ...).
         metadata: Arbitrary JSON-serialisable extra context. Copied
             verbatim onto every order created from this series.
+            For SCALE_IN, ``scale_in_stage`` selects a zero-based,
+            fill-driven stage; ``require_lower_price=True`` requires the
+            close to be below the latest accepted entry's fill price.
+            Emit separate raw masks for each stage, without simulating
+            positions. Missing stages stop additions; fully flat resets
+            progression, while partial exits do not.
+            Native confluence exits with ``position_scoped_lookback=True``
+            are candidates, not final signals. Their consumer must rescore
+            rules using actual entry fills; VectorBacktestService does this.
 
     Examples:
         >>> from investing_algorithm_framework import (
@@ -71,6 +83,8 @@ class SignalSeries:
         ... )  # doctest: +ELLIPSIS
         SignalSeries(symbol='BTC', side=open_long, ...)
     """
+
+    supports_staged_scale_in: ClassVar[bool] = True
 
     symbol: str
     side: SignalSide

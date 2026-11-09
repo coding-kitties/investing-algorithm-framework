@@ -18,7 +18,10 @@ class TestRunReportsController(WebTestBase):
 
     def test_manual_invoke_wait_returns_report(self):
         runner = self.iaf_app.container.algorithm_runner()
-        report = {"id": 42, "status": "completed", "signals": []}
+        report = {
+            "id": "algorithm_20200101T000000.000000Z_test",
+            "strategy_ids": ["alpha"], "status": "completed", "signals": [],
+        }
         with patch.object(runner, "invoke_now", return_value=report) as invoke:
             response = self.client.post(
                 "/api/algorithm/invoke?wait=true&timeout=5&strategy_id=alpha")
@@ -47,11 +50,37 @@ class TestRunReportsController(WebTestBase):
         service = self.iaf_app.container.run_report_service()
         report = service.create({
             "decision_traces": [DecisionTrace(summary="API trace").to_dict()],
+            "strategy_ids": ["alpha", "beta"],
+            "indicators": [{
+                "strategy_id": "alpha", "symbol": "BTC",
+                "timestamp": "2020-01-01T00:00:00+00:00",
+                "name": "trend.value", "value": 123.0,
+            }],
+            "signals": [{
+                "strategy_id": "alpha", "timestamp": "2020-01-01T00:00:00+00:00",
+                "symbol": "BTC", "side": "open_long", "status": "approved",
+            }],
+            "confluence_scores": [{
+                "strategy_id": "alpha", "card_id": "entry", "score": 3,
+                "groups": [{"name": "primary", "score": 3}],
+            }],
+            "data_sources": [{
+                "strategy_id": "alpha", "identifier": "prices",
+                "values": {"Open": 100, "Close": 123},
+            }],
         })
         response = self.client.get("/api/run-reports")
         self.assertEqual(200, response.status_code)
         items = json.loads(response.data.decode())["items"]
         item = next(item for item in items if item["id"] == report.id)
+        self.assertIsInstance(item["id"], str)
+        self.assertEqual(["alpha", "beta"], item["strategy_ids"])
+        self.assertEqual(report.indicators, item["indicators"])
+        self.assertEqual(report.signals, item["signals"])
+        self.assertEqual(report.confluence_scores, item["confluence_scores"])
+        self.assertEqual(report.data_sources, item["data_sources"])
+        self.assertNotIn("reason", item)
+        self.assertNotIn("is_paper", item)
         self.assertEqual(item["decision_traces"], item["score_cards"])
         self.assertEqual("API trace", item["decision_traces"][0]["summary"])
         self.assertEqual(

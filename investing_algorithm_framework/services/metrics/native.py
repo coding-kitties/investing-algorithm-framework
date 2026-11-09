@@ -19,7 +19,7 @@ NATIVE_METRICS = frozenset({
 def native_risk_metrics(snapshots):
     import iaf_confluence_native as native
 
-    if getattr(native, 'DRAWDOWN_SEMANTICS_VERSION', None) != 'drawdown-v2':
+    if getattr(native, 'DRAWDOWN_SEMANTICS_VERSION', None) != 'drawdown-v1':
         raise NativeMetricsUnsupported('Native risk metric version mismatch')
     ordered = sorted(snapshots, key=lambda snapshot: snapshot.created_at)
     values, flows, times, elapsed = [], [], [], []

@@ -40,6 +40,10 @@ def _definition(card):
 
     try:
         definition = card.to_dict()
+        if "confluence_score_card_version" in definition:
+            raise NativeConfluenceUnsupported(
+                "Named score cards require the Python backend"
+            )
         check(definition)
         return json.dumps(definition, sort_keys=True, allow_nan=False)
     except (TypeError, ValueError, RecursionError) as error:

@@ -19,7 +19,18 @@ def _constant(frame, value):
     return pd.Series(value, index=frame.index)
 
 
-def _expression(expression, frame):
+def _expression(expression, frame, rule_matches=None, group_scores=None):
+    from .confluence_score import Rule, Threshold
+
+    if isinstance(expression, Rule):
+        if rule_matches is None:
+            raise ValueError("Rule references require ConfluenceScoreCard evaluation")
+        return rule_matches[expression.name]
+    if isinstance(expression, Threshold):
+        if group_scores is None:
+            raise ValueError("Threshold references require ConfluenceScoreCard evaluation")
+        score, available = group_scores[expression.group]
+        return score.ge(expression.value) & available, available
     if isinstance(expression, ConditionExpression):
         predicate = expression.condition
 
@@ -71,13 +82,13 @@ def _expression(expression, frame):
         return matched.fillna(False).astype(bool) & available, available
 
     if isinstance(expression, Not):
-        matched, available = _expression(expression.expression, frame)
+        matched, available = _expression(expression.expression, frame, rule_matches, group_scores)
         return ~matched & available, available
     if isinstance(expression, (AllOf, AnyOf, AtLeast)):
         available = _constant(frame, True)
         matches = _constant(frame, 0)
         for child in expression.expressions:
-            matched, child_available = _expression(child, frame)
+            matched, child_available = _expression(child, frame, rule_matches, group_scores)
             matches += matched.astype(int)
             available &= child_available
         if isinstance(expression, AllOf):
@@ -156,4 +167,74 @@ def evaluate_card_series(card, frame, *, backend="python"):
         "score": score.where(available),
         "available": available,
         "qualified": qualified,
+    }, index=frame.index)
+
+
+def evaluate_score_card_series(card, frame, *, backend="python"):
+    """Batch evaluation for named multi-group cards, retaining fail-closed availability."""
+    import numpy as np
+
+    from .confluence_native import NativeConfluenceUnsupported
+
+    _validate_frame(frame)
+    if backend not in ("python", "rust", "auto"):
+        raise ValueError("backend must be 'python', 'rust', or 'auto'")
+    if backend == "rust":
+        raise NativeConfluenceUnsupported(
+            "Named score cards with group aggregation and overrides require the Python backend"
+        )
+    matches = {
+        name: _expression(rule.expression, frame)
+        for name, rule in card.rules.items()
+    }
+    available = _constant(frame, True)
+    for _, ready in matches.values():
+        available &= ready
+    groups = {}
+    for group, method in card.group_aggregation.items():
+        group_available = _constant(frame, True)
+        contributions = []
+        for name, rule in card.rules.items():
+            if group not in rule.group_weights:
+                continue
+            matched, ready = matches[name]
+            group_available &= ready
+            contribution = _constant(frame, rule.group_weights[group])
+            contributions.append(
+                contribution.where(matched) if method == "max"
+                else contribution.where(matched, 0.0)
+            )
+        stacked = pd.concat(contributions, axis=1)
+        score = (
+            stacked.max(axis=1).fillna(0.0) if method == "max"
+            else stacked.sum(axis=1)
+        )
+        if not np.isfinite(score.to_numpy()).all():
+            raise ValueError("Aggregated score must be finite")
+        groups[group] = (score, group_available)
+    normal = _constant(frame, bool(card.group_thresholds))
+    for group, threshold in card.group_thresholds.items():
+        normal &= groups[group][0].ge(threshold)
+    override = _constant(frame, False)
+    if card.override_triggers is not None:
+        override, ready = _expression(card.override_triggers, frame, matches, groups)
+        available &= ready
+    qualified = normal | override
+    for requirement in card.requirements:
+        matched, ready = _expression(requirement.expression, frame)
+        available &= ready
+        qualified &= matched
+    for veto in card.vetoes:
+        matched, ready = _expression(veto.expression, frame)
+        available &= ready
+        qualified &= ~matched
+    total = _constant(frame, 0.0)
+    for score, _ in groups.values():
+        total += score
+    if not np.isfinite(total.to_numpy()).all():
+        raise ValueError("Aggregated score must be finite")
+    return pd.DataFrame({
+        "score": total.where(available),
+        "available": available,
+        "qualified": qualified & available,
     }, index=frame.index)

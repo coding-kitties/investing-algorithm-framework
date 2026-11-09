@@ -65,7 +65,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     target_symbol = Column(String)
     trading_symbol = Column(String)
     closed_at = Column(DateTime, default=None)
-    opened_at = Column(DateTime, default=None)
+    opened_at = Column(DateTime, default=None, index=True)
     open_price = Column(SqliteDecimal(), default=None)
     amount = Column(SqliteDecimal(), default=None)
     available_amount = Column(SqliteDecimal(), default=None)

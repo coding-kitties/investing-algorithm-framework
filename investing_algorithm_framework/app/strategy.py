@@ -1,13 +1,14 @@
 import logging
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Union
+from collections.abc import Mapping
 
 import pandas as pd
 
 from investing_algorithm_framework.domain import (
     INDEX_DATETIME, ConflictPolicy, CooldownRule, CooldownTracker,
-    ConfluenceCard, DataSource, DataType, DecisionTrace, DecisionTraceEntry,
-    EvaluationContext, ExposureRule, OperationalException, Order,
+    ConfluenceCard, ConfluenceScoreCard, DataSource, DataType, DecisionTrace,
+    ExposureRule, OperationalException, Order,
     Position, PositionSize, ScalingRule, Schedule, ScheduledFunction,
     Signal, SignalSide, SignalSeries, StopLossRule, StrategyProfile,
     TakeProfitRule, Trade,
@@ -17,11 +18,12 @@ from ..services.strategy_phases import (
     PhaseState, StrategyPhase, build_default_phases,
 )
 from .context import Context
+from .confluence_signal_support import ConfluenceSignalSupport
 
 logger = logging.getLogger(__name__)
 
 
-class TradingStrategy:
+class TradingStrategy(ConfluenceSignalSupport):
     """
     TradingStrategy is the base class for all trading strategies. A trading
     strategy is a set of rules that defines when to buy or sell an asset.
@@ -42,8 +44,8 @@ class TradingStrategy:
 
     Pipeline composition:
         ``run_strategy`` is a thin loop over :pyattr:`phases` — by
-        default the seven canonical phases (collect → resolve → size
-        → risk-budget → emit → attach-rules → record-cooldown).
+        default the nine canonical phases (pipelines → indicators → collect
+        → resolve → size → risk-budget → emit → attach-rules → record-cooldown).
         Override :pyattr:`phases` to insert/replace/reorder; override
         :pyattr:`conflict_policy` to change how same-symbol signal
         clashes are resolved; override :pyattr:`executor` to swap
@@ -106,10 +108,11 @@ class TradingStrategy:
     decorated = None
     data_sources: List[DataSource] = []
     pipelines: List[type] = []
+    indicator_configs = ()
+    confluence_cards = None
     traces = None
     last_signals: List[Signal] = []
     last_decision_traces: List[Dict[str, Any]] = []
-    signal_cards: Dict[SignalSide, ConfluenceCard] = None
     context: Context = None
     metadata: Dict[str, Any] = None
     position_sizes: List[PositionSize] = []
@@ -144,18 +147,28 @@ class TradingStrategy:
         flip_on_opposite_signal: bool = None,
         exposure_rule: ExposureRule = None,
         decorated=None,
-        signal_cards: Dict[SignalSide, ConfluenceCard] = None,
+        signal_cards: Dict[SignalSide, ConfluenceCard | ConfluenceScoreCard] = None,
+        indicator_configs=None,
+        confluence_cards=None,
     ):
-        configured_cards = (
-            signal_cards if signal_cards is not None else self.signal_cards
+        configured_indicators = (
+            self.indicator_configs if indicator_configs is None else indicator_configs
         )
-        self.signal_cards = dict(configured_cards or {})
-        for side, card in self.signal_cards.items():
-            if not isinstance(side, SignalSide):
-                raise ValueError("signal_cards keys must be SignalSide values")
-            if not isinstance(card, ConfluenceCard):
-                raise ValueError("signal_cards values must be ConfluenceCard")
+        self.indicator_configs = (
+            dict(configured_indicators) if isinstance(configured_indicators, Mapping)
+            else list(configured_indicators) if isinstance(configured_indicators, list)
+            else tuple(configured_indicators)
+        )
+        configured_confluence = (
+            self.confluence_cards if confluence_cards is None else confluence_cards
+        )
+        self.confluence_cards = (
+            dict(configured_confluence) if isinstance(configured_confluence, Mapping)
+            else list(configured_confluence) if configured_confluence is not None else {}
+        )
+        self._configure_signal_cards(signal_cards)
         self._pending_decision_traces = []
+        self._pending_confluence_scores = []
         self.last_decision_traces = []
 
         if metadata is None:
@@ -500,41 +513,14 @@ class TradingStrategy:
         """
         return dict(self._parameters)
 
-    def prepare_signal_data(self, data) -> Dict[str, pd.DataFrame]:
-        """Prepare symbol-keyed pandas frames for default card evaluation.
-
-        Override to compute indicators and custom boolean columns. Both
-        signal hooks call this once. Use only current/past data per row.
-        Vector mode requires unique, ascending DatetimeIndex values.
-        """
-        raise NotImplementedError(
-            "Strategies using default signal_cards hooks must implement "
-            "prepare_signal_data(data) returning {symbol: pandas.DataFrame}"
+    def create_indicator_engine(self):
+        """Create fresh run-local indicator state for the default phase."""
+        from investing_algorithm_framework.services.indicator_engine import (
+            IndicatorEngine,
         )
-
-    def _prepared_signal_frames(self, data, *, vector=False):
-        frames = self.prepare_signal_data(data)
-        if not isinstance(frames, dict):
-            raise TypeError("prepare_signal_data must return a symbol mapping")
-        for symbol, frame in frames.items():
-            if not isinstance(symbol, str) or not symbol:
-                raise ValueError("Prepared signal symbols must be non-empty")
-            if not isinstance(frame, pd.DataFrame):
-                raise TypeError(
-                    "Prepared signal data must be pandas DataFrames"
-                )
-            if not frame.columns.is_unique:
-                raise ValueError("Prepared signal columns must be unique")
-            if vector and not isinstance(frame.index, pd.DatetimeIndex):
-                raise ValueError(
-                    "Vector signal frames require a DatetimeIndex"
-                )
-            if (not frame.index.is_unique
-                    or not frame.index.is_monotonic_increasing):
-                raise ValueError(
-                    "Signal frame indices must be unique and sorted"
-                )
-            yield symbol, frame
+        return IndicatorEngine(
+            self.indicator_configs, self.confluence_cards, self.data_sources,
+        )
 
     def generate_signals(
         self, context: Context, data: Dict[str, Any]
@@ -602,52 +588,7 @@ class TradingStrategy:
             skipped. Without cards it yields nothing. Existing overrides
             remain responsible for their own signal behavior.
         """
-        if not self.signal_cards:
-            return
-        for symbol, frame in self._prepared_signal_frames(data):
-            recent = frame.iloc[-2:]
-            if recent.empty:
-                continue
-            evaluation_context = EvaluationContext(
-                recent.iloc[-1].to_dict(),
-                recent.iloc[-2].to_dict() if len(recent) > 1 else {},
-            )
-            for side, card in self.signal_cards.items():
-                availability = card.evaluate_series(recent)["available"]
-                if availability.iloc[-1]:
-                    yield from self._signals_from_card(
-                        evaluation_context, symbol, side, card
-                    )
-
-    def generate_signals_from_cards(
-        self, evaluation_context: EvaluationContext, *, symbol: str
-    ) -> Iterable[Signal]:
-        """Evaluate each configured card independently for one symbol.
-
-        Call from generate_signals after computing indicators. Qualified
-        cards yield traced signals; rejected cards are recorded for the tick.
-        Position eligibility and conflicts remain the strategy phases' job.
-        This helper emits event signals, not vector SignalSeries.
-        """
-        for side, card in self.signal_cards.items():
-            yield from self._signals_from_card(
-                evaluation_context, symbol, side, card
-            )
-
-    def _signals_from_card(self, evaluation_context, symbol, side, card):
-        result = card.evaluate(evaluation_context)
-        trace = DecisionTrace.from_confluence_result(
-            result, indicator_snapshot=evaluation_context
-        )
-        trace.entries.append(DecisionTraceEntry(
-            name="signal_side", value=side.value, group="decision"
-        ))
-        if result.qualified:
-            yield Signal(
-                symbol=symbol, side=side, source=card.name,
-            ).with_decision_trace(trace)
-        else:
-            self.record_decision_trace(trace, symbol=symbol)
+        yield from self._generate_card_signals(data, context)
 
     def generate_signal_series(
         self, data: Dict[str, Any]
@@ -711,15 +652,7 @@ class TradingStrategy:
             not construct per-row decision traces. Without cards it yields
             nothing; vector validation requires an override or card setup.
         """
-        if not self.signal_cards:
-            return
-        for symbol, frame in self._prepared_signal_frames(data, vector=True):
-            for side, card in self.signal_cards.items():
-                result = card.evaluate_series(frame)
-                yield SignalSeries(
-                    symbol=symbol, side=side, series=result["qualified"],
-                    source=card.name,
-                )
+        yield from self._generate_card_signal_series(data)
 
     def run_strategy(self, context: Context, data: Dict[str, Any]):
         """
@@ -755,6 +688,7 @@ class TradingStrategy:
         """
         self.context = context
         self._pending_decision_traces = []
+        self._pending_confluence_scores = []
         state = PhaseState(
             strategy=self,
             context=context,
@@ -846,7 +780,8 @@ class TradingStrategy:
 
         if self.take_profit_rules_lookup == {}:
             for tp in self.take_profits:
-                self.take_profit_rules_lookup[(tp.symbol, tp.side)] = tp
+                for target in tp.symbols or (None,):
+                    self.take_profit_rules_lookup[(target, tp.side)] = tp
 
         return self.take_profit_rules_lookup.get(
             (symbol, side),
@@ -872,7 +807,8 @@ class TradingStrategy:
 
         if self.stop_loss_rules_lookup == {}:
             for sl in self.stop_losses:
-                self.stop_loss_rules_lookup[(sl.symbol, sl.side)] = sl
+                for target in sl.symbols or (None,):
+                    self.stop_loss_rules_lookup[(target, sl.side)] = sl
 
         return self.stop_loss_rules_lookup.get(
             (symbol, side),
@@ -904,7 +840,8 @@ class TradingStrategy:
 
         if self.position_sizes_lookup == {}:
             for ps in self.position_sizes:
-                self.position_sizes_lookup[ps.symbol] = ps
+                for target in ps.symbols or (None,):
+                    self.position_sizes_lookup[target] = ps
 
         position_size = self.position_sizes_lookup.get(
             symbol, self.position_sizes_lookup.get(None)
@@ -940,7 +877,8 @@ class TradingStrategy:
 
         if self.scaling_rules_lookup == {}:
             for sr in self.scaling_rules:
-                self.scaling_rules_lookup[sr.symbol] = sr
+                for target in sr.symbols or (None,):
+                    self.scaling_rules_lookup[target] = sr
 
         return self.scaling_rules_lookup.get(
             symbol, self.scaling_rules_lookup.get(None)
@@ -1392,22 +1330,6 @@ class TradingStrategy:
             int: The number of positions
         """
         return self.context.get_number_of_positions()
-
-    @property
-    def long_entry_card(self):
-        return self.signal_cards[SignalSide.OPEN_LONG]
-
-    @property
-    def short_entry_card(self):
-        return self.signal_cards[SignalSide.OPEN_SHORT]
-
-    @property
-    def short_exit_card(self):
-        return self.signal_cards[SignalSide.CLOSE_SHORT]
-
-    @property
-    def long_exit_card(self):
-        return self.signal_cards[SignalSide.CLOSE_LONG]
 
     def get_position(
         self, symbol, market=None, identifier=None

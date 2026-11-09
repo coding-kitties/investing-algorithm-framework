@@ -1,5 +1,9 @@
 import math
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any, Optional, TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from investing_algorithm_framework.domain.backtesting.backtest_utils \
+        import BacktestIndex
 
 
 def create_markdown_table(data: List[Union[Dict[str, Any], Any]]):
@@ -255,6 +259,11 @@ def create_backtest_metrics_table(
             attribute names (strings) or a list of
             ``(attribute, header, format_spec)`` tuples. Defaults to
             ``DEFAULT_METRIC_COLUMNS``.
+            At run level, attributes absent from ``BacktestMetrics`` are
+            read from ``BacktestRun``, e.g. ``number_of_orders``.
+            Bare Python format specs (e.g. ``".2%"`` or ``",.2f"``) format
+            raw metric values. Legacy templates (e.g. ``"{:.2f}"``) and
+            empty formats retain automatic percentage-point conversion.
         id_attribute: Backtest attribute used as the first column to
             identify each row. Defaults to ``"algorithm_id"``.
         sort_by: Optional metric attribute name to sort rows by.
@@ -315,9 +324,8 @@ def create_backtest_metrics_table(
                 fmt = entry[2] if len(entry) > 2 else ""
                 columns.append((attr, header, fmt))
 
-    # Collect (backtest, metrics_obj, window_label) triples for the
-    # requested engine. ``window_label`` is None for summary level.
-    triples = []
+    # Retain the run for scalar fields not stored in BacktestMetrics.
+    records = []
     for backtest in backtests:
         engines = backtest.engines() if hasattr(backtest, "engines") else []
         if engine not in engines:
@@ -327,7 +335,7 @@ def create_backtest_metrics_table(
             summary = _get_summary(backtest, engine, study)
             if summary is None:
                 continue
-            triples.append((backtest, summary, None))
+            records.append((backtest, summary, None, None))
         else:  # level == "run"
             runs = _get_runs(backtest, engine, study)
             for run in runs:
@@ -344,9 +352,9 @@ def create_backtest_metrics_table(
                     or _format_window_dates(run)
                     or "—"
                 )
-                triples.append((backtest, run_metrics, window_label))
+                records.append((backtest, run_metrics, window_label, run))
 
-    if not triples:
+    if not records:
         return create_markdown_table([])
 
     if using_default_columns:
@@ -354,7 +362,7 @@ def create_backtest_metrics_table(
             columns = DEFAULT_METRIC_COLUMNS
         elif all(
             getattr(summary, "aggregation_semantics_version", None) is None
-            for _, summary, _ in triples
+            for _, summary, _, _ in records
         ):
             columns = DEFAULT_LEGACY_SUMMARY_METRIC_COLUMNS
         else:
@@ -362,25 +370,27 @@ def create_backtest_metrics_table(
 
     # Optional sort by a metric attribute (``None`` placed last).
     if sort_by is not None:
-        def _has_value(triple):
-            return getattr(triple[1], sort_by, None) is not None
+        def _has_value(record):
+            return _sort_key(record) is not None
 
-        def _sort_key(triple):
-            return getattr(triple[1], sort_by, None)
+        def _sort_key(record):
+            return getattr(
+                record[1], sort_by, getattr(record[3], sort_by, None),
+            )
 
-        with_value = [t for t in triples if _has_value(t)]
-        without_value = [t for t in triples if not _has_value(t)]
+        with_value = [record for record in records if _has_value(record)]
+        without_value = [record for record in records if not _has_value(record)]
         with_value.sort(key=_sort_key, reverse=descending)
-        triples = with_value + without_value
+        records = with_value + without_value
 
-    triples = triples[row_offset:]
+    records = records[row_offset:]
     if row_limit is not None:
-        triples = triples[:row_limit]
+        records = records[:row_limit]
 
     # Build row dicts so we can reuse ``create_markdown_table``.
     id_header = id_attribute.replace("_", " ").title()
     rows = []
-    for backtest, metrics_obj, window_label in triples:
+    for backtest, metrics_obj, window_label, backtest_run in records:
         row = {
             id_header: getattr(backtest, id_attribute, None) or "N/A",
             "Engine": engine,
@@ -388,7 +398,10 @@ def create_backtest_metrics_table(
         if level == "run":
             row["Window"] = window_label
         for attr, header, fmt in columns:
-            value = getattr(metrics_obj, attr, None)
+            value = getattr(
+                metrics_obj, attr, getattr(backtest_run, attr, None),
+            )
+            raw_format = bool(fmt) and "{" not in fmt and "}" not in fmt
             # The framework stores percentage fields as decimals
             # (e.g. 0.25 == 25%). For display in columns labelled "%"
             # we multiply by 100 so per-run and summary rows render in
@@ -397,6 +410,7 @@ def create_backtest_metrics_table(
             # well-known decimal ratios (cagr, max_drawdown, win_rate,
             # volatility) are listed in ``_PERCENT_RATIO_ATTRS``.
             if value is not None \
+                    and not raw_format \
                     and (attr.endswith("_percentage")
                          or attr in _PERCENT_RATIO_ATTRS) \
                     and isinstance(value, (int, float)) \
@@ -404,6 +418,8 @@ def create_backtest_metrics_table(
                 value = value * 100
             if value is None:
                 row[header] = "N/A"
+            elif raw_format:
+                row[header] = format(value, fmt)
             elif fmt:
                 try:
                     row[header] = fmt.format(value)
@@ -1098,6 +1114,8 @@ def show_backtest_summaries(
         columns: Optional column override — a list of attribute
             names (strings) or ``(attribute, header, format_spec)``
             tuples. Defaults to :data:`DEFAULT_METRIC_COLUMNS`.
+            Bare specs format raw values (``".2%"`` renders 0.25 as
+            25.00%); legacy templates retain their existing scaling.
         id_attribute: Backtest attribute used as the first column.
         sort_by: Optional metric attribute name to sort rows by.
         descending: Sort direction when ``sort_by`` is set.
@@ -1136,7 +1154,7 @@ def show_backtest_summaries(
 
 
 def show_backtest_runs(
-    backtests: List[Any],
+    backtests: Optional[List[Any]] = None,
     study: str = None,
     run: Any = None,
     engine: str = "vector",
@@ -1146,6 +1164,9 @@ def show_backtest_runs(
     descending: bool = True,
     page: int = 1,
     page_size: int = 25,
+    *,
+    backtest_index: Optional["BacktestIndex"] = None,
+    workers: Optional[int] = None,
 ) -> str:
     """Render one row per rolling-window run as markdown for notebook
     display.
@@ -1156,7 +1177,8 @@ def show_backtest_runs(
     when running in IPython/Jupyter.
 
     Args:
-        backtests: List of ``Backtest`` objects.
+        backtests: List of ``Backtest`` objects. Provide either this or
+            ``backtest_index``, not both.
         study: Optional study name to scope the lookup to a specific
             study slot in a multi-study bundle. Forwarded to
             ``backtest.get_runs(engine, study=...)``. When omitted,
@@ -1176,11 +1198,19 @@ def show_backtest_runs(
         columns: Optional column override — a list of attribute
             names (strings) or ``(attribute, header, format_spec)``
             tuples. Defaults to :data:`DEFAULT_METRIC_COLUMNS`.
+            Bare specs format raw values (``".2%"`` renders 0.25 as
+            25.00%); legacy templates retain their existing scaling.
         id_attribute: Backtest attribute used as the first column.
         sort_by: Optional metric attribute name to sort rows by.
         descending: Sort direction when ``sort_by`` is set.
         page: One-based result page to render. Defaults to 1.
         page_size: Number of run rows per page. Defaults to 25.
+        backtest_index: Optional ``BacktestIndex`` whose referenced bundles
+            are loaded once, then passed through the same run rendering.
+            Duplicate bundle paths are loaded only once. Study, engine,
+            and run filters apply to the loaded bundles, not index metrics.
+        workers: Bundle-loading workers, only for ``backtest_index``.
+            Use 1 for sequential loading; None uses the loader default.
 
     Returns:
         str: The rendered markdown string.
@@ -1189,6 +1219,39 @@ def show_backtest_runs(
         raise ValueError("page must be >= 1")
     if page_size < 1:
         raise ValueError("page_size must be >= 1")
+    if backtests is not None and backtest_index is not None:
+        raise ValueError("Provide either backtests or backtest_index, not both")
+    if backtest_index is not None:
+        from investing_algorithm_framework.domain import (
+            BacktestIndex, OperationalException,
+        )
+
+        if not isinstance(backtest_index, BacktestIndex):
+            raise TypeError("backtest_index must be a BacktestIndex")
+        if backtest_index.df.empty:
+            backtests = []
+        else:
+            if "bundle_path" not in backtest_index.df.columns:
+                raise OperationalException(
+                    "Backtest index must contain a bundle_path column."
+                )
+            paths = (
+                backtest_index.df["bundle_path"].drop_duplicates().tolist()
+            )
+            if any(not isinstance(path, str) or not path for path in paths):
+                raise OperationalException(
+                    "Backtest index contains an invalid bundle_path."
+                )
+            backtests = backtest_index.load_backtests(workers=workers)
+            if len(backtests) != len(paths):
+                raise OperationalException(
+                    "Could not load all indexed backtest bundles; "
+                    "see the logged loading errors. No partial table rendered."
+                )
+    elif workers is not None:
+        raise ValueError("workers is only supported with backtest_index")
+    if backtests is None:
+        raise ValueError("Provide backtests or backtest_index")
 
     total_rows = _count_matching_runs(backtests, engine, study, run)
     total_pages = max(1, math.ceil(total_rows / page_size))

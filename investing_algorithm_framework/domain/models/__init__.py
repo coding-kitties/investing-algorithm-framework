@@ -27,6 +27,9 @@ from .confluence import AllOf, AnyOf, AtLeast, Condition, \
     Requirement, RuleEvaluation, ScoreRule, ScoreType, Veto, \
     CONFLUENCE_CARD_VERSION
 from .signal_series import SignalSeries
+from .confluence_score import (
+    ConfluenceScoreCard, ConfluenceScoreRule, Rule, Threshold,
+)
 from .signal_helpers import signals_from_column, signals_from_panel, \
     signal_series_from_column
 from .conflict_policy import ConflictPolicy, ConflictResolution
@@ -63,6 +66,10 @@ __all__ = [
     "ConditionExpression",
     "condition",
     "ConfluenceCard",
+    "ConfluenceScoreCard",
+    "ConfluenceScoreRule",
+    "Rule",
+    "Threshold",
     "ConfluenceResult",
     "EvaluationContext",
     "Expression",

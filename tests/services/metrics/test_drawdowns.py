@@ -109,7 +109,7 @@ class TestNativeDrawdown(unittest.TestCase):
         except ImportError:
             self.skipTest('Optional native extension is not installed')
         self.assertEqual(iaf_confluence_native.DRAWDOWN_SEMANTICS_VERSION,
-                         'drawdown-v2')
+                         'drawdown-v1')
         functions = {
             'equity_curve': get_equity_curve,
             'drawdown_series': get_drawdown_series,

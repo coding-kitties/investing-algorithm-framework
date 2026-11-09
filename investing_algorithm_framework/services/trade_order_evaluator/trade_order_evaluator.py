@@ -75,6 +75,9 @@ class TradeOrderEvaluator(ABC):
             # "take_profits" from this dict in place (OrderService.
             # create), so capture the trade refs before calling it.
             trades = take_profit_order.get("trades", [])
+            self._record_protective_trigger(
+                take_profit_order, take_profits, "take_profit", current_date,
+            )
             for trade_ref in trades:
                 self.order_service.cancel_mirror_orders_for_trade(
                     trade_ref["trade_id"]
@@ -100,6 +103,9 @@ class TradeOrderEvaluator(ABC):
             stop_losses = stop_loss_order["stop_losses"]
             # See note in _check_take_profits: capture before mutation.
             trades = stop_loss_order.get("trades", [])
+            self._record_protective_trigger(
+                stop_loss_order, stop_losses, "stop_loss", current_date,
+            )
 
             for trade_ref in trades:
                 self.order_service.cancel_mirror_orders_for_trade(
@@ -134,6 +140,34 @@ class TradeOrderEvaluator(ABC):
                 else "on_trade_stop_loss_triggered"
             )
             self._dispatch_hook_for_trades(trades, hook_name)
+
+    def _record_protective_trigger(self, order_data, references, kind, timestamp):
+        service = (
+            self.trade_stop_loss_service if kind == "stop_loss"
+            else self.trade_take_profit_service
+        )
+        rules = []
+        for reference in references:
+            rule = service.get(reference[f"{kind}_id"])
+            rules.append({
+                "rule_id": reference[f"{kind}_id"],
+                "amount": reference["amount"],
+                "threshold_price": getattr(rule, f"{kind}_price"),
+                "trailing": bool(getattr(rule, "trailing", False)),
+            })
+        trade_refs = order_data.get("trades", [])
+        strategy_ids = {
+            self.trade_service.get(ref["trade_id"]).strategy_id
+            for ref in trade_refs
+        } - {None}
+        metadata = order_data.setdefault("metadata", {})
+        metadata["protective_trigger"] = {
+            "timestamp": timestamp.isoformat(), "rules": rules,
+            "trades": [dict(ref) for ref in trade_refs],
+            "price": order_data["price"], "amount": order_data["amount"],
+        }
+        if len(strategy_ids) == 1:
+            metadata["strategy_id"] = next(iter(strategy_ids))
 
     def _dispatch_hook_for_trades(self, trades, hook_name):
         """

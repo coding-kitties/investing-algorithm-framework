@@ -38,7 +38,7 @@ from .models import AllOf, AnyOf, AtLeast, Condition, ConditionExpression, \
     condition, \
     ConfluenceCard, ConfluenceResult, EvaluationContext, Expression, Not, \
     Operator, PrimaryGroup, EvidenceGroup, GroupEvaluation, Requirement, \
-    RuleEvaluation, ScoreRule, \
+    RuleEvaluation, ScoreRule, ConfluenceScoreCard, ConfluenceScoreRule, Rule, Threshold, \
     ScoreType, Veto, CONFLUENCE_CARD_VERSION
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
@@ -133,6 +133,10 @@ __all__ = [
     "ConditionExpression",
     "condition",
     "ConfluenceCard",
+    "ConfluenceScoreCard",
+    "ConfluenceScoreRule",
+    "Rule",
+    "Threshold",
     "ConfluenceResult",
     "EvaluationContext",
     "Expression",

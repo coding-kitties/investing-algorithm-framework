@@ -5,7 +5,7 @@
 provide a custom ``phases = [...]`` override. The ordering
 reproduces the legacy ``run_strategy`` behaviour:
 
-    Collect → Resolve → Size → Risk-budget → Emit → Attach → Record
+    Pipelines → Indicators → Collect → Resolve → Size → Risk-budget → Emit → Attach → Record
 
 :func:`build_default_phases` returns a fresh list of phase
 *instances* so each strategy gets its own (currently stateless,
@@ -21,6 +21,7 @@ from .base import StrategyPhase
 from .collect_signals import CollectSignalsPhase
 from .emit_orders import EmitOrdersPhase
 from .evaluate_pipelines import EvaluatePipelinesPhase
+from .evaluate_indicators import EvaluateIndicatorsPhase
 from .record_cooldown import RecordCooldownPhase
 from .resolve_conflicts import ResolveConflictsPhase
 from .size_positions import SizePositionsPhase
@@ -30,6 +31,7 @@ from .size_positions import SizePositionsPhase
 #: for declarative use (e.g. ``phases = DEFAULT_PHASES``).
 DEFAULT_PHASES: Tuple[Type[StrategyPhase], ...] = (
     EvaluatePipelinesPhase,
+    EvaluateIndicatorsPhase,
     CollectSignalsPhase,
     ResolveConflictsPhase,
     SizePositionsPhase,

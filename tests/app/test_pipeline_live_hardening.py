@@ -53,7 +53,7 @@ def _strategy(strategy_id, data_sources, pipelines):
     )
 
 
-def _eventloop(env=Environment.DEV):
+def _eventloop(env=Environment.PROD):
     """Construct an :class:`EventLoopService` with stub services. The
     helper methods under test only need ``configuration_service`` to
     return ``{"environment": env}``, the rest can stay ``None``."""
@@ -141,7 +141,7 @@ class TestLiveEnvelopeValidation(TestCase):
         sources = [_ds("BTC/EUR", time_frame=TimeFrame.ONE_DAY)]
         strat = _strategy("s1", sources, [_DailyPipeline])
         loop._maybe_validate_live_envelope(
-            [strat], Environment.DEV.value,
+            [strat], Environment.PROD.value,
         )
         self.assertTrue(loop._pipelines_live_validated)
         # Even if we mutate the strategy to violate the envelope,
@@ -150,7 +150,7 @@ class TestLiveEnvelopeValidation(TestCase):
             _ds("BTC/EUR", time_frame=TimeFrame.ONE_HOUR),
         ]
         loop._maybe_validate_live_envelope(
-            [strat], Environment.DEV.value,
+            [strat], Environment.PROD.value,
         )  # no raise
 
 
@@ -248,7 +248,7 @@ class _PhaseStateStub:
         # context.config[ENVIRONMENT] is what the phase actually reads
         env = (
             Environment.BACKTEST.value
-            if is_backtest else Environment.DEV.value
+            if is_backtest else Environment.PROD.value
         )
         self.context = SimpleNamespace(config={"ENVIRONMENT": env})
         self.traces = []
@@ -277,7 +277,7 @@ class TestEvaluatePipelinesPhaseResilience(TestCase):
         return phase, state
 
     def test_live_mode_swallows_pipeline_error(self):
-        phase, state = self._setup(Environment.DEV)
+        phase, state = self._setup(Environment.PROD)
         logger_name = (
             "investing_algorithm_framework.services.strategy_phases"
             ".evaluate_pipelines"

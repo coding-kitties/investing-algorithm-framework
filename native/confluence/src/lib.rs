@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use serde_json::Value;
 
+mod cash;
 mod drawdown;
 mod event;
 mod event_accounting;
@@ -374,7 +375,7 @@ fn iaf_confluence_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("EVENT_ACCOUNTING_SEMANTICS_VERSION", "event-accounting-v1")?;
     module.add("EVENT_SETTLEMENT_SEMANTICS_VERSION", "event-settlement-v1")?;
     module.add("EVENT_LIFECYCLE_SEMANTICS_VERSION", "event-lifecycle-v1")?;
-    module.add("EVENT_ARCHIVE_SEMANTICS_VERSION", "event-archive-v2")?;
+    module.add("EVENT_ARCHIVE_SEMANTICS_VERSION", "event-archive-v3")?;
     module.add_function(wrap_pyfunction!(
         event_schedule::evaluate_event_market,
         module
@@ -421,9 +422,9 @@ fn iaf_confluence_native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<event_broker::BrokerAllocation>()?;
     module.add("SEMANTICS_VERSION", "confluence-vector-v1")?;
     module.add_class::<CompiledCard>()?;
-    module.add("EXECUTION_SEMANTICS_VERSION", "static-netting-v1")?;
-    module.add("NETTING_SEMANTICS_VERSION", "netting-accounting-v5")?;
-    module.add("DRAWDOWN_SEMANTICS_VERSION", "drawdown-v2")?;
+    module.add("EXECUTION_SEMANTICS_VERSION", "static-netting-v2")?;
+    module.add("NETTING_SEMANTICS_VERSION", "netting-accounting-v6")?;
+    module.add("DRAWDOWN_SEMANTICS_VERSION", "drawdown-v1")?;
     module.add("EVENT_FILL_SEMANTICS_VERSION", "event-fill-v1")?;
     module.add("EVENT_SCHEDULE_SEMANTICS_VERSION", "event-schedule-v1")?;
     module.add_function(wrap_pyfunction!(

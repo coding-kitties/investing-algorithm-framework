@@ -284,7 +284,7 @@ class TestPaperTradingApp(TestCase):
         ]
         self.assertEqual(1, len(sandbox_providers))
 
-    def test_paper_trading_executor_does_not_shadow_other_markets(self):
+    def test_mixed_paper_and_live_markets_are_rejected(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         app.add_market(
             market="BITVAVO",
@@ -293,25 +293,11 @@ class TestPaperTradingApp(TestCase):
             paper_trading=True,
             paper_trading_mode=PaperTradingMode.LOCAL,
         )
-        app.add_market(
-            market="BINANCE",
-            trading_symbol="EUR",
-            api_key="x",
-            secret_key="y",
-        )
-        app.initialize_config()
-        app.initialize_order_executors()
-
-        order_executor_lookup = app.container.order_executor_lookup()
-        order_executor_lookup.register_order_executor_for_market("BITVAVO")
-        order_executor_lookup.register_order_executor_for_market("BINANCE")
-
-        self.assertIsInstance(
-            order_executor_lookup.get_order_executor("BITVAVO"),
-            PaperTradingOrderExecutor,
-        )
-        binance_executor = order_executor_lookup.get_order_executor(
-            "BINANCE"
-        )
-        self.assertIsInstance(binance_executor, CCXTOrderExecutor)
-        self.assertFalse(binance_executor.sandbox)
+        with self.assertRaisesRegex(OperationalException, "Mixed"):
+            app.add_market(
+                market="BINANCE",
+                trading_symbol="EUR",
+                api_key="x",
+                secret_key="y",
+            )
+        self.assertEqual(1, len(app.get_portfolio_configurations()))

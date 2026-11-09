@@ -285,7 +285,16 @@ class ResolveConflictsPhase(StrategyPhase):
             policy.is_blocked_by_cooldown(side)
             and cooldown_key in strategy._cooldown_remaining
         ):
-            state.trace("resolve_conflicts.scaling_cooldown", sig)
+            details = {
+                "remaining_bars": strategy._cooldown_remaining[cooldown_key],
+            }
+            scaling_rule = strategy.get_scaling_rule(symbol)
+            if scaling_rule is not None and scaling_rule.cooldown_in_bars > 0:
+                details["cooldown_bars"] = scaling_rule.cooldown_in_bars
+            state.trace(
+                "resolve_conflicts.scaling_cooldown",
+                (sig, {"reason_details": details}),
+            )
             return False
 
         # CooldownRule via the strategy's CooldownTracker. Tracker
@@ -293,21 +302,35 @@ class ResolveConflictsPhase(StrategyPhase):
         tracker_side = _TRACKER_SIDE.get(side)
         if tracker_side is None:
             return True  # pragma: no cover - exhaustive map
+        position_side = (
+            ("long" if side.is_long else "short")
+            if state.position_mode == PositionMode.HEDGE else None
+        )
         blocked, vetoing_rule = strategy._cooldown_tracker.is_blocked(
             strategy.cooldowns,
             signal_side=tracker_side,
             symbol=symbol,
             bar_index=state.bar_index,
-            position_side=(
-                ("long" if side.is_long else "short")
-                if state.position_mode == PositionMode.HEDGE
-                else None
-            ),
+            position_side=position_side,
         )
         if blocked:
+            if vetoing_rule is None:
+                raise RuntimeError("Blocked cooldown did not identify its rule")
             state.trace(
                 "resolve_conflicts.cooldown_rule",
-                (sig, repr(vetoing_rule)),
+                (sig, repr(vetoing_rule), {"reason_details": {
+                    "cooldown_bars": vetoing_rule.bars,
+                    "remaining_bars": strategy._cooldown_tracker.remaining_bars(
+                        vetoing_rule, symbol=symbol, bar_index=state.bar_index,
+                        position_side=position_side,
+                    ),
+                    "scope": (
+                        "portfolio" if vetoing_rule.is_portfolio_scoped
+                        else "symbol"
+                    ),
+                    "trigger": vetoing_rule.trigger.value,
+                    "blocks": vetoing_rule.blocks.value,
+                }}),
             )
             return False
         return True

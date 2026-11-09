@@ -396,7 +396,7 @@ impl EventBroker {
         let mut position = self.position(&symbol);
         let cash = if side == 1 { 0.0 } else { amount * price };
         let units = if side == 1 || side == 3 { amount } else { 0.0 };
-        if cash > self.cash {
+        if crate::cash::exceeds_cash(cash, self.cash) {
             return Err(invalid("Insufficient cash"));
         }
         let available = if side == 3 {
@@ -801,6 +801,45 @@ mod tests {
         let before = broker.clone();
         assert!(broker.fill(buy, 1.0, f64::MAX, f64::MAX).is_err());
         assert_eq!(broker, before);
+    }
+
+    #[test]
+    fn thirds_roundoff_preserves_reservations_and_real_overspend_rejection() {
+        let third = 1000.0 * ((100.0 / 3.0) / 100.0);
+        for side in [0, 2] {
+            let mut broker = EventBroker::new(1000.0, false).unwrap();
+            let mut ids = Vec::new();
+            for _ in 0..3 {
+                ids.push(
+                    broker
+                        .submit("QQQ".into(), side, third / 100.0, 100.0)
+                        .unwrap(),
+                );
+            }
+            assert!(broker.cash.abs() < 1e-8);
+            let before = broker.clone();
+            assert!(broker
+                .submit("QQQ".into(), side, 0.01 / 100.0, 100.0)
+                .is_err());
+            assert_eq!(broker, before);
+            for id in ids {
+                broker.cancel(id).unwrap();
+            }
+            assert!((broker.cash - 1000.0).abs() < 1e-8);
+        }
+    }
+
+    #[test]
+    fn thirds_can_settle_at_the_reserved_price() {
+        let third = 1000.0 * ((100.0 / 3.0) / 100.0);
+        let mut broker = EventBroker::new(1000.0, false).unwrap();
+        for _ in 0..3 {
+            let amount = third / 100.0;
+            let id = broker.submit("QQQ".into(), 0, amount, 100.0).unwrap();
+            broker.fill(id, amount, 100.0, 0.0).unwrap();
+        }
+        assert!(broker.cash.abs() < 1e-8);
+        assert!((broker.position("QQQ").cost - 1000.0).abs() < 1e-8);
     }
 
     #[test]

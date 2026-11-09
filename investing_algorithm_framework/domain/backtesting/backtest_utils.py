@@ -5,7 +5,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed, \
 from logging import getLogger
 from pathlib import Path
 from random import Random
-from typing import Iterator, List, Union, Callable, Optional
+from typing import Any, Dict, Iterator, List, Union, Callable, Optional
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
@@ -750,11 +750,23 @@ class BacktestIndex:
     Lets analysis code filter on summary metrics / parameters
     *without opening any bundle*. Bundles for surviving rows can then
     be loaded explicitly via :py:meth:`load_backtests`.
+
+    ``run_reports`` is None by default, or a list of transient event-tick
+    report dictionaries when capture is requested. It includes evaluated
+    algorithms/windows, even if later metric filters prune their results.
+    Calling ``filter`` keeps reports for the surviving algorithm ids.
+    Reopening an index does not automatically restore reports. When
+    persistence was requested, load_run_reports explicitly reads the
+    compressed sidecars referenced by the current rows.
     """
 
-    def __init__(self, directory: Union[str, Path], dataframe):
+    def __init__(
+        self, directory: Union[str, Path], dataframe,
+        run_reports: Optional[List[Dict[str, Any]]] = None,
+    ):
         self.directory = Path(directory)
         self.df = dataframe
+        self.run_reports = run_reports
 
     @classmethod
     def open(
@@ -777,14 +789,159 @@ class BacktestIndex:
     def __len__(self) -> int:
         return len(self.df)
 
+    def _distinct_identifiers(self, column: str) -> List[str]:
+        if self.df.empty:
+            return []
+        if column not in self.df.columns:
+            raise OperationalException(
+                f"Backtest index must contain a {column} column."
+            )
+        values = self.df[column].dropna().drop_duplicates().tolist()
+        if any(not isinstance(value, str) for value in values):
+            raise OperationalException(
+                f"Backtest index {column} values must be strings or null."
+            )
+        return sorted(values)
+
+    def get_algorithm_ids(self) -> List[str]:
+        """Return sorted, distinct non-null algorithm ids in this index."""
+        return self._distinct_identifiers("algorithm_id")
+
+    def get_study_names(self) -> List[str]:
+        """Return sorted, distinct non-null study names in this index."""
+        return self._distinct_identifiers("study_name")
+
+    def get_engine_types(self) -> List[str]:
+        """Return sorted, distinct engine types, e.g. event and vector."""
+        return self._distinct_identifiers("engine_type")
+
+    def get_universe_keys(self) -> List[str]:
+        """Return distinct universe keys, excluding null pooled rows."""
+        return self._distinct_identifiers("universe_key")
+
+    def get_number_of_algorithms(self) -> int:
+        """Count distinct algorithm ids, not study/engine/universe rows."""
+        return len(self.get_algorithm_ids())
+
+    def get_number_of_studies(self) -> int:
+        """Count distinct study names across all algorithms."""
+        return len(self.get_study_names())
+
+    def get_number_of_engines(self) -> int:
+        """Count distinct engine types across all algorithms and studies."""
+        return len(self.get_engine_types())
+
+    def get_number_of_universes(self) -> int:
+        """Count distinct recorded universe keys, excluding pooled rows."""
+        return len(self.get_universe_keys())
+
+    def get_summary(self) -> Dict[str, int]:
+        """Describe the current index without loading backtest bundles."""
+        return {
+            "number_of_rows": len(self),
+            "number_of_algorithms": self.get_number_of_algorithms(),
+            "number_of_studies": self.get_number_of_studies(),
+            "number_of_engines": self.get_number_of_engines(),
+            "number_of_universes": self.get_number_of_universes(),
+        }
+
     def filter(self, predicate: Callable) -> "BacktestIndex":
         """Return a new index restricted to rows where *predicate(row)*
         is True.  ``predicate`` receives a pandas Series.
         """
         if self.df.empty:
-            return BacktestIndex(self.directory, self.df.copy())
+            return BacktestIndex(
+                self.directory, self.df.copy(),
+                run_reports=[] if self.run_reports is not None else None,
+            )
         mask = self.df.apply(predicate, axis=1).astype(bool)
-        return BacktestIndex(self.directory, self.df.loc[mask].copy())
+        dataframe = self.df.loc[mask].copy()
+        reports = None
+        if self.run_reports is not None:
+            algorithm_ids = set(dataframe["algorithm_id"])
+            reports = [
+                report for report in self.run_reports
+                if report["algorithm_id"] in algorithm_ids
+            ]
+        return BacktestIndex(self.directory, dataframe, run_reports=reports)
+
+    def load_run_reports(
+        self, algorithm_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Load persisted reports for the current algorithm/study/engine rows.
+
+        Does not populate run_reports or load backtest bundles. Universe
+        rows share algorithm-wide snapshots; they do not trim report contents.
+        Missing references/files and corrupt sidecars raise explicitly.
+        """
+        from .run_report_storage import (
+            REPORT_SCOPE_COLUMNS, RUN_REPORTS_PATH_COLUMN,
+            iter_run_reports, report_scope,
+        )
+
+        if algorithm_id is not None and (
+            not isinstance(algorithm_id, str) or not algorithm_id
+        ):
+            raise ValueError("algorithm_id must be a non-empty string")
+        frame = self.df
+        if algorithm_id is not None:
+            if algorithm_id not in self.get_algorithm_ids():
+                raise OperationalException(
+                    f"Algorithm {algorithm_id!r} is not present in this index."
+                )
+            frame = frame.loc[frame["algorithm_id"].eq(algorithm_id)]
+        if frame.empty:
+            return []
+        required = (*REPORT_SCOPE_COLUMNS, RUN_REPORTS_PATH_COLUMN)
+        if any(column not in frame for column in required):
+            raise OperationalException(
+                "Index has no complete persisted run report references. "
+                "Rerun with capture_run_reports=True and "
+                "persist_run_reports=True."
+            )
+        scopes_by_path = {}
+        for row in frame[list(required)].itertuples(index=False, name=None):
+            *scope, reference = row
+            if any(not isinstance(value, str) or not value for value in row):
+                raise OperationalException(
+                    "Index contains an invalid run report scope or "
+                    "run_reports_path. Reports must be persisted for "
+                    "every selected row."
+                )
+            scopes_by_path.setdefault(reference, set()).add(tuple(scope))
+        reports = []
+        for reference, scopes in scopes_by_path.items():
+            for report in iter_run_reports(self.directory, reference):
+                if report_scope(report) in scopes:
+                    reports.append(report)
+        return reports
+
+    def get_backtest(self, algorithm_id: str) -> Optional[Backtest]:
+        """Load the bundle indexed for an algorithm, or return None.
+
+        Respects the current rows, including filters. Repeated rows for
+        one bundle load it once; multiple distinct bundles are ambiguous.
+        Invalid index data and bundle loading errors propagate.
+        """
+        if self.df.empty:
+            return None
+        if "algorithm_id" not in self.df.columns:
+            raise OperationalException(
+                "Backtest index must contain an algorithm_id column."
+            )
+        matches = self.df.loc[self.df["algorithm_id"].eq(algorithm_id)]
+        if matches.empty:
+            return None
+        if "bundle_path" not in matches.columns:
+            raise OperationalException(
+                "Backtest index must contain a bundle_path column."
+            )
+        if len(matches["bundle_path"].drop_duplicates()) > 1:
+            raise OperationalException(
+                f"Backtest index contains multiple bundles for "
+                f"algorithm_id {algorithm_id!r}; filter the index first."
+            )
+        return next(BacktestIndex(self.directory, matches).iter_backtests())
 
     def iter_backtests(self) -> Iterator[Backtest]:
         """Load one full backtest at a time, without retaining prior ones.

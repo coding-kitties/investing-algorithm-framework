@@ -29,6 +29,17 @@ fn sift_reservations(heap: &mut [usize], rows: &[(i64, f64, bool)], mut position
     heap[position] = value;
 }
 
+fn amount_roundoff_tolerance(first: f64, second: f64) -> f64 {
+    let magnitude = first.abs().max(second.abs());
+    let bits = magnitude.to_bits();
+    let spacing = if magnitude == f64::MAX {
+        magnitude - f64::from_bits(bits - 1)
+    } else {
+        f64::from_bits(bits + 1) - magnitude
+    };
+    16.0 * spacing
+}
+
 #[pyfunction]
 pub fn event_reservation_plan(
     rows: Vec<(i64, f64, bool)>,
@@ -55,16 +66,29 @@ pub fn event_reservation_plan(
         }
     } else {
         let mut heap = Vec::new();
-        let mut total = 0.0;
+        let mut total: f64 = 0.0;
+        let mut correction = 0.0;
         for (index, row) in rows.iter().enumerate() {
             if !row.2 && row.1 > 0.0 {
-                total += row.1;
+                let next = total + row.1;
+                correction += if total.abs() >= row.1.abs() {
+                    (total - next) + row.1
+                } else {
+                    (row.1 - next) + total
+                };
+                total = next;
                 heap.push(index);
                 let position = heap.len() - 1;
                 sift_reservations(&mut heap, &rows, position);
             }
         }
-        if total < amount {
+        total += correction;
+        if !total.is_finite() {
+            return Err(PyValueError::new_err("Reservation overflow"));
+        }
+        if (amount > 0.0 && total <= 0.0)
+            || amount - total > amount_roundoff_tolerance(amount, total)
+        {
             return Err(PyValueError::new_err(
                 "Not enough amount to close in trades.",
             ));

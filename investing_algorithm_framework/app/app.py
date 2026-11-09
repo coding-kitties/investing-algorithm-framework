@@ -26,7 +26,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestMonteCarloTest, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY, Schedule, \
     Universe, PositionMode, RunReport, PaperTradingMode, DATETIME_FORMAT, \
-    DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE, OrderStatus, \
+    DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE, \
     BacktestIndex, BacktestRunConfiguration
 from investing_algorithm_framework.domain.backtesting.study import Study
 from investing_algorithm_framework.domain.optimization import \
@@ -453,7 +453,10 @@ class App:
             None
         """
         data = {
-            ENVIRONMENT: self.config.get(ENVIRONMENT, Environment.PROD.value),
+            ENVIRONMENT: Environment.for_portfolios(
+                self.config.get(ENVIRONMENT, Environment.PROD.value),
+                self.get_portfolio_configurations(),
+            ).value,
             DATABASE_DIRECTORY_NAME: "databases",
             LAST_SNAPSHOT_DATETIME: None
         }
@@ -466,18 +469,9 @@ class App:
                 INDEX_DATETIME, datetime.now(timezone.utc)
             )
 
-        if Environment.TEST.equals(config[ENVIRONMENT]):
-            configuration_service.add_value(
-                DATABASE_NAME, "test-database.sqlite3"
-            )
-        elif Environment.PROD.equals(config[ENVIRONMENT]):
-            configuration_service.add_value(
-                DATABASE_NAME, "prod-database.sqlite3"
-            )
-        else:
-            configuration_service.add_value(
-                DATABASE_NAME, "dev-database.sqlite3"
-            )
+        configuration_service.add_value(
+            DATABASE_NAME, f"{config[ENVIRONMENT].lower()}-database.sqlite3"
+        )
 
         resource_dir = config[RESOURCE_DIRECTORY]
         database_dir_name = config.get(DATABASE_DIRECTORY_NAME)
@@ -790,6 +784,13 @@ class App:
             None
         """
         logger.info("Initializing services")
+        self.container.configuration_service().add_value(
+            ENVIRONMENT,
+            Environment.for_portfolios(
+                self.config[ENVIRONMENT],
+                self.get_portfolio_configurations(),
+            ).value,
+        )
         self.initialize_order_executors()
         self.initialize_portfolio_providers()
 
@@ -961,16 +962,18 @@ class App:
             self._run(number_of_iterations, run_immediately_on_start)
         except (Exception, KeyboardInterrupt) as error:
             if self._last_run_report is None \
-                    or self._last_run_report.status != "failed":
+                    or self._last_run_report.status not in (
+                        "execution_error", "interrupted",
+                    ):
                 self._last_run_report = None
                 try:
                     self.initialize_storage()
                     self._last_run_report = self._build_run_report(
                         self._report_event_loop, self._report_started_at,
                         number_of_iterations=number_of_iterations,
-                        status="failed", error=str(error) or "Interrupted",
-                        reason="interrupted" if isinstance(
+                        status="interrupted" if isinstance(
                             error, KeyboardInterrupt) else "execution_error",
+                        error=str(error) or "Interrupted",
                     )
                 except Exception:
                     logger.exception("Could not persist failed run report")
@@ -1017,7 +1020,7 @@ class App:
             self._last_run_report = self._build_run_report(
                 None, self._report_started_at,
                 number_of_iterations=number_of_iterations,
-                status="skipped", reason="algorithm_disabled",
+                status="algorithm_disabled",
             )
             return
 
@@ -1163,8 +1166,6 @@ class App:
                             number_of_iterations=number_of_iterations,
                             status=("completed"
                                     if event_loop_service.signal_log
-                                    else "skipped"),
-                            reason=(None if event_loop_service.signal_log
                                     else "no_strategy_due"),
                         )
                 except KeyboardInterrupt:
@@ -1689,6 +1690,11 @@ class App:
             )
 
         if optimization is not None:
+            if run_configuration.capture_run_reports:
+                raise OperationalException(
+                    "capture_run_reports is not supported with optimization. "
+                    "Capture a bounded event backtest of a selected strategy."
+                )
             from investing_algorithm_framework.infrastructure.services \
                 .backtesting.optimization import OptimizationCoordinator
             from investing_algorithm_framework.services.data_providers \
@@ -1900,6 +1906,13 @@ class App:
                 )
                 and all(type(s).generate_signals is _base_gs for s in strats)
             )
+
+        if run_configuration.capture_run_reports:
+            if use_vector or len(study.engines) > 1:
+                raise OperationalException(
+                    "capture_run_reports requires a single event-driven "
+                    "engine. Set study.engines=[BacktestEngine.EVENT_DRIVEN]."
+                )
 
         if use_vector and combined_algorithm is not None \
                 and len(strats) > 1:
@@ -2185,6 +2198,8 @@ class App:
                         run_configuration.event_schedule_backend
                     ),
                     event_state_backend=run_configuration.event_state_backend,
+                    capture_run_reports=run_configuration.capture_run_reports,
+                    persist_run_reports=run_configuration.persist_run_reports,
                     hard_memory_limit_mb=(
                         run_configuration.hard_memory_limit_mb
                     ),
@@ -2731,7 +2746,7 @@ class App:
         fee_percentage=0.0,
         slippage_percentage=0.0,
         position_mode="netting",
-        paper_trading=False,
+        paper_trading=None,
         paper_trading_mode=PaperTradingMode.AUTO,
         trading_costs=None,
     ):
@@ -2789,6 +2804,9 @@ class App:
         Returns:
             None
         """
+
+        if paper_trading is None:
+            paper_trading = Environment.PAPER.equals(self.config[ENVIRONMENT])
 
         effective_market = market if market is not None else os.getenv(
             "MARKET"
@@ -3510,7 +3528,6 @@ class App:
         number_of_iterations: int = None,
         status: str = "completed",
         error: str = None,
-        reason: str = None,
     ) -> RunReport:
         """
         Assemble and persist a :class:`RunReport` for the run that
@@ -3528,96 +3545,50 @@ class App:
         dict already carries its own ``strategy_id``, so a report
         covering several strategies can be attributed per-order.
         """
-        order_service = self.container.order_service()
-        trade_service = self.container.trade_service()
-        position_service = self.container.position_service()
-        portfolio_service = self.container.portfolio_service()
-        run_report_service = self.container.run_report_service()
+        from investing_algorithm_framework.services.run_reports.snapshot \
+            import run_report_snapshot
 
-        def _aware(value):
-            # SQLite round-trips can drop tzinfo; normalize to UTC so
-            # naive/aware datetimes never fail to compare.
-            if value is not None and value.tzinfo is None:
-                return value.replace(tzinfo=timezone.utc)
-            return value
-
-        def _touched_this_run(order):
-            created_at = _aware(order.created_at)
-            updated_at = _aware(order.updated_at)
-            return (
-                created_at is not None and created_at >= run_started_at
-            ) or (
-                updated_at is not None and updated_at >= run_started_at
-            )
-
-        def _in_report(order):
-            # New orders and orders that changed (e.g. got filled) this
-            # run, plus any order still pending at the venue regardless
-            # of when it was created — so a limit order placed several
-            # runs ago and still waiting to fill doesn't silently drop
-            # out of the report until it finally changes.
-            return _touched_this_run(order) or OrderStatus.is_pending(
-                order.status
-            )
-
-        run_started_at = _aware(run_started_at)
-        orders, positions, portfolios, trades = [], [], [], []
-        if event_loop_service is not None:
-            try:
-                orders = [order.to_dict() for order in order_service.get_all()
-                          if _in_report(order)]
-                positions = [position.to_dict()
-                             for position in position_service.get_all()]
-                portfolios = [portfolio.to_dict()
-                              for portfolio in portfolio_service.get_all()]
-                trades = [trade.to_dict() for trade in trade_service.get_all()]
-            except Exception:
-                if status != "failed":
-                    raise
-                logger.exception("Could not snapshot failed run state")
-        signal_log = (event_loop_service.signal_log
-                      if event_loop_service is not None else [])
-        decision_traces = [
-            {
-                "strategy_id": entry.get("strategy_id"),
-                "symbol": item.get("symbol"),
-                **trace,
-            }
-            for entry in signal_log
-            for item in entry.get("decision_traces", [])
-            for trace in [item["decision_trace"]]
-        ]
-        config = self.container.configuration_service().get_config()
-
-        # A run is "paper" only when every configured portfolio is
-        # paper-traded — a mixed live/paper setup is reported as not
-        # paper, so real activity is never mistaken for fake trades.
-        portfolio_configurations = self.container \
-            .portfolio_configuration_service().get_all()
-        is_paper = bool(portfolio_configurations) and all(
-            pc.paper_trading for pc in portfolio_configurations
+        algorithm = (
+            algorithm or getattr(self, "_report_algorithm", None)
+            or self.get_algorithm()
         )
-
-        report = run_report_service.create({
-            "algorithm_id": getattr(
-                algorithm or getattr(self, "_report_algorithm", None),
-                "algorithm_id", None),
-            "status": status,
-            "error": error,
-            "reason": reason,
-            "environment": config.get(ENVIRONMENT),
-            "is_paper": is_paper,
-            "number_of_iterations": number_of_iterations,
-            "started_at": run_started_at,
-            "completed_at": datetime.now(timezone.utc),
-            "orders": orders,
-            "signals": list(signal_log),
-            "positions": positions,
-            "portfolios": portfolios,
-            "trades": trades,
-            "decision_traces": decision_traces,
-        })
-        return report
+        payload = run_report_snapshot(
+            algorithm_id=algorithm.algorithm_id,
+            strategy_ids=[
+                strategy.strategy_id for strategy in algorithm.strategies
+            ],
+            started_at=run_started_at,
+            completed_at=datetime.now(timezone.utc),
+            signal_log=(
+                event_loop_service.signal_log
+                if event_loop_service is not None else []
+            ),
+            indicators=(
+                event_loop_service.indicator_log
+                if event_loop_service is not None else []
+            ),
+            confluence_scores=(
+                event_loop_service.confluence_score_log
+                if event_loop_service is not None else []
+            ),
+            data_sources=(
+                event_loop_service.data_source_log
+                if event_loop_service is not None else []
+            ),
+            config=self.container.configuration_service().get_config(),
+            order_service=self.container.order_service(),
+            position_service=self.container.position_service(),
+            portfolio_service=self.container.portfolio_service(),
+            trade_service=self.container.trade_service(),
+            portfolio_configuration_service=(
+                self.container.portfolio_configuration_service()
+            ),
+            snapshot_state=event_loop_service is not None,
+            number_of_iterations=number_of_iterations,
+            status=status,
+            error=error,
+        )
+        return self.container.run_report_service().create(payload)
 
     def has_run(self, worker_id) -> bool:
         """

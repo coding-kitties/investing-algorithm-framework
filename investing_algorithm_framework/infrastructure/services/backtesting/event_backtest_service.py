@@ -108,6 +108,7 @@ class EventBacktestService:
             algorithm=algorithm,
             trade_order_evaluator=trade_order_evaluator
         )
+        self.prepare_indicators(algorithm, backtest_date_range)
         event_loop_service.start(
             schedule=schedule, show_progress=show_progress
         )
@@ -122,6 +123,27 @@ class EventBacktestService:
             .get_recorded_values(),
             metrics_backend=metrics_backend,
         )
+
+    def prepare_indicators(self, algorithm, backtest_date_range):
+        """Create fresh run-local engines and prepare explicitly eligible functions."""
+        for strategy in algorithm.strategies:
+            if not getattr(strategy, "indicator_configs", ()):
+                continue
+            engine = strategy.create_indicator_engine()
+            if any(
+                config.calculate is None or config.execution == "precompute"
+                for config in engine.configs.values()
+            ):
+                frames = {}
+                for identifier in engine.required_windows:
+                    source = engine.data_sources[identifier]
+                    frames[identifier] = self._data_provider_service.get_backtest_data(
+                        source,
+                        start_date=source.create_start_date_data(backtest_date_range.start_date),
+                        end_date=backtest_date_range.end_date,
+                    )
+                engine.prepare(frames)
+            strategy._indicator_engine = engine
 
     def generate_schedule(
         self,

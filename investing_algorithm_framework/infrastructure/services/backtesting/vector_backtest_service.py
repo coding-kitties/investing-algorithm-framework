@@ -15,6 +15,7 @@ from investing_algorithm_framework.services import DataProviderService, \
     create_backtest_metrics
 from investing_algorithm_framework.services.pipeline import \
     VectorPipelineEngine
+from investing_algorithm_framework.domain.utils.cash import cash_tolerance
 
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,10 @@ class VectorBacktestService:
                 at each trade based on current portfolio value (similar to
                 event-based backtesting). If False (default), position sizes
                 are calculated once at the start based on initial portfolio
-                value. Default is False for backward compatibility.
+                value. In both modes, entries are capped to available cash.
+                Static mode retains its initial-capital allocation ceiling
+                and does not compound target sizes after profits.
+                Default is False.
             execution_backend: "python" (default), "rust" (strict native
                 subset), or "auto" (native with Python fallback). Native
                 supports netting with standard costs, sizing, deposits, flips,
@@ -123,12 +127,24 @@ class VectorBacktestService:
         )
 
         # Compute signals from strategy via the v9.0 SignalSeries
-        # protocol. The strategy yields one SignalSeries per
-        # (symbol, side) pair; we bucket them back into the six
-        # per-side dicts the downstream per-bar loop already speaks.
+        # protocol. Keep staged scale-in masks separate from the six
+        # per-side dictionaries used by the legacy per-bar loop.
         # Strategies that target the vector engine must override
         # ``generate_signal_series(data)``; see
         # docs/migration-v8-to-v9.md §10.
+        staged_scale_in = {}
+        position_scoped_exits = set()
+        cards = strategy.confluence_cards
+        declarations = cards.values() if isinstance(cards, dict) else cards or ()
+        if any(
+            card.initial_delay or any(rule.initial_delay for rule in card.rules.values())
+            for card in declarations
+        ):
+            data["_confluence_decision_index"] = pd.DatetimeIndex(
+                strategy.strategy_profile.schedule.iter_run_times(
+                    backtest_date_range.start_date, backtest_date_range.end_date,
+                ),
+            )
         (
             buy_signals,
             sell_signals,
@@ -137,8 +153,20 @@ class VectorBacktestService:
             short_signals,
             cover_signals,
         ) = self._bucket_signal_series(
-            strategy.generate_signal_series(data)
+            strategy.generate_signal_series(data), staged_scale_in,
+            position_scoped_exits,
         )
+        position_exit_evaluators = {}
+        if position_scoped_exits:
+            exit_evaluators = getattr(strategy, "_position_scoped_exit_evaluators", None)
+            if exit_evaluators is None:
+                raise ValueError("Position-scoped exit candidates require a fill-driven evaluator")
+            position_exit_evaluators = exit_evaluators()
+            if {
+                (symbol, side) for symbol, sides in position_exit_evaluators.items()
+                for side in sides
+            } != position_scoped_exits:
+                raise ValueError("Position-scoped exit evaluators must match candidate series")
         shorting_enabled = (
             short_signals is not None and cover_signals is not None
         )
@@ -190,6 +218,8 @@ class VectorBacktestService:
             }
 
         index = index.union(most_granular_ohlcv_data.index)
+        if "_confluence_decision_index" in data:
+            index = index.union(data["_confluence_decision_index"])
         index = index.sort_values()
 
         # Initialize trades and portfolio values
@@ -229,12 +259,12 @@ class VectorBacktestService:
             # precedence over a symbol=None default (if any).
             pos_size_obj = next(
                 (p for p in strategy.position_sizes if
-                 p.symbol == symbol), None
+                 p.symbols is not None and symbol in p.symbols), None
             )
             if pos_size_obj is None:
                 pos_size_obj = next(
                     (p for p in strategy.position_sizes if
-                     p.symbol is None), None
+                     p.symbols is None), None
                 )
 
             if pos_size_obj is None:
@@ -303,13 +333,13 @@ class VectorBacktestService:
             if hasattr(strategy, 'scaling_rules') and strategy.scaling_rules:
                 scaling_rule = next(
                     (sr for sr in strategy.scaling_rules
-                     if sr.symbol == symbol),
+                     if sr.symbols is not None and symbol in sr.symbols),
                     None
                 )
                 if scaling_rule is None:
                     scaling_rule = next(
                         (sr for sr in strategy.scaling_rules
-                         if sr.symbol is None),
+                         if sr.symbols is None),
                         None
                     )
 
@@ -336,6 +366,7 @@ class VectorBacktestService:
 
             symbol_data[symbol] = {
                 'full_symbol': full_symbol,
+                'position_exit_evaluators': position_exit_evaluators.get(symbol, {}),
                 'pos_size_obj': pos_size_obj,
                 'close': _loop_values(close),
                 'buy_signal': buy_signal if hedge_mode else
@@ -359,6 +390,18 @@ class VectorBacktestService:
                 'cooldown_remaining': 0,  # Bars remaining in cooldown
                 'scale_out_count': 0,     # Number of scale-outs done
                 'entry_count': 0,         # Number of entries so far
+                'staged_scale_in': {
+                    stage: (
+                        _loop_values(series.series.reindex(
+                            index, fill_value=False
+                        )),
+                        series.metadata.get('require_lower_price', False),
+                    )
+                    for stage, series in staged_scale_in.get(
+                        symbol, {}
+                    ).items()
+                },
+                'last_entry_price': None,
                 'legs': {
                     'long': {
                         'last_trade': None,
@@ -366,6 +409,7 @@ class VectorBacktestService:
                         'cooldown_remaining': 0,
                         'scale_out_count': 0,
                         'entry_count': 0,
+                        'last_entry_price': None,
                     },
                     'short': {
                         'last_trade': None,
@@ -389,6 +433,7 @@ class VectorBacktestService:
         current_unallocated = initial_amount
         total_realized_gains = 0.0
         total_allocated = 0.0  # Track total allocated in static mode
+        static_reservations = {}
         open_trades_value = {}  # Track value of open trades per symbol
 
         # Pre-compute scheduled external deposits (e.g. monthly paychecks)
@@ -411,6 +456,20 @@ class VectorBacktestService:
         def _value_key(sym, leg=None):
             return sym if leg is None else (sym, leg)
 
+        def _position_scoped_exit(sym_data, side, date, raw):
+            evaluator = sym_data['position_exit_evaluators'].get(side)
+            if evaluator is None:
+                return raw
+            short = side is SignalSide.CLOSE_SHORT
+            state = _trade_state(
+                sym_data, ('short' if short else 'long') if hedge_mode else None,
+            )
+            if state['last_trade'] is None or (
+                not hedge_mode and sym_data['is_short'] != short
+            ):
+                return False
+            return evaluator(date, state['position_opened_at'])
+
         def _close_trade(sym, sym_data, price, date, leg=None):
             """Helper to close an open trade for a symbol."""
             nonlocal current_unallocated, total_realized_gains, \
@@ -425,12 +484,12 @@ class VectorBacktestService:
             net_gain_val = gross - sell_fee - lt.cost
 
             # Update shared portfolio state
+            current_unallocated += lt.cost + net_gain_val
             if dynamic_position_sizing:
-                current_unallocated += lt.cost + net_gain_val
                 total_realized_gains += net_gain_val
                 open_trades_value.pop(_value_key(sym, leg), None)
             else:
-                total_allocated -= lt.cost
+                total_allocated -= static_reservations.pop(lt.id)
 
             sell_order = Order(
                 id=uuid4(),
@@ -465,6 +524,7 @@ class VectorBacktestService:
                 }
             )
             state['last_trade'] = None
+            state['position_opened_at'] = None
             # Close all open trades when fully exiting
             for ot in state['open_trades']:
                 if ot.id != lt.id and TradeStatus.OPEN.equals(ot.status):
@@ -500,13 +560,14 @@ class VectorBacktestService:
                         "net_gain": ot_gain,
                         "total_fees": ot_total_fees,
                     })
+                    current_unallocated += ot.cost + ot_gain
                     if dynamic_position_sizing:
-                        current_unallocated += ot.cost + ot_gain
                         total_realized_gains += ot_gain
                     else:
-                        total_allocated -= ot.cost
+                        total_allocated -= static_reservations.pop(ot.id)
             state['open_trades'] = []
             state['entry_count'] = 0
+            state['last_entry_price'] = None
             state['scale_out_count'] = 0
 
         def _open_trade(
@@ -528,9 +589,8 @@ class VectorBacktestService:
 
             amount = float(net_capital / fill_price)
 
-            if dynamic_position_sizing:
-                current_unallocated -= capital
-            else:
+            current_unallocated -= capital
+            if not dynamic_position_sizing:
                 total_allocated += capital
 
             buy_order = Order(
@@ -569,10 +629,16 @@ class VectorBacktestService:
                 total_fees=buy_fee,
             )
             state = _trade_state(sym_data, leg)
+            if state['last_trade'] is None:
+                state['position_opened_at'] = date
             state['last_trade'] = trade
             state['open_trades'].append(trade)
             state['entry_count'] += 1
+            state['last_entry_price'] = fill_price
             trades.append(trade)
+
+            if not dynamic_position_sizing:
+                static_reservations[trade.id] = capital
 
             if dynamic_position_sizing:
                 key = _value_key(sym, leg)
@@ -603,9 +669,12 @@ class VectorBacktestService:
             else:
                 base = sym_data['initial_capital_for_trade']
                 capital = base * pct_of_base / 100
-                if total_allocated + capital > initial_amount:
+                requested_total = total_allocated + capital
+                if requested_total > initial_amount + cash_tolerance(
+                    requested_total, initial_amount
+                ):
                     return 0
-                return capital
+                return min(capital, max(0.0, current_unallocated))
 
         def _partial_close(
             sym, sym_data, price, date, sell_pct, leg=None,
@@ -632,8 +701,8 @@ class VectorBacktestService:
             sell_fee = tc.get_fee(gross)
             net_gain_val = gross - sell_fee - sell_cost
 
+            current_unallocated += sell_cost + net_gain_val
             if dynamic_position_sizing:
-                current_unallocated += sell_cost + net_gain_val
                 total_realized_gains += net_gain_val
                 key = _value_key(sym, leg)
                 if key in open_trades_value:
@@ -641,7 +710,11 @@ class VectorBacktestService:
                         0, open_trades_value[key] - sell_cost
                     )
             else:
-                total_allocated -= sell_cost
+                released = static_reservations[lt.id] * (
+                    sell_amount / lt.available_amount
+                )
+                static_reservations[lt.id] -= released
+                total_allocated -= released
 
             sell_order = Order(
                 id=uuid4(),
@@ -676,6 +749,8 @@ class VectorBacktestService:
                 "updated_at": date,
             }
             if new_available <= 0:
+                if not dynamic_position_sizing:
+                    static_reservations.pop(lt.id)
                 update_dict["closed_at"] = date
                 update_dict["status"] = TradeStatus.CLOSED.value
                 state['open_trades'] = [
@@ -685,6 +760,13 @@ class VectorBacktestService:
                     state['open_trades'][-1]
                     if state['open_trades'] else None
                 )
+                if state['last_trade'] is None:
+                    state['position_opened_at'] = None
+                if (sym_data['staged_scale_in']
+                        and state['last_trade'] is None):
+                    state['entry_count'] = 0
+                    state['last_entry_price'] = None
+                    state['scale_out_count'] = 0
             lt.update(update_dict)
 
         # ------------------------------------------------------------------
@@ -722,11 +804,8 @@ class VectorBacktestService:
             if amount <= 0 or net_proceeds <= 0:
                 return None
 
-            if dynamic_position_sizing:
-                # Short entry releases cash into the wallet (proceeds in,
-                # fee out).
-                current_unallocated += net_proceeds
-            else:
+            current_unallocated += net_proceeds
+            if not dynamic_position_sizing:
                 # Static mode still reserves notional against the original
                 # budget so a short cannot exceed portfolio capacity.
                 total_allocated += capital
@@ -772,12 +851,16 @@ class VectorBacktestService:
                 metadata={"is_short": True},
             )
             state = _trade_state(sym_data, leg)
+            if state['last_trade'] is None:
+                state['position_opened_at'] = date
             state['last_trade'] = trade
             state['open_trades'].append(trade)
             state['entry_count'] += 1
             if leg is None:
                 sym_data['is_short'] = True
             trades.append(trade)
+            if not dynamic_position_sizing:
+                static_reservations[trade.id] = capital
 
             if dynamic_position_sizing:
                 # Track the short's notional liability so portfolio value
@@ -807,12 +890,12 @@ class VectorBacktestService:
             # proceeds(=cost) - gross_buy - fee.
             net_gain_val = lt.cost - cover_gross - cover_fee
 
+            current_unallocated -= (cover_gross + cover_fee)
             if dynamic_position_sizing:
-                current_unallocated -= (cover_gross + cover_fee)
                 total_realized_gains += net_gain_val
                 open_trades_value.pop(_value_key(sym, leg), None)
             else:
-                total_allocated -= lt.cost
+                total_allocated -= static_reservations.pop(lt.id)
 
             cover_order = Order(
                 id=uuid4(),
@@ -847,6 +930,7 @@ class VectorBacktestService:
                 }
             )
             state['last_trade'] = None
+            state['position_opened_at'] = None
             state['open_trades'] = []
             state['entry_count'] = 0
             state['scale_out_count'] = 0
@@ -865,6 +949,9 @@ class VectorBacktestService:
         )
 
         def _matches_symbol(rule, sym):
+            rule_symbols = getattr(rule, 'symbols', None)
+            if rule_symbols is not None:
+                return sym in rule_symbols
             rule_sym = getattr(rule, 'symbol', None)
             return rule_sym is None or rule_sym == sym
 
@@ -979,10 +1066,24 @@ class VectorBacktestService:
                 "reason": reason,
             })
 
+        def _staged_scale_requested(sym_data, state, bar_index, price):
+            """Select by accepted entries, not surviving trade fragments."""
+            stage = sym_data['staged_scale_in'].get(
+                state['entry_count'] - 1
+            )
+            if stage is None or state['last_trade'] is None:
+                return False
+            mask, require_lower = stage
+            return bool(mask[bar_index]) and (
+                not require_lower
+                or price < state['last_entry_price']
+            )
+
         def _process_hedge_bar(sym, sym_data, price, date, bar_index):
             long_state = sym_data['legs']['long']
             short_state = sym_data['legs']['short']
             scaling_rule = sym_data['scaling_rule']
+            long_exited = False
 
             for leg, state in (
                 ('long', long_state), ('short', short_state),
@@ -993,6 +1094,8 @@ class VectorBacktestService:
                     )
                     if reason is not None:
                         _hedge_event(date, sym, reason, True, "executed")
+                        if leg == 'long':
+                            long_exited = True
                 if state['cooldown_remaining'] > 0:
                     state['cooldown_remaining'] -= 1
 
@@ -1006,6 +1109,20 @@ class VectorBacktestService:
             )
             is_short = bool(sym_data['short_signal'].get(date, False))
             is_cover = bool(sym_data['cover_signal'].get(date, False))
+            if sym_data['position_exit_evaluators']:
+                is_sell = _position_scoped_exit(
+                    sym_data, SignalSide.CLOSE_LONG, date, is_sell,
+                )
+                is_cover = _position_scoped_exit(
+                    sym_data, SignalSide.CLOSE_SHORT, date, is_cover,
+                )
+            if sym_data['staged_scale_in']:
+                is_scale_in = _staged_scale_requested(
+                    sym_data, long_state, bar_index, price
+                )
+                if is_sell or is_scale_out or long_exited:
+                    is_scale_in = False
+                    is_buy = False
 
             long_cooldown = long_state['cooldown_remaining'] > 0
             short_cooldown = short_state['cooldown_remaining'] > 0
@@ -1084,7 +1201,9 @@ class VectorBacktestService:
                     _partial_close(
                         sym, sym_data, price, date, percentage, "long"
                     )
-                    long_state['scale_out_count'] += 1
+                    if (not sym_data['staged_scale_in']
+                            or long_state['last_trade'] is not None):
+                        long_state['scale_out_count'] += 1
                     _hedge_event(
                         date, sym, "scale_out", True, "executed",
                     )
@@ -1104,16 +1223,25 @@ class VectorBacktestService:
                         date, sym, "buy", False, "in_cooldown_rule",
                     )
                 else:
-                    capital = _get_capital_for_trade(sym_data, price, 100)
+                    capital = _get_capital_for_trade(
+                        sym_data, price,
+                        scaling_rule.initial_entry_percentage
+                        if scaling_rule is not None else 100,
+                    )
                     if capital <= 0:
                         _hedge_event(
                             date, sym, "buy", False,
                             "insufficient_capital",
                         )
                     else:
-                        _open_trade(
+                        trade = _open_trade(
                             sym, sym_data, price, date, capital, leg="long"
                         )
+                        if (sym_data['staged_scale_in'] and trade is not None
+                                and scaling_rule is not None
+                                and scaling_rule.cooldown_in_bars > 0):
+                            long_state['cooldown_remaining'] = \
+                                scaling_rule.cooldown_in_bars
                         _hedge_event(date, sym, "buy", True, "executed")
                         cooldown_tracker.record(
                             symbol=sym, order_side="buy",
@@ -1161,17 +1289,24 @@ class VectorBacktestService:
                             "insufficient_capital",
                         )
                     else:
-                        _open_trade(
+                        trade = _open_trade(
                             sym, sym_data, price, date, capital,
                             order_reason="scale_in", leg="long",
                         )
                         _hedge_event(
-                            date, sym, "scale_in", True, "executed",
+                            date, sym, "scale_in", trade is not None,
+                            "executed" if trade is not None
+                            else "insufficient_capital",
                         )
-                        cooldown_tracker.record(
-                            symbol=sym, order_side="buy",
-                            bar_index=bar_index, position_side="long",
-                        )
+                        if trade is not None:
+                            if (sym_data['staged_scale_in']
+                                    and scaling_rule.cooldown_in_bars > 0):
+                                long_state['cooldown_remaining'] = \
+                                    scaling_rule.cooldown_in_bars
+                            cooldown_tracker.record(
+                                symbol=sym, order_side="buy",
+                                bar_index=bar_index, position_side="long",
+                            )
 
             if is_short:
                 if short_state['last_trade'] is not None:
@@ -1223,9 +1358,10 @@ class VectorBacktestService:
                     hedge_mode=hedge_mode, deposit_events=deposit_events,
                     index=index,
                 )
-            except (ImportError, NativeExecutionUnsupported):
+            except (ImportError, NativeExecutionUnsupported) as exc:
                 if execution_backend == "rust":
                     raise
+                logger.info("Using Python vector execution: %s", exc)
         if execution_events is not None:
             trades, orders, signal_events = materialize_executions(
                 execution_events.events, symbol_data, index,
@@ -1275,6 +1411,7 @@ class VectorBacktestService:
                 last_trade = data['last_trade']
                 scaling_rule = data['scaling_rule']
                 has_position = last_trade is not None
+                exited_this_bar = False
 
                 # v9.0 (#487) — evaluate fixed TP / SL before signal
                 # processing. A triggered TP/SL closes the open trade
@@ -1287,6 +1424,7 @@ class VectorBacktestService:
                         symbol, data, current_price, current_date, i
                     )
                     if tp_sl_reason is not None:
+                        exited_this_bar = True
                         signal_events.append({
                             "date": current_date,
                             "symbol": symbol,
@@ -1314,6 +1452,20 @@ class VectorBacktestService:
                 is_cover_sig = bool(data['cover_signal'][i])
                 is_short_pos = data['is_short']
                 is_long_pos = has_position and not is_short_pos
+                if data['position_exit_evaluators']:
+                    is_sell = _position_scoped_exit(
+                        data, SignalSide.CLOSE_LONG, current_date, is_sell,
+                    )
+                    is_cover_sig = _position_scoped_exit(
+                        data, SignalSide.CLOSE_SHORT, current_date, is_cover_sig,
+                    )
+                if data['staged_scale_in']:
+                    is_scale_in = _staged_scale_requested(
+                        data, data, i, current_price
+                    )
+                    if is_sell or is_scale_out or exited_this_bar:
+                        is_scale_in = False
+                        is_buy = False
 
                 rule_block_buy = False
                 rule_block_sell = False
@@ -1489,7 +1641,9 @@ class VectorBacktestService:
                     _partial_close(
                         symbol, data, current_price, current_date, pct
                     )
-                    data['scale_out_count'] += 1
+                    if (not data['staged_scale_in']
+                            or data['last_trade'] is not None):
+                        data['scale_out_count'] += 1
                     last_trade = data['last_trade']
                     has_position = last_trade is not None
                     if scaling_rule.cooldown_in_bars > 0:
@@ -1520,7 +1674,9 @@ class VectorBacktestService:
                     })
                 elif is_buy and not has_position and not in_cooldown:
                     capital = _get_capital_for_trade(
-                        data, current_price, 100
+                        data, current_price,
+                        scaling_rule.initial_entry_percentage
+                        if scaling_rule is not None else 100,
                     )
                     if capital <= 0:
                         signal_events.append({
@@ -1561,9 +1717,10 @@ class VectorBacktestService:
                 elif is_buy and is_long_pos and not in_cooldown:
                     # Possible scale-in via buy signal (if no separate
                     # scale_in_signals provided, buy = scale_in)
-                    if scaling_rule is not None:
+                    if (scaling_rule is not None
+                            and not data['staged_scale_in']):
                         is_scale_in = True  # treat as scale-in below
-                    else:
+                    elif scaling_rule is None:
                         signal_events.append({
                             "date": current_date,
                             "symbol": symbol,
@@ -1637,7 +1794,7 @@ class VectorBacktestService:
                                 "reason": "insufficient_capital",
                             })
                         else:
-                            _open_trade(
+                            trade = _open_trade(
                                 symbol, data, current_price,
                                 current_date, capital,
                                 order_reason="scale_in"
@@ -1646,16 +1803,18 @@ class VectorBacktestService:
                                 "date": current_date,
                                 "symbol": symbol,
                                 "signal": "scale_in",
-                                "executed": True,
-                                "reason": "executed",
+                                "executed": trade is not None,
+                                "reason": "executed" if trade is not None
+                                else "insufficient_capital",
                             })
-                            if scaling_rule.cooldown_in_bars > 0:
-                                data['cooldown_remaining'] = \
-                                    scaling_rule.cooldown_in_bars
-                            cooldown_tracker.record(
-                                symbol=symbol, order_side="buy",
-                                bar_index=i,
-                            )
+                            if trade is not None:
+                                if scaling_rule.cooldown_in_bars > 0:
+                                    data['cooldown_remaining'] = \
+                                        scaling_rule.cooldown_in_bars
+                                cooldown_tracker.record(
+                                    symbol=symbol, order_side="buy",
+                                    bar_index=i,
+                                )
 
                 # ---- SHORT (open short, #433) ----
                 # Open a new short only when flat. Buy signals on the
@@ -1802,6 +1961,9 @@ class VectorBacktestService:
             for trade in snapshot_trade_events.get(interval_datetime, ()):
 
                 if trade.opened_at == interval_datetime:
+                    opening_fee = trade.orders[0].order_fee or 0
+                    unallocated -= opening_fee
+                    total_net_gain -= opening_fee
                     if trade.is_short:
                         # Short entry credits the wallet with sale
                         # proceeds (#433).
@@ -1983,7 +2145,9 @@ class VectorBacktestService:
         return run
 
     @staticmethod
-    def _bucket_signal_series(signal_series_iterable):
+    def _bucket_signal_series(
+        signal_series_iterable, staged_scale_in=None, position_scoped_exits=None,
+    ):
         """Bucket a stream of :class:`SignalSeries` into per-side dicts.
 
         The vector backtest engine's per-bar loop is structured
@@ -1993,8 +2157,9 @@ class VectorBacktestService:
         flat stream of :class:`SignalSeries`. This helper translates
         between the two without changing downstream code.
 
-        For a given symbol the *last* SignalSeries for a given side
-        wins (strategies are expected to emit at most one per pair).
+        For a given symbol the *last* unstaged SignalSeries for a given
+        side wins. Staged SCALE_IN series are kept separately in
+        ``staged_scale_in`` keyed by symbol and zero-based stage.
         ``scale_in_signals`` defaults to ``buy_signals`` if the
         strategy emits no SCALE_IN series, matching legacy semantics.
         ``short_signals`` / ``cover_signals`` are returned as ``None``
@@ -2004,6 +2169,13 @@ class VectorBacktestService:
         Args:
             signal_series_iterable: Result of
                 ``strategy.generate_signal_series(data)``.
+            staged_scale_in: Optional output dict receiving each staged
+                SignalSeries, keyed by symbol then stage. Staged symbols
+                receive an all-False placeholder in the scale-in bucket
+                so the legacy buy-signal fallback remains disabled.
+            position_scoped_exits: Output set receiving (symbol, side) pairs
+                that require actual-fill-aware evaluation. These candidate
+                series cannot be consumed without that execution support.
 
         Returns:
             tuple: ``(buy, sell, scale_in, scale_out, short, cover)``
@@ -2011,8 +2183,47 @@ class VectorBacktestService:
             ``None`` (for the optional short/cover/scale_out pair).
         """
         per_side: dict = {side: {} for side in SignalSide}
+        if staged_scale_in is None:
+            staged_scale_in = {}
 
         for series in signal_series_iterable:
+            if series.metadata.get("position_scoped_lookback"):
+                if (
+                    series.metadata["position_scoped_lookback"] is not True
+                    or series.side not in (SignalSide.CLOSE_LONG, SignalSide.CLOSE_SHORT)
+                    or position_scoped_exits is None
+                ):
+                    raise ValueError("Position-scoped exit candidates require fill-driven execution")
+                position_scoped_exits.add((series.symbol, series.side))
+            if series.side == SignalSide.SCALE_IN:
+                staged = 'scale_in_stage' in series.metadata
+                symbol = series.symbol
+                if staged:
+                    stage = series.metadata['scale_in_stage']
+                    if (not isinstance(stage, int)
+                            or isinstance(stage, bool) or stage < 0):
+                        raise ValueError(
+                            "scale_in_stage must be a nonnegative integer"
+                        )
+                    if (symbol in per_side[SignalSide.SCALE_IN]
+                            and symbol not in staged_scale_in):
+                        raise ValueError(
+                            f"Mixed staged and unstaged SCALE_IN for {symbol}"
+                        )
+                    stages = staged_scale_in.setdefault(symbol, {})
+                    if stage in stages:
+                        raise ValueError(
+                            f"Duplicate scale_in_stage {stage} for {symbol}"
+                        )
+                    stages[stage] = series
+                    per_side[SignalSide.SCALE_IN][symbol] = pd.Series(
+                        False, index=series.series.index
+                    )
+                    continue
+                if symbol in staged_scale_in:
+                    raise ValueError(
+                        f"Mixed staged and unstaged SCALE_IN for {symbol}"
+                    )
             per_side[series.side][series.symbol] = series.series
 
         buy = per_side[SignalSide.OPEN_LONG]

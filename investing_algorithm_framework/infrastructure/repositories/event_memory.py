@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
+from datetime import datetime
+from enum import Enum
 from functools import partial, wraps
 import operator
 
@@ -12,6 +14,9 @@ from investing_algorithm_framework.domain import OperationalException
 
 
 _active_state = ContextVar('event_memory_state', default=None)
+_immutable_types = frozenset((
+    type(None), bool, int, float, str, bytes, datetime,
+))
 
 
 def event_memory_active():
@@ -72,6 +77,8 @@ class EventMemoryState:
 
     @classmethod
     def _clone(cls, value, memo=None, *, eager_only=False):
+        if type(value) in _immutable_types:
+            return value
         from investing_algorithm_framework.infrastructure.database import \
             SQLBaseModel
 
@@ -132,7 +139,8 @@ class EventMemoryState:
         if identity is None:
             identity = self.next_ids.get(model, 1)
             value.id = identity
-        self.next_ids[model] = max(self.next_ids.get(model, 1), identity + 1)
+        if isinstance(identity, int):
+            self.next_ids[model] = max(self.next_ids.get(model, 1), identity + 1)
         table[identity] = value
         mapper = inspect(model)
         for column in mapper.columns:
@@ -246,7 +254,7 @@ class EventMemoryState:
             },
             'SQLTrade': {
                 'portfolio_id', 'status', 'target_symbol', 'trading_symbol',
-                'order_id',
+                'order_id', 'opened_at_gte',
             },
             'SQLTradeAllocation': {'order_id', 'trade_id'},
             'SQLTradeStopLoss': {'trade_id', 'triggered'},
@@ -274,7 +282,8 @@ class EventMemoryState:
             expected = repository.get_query_param(key, params)
             if expected is None:
                 continue
-            expected = getattr(expected, 'value', expected)
+            if isinstance(expected, Enum):
+                expected = expected.value
             if model is SQLOrder and key == 'portfolio_id':
                 positions = self._table(SQLPosition)
                 values = filter(partial(
