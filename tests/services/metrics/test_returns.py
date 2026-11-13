@@ -98,6 +98,21 @@ class TestGetMonthlyReturns(TestCase):
         result = get_monthly_returns(snapshots)
         self.assertEqual(result, [])
 
+    def test_monthly_returns_includes_first_month(self):
+        """Test the first month is measured from the initial snapshot."""
+        start = datetime(2023, 1, 1, tzinfo=timezone.utc)
+        snapshots = [
+            MockSnapshot(1000, start),
+            MockSnapshot(1100, start + timedelta(days=30)),
+            MockSnapshot(1210, start + timedelta(days=58)),
+        ]
+
+        result = get_monthly_returns(snapshots)
+
+        self.assertEqual(len(result), 2)
+        self.assertAlmostEqual(result[0][0], 0.10)
+        self.assertAlmostEqual(result[1][0], 0.10)
+
     def test_monthly_returns_positive_trend(self):
         """Test with consistently positive monthly returns."""
         # 5% monthly growth for 6 months
