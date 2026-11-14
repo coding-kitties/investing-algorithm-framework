@@ -134,6 +134,26 @@ class OptimizationFixture(TestCase):
             backtest_storage_directory=self.directory / "results",
             show_progress=False, continue_on_error=False,
         )
+        fixture = (
+            Path(__file__).resolve().parents[2] / "resources" / "test_data"
+            / "ohlcv" / CSV_FILENAME
+        )
+        data = pd.read_csv(fixture)
+        last = data.iloc[-1].to_dict()
+        timestamp = pd.to_datetime(last["Datetime"], utc=True)
+        # Preserve the original cycles and cover the third-window tests.
+        extension = pd.DataFrame([
+            {
+                **last,
+                "Datetime": (timestamp + timedelta(hours=2 * index))
+                .strftime("%Y-%m-%dT%H:%M:%S.%f%z"),
+            }
+            for index in range(1, 6)
+        ])
+        self.csv = self.directory / CSV_FILENAME
+        pd.concat([data, extension], ignore_index=True).to_csv(
+            self.csv, index=False,
+        )
         self.saved = []
 
     def app(self):
@@ -141,12 +161,8 @@ class OptimizationFixture(TestCase):
             name=uuid4().hex,
             config={RESOURCE_DIRECTORY: str(self.directory)},
         )
-        csv = (
-            Path(__file__).resolve().parents[2] / "resources" / "test_data"
-            / "ohlcv" / CSV_FILENAME
-        )
         app.add_data_provider(CSVOHLCVDataProvider(
-            storage_path=str(csv), symbol="BTC/EUR", time_frame="2h",
+            storage_path=str(self.csv), symbol="BTC/EUR", time_frame="2h",
             market="BITVAVO", warmup_window=5,
         ), priority=1)
         return app
