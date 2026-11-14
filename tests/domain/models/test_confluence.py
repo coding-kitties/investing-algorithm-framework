@@ -38,6 +38,14 @@ def condition(indicator, operator, value=None, reference=None, timeframe=None):
 
 class TestConfluenceCard(TestCase):
 
+    @staticmethod
+    def _hedged_context():
+        context = Mock(spec=["get_open_trades"])
+        context.get_open_trades.return_value = [
+            Mock(is_short=False), Mock(is_short=True),
+        ]
+        return context
+
     def test_condition_factory_preserves_fields_and_evaluation(self):
         expression = framework_condition(
             "close", Operator.CROSS_ABOVE, reference="ema_50",
@@ -469,7 +477,7 @@ class TestConfluenceCard(TestCase):
         )
 
         strategy = ConfluenceEntryStrategy()
-        signals = list(strategy.generate_signals(None, {
+        signals = list(strategy.generate_signals(self._hedged_context(), {
             "indicators": pd.DataFrame([{"rsi": 29, "macd": -0.1}, {
                 "rsi": 31, "macd": 0.2, "stoch": 24,
                 "close": 42000, "ema_50": 41000,
@@ -600,7 +608,7 @@ class TestConfluenceCard(TestCase):
             "volume_confirmed",
         }.issubset(prepared.columns))
         list(ConfluenceEntryStrategy().generate_signals(
-            None, {"indicators": prepared}
+            self._hedged_context(), {"indicators": prepared}
         ))
         pd.testing.assert_frame_equal(original, dataframe)
 
@@ -627,7 +635,7 @@ class TestConfluenceCard(TestCase):
         self.assertEqual(4, len(series))
         self.assertTrue(all(isinstance(item, SignalSeries) for item in series))
         for index in range(len(frame)):
-            events = list(strategy.generate_signals(None, {
+            events = list(strategy.generate_signals(self._hedged_context(), {
                 "indicators": frame.iloc[:index + 1],
             }))
             self.assertEqual(
