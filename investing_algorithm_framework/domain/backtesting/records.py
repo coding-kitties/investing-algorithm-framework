@@ -156,7 +156,9 @@ class CardDefinition:
         if isinstance(data, dict) and "confluence_score_card_version" in data:
             card = ConfluenceScoreCard.from_dict(data)
             if canonical_bytes(card.to_dict()) != self.payload:
-                raise ValueError("Definition is not a complete named score card")
+                raise ValueError(
+                    "Definition is not a complete named score card"
+                )
             return
         if not isinstance(data, dict) or (
             type(data.get("confluence_card_version")) is not int
@@ -168,7 +170,9 @@ class CardDefinition:
             raise ValueError("Definition is not a complete v1 card")
 
     @classmethod
-    def from_card(cls, card: ConfluenceCard | ConfluenceScoreCard) -> CardDefinition:
+    def from_card(
+        cls, card: ConfluenceCard | ConfluenceScoreCard
+    ) -> CardDefinition:
         return cls(canonical_bytes(card.to_dict()))
 
     @property
@@ -177,14 +181,19 @@ class CardDefinition:
 
     def to_card(self) -> ConfluenceCard | ConfluenceScoreCard:
         data = decode_canonical(self.payload)
-        constructor = ConfluenceScoreCard if "confluence_score_card_version" in data else ConfluenceCard
+        constructor = (
+            ConfluenceScoreCard
+            if "confluence_score_card_version" in data
+            else ConfluenceCard
+        )
         return constructor.from_dict(data)
 
     def slots(self) -> tuple[RuleSlot, ...]:
         card = self.to_card()
         slots = []
         if isinstance(card, ConfluenceScoreCard):
-            from investing_algorithm_framework.domain.models.confluence import ScoreType
+            from investing_algorithm_framework.domain.models \
+                .confluence import ScoreType
 
             for index, (name, rule) in enumerate(card.rules.items()):
                 if not rule.group_weights:
@@ -192,19 +201,45 @@ class CardDefinition:
                         f"rules/{index}/match", name, "score", None,
                         0.0, ScoreType.POSITIVE,
                     ))
-                for offset, (group, weight) in enumerate(rule.group_weights.items()):
-                    slots.append(RuleSlot(
-                        f"rules/{index}/groups/{offset}", name, "score", group,
-                        weight, ScoreType.NEGATIVE if weight < 0 else ScoreType.POSITIVE,
-                    ))
-            for category, items in (("requirement", card.requirements), ("veto", card.vetoes)):
+                for offset, (group, weight) in enumerate(
+                    rule.group_weights.items()
+                ):
+                    slots.append(
+                        RuleSlot(
+                            f"rules/{index}/groups/{offset}",
+                            name,
+                            "score",
+                            group,
+                            weight,
+                            (
+                                ScoreType.NEGATIVE
+                                if weight < 0
+                                else ScoreType.POSITIVE
+                            ),
+                        )
+                    )
+            for category, items in (
+                ("requirement", card.requirements),
+                ("veto", card.vetoes),
+            ):
                 for index, item in enumerate(items):
-                    slots.append(RuleSlot(f"{category}/{index}", item.name, category))
-            slots.extend((
-                RuleSlot("primary", "qualification", "primary"),
-                RuleSlot("normal_path", "normal_path", "score", "qualification"),
-                RuleSlot("override_path", "override_path", "score", "qualification"),
-            ))
+                    slots.append(
+                        RuleSlot(f"{category}/{index}", item.name, category)
+                    )
+            slots.extend(
+                (
+                    RuleSlot("primary", "qualification", "primary"),
+                    RuleSlot(
+                        "normal_path", "normal_path", "score", "qualification"
+                    ),
+                    RuleSlot(
+                        "override_path",
+                        "override_path",
+                        "score",
+                        "qualification",
+                    ),
+                )
+            )
             return tuple(slots)
 
         def scoring(rules, prefix, group=None):
@@ -310,8 +345,10 @@ class ConfluenceEvaluation:
     def _validate_definition(self, definition):
         slots = definition.slots()
         card = definition.to_card()
-        group_count = len(card.group_aggregation) if isinstance(card, ConfluenceScoreCard) else len(card.secondary) + int(
-            card.primary.expression is None
+        group_count = (
+            len(card.group_aggregation)
+            if isinstance(card, ConfluenceScoreCard)
+            else len(card.secondary) + int(card.primary.expression is None)
         )
         if self.card_id != definition.card_id or (
             len(slots) != len(self.outcomes)
@@ -342,18 +379,33 @@ class ConfluenceEvaluation:
                 matches[name] = values.pop()
             result = card.result_from_evidence(
                 matches,
-                tuple(bool(by_path[f"requirement/{index}"]) for index in range(len(card.requirements))),
-                tuple(bool(by_path[f"veto/{index}"]) for index in range(len(card.vetoes))),
+                tuple(
+                    bool(by_path[f"requirement/{index}"])
+                    for index in range(len(card.requirements))
+                ),
+                tuple(
+                    bool(by_path[f"veto/{index}"])
+                    for index in range(len(card.vetoes))
+                ),
                 bool(by_path["override_path"]),
             )
-            normal = next(item.matched for item in result.evaluations if item.group == "qualification" and item.name == "normal_path")
+            normal = next(
+                item.matched
+                for item in result.evaluations
+                if item.group == "qualification" and item.name == "normal_path"
+            )
             if (
-                result.score != self.score or result.qualified != self.qualified
-                or tuple(group.score for group in result.groups) != self.group_scores
+                result.score != self.score
+                or result.qualified != self.qualified
+                or tuple(group.score for group in result.groups)
+                != self.group_scores
                 or result.primary_triggered != bool(by_path["primary"])
                 or normal != bool(by_path["normal_path"])
             ):
-                raise ValueError("Named scoring evidence contradicts recorded totals or paths")
+                raise ValueError(
+                    "Named scoring evidence contradicts recorded totals "
+                    "or paths"
+                )
             return result
         evaluations = tuple(RuleEvaluation(
             name=slot.name, matched=bool(outcome), category=slot.category,

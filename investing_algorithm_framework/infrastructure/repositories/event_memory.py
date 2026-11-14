@@ -140,7 +140,9 @@ class EventMemoryState:
             identity = self.next_ids.get(model, 1)
             value.id = identity
         if isinstance(identity, int):
-            self.next_ids[model] = max(self.next_ids.get(model, 1), identity + 1)
+            self.next_ids[model] = max(
+                self.next_ids.get(model, 1), identity + 1
+            )
         table[identity] = value
         mapper = inspect(model)
         for column in mapper.columns:

@@ -33,7 +33,11 @@ def _positive_int(value, name):
 
 
 def _finite(value, name):
-    if isinstance(value, bool) or not isinstance(value, Real) or not isfinite(value):
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, Real)
+        or not isfinite(value)
+    ):
         raise ValueError(f"{name} must be finite")
 
 
@@ -46,16 +50,23 @@ def _validate_match_expression(expression, names):
         if predicate.reference is not None:
             references.add(predicate.reference)
         if predicate.timeframe is not None or references - names:
-            raise ValueError("Card gates must reference named indicator-rule matches")
+            raise ValueError(
+                "Card gates must reference named indicator-rule matches"
+            )
         if predicate.operator in (Operator.CROSS_ABOVE, Operator.CROSS_BELOW):
-            raise ValueError("Card gates cannot cross rule matches; declare native lookbacks instead")
+            raise ValueError(
+                "Card gates cannot cross rule matches; "
+                "declare native lookbacks instead"
+            )
     elif isinstance(expression, (AllOf, AnyOf, AtLeast)):
         for child in expression.expressions:
             _validate_match_expression(child, names)
     elif isinstance(expression, Not):
         _validate_match_expression(expression.expression, names)
     else:
-        raise ValueError("Card match conditions must use built-in condition expressions")
+        raise ValueError(
+            "Card match conditions must use built-in condition expressions"
+        )
 
 
 @dataclass(frozen=True)
@@ -92,15 +103,27 @@ class IndicatorConfig:
             if not callable(self.calculate):
                 raise TypeError("calculate must be callable")
             if self.indicator is not None:
-                raise ValueError("Declare either indicator or calculate, not both")
+                raise ValueError(
+                    "Declare either indicator or calculate, not both"
+                )
             if not isinstance(self.parameters, Mapping):
                 raise TypeError("parameters must be a mapping")
             columns = self.output_columns
-            if (not isinstance(columns, (list, tuple)) or not columns
-                    or any(not isinstance(name, str) or not name.strip() for name in columns)
-                    or len(set(columns)) != len(columns)):
-                raise ValueError("output_columns must contain unique non-empty column names")
-            object.__setattr__(self, "parameters", MappingProxyType(dict(self.parameters)))
+            if (
+                not isinstance(columns, (list, tuple))
+                or not columns
+                or any(
+                    not isinstance(name, str) or not name.strip()
+                    for name in columns
+                )
+                or len(set(columns)) != len(columns)
+            ):
+                raise ValueError(
+                    "output_columns must contain unique non-empty column names"
+                )
+            object.__setattr__(
+                self, "parameters", MappingProxyType(dict(self.parameters))
+            )
             object.__setattr__(self, "output_columns", tuple(columns))
         elif self.indicator not in OUTPUTS:
             raise ValueError(f"Unsupported indicator: {self.indicator}")
@@ -112,7 +135,9 @@ class IndicatorConfig:
         if self.timeframe is not None or self.calculate is None:
             timeframe = TimeFrame.from_value(self.timeframe or "2h")
             if timeframe is TimeFrame.CURRENT:
-                raise ValueError("Indicators require a native candle timeframe")
+                raise ValueError(
+                    "Indicators require a native candle timeframe"
+                )
             object.__setattr__(self, "timeframe", timeframe.value)
         for name in ("period", "k_slowing", "d_period", "short_period",
                      "long_period", "signal_period"):
@@ -131,13 +156,25 @@ class IndicatorConfig:
                 or identifier != identifier.strip()
                 for symbol, identifier in source.items()
             ):
-                raise ValueError("data_source mappings require uppercase symbols and non-empty identifiers")
-            object.__setattr__(self, "data_source", MappingProxyType(dict(source)))
+                raise ValueError(
+                    "data_source mappings require uppercase symbols "
+                    "and non-empty identifiers"
+                )
+            object.__setattr__(
+                self, "data_source", MappingProxyType(dict(source))
+            )
         elif source is not None:
             if not isinstance(source, (str, DataSource)):
-                raise TypeError("data_source must be an identifier, DataSource, or symbol mapping")
-            if isinstance(source, str) and (not source or source != source.strip()):
-                raise ValueError("data_source must be a non-empty source identifier")
+                raise TypeError(
+                    "data_source must be an identifier, DataSource, "
+                    "or symbol mapping"
+                )
+            if isinstance(source, str) and (
+                not source or source != source.strip()
+            ):
+                raise ValueError(
+                    "data_source must be a non-empty source identifier"
+                )
         if self.data_sources is not None:
             if source is not None:
                 raise ValueError(
@@ -170,21 +207,32 @@ class IndicatorConfig:
         )
 
     def to_dict(self):
-        """Export built-in declarations without serializing executable callables."""
+        """Export built-ins without serializing executable callables."""
         if self.calculate is not None:
-            raise TypeError("Callable indicators must be reconstructed from their Python declarations")
+            raise TypeError(
+                "Callable indicators must be reconstructed "
+                "from their Python declarations"
+            )
         source = self.data_source
         if isinstance(source, DataSource):
             source = source.get_identifier()
         elif isinstance(source, Mapping):
             source = dict(source)
         definition = {
-            "id": self.id, "indicator": self.indicator, "period": self.period,
-            "timeframe": self.timeframe, "data_source": source, "scale": self.scale,
-            "k_slowing": self.k_slowing, "d_period": self.d_period,
-            "short_period": self.short_period, "long_period": self.long_period,
-            "signal_period": self.signal_period, "symbol": self.symbol,
-            "minimum_history": self.minimum_history, "history": self.history,
+            "id": self.id,
+            "indicator": self.indicator,
+            "period": self.period,
+            "timeframe": self.timeframe,
+            "data_source": source,
+            "scale": self.scale,
+            "k_slowing": self.k_slowing,
+            "d_period": self.d_period,
+            "short_period": self.short_period,
+            "long_period": self.long_period,
+            "signal_period": self.signal_period,
+            "symbol": self.symbol,
+            "minimum_history": self.minimum_history,
+            "history": self.history,
             "execution": self.execution,
         }
         if self.data_sources is not None:
@@ -207,13 +255,19 @@ class IndicatorConfig:
             )
         if self.indicator == "macd":
             return self.long_period + (
-                self.signal_period - 1 if output in (None, "signal", "histogram") else 0
+                self.signal_period - 1
+                if output in (None, "signal", "histogram")
+                else 0
             )
         return self.period
 
     @property
     def outputs(self):
-        return self.output_columns if self.calculate is not None else OUTPUTS[self.indicator]
+        return (
+            self.output_columns
+            if self.calculate is not None
+            else OUTPUTS[self.indicator]
+        )
 
 
 @dataclass(frozen=True)
@@ -244,7 +298,9 @@ class IndicatorRule:
                 or self.initial_delay < 0):
             raise ValueError("initial_delay must be a nonnegative integer")
         if self.initial_delay_mode not in ("continuous", "recheck"):
-            raise ValueError("initial_delay_mode must be continuous or recheck")
+            raise ValueError(
+                "initial_delay_mode must be continuous or recheck"
+            )
         if self.lookback_scope not in ("market", "position"):
             raise ValueError("lookback_scope must be market or position")
         if self.comparison not in ("le", "ge", "lt", "gt", "eq", "ne"):
@@ -264,7 +320,11 @@ class IndicatorRule:
                     self.comparison in ("ge", "eq") and high < self.threshold
                     or self.comparison == "gt" and high <= self.threshold)):
             raise ValueError("Bounds and comparison define an empty interval")
-        if self.output is not None and self.output_column is not None and self.output != self.output_column:
+        if (
+            self.output is not None
+            and self.output_column is not None
+            and self.output != self.output_column
+        ):
             raise ValueError("output and output_column must agree")
         # Delegate weight validation to the existing scoring contract.
         validated = ConfluenceScoreRule(
@@ -275,7 +335,11 @@ class IndicatorRule:
 
     @property
     def selected_output(self):
-        return self.output_column if self.output_column is not None else self.output
+        return (
+            self.output_column
+            if self.output_column is not None
+            else self.output
+        )
 
     def match(self, values):
         import operator
@@ -323,7 +387,9 @@ class ConfluenceScoreConfig:
             raise ValueError(
                 "initial_delay_mode must be continuous or recheck"
             )
-        if self.id is not None and (not isinstance(self.id, str) or not self.id.strip()):
+        if self.id is not None and (
+            not isinstance(self.id, str) or not self.id.strip()
+        ):
             raise ValueError("Card id must be non-empty")
         if self.side is not None:
             object.__setattr__(self, "side", SignalSide.from_value(self.side))
@@ -331,14 +397,19 @@ class ConfluenceScoreConfig:
             if (isinstance(self.scale_in_stage, bool)
                     or not isinstance(self.scale_in_stage, int)
                     or self.scale_in_stage < 0):
-                raise ValueError("scale_in_stage must be a nonnegative integer")
+                raise ValueError(
+                    "scale_in_stage must be a nonnegative integer"
+                )
             if self.side is not SignalSide.SCALE_IN:
                 raise ValueError(
                     "scale_in_stage requires side=SignalSide.SCALE_IN"
                 )
-        if (not isinstance(self.symbols, (list, tuple))
-                or any(not isinstance(symbol, str) or not symbol.strip()
-                       or symbol != symbol.strip() for symbol in self.symbols)):
+        if not isinstance(self.symbols, (list, tuple)) or any(
+            not isinstance(symbol, str)
+            or not symbol.strip()
+            or symbol != symbol.strip()
+            for symbol in self.symbols
+        ):
             raise ValueError("symbols must contain non-empty target symbols")
         symbols = tuple(symbol.upper() for symbol in self.symbols)
         if (any("/" in symbol for symbol in symbols)
@@ -351,13 +422,20 @@ class ConfluenceScoreConfig:
             isinstance(rule, IndicatorRule) for rule in self.rules.values()
         ):
             raise TypeError("rules must map names to IndicatorRule instances")
-        if any(rule.lookback_scope == "position" for rule in self.rules.values()):
+        if any(
+            rule.lookback_scope == "position" for rule in self.rules.values()
+        ):
             if self.side not in (
                 SignalSide.CLOSE_LONG, SignalSide.CLOSE_SHORT,
             ):
-                raise ValueError("Position-scoped lookbacks require close_long or close_short")
+                raise ValueError(
+                    "Position-scoped lookbacks require "
+                    "close_long or close_short"
+                )
         for name in ("rules", "group_aggregation", "group_thresholds"):
-            object.__setattr__(self, name, MappingProxyType(dict(getattr(self, name))))
+            object.__setattr__(
+                self, name, MappingProxyType(dict(getattr(self, name)))
+            )
         object.__setattr__(self, "requirements", tuple(self.requirements))
         object.__setattr__(self, "vetoes", tuple(self.vetoes))
         for field_name in ("required_rules", "blocking_rules", "gates"):
@@ -369,7 +447,9 @@ class ConfluenceScoreConfig:
                     f"{field_name} must contain non-empty rule names"
                 )
             if len(set(names)) != len(names):
-                raise ValueError(f"{field_name} must contain unique rule names")
+                raise ValueError(
+                    f"{field_name} must contain unique rule names"
+                )
             unknown = set(names) - set(self.rules)
             if unknown:
                 raise ValueError(
@@ -435,4 +515,6 @@ class IndicatorEvaluation:
     values: Mapping[str, Mapping[str, float]]
     cards: Mapping[str, Mapping]
     ready: Mapping[str, bool]
-    rule_readiness: Mapping[str, Mapping[str, bool]] = field(default_factory=dict)
+    rule_readiness: Mapping[str, Mapping[str, bool]] = field(
+        default_factory=dict
+    )

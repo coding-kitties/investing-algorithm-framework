@@ -1,4 +1,4 @@
-"""Reconstruct frozen dataclasses with read-only mappings in process workers."""
+"""Reconstruct frozen dataclasses and read-only mappings in workers."""
 
 from collections.abc import Mapping
 from dataclasses import fields

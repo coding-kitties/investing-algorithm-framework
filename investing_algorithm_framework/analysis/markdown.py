@@ -379,7 +379,9 @@ def create_backtest_metrics_table(
             )
 
         with_value = [record for record in records if _has_value(record)]
-        without_value = [record for record in records if not _has_value(record)]
+        without_value = [
+            record for record in records if not _has_value(record)
+        ]
         with_value.sort(key=_sort_key, reverse=descending)
         records = with_value + without_value
 
@@ -1220,7 +1222,9 @@ def show_backtest_runs(
     if page_size < 1:
         raise ValueError("page_size must be >= 1")
     if backtests is not None and backtest_index is not None:
-        raise ValueError("Provide either backtests or backtest_index, not both")
+        raise ValueError(
+            "Provide either backtests or backtest_index, not both"
+        )
     if backtest_index is not None:
         from investing_algorithm_framework.domain import (
             BacktestIndex, OperationalException,

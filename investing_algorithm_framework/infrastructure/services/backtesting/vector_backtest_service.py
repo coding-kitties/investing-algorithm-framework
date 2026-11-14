@@ -135,14 +135,18 @@ class VectorBacktestService:
         staged_scale_in = {}
         position_scoped_exits = set()
         cards = strategy.confluence_cards
-        declarations = cards.values() if isinstance(cards, dict) else cards or ()
+        declarations = (
+            cards.values() if isinstance(cards, dict) else cards or ()
+        )
         if any(
-            card.initial_delay or any(rule.initial_delay for rule in card.rules.values())
+            card.initial_delay
+            or any(rule.initial_delay for rule in card.rules.values())
             for card in declarations
         ):
             data["_confluence_decision_index"] = pd.DatetimeIndex(
                 strategy.strategy_profile.schedule.iter_run_times(
-                    backtest_date_range.start_date, backtest_date_range.end_date,
+                    backtest_date_range.start_date,
+                    backtest_date_range.end_date,
                 ),
             )
         (
@@ -158,15 +162,24 @@ class VectorBacktestService:
         )
         position_exit_evaluators = {}
         if position_scoped_exits:
-            exit_evaluators = getattr(strategy, "_position_scoped_exit_evaluators", None)
+            exit_evaluators = getattr(
+                strategy, "_position_scoped_exit_evaluators", None
+            )
             if exit_evaluators is None:
-                raise ValueError("Position-scoped exit candidates require a fill-driven evaluator")
+                raise ValueError(
+                    "Position-scoped exit candidates require "
+                    "a fill-driven evaluator"
+                )
             position_exit_evaluators = exit_evaluators()
             if {
-                (symbol, side) for symbol, sides in position_exit_evaluators.items()
+                (symbol, side)
+                for symbol, sides in position_exit_evaluators.items()
                 for side in sides
             } != position_scoped_exits:
-                raise ValueError("Position-scoped exit evaluators must match candidate series")
+                raise ValueError(
+                    "Position-scoped exit evaluators must match "
+                    "candidate series"
+                )
         shorting_enabled = (
             short_signals is not None and cover_signals is not None
         )
@@ -366,35 +379,43 @@ class VectorBacktestService:
 
             symbol_data[symbol] = {
                 'full_symbol': full_symbol,
-                'position_exit_evaluators': position_exit_evaluators.get(symbol, {}),
+                'position_exit_evaluators': position_exit_evaluators.get(
+                    symbol, {}
+                ),
                 'pos_size_obj': pos_size_obj,
                 'close': _loop_values(close),
-                'buy_signal': buy_signal if hedge_mode else
-                _loop_values(buy_signal),
-                'sell_signal': sell_signal if hedge_mode else
-                _loop_values(sell_signal),
-                'scale_in_signal': si_signal if hedge_mode else
-                _loop_values(si_signal),
-                'scale_out_signal': so_signal if hedge_mode else
-                _loop_values(so_signal),
-                'short_signal': short_signal if hedge_mode else
-                _loop_values(short_signal),
-                'cover_signal': cover_signal if hedge_mode else
-                _loop_values(cover_signal),
+                'buy_signal': (
+                    buy_signal if hedge_mode else _loop_values(buy_signal)
+                ),
+                'sell_signal': (
+                    sell_signal if hedge_mode else _loop_values(sell_signal)
+                ),
+                'scale_in_signal': (
+                    si_signal if hedge_mode else _loop_values(si_signal)
+                ),
+                'scale_out_signal': (
+                    so_signal if hedge_mode else _loop_values(so_signal)
+                ),
+                'short_signal': (
+                    short_signal if hedge_mode else _loop_values(short_signal)
+                ),
+                'cover_signal': (
+                    cover_signal if hedge_mode else _loop_values(cover_signal)
+                ),
                 'scaling_rule': scaling_rule,
                 'trading_cost': trading_cost,
                 'initial_capital_for_trade': initial_capital_for_trade,
                 'last_trade': None,  # Track open trade per symbol
-                'open_trades': [],   # All open trades for this symbol
-                'is_short': False,   # True iff last_trade is a short (#433)
+                'open_trades': [],  # All open trades for this symbol
+                'is_short': False,  # True iff last_trade is a short (#433)
                 'cooldown_remaining': 0,  # Bars remaining in cooldown
-                'scale_out_count': 0,     # Number of scale-outs done
-                'entry_count': 0,         # Number of entries so far
+                'scale_out_count': 0,  # Number of scale-outs done
+                'entry_count': 0,  # Number of entries so far
                 'staged_scale_in': {
                     stage: (
-                        _loop_values(series.series.reindex(
-                            index, fill_value=False
-                        )),
+                        _loop_values(
+                            series.series.reindex(index, fill_value=False)
+                        ),
                         series.metadata.get('require_lower_price', False),
                     )
                     for stage, series in staged_scale_in.get(
@@ -402,23 +423,27 @@ class VectorBacktestService:
                     ).items()
                 },
                 'last_entry_price': None,
-                'legs': {
-                    'long': {
-                        'last_trade': None,
-                        'open_trades': [],
-                        'cooldown_remaining': 0,
-                        'scale_out_count': 0,
-                        'entry_count': 0,
-                        'last_entry_price': None,
-                    },
-                    'short': {
-                        'last_trade': None,
-                        'open_trades': [],
-                        'cooldown_remaining': 0,
-                        'scale_out_count': 0,
-                        'entry_count': 0,
-                    },
-                } if hedge_mode else None,
+                'legs': (
+                    {
+                        'long': {
+                            'last_trade': None,
+                            'open_trades': [],
+                            'cooldown_remaining': 0,
+                            'scale_out_count': 0,
+                            'entry_count': 0,
+                            'last_entry_price': None,
+                        },
+                        'short': {
+                            'last_trade': None,
+                            'open_trades': [],
+                            'cooldown_remaining': 0,
+                            'scale_out_count': 0,
+                            'entry_count': 0,
+                        },
+                    }
+                    if hedge_mode
+                    else None
+                ),
             }
 
         # Signal event log — records every fired signal and its outcome
@@ -462,7 +487,8 @@ class VectorBacktestService:
                 return raw
             short = side is SignalSide.CLOSE_SHORT
             state = _trade_state(
-                sym_data, ('short' if short else 'long') if hedge_mode else None,
+                sym_data,
+                ('short' if short else 'long') if hedge_mode else None,
             )
             if state['last_trade'] is None or (
                 not hedge_mode and sym_data['is_short'] != short
@@ -1457,7 +1483,10 @@ class VectorBacktestService:
                         data, SignalSide.CLOSE_LONG, current_date, is_sell,
                     )
                     is_cover_sig = _position_scoped_exit(
-                        data, SignalSide.CLOSE_SHORT, current_date, is_cover_sig,
+                        data,
+                        SignalSide.CLOSE_SHORT,
+                        current_date,
+                        is_cover_sig,
                     )
                 if data['staged_scale_in']:
                     is_scale_in = _staged_scale_requested(
@@ -2146,7 +2175,9 @@ class VectorBacktestService:
 
     @staticmethod
     def _bucket_signal_series(
-        signal_series_iterable, staged_scale_in=None, position_scoped_exits=None,
+        signal_series_iterable,
+        staged_scale_in=None,
+        position_scoped_exits=None,
     ):
         """Bucket a stream of :class:`SignalSeries` into per-side dicts.
 
@@ -2190,10 +2221,14 @@ class VectorBacktestService:
             if series.metadata.get("position_scoped_lookback"):
                 if (
                     series.metadata["position_scoped_lookback"] is not True
-                    or series.side not in (SignalSide.CLOSE_LONG, SignalSide.CLOSE_SHORT)
+                    or series.side
+                    not in (SignalSide.CLOSE_LONG, SignalSide.CLOSE_SHORT)
                     or position_scoped_exits is None
                 ):
-                    raise ValueError("Position-scoped exit candidates require fill-driven execution")
+                    raise ValueError(
+                        "Position-scoped exit candidates require "
+                        "fill-driven execution"
+                    )
                 position_scoped_exits.add((series.symbol, series.side))
             if series.side == SignalSide.SCALE_IN:
                 staged = 'scale_in_stage' in series.metadata

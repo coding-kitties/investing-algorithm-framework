@@ -24,11 +24,15 @@ def _expression(expression, frame, rule_matches=None, group_scores=None):
 
     if isinstance(expression, Rule):
         if rule_matches is None:
-            raise ValueError("Rule references require ConfluenceScoreCard evaluation")
+            raise ValueError(
+                "Rule references require ConfluenceScoreCard evaluation"
+            )
         return rule_matches[expression.name]
     if isinstance(expression, Threshold):
         if group_scores is None:
-            raise ValueError("Threshold references require ConfluenceScoreCard evaluation")
+            raise ValueError(
+                "Threshold references require ConfluenceScoreCard evaluation"
+            )
         score, available = group_scores[expression.group]
         return score.ge(expression.value) & available, available
     if isinstance(expression, ConditionExpression):
@@ -82,13 +86,17 @@ def _expression(expression, frame, rule_matches=None, group_scores=None):
         return matched.fillna(False).astype(bool) & available, available
 
     if isinstance(expression, Not):
-        matched, available = _expression(expression.expression, frame, rule_matches, group_scores)
+        matched, available = _expression(
+            expression.expression, frame, rule_matches, group_scores
+        )
         return ~matched & available, available
     if isinstance(expression, (AllOf, AnyOf, AtLeast)):
         available = _constant(frame, True)
         matches = _constant(frame, 0)
         for child in expression.expressions:
-            matched, child_available = _expression(child, frame, rule_matches, group_scores)
+            matched, child_available = _expression(
+                child, frame, rule_matches, group_scores
+            )
             matches += matched.astype(int)
             available &= child_available
         if isinstance(expression, AllOf):
@@ -171,7 +179,7 @@ def evaluate_card_series(card, frame, *, backend="python"):
 
 
 def evaluate_score_card_series(card, frame, *, backend="python"):
-    """Batch evaluation for named multi-group cards, retaining fail-closed availability."""
+    """Batch named multi-group cards with fail-closed availability."""
     import numpy as np
 
     from .confluence_native import NativeConfluenceUnsupported
@@ -181,7 +189,8 @@ def evaluate_score_card_series(card, frame, *, backend="python"):
         raise ValueError("backend must be 'python', 'rust', or 'auto'")
     if backend == "rust":
         raise NativeConfluenceUnsupported(
-            "Named score cards with group aggregation and overrides require the Python backend"
+            "Named score cards with group aggregation and overrides "
+            "require the Python backend"
         )
     matches = {
         name: _expression(rule.expression, frame)
@@ -217,7 +226,9 @@ def evaluate_score_card_series(card, frame, *, backend="python"):
         normal &= groups[group][0].ge(threshold)
     override = _constant(frame, False)
     if card.override_triggers is not None:
-        override, ready = _expression(card.override_triggers, frame, matches, groups)
+        override, ready = _expression(
+            card.override_triggers, frame, matches, groups
+        )
         available &= ready
     qualified = normal | override
     for requirement in card.requirements:

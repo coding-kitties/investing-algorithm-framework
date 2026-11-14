@@ -52,7 +52,9 @@ def _build_signal_report(strategy: TradingStrategy, timestamp) -> Dict:
                     ), None)
                     if details is not None:
                         if not isinstance(details, dict):
-                            raise TypeError("Signal reason_details must be a mapping")
+                            raise TypeError(
+                                "Signal reason_details must be a mapping"
+                            )
                         rejection_details[key] = deepcopy(details)
 
     signals = []
@@ -1262,7 +1264,8 @@ class EventLoopService:
             ))
         positions_before = (
             confluence_position_snapshots(strategy, self.context)
-            if capture_report and (strategy.confluence_cards or strategy.signal_cards)
+            if capture_report
+            and (strategy.confluence_cards or strategy.signal_cards)
             else None
         )
         self.context._current_strategy_id = strategy.strategy_id
@@ -1282,10 +1285,14 @@ class EventLoopService:
                 if capture_report:
                     engine = getattr(strategy, "_indicator_engine", None)
                     evaluation = data.get("indicators")
-                    score_snapshot = getattr(engine, "confluence_snapshot", None)
+                    score_snapshot = getattr(
+                        engine, "confluence_snapshot", None
+                    )
                     scores = (
                         score_snapshot(evaluation)
-                        if score_snapshot is not None and evaluation is not None else []
+                        if score_snapshot is not None
+                        and evaluation is not None
+                        else []
                     )
                     self.confluence_score_log.extend({
                         **record, "strategy_id": strategy.strategy_id,

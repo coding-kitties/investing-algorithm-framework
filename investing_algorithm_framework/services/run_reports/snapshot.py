@@ -139,17 +139,23 @@ def confluence_position_snapshots(strategy, context):
         scaling = strategy.get_scaling_rule(symbol)
         records[symbol] = {
             "side": (
-                "hedged" if long_entries and short_entries else
-                "long" if long_entries else "short" if short_entries else "flat"
+                "hedged"
+                if long_entries and short_entries
+                else (
+                    "long"
+                    if long_entries
+                    else "short" if short_entries else "flat"
+                )
             ),
-            "long_entries": long_entries, "short_entries": short_entries,
+            "long_entries": long_entries,
+            "short_entries": short_entries,
             "maximum_entries": scaling.max_entries if scaling else None,
         }
     return records
 
 
 def confluence_score_snapshots(*, evaluated, signals, positions_before=None):
-    """Attach this tick's signal outcome without changing card qualification."""
+    """Attach the tick's signal outcome without changing qualification."""
     outcomes = {
         (signal["symbol"], signal["side"], signal["source"]): signal
         for signal in signals or []
@@ -172,14 +178,18 @@ def confluence_score_snapshots(*, evaluated, signals, positions_before=None):
             status, reason = "not_emitted", "confluence.not_qualified"
         else:
             status = "not_emitted"
-            reason = card.get("signal_reason") or "confluence.signal_not_emitted"
+            reason = (
+                card.get("signal_reason") or "confluence.signal_not_emitted"
+            )
         card.update(signal_status=status, signal_reason=reason)
         card["signal_strength"] = signal.get("strength") if signal else None
         card.pop("signal_reason_details", None)
         if signal is not None and signal.get("reason_details") is not None:
             card["signal_reason_details"] = deepcopy(signal["reason_details"])
         if positions_before is not None and card["symbol"] in positions_before:
-            card["position_before"] = deepcopy(positions_before[card["symbol"]])
+            card["position_before"] = deepcopy(
+                positions_before[card["symbol"]]
+            )
         records.append(card)
     return records
 
@@ -192,7 +202,10 @@ def protective_exit_snapshots(orders, trades=()):
         metadata = order.get("metadata") or {}
         reason = metadata.get("order_reason")
         if reason not in (
-            "stop_loss", "take_profit", "stop_loss_mirror", "take_profit_mirror",
+            "stop_loss",
+            "take_profit",
+            "stop_loss_mirror",
+            "take_profit_mirror",
         ):
             continue
         kind = reason.removesuffix("_mirror")
@@ -257,7 +270,9 @@ def protective_exit_snapshots(orders, trades=()):
         fills = metadata.get("protective_fills", [])
         if filled > 0 and not fills:
             if order.get("updated_at") is None:
-                raise ValueError("Protective fills require an update timestamp")
+                raise ValueError(
+                    "Protective fills require an update timestamp"
+                )
             fills = [{
                 "timestamp": order["updated_at"], "filled_amount": filled,
                 "amount": filled, "price": order.get("price"),
@@ -268,12 +283,20 @@ def protective_exit_snapshots(orders, trades=()):
             stamp = pd.to_datetime(fill["timestamp"], utc=True)
             if pd.isna(stamp):
                 raise ValueError("Protective events require a valid timestamp")
-            output[collection].append({
-                **record, **fill, "event_type": "fill",
-                "sequence": fill.get("sequence", sequence),
-                "timestamp": stamp.to_pydatetime(),
-                "price_source": "order_execution" if "protective_fills" in metadata else "legacy_order_price",
-            })
+            output[collection].append(
+                {
+                    **record,
+                    **fill,
+                    "event_type": "fill",
+                    "sequence": fill.get("sequence", sequence),
+                    "timestamp": stamp.to_pydatetime(),
+                    "price_source": (
+                        "order_execution"
+                        if "protective_fills" in metadata
+                        else "legacy_order_price"
+                    ),
+                }
+            )
     return normalize_report_value(output)
 
 

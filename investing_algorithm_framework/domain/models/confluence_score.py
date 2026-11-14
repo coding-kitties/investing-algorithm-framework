@@ -9,9 +9,22 @@ from typing import TYPE_CHECKING, Literal, Mapping
 from ..utils.immutable import reduce_immutable_dataclass
 
 from .confluence import (
-    AllOf, AnyOf, AtLeast, ConfluenceResult, EvaluationContext, Expression,
-    GroupEvaluation, Not, Requirement, RuleEvaluation, ScoreType, Veto,
-    _expression_from_dict, _expression_to_dict, _format_expression, _render_card_box,
+    AllOf,
+    AnyOf,
+    AtLeast,
+    ConfluenceResult,
+    EvaluationContext,
+    Expression,
+    GroupEvaluation,
+    Not,
+    Requirement,
+    RuleEvaluation,
+    ScoreType,
+    Veto,
+    _expression_from_dict,
+    _expression_to_dict,
+    _format_expression,
+    _render_card_box,
 )
 
 if TYPE_CHECKING:
@@ -21,12 +34,22 @@ if TYPE_CHECKING:
 
 
 def _name(value: str, label: str) -> None:
-    if not isinstance(value, str) or not value.strip() or value != value.strip():
-        raise ValueError(f"{label} must be a non-empty name without surrounding whitespace")
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or value != value.strip()
+    ):
+        raise ValueError(
+            f"{label} must be a non-empty name without surrounding whitespace"
+        )
 
 
 def _number(value: float, label: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, Real) or not isfinite(value):
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, Real)
+        or not isfinite(value)
+    ):
         raise ValueError(f"{label} must be a finite number")
     return float(value)
 
@@ -38,7 +61,11 @@ def _inspection_value_key(value: object) -> tuple:
             for key, item in value.items()
         ))
     if isinstance(value, (tuple, list)):
-        return ("sequence", type(value), tuple(_inspection_value_key(item) for item in value))
+        return (
+            "sequence",
+            type(value),
+            tuple(_inspection_value_key(item) for item in value),
+        )
     if is_dataclass(value) and not isinstance(value, type):
         return (type(value), tuple(
             (item.name, _inspection_value_key(getattr(value, item.name)))
@@ -46,7 +73,7 @@ def _inspection_value_key(value: object) -> tuple:
         ))
     if value is None or type(value) in (str, bool, int, float):
         return ("value", type(value), value)
-    # Opaque parameter objects cannot safely establish cross-symbol equivalence.
+    # Opaque parameters cannot establish cross-symbol equivalence.
     return ("identity", type(value), id(value))
 
 
@@ -58,7 +85,7 @@ class _ScoreContext(EvaluationContext):
 
 @dataclass(frozen=True)
 class Rule(Expression):
-    """Reference the observed match of a named rule, not its credited points."""
+    """Reference a named rule's observed match, not its credited points."""
 
     name: str
 
@@ -67,7 +94,9 @@ class Rule(Expression):
 
     def evaluate(self, context: EvaluationContext) -> bool:
         if not isinstance(context, _ScoreContext):
-            raise ValueError("Rule references require ConfluenceScoreCard evaluation")
+            raise ValueError(
+                "Rule references require ConfluenceScoreCard evaluation"
+            )
         return context.rule_matches[self.name]
 
 
@@ -80,11 +109,15 @@ class Threshold(Expression):
 
     def __post_init__(self) -> None:
         _name(self.group, "Threshold.group")
-        object.__setattr__(self, "value", _number(self.value, "Threshold.value"))
+        object.__setattr__(
+            self, "value", _number(self.value, "Threshold.value")
+        )
 
     def evaluate(self, context: EvaluationContext) -> bool:
         if not isinstance(context, _ScoreContext):
-            raise ValueError("Threshold references require ConfluenceScoreCard evaluation")
+            raise ValueError(
+                "Threshold references require ConfluenceScoreCard evaluation"
+            )
         return context.group_scores[self.group] >= self.value
 
 
@@ -110,14 +143,21 @@ class ConfluenceScoreRule:
         if not isinstance(self.expression, Expression):
             raise TypeError("Rule expression must be an Expression")
         if any(_references(self.expression)):
-            raise ValueError("Scoring rule expressions cannot reference rule or group results")
+            raise ValueError(
+                "Scoring rule expressions cannot reference "
+                "rule or group results"
+            )
         if not isinstance(self.group_weights, Mapping):
             raise ValueError("group_weights must be a mapping")
         weights = {}
         for group, weight in self.group_weights.items():
             _name(group, "Scoring group")
             weights[group] = _number(weight, "Group weight")
-        object.__setattr__(self, "group_weights", MappingProxyType(dict(sorted(weights.items()))))
+        object.__setattr__(
+            self,
+            "group_weights",
+            MappingProxyType(dict(sorted(weights.items()))),
+        )
 
 
 @dataclass(frozen=True)
@@ -132,7 +172,9 @@ class ConfluenceScoreCard:
     name: str
     rules: Mapping[str, ConfluenceScoreRule]
     group_thresholds: Mapping[str, float] = field(default_factory=dict)
-    group_aggregation: Mapping[str, Literal["sum", "max"]] = field(default_factory=dict)
+    group_aggregation: Mapping[str, Literal["sum", "max"]] = field(
+        default_factory=dict
+    )
     override_triggers: Expression | None = None
     requirements: tuple[Requirement, ...] = ()
     vetoes: tuple[Veto, ...] = ()
@@ -159,21 +201,52 @@ class ConfluenceScoreCard:
             raise ValueError("rules must be a non-empty mapping")
         for name, rule in self.rules.items():
             _name(name, "Rule name")
-            if name in {"score", "matches", "minimum_score", "minimum_matches", "passed"}:
-                raise ValueError(f"Rule name is reserved for group evidence: {name}")
+            if name in {
+                "score",
+                "matches",
+                "minimum_score",
+                "minimum_matches",
+                "passed",
+            }:
+                raise ValueError(
+                    f"Rule name is reserved for group evidence: {name}"
+                )
             if not isinstance(rule, ConfluenceScoreRule):
-                raise TypeError("rules must contain ConfluenceScoreRule instances")
-        groups = {group for rule in self.rules.values() for group in rule.group_weights}
+                raise TypeError(
+                    "rules must contain ConfluenceScoreRule instances"
+                )
+        groups = {
+            group
+            for rule in self.rules.values()
+            for group in rule.group_weights
+        }
         # These group names carry fixed meanings in DecisionTrace.
-        if groups & {"decision", "indicators", "indicator_sources", "requirement", "veto", "qualification"}:
-            raise ValueError("Scoring groups must not use reserved decision-trace group names")
+        if groups & {
+            "decision",
+            "indicators",
+            "indicator_sources",
+            "requirement",
+            "veto",
+            "qualification",
+        }:
+            raise ValueError(
+                "Scoring groups must not use reserved "
+                "decision-trace group names"
+            )
         for values in (self.group_thresholds, self.group_aggregation):
             if not isinstance(values, Mapping):
                 raise TypeError("Group settings must be mappings")
             if set(values) - groups:
-                raise ValueError(f"Unknown scoring groups: {sorted(set(values) - groups)}")
-        aggregation = {group: self.group_aggregation.get(group, "sum") for group in sorted(groups)}
-        if any(method not in ("sum", "max") for method in aggregation.values()):
+                raise ValueError(
+                    f"Unknown scoring groups: {sorted(set(values) - groups)}"
+                )
+        aggregation = {
+            group: self.group_aggregation.get(group, "sum")
+            for group in sorted(groups)
+        }
+        if any(
+            method not in ("sum", "max") for method in aggregation.values()
+        ):
             raise ValueError("Group aggregation must be sum or max")
         thresholds = {
             group: _number(value, "Group threshold")
@@ -185,35 +258,65 @@ class ConfluenceScoreCard:
                 max(0.0, rule.group_weights[group])
                 for rule in self.rules.values() if group in rule.group_weights
             ]
-            maxima[group] = _number(sum(weights) if method == "sum" else max(weights), "Maximum group score")
+            maxima[group] = _number(
+                sum(weights) if method == "sum" else max(weights),
+                "Maximum group score",
+            )
         for group, threshold in thresholds.items():
             if threshold > maxima[group]:
-                raise ValueError(f"{group} threshold exceeds maximum score {maxima[group]:g}")
+                raise ValueError(
+                    f"{group} threshold exceeds maximum score "
+                    f"{maxima[group]:g}"
+                )
         if not thresholds and self.override_triggers is None:
             raise ValueError("Configure group_thresholds or override_triggers")
         if self.override_triggers is not None:
             if not isinstance(self.override_triggers, Expression):
                 raise TypeError("override_triggers must be an Expression")
             for reference in _references(self.override_triggers):
-                if isinstance(reference, Rule) and reference.name not in self.rules:
-                    raise ValueError(f"Unknown override rule: {reference.name}")
-                if isinstance(reference, Threshold) and reference.group not in groups:
-                    raise ValueError(f"Unknown override group: {reference.group}")
-                if isinstance(reference, Threshold) and reference.value > maxima[reference.group]:
-                    raise ValueError(f"Override threshold exceeds {reference.group} maximum score")
+                if (
+                    isinstance(reference, Rule)
+                    and reference.name not in self.rules
+                ):
+                    raise ValueError(
+                        f"Unknown override rule: {reference.name}"
+                    )
+                if (
+                    isinstance(reference, Threshold)
+                    and reference.group not in groups
+                ):
+                    raise ValueError(
+                        f"Unknown override group: {reference.group}"
+                    )
+                if (
+                    isinstance(reference, Threshold)
+                    and reference.value > maxima[reference.group]
+                ):
+                    raise ValueError(
+                        f"Override threshold exceeds {reference.group} "
+                        "maximum score"
+                    )
         requirements, vetoes = tuple(self.requirements), tuple(self.vetoes)
         for item in (*requirements, *vetoes):
             if not isinstance(item, (Requirement, Veto)):
-                raise TypeError("Requirements and vetoes must use framework rule types")
+                raise TypeError(
+                    "Requirements and vetoes must use framework rule types"
+                )
             if any(_references(item.expression)):
-                raise ValueError("Requirements and vetoes must use independent conditions")
+                raise ValueError(
+                    "Requirements and vetoes must use independent conditions"
+                )
         if not all(isinstance(item, Requirement) for item in requirements):
             raise TypeError("requirements must contain Requirement instances")
         if not all(isinstance(item, Veto) for item in vetoes):
             raise TypeError("vetoes must contain Veto instances")
         object.__setattr__(self, "rules", MappingProxyType(dict(self.rules)))
-        object.__setattr__(self, "group_aggregation", MappingProxyType(aggregation))
-        object.__setattr__(self, "group_thresholds", MappingProxyType(thresholds))
+        object.__setattr__(
+            self, "group_aggregation", MappingProxyType(aggregation)
+        )
+        object.__setattr__(
+            self, "group_thresholds", MappingProxyType(thresholds)
+        )
         object.__setattr__(self, "requirements", requirements)
         object.__setattr__(self, "vetoes", vetoes)
         if self.symbol_cards is not None:
@@ -232,31 +335,81 @@ class ConfluenceScoreCard:
         config = self.configuration
         if not isinstance(config, ConfluenceScoreConfig):
             raise TypeError("configuration must be ConfluenceScoreConfig")
-        if not isinstance(self.symbol, str) or not self.symbol or self.symbol != self.symbol.strip().upper():
-            raise ValueError("Inspection symbol must be a non-empty uppercase target")
+        if (
+            not isinstance(self.symbol, str)
+            or not self.symbol
+            or self.symbol != self.symbol.strip().upper()
+        ):
+            raise ValueError(
+                "Inspection symbol must be a non-empty uppercase target"
+            )
         if config.side is None or set(config.rules) != set(self.rules):
-            raise ValueError("Inspection configuration must match the scoring card and declare a side")
+            raise ValueError(
+                "Inspection configuration must match the scoring card "
+                "and declare a side"
+            )
         indicators, sources = self.indicator_configs, self.data_sources
-        if not isinstance(indicators, Mapping) or not isinstance(sources, Mapping):
-            raise TypeError("Inspection requires indicator_configs and data_sources mappings")
-        if set(indicators) != {rule.indicator_id for rule in config.rules.values()}:
-            raise ValueError("Inspection indicators must match the configured rules")
+        if not isinstance(indicators, Mapping) or not isinstance(
+            sources, Mapping
+        ):
+            raise TypeError(
+                "Inspection requires indicator_configs "
+                "and data_sources mappings"
+            )
+        if set(indicators) != {
+            rule.indicator_id for rule in config.rules.values()
+        }:
+            raise ValueError(
+                "Inspection indicators must match the configured rules"
+            )
         for name, indicator in indicators.items():
-            if not isinstance(indicator, IndicatorConfig) or indicator.id != name:
-                raise ValueError("Inspection indicator keys must match IndicatorConfig IDs")
-            if not isinstance(indicator.data_source, str) or indicator.data_source not in sources:
-                raise ValueError("Inspection indicators require resolved source identifiers")
+            if (
+                not isinstance(indicator, IndicatorConfig)
+                or indicator.id != name
+            ):
+                raise ValueError(
+                    "Inspection indicator keys must match IndicatorConfig IDs"
+                )
+            if (
+                not isinstance(indicator.data_source, str)
+                or indicator.data_source not in sources
+            ):
+                raise ValueError(
+                    "Inspection indicators require resolved source identifiers"
+                )
         for name, source in sources.items():
-            if not isinstance(source, DataSource) or source.get_identifier() != name:
-                raise ValueError("Inspection source keys must match DataSource identifiers")
-            if source.symbol is None or source.symbol.split("/")[0] != self.symbol:
-                raise ValueError("Inspection sources must belong to the target symbol")
-        object.__setattr__(self, "indicator_configs", MappingProxyType(dict(indicators)))
-        object.__setattr__(self, "data_sources", MappingProxyType(dict(sources)))
+            if (
+                not isinstance(source, DataSource)
+                or source.get_identifier() != name
+            ):
+                raise ValueError(
+                    "Inspection source keys must match DataSource identifiers"
+                )
+            if (
+                source.symbol is None
+                or source.symbol.split("/")[0] != self.symbol
+            ):
+                raise ValueError(
+                    "Inspection sources must belong to the target symbol"
+                )
+        object.__setattr__(
+            self, "indicator_configs", MappingProxyType(dict(indicators))
+        )
+        object.__setattr__(
+            self, "data_sources", MappingProxyType(dict(sources))
+        )
 
     def _inspection_definition(self) -> tuple:
-        config, indicators, sources = self.configuration, self.indicator_configs, self.data_sources
-        assert config is not None and indicators is not None and sources is not None
+        config, indicators, sources = (
+            self.configuration,
+            self.indicator_configs,
+            self.data_sources,
+        )
+        assert (
+            config is not None
+            and indicators is not None
+            and sources is not None
+        )
         source_definitions = {}
         for name, indicator in indicators.items():
             identifier = indicator.data_source
@@ -264,7 +417,8 @@ class ConfluenceScoreCard:
             source = sources[identifier]
             source_definitions[name] = {
                 item.name: getattr(source, item.name)
-                for item in fields(source) if item.name not in {"identifier", "symbol"}
+                for item in fields(source)
+                if item.name not in {"identifier", "symbol"}
             }
         return _inspection_value_key((
             self.to_dict(), replace(config, symbols=()),
@@ -285,34 +439,55 @@ class ConfluenceScoreCard:
                 or card.symbol_cards is not None for card in cards
             )
         ):
-            raise ValueError("Merged inspection requires at least two symbol-bound cards")
-        if any(value is not None for value in (
-            self.symbol, self.configuration, self.indicator_configs, self.data_sources,
-        )):
-            raise ValueError("Merged inspection metadata must be accessed through symbol_cards")
+            raise ValueError(
+                "Merged inspection requires at least two symbol-bound cards"
+            )
+        if any(
+            value is not None
+            for value in (
+                self.symbol,
+                self.configuration,
+                self.indicator_configs,
+                self.data_sources,
+            )
+        ):
+            raise ValueError(
+                "Merged inspection metadata must be accessed "
+                "through symbol_cards"
+            )
         if len({card.symbol for card in cards}) != len(cards):
             raise ValueError("Merged inspection symbols must be unique")
         definition = cards[0]._inspection_definition()
         if self.to_dict() != cards[0].to_dict() or any(
             card._inspection_definition() != definition for card in cards[1:]
         ):
-            raise ValueError("Only identical inspection definitions can be merged")
+            raise ValueError(
+                "Only identical inspection definitions can be merged"
+            )
 
     @property
     def symbols(self) -> tuple[str, ...]:
         if self.symbol_cards is not None:
-            return tuple(symbol for card in self.symbol_cards for symbol in card.symbols)
+            return tuple(
+                symbol for card in self.symbol_cards for symbol in card.symbols
+            )
         return (self.symbol,) if self.symbol is not None else ()
 
     @property
     def side(self) -> SignalSide | None:
         card = self.symbol_cards[0] if self.symbol_cards is not None else self
-        return card.configuration.side if card.configuration is not None else None
+        return (
+            card.configuration.side if card.configuration is not None else None
+        )
 
     @property
     def scale_in_stage(self) -> int | None:
         card = self.symbol_cards[0] if self.symbol_cards is not None else self
-        return card.configuration.scale_in_stage if card.configuration is not None else None
+        return (
+            card.configuration.scale_in_stage
+            if card.configuration is not None
+            else None
+        )
 
     def score_rules(self, matches: Mapping[str, bool]):
         contributions = {
@@ -326,12 +501,22 @@ class ConfluenceScoreCard:
                     name for name, rule in self.rules.items()
                     if group in rule.group_weights and matches[name]
                 ]
-                winner = max(candidates, key=lambda name: contributions[group, name]) if candidates else None
+                winner = (
+                    max(
+                        candidates, key=lambda name: contributions[group, name]
+                    )
+                    if candidates
+                    else None
+                )
                 for key in contributions:
                     if key[0] == group and key[1] != winner:
                         contributions[key] = 0.0
         scores = {
-            group: sum(value for (name, _), value in contributions.items() if name == group)
+            group: sum(
+                value
+                for (name, _), value in contributions.items()
+                if name == group
+            )
             for group in self.group_aggregation
         }
         for score in (*scores.values(), sum(scores.values())):
@@ -347,11 +532,18 @@ class ConfluenceScoreCard:
         scored_context = _ScoreContext(
             context.values, context.previous_values, matches, scores,
         )
-        override = self.override_triggers is not None and bool(self.override_triggers.evaluate(scored_context))
+        override = self.override_triggers is not None and bool(
+            self.override_triggers.evaluate(scored_context)
+        )
         return self.result_from_evidence(
             matches,
-            tuple(bool(item.expression.evaluate(context)) for item in self.requirements),
-            tuple(bool(item.expression.evaluate(context)) for item in self.vetoes),
+            tuple(
+                bool(item.expression.evaluate(context))
+                for item in self.requirements
+            ),
+            tuple(
+                bool(item.expression.evaluate(context)) for item in self.vetoes
+            ),
             override,
         )
 
@@ -360,16 +552,28 @@ class ConfluenceScoreCard:
         requirement_matches: tuple[bool, ...], veto_matches: tuple[bool, ...],
         override: bool,
     ) -> ConfluenceResult:
-        """Reconstruct a result from recorded matches, without evaluating predicates."""
-        if set(matches) != set(self.rules) or any(type(value) is not bool for value in matches.values()):
-            raise ValueError("Rule evidence must contain a boolean for every named rule")
-        if len(requirement_matches) != len(self.requirements) or len(veto_matches) != len(self.vetoes):
-            raise ValueError("Gate evidence does not match the card definition")
-        if any(type(value) is not bool for value in (*requirement_matches, *veto_matches, override)):
+        """Reconstruct from recorded matches without evaluating predicates."""
+        if set(matches) != set(self.rules) or any(
+            type(value) is not bool for value in matches.values()
+        ):
+            raise ValueError(
+                "Rule evidence must contain a boolean for every named rule"
+            )
+        if len(requirement_matches) != len(self.requirements) or len(
+            veto_matches
+        ) != len(self.vetoes):
+            raise ValueError(
+                "Gate evidence does not match the card definition"
+            )
+        if any(
+            type(value) is not bool
+            for value in (*requirement_matches, *veto_matches, override)
+        ):
             raise ValueError("Gate and override evidence must be boolean")
         scores, contributions = self.score_rules(matches)
         normal = bool(self.group_thresholds) and all(
-            scores[group] >= threshold for group, threshold in self.group_thresholds.items()
+            scores[group] >= threshold
+            for group, threshold in self.group_thresholds.items()
         )
         evaluations = []
         for name, rule in self.rules.items():
@@ -378,10 +582,19 @@ class ConfluenceScoreCard:
                     name, matches[name], score_type=ScoreType.POSITIVE,
                 ))
             for group, weight in rule.group_weights.items():
-                evaluations.append(RuleEvaluation(
-                    name, matches[name], points=contributions[group, name], group=group,
-                    score_type=ScoreType.NEGATIVE if weight < 0 else ScoreType.POSITIVE,
-                ))
+                evaluations.append(
+                    RuleEvaluation(
+                        name,
+                        matches[name],
+                        points=contributions[group, name],
+                        group=group,
+                        score_type=(
+                            ScoreType.NEGATIVE
+                            if weight < 0
+                            else ScoreType.POSITIVE
+                        ),
+                    )
+                )
         gates = [
             RuleEvaluation(item.name, matched, category="requirement")
             for item, matched in zip(self.requirements, requirement_matches)
@@ -389,24 +602,54 @@ class ConfluenceScoreCard:
             RuleEvaluation(item.name, matched, category="veto")
             for item, matched in zip(self.vetoes, veto_matches)
         ]
-        requirements_passed = all(item.matched for item in gates if item.category == "requirement")
-        veto_triggered = any(item.matched for item in gates if item.category == "veto")
+        requirements_passed = all(
+            item.matched for item in gates if item.category == "requirement"
+        )
+        veto_triggered = any(
+            item.matched for item in gates if item.category == "veto"
+        )
         return ConfluenceResult(
-            card_name=self.name, primary_triggered=normal or override,
-            requirements_passed=requirements_passed, veto_triggered=veto_triggered,
-            score=sum(scores.values()), minimum_score=0.0,
-            qualified=requirements_passed and not veto_triggered and (normal or override),
-            evaluations=tuple(evaluations + gates + [
-                RuleEvaluation("qualification", normal or override, category="primary"),
-                RuleEvaluation("normal_path", normal, group="qualification"),
-                RuleEvaluation("override_path", override, group="qualification"),
-            ]),
+            card_name=self.name,
+            primary_triggered=normal or override,
+            requirements_passed=requirements_passed,
+            veto_triggered=veto_triggered,
+            score=sum(scores.values()),
+            minimum_score=0.0,
+            qualified=requirements_passed
+            and not veto_triggered
+            and (normal or override),
+            evaluations=tuple(
+                evaluations
+                + gates
+                + [
+                    RuleEvaluation(
+                        "qualification", normal or override, category="primary"
+                    ),
+                    RuleEvaluation(
+                        "normal_path", normal, group="qualification"
+                    ),
+                    RuleEvaluation(
+                        "override_path", override, group="qualification"
+                    ),
+                ]
+            ),
             groups=tuple(
                 GroupEvaluation(
-                    group, "score",
-                    sum(matches[name] for name, rule in self.rules.items() if group in rule.group_weights),
-                    score, 0, self.group_thresholds.get(group),
-                    score >= self.group_thresholds[group] if group in self.group_thresholds else True,
+                    group,
+                    "score",
+                    sum(
+                        matches[name]
+                        for name, rule in self.rules.items()
+                        if group in rule.group_weights
+                    ),
+                    score,
+                    0,
+                    self.group_thresholds.get(group),
+                    (
+                        score >= self.group_thresholds[group]
+                        if group in self.group_thresholds
+                        else True
+                    ),
                 )
                 for group, score in scores.items()
             ),
@@ -430,13 +673,23 @@ class ConfluenceScoreCard:
             },
             "group_aggregation": dict(self.group_aggregation),
             "group_thresholds": dict(self.group_thresholds),
-            "override_triggers": _expression_to_dict(self.override_triggers) if self.override_triggers else None,
+            "override_triggers": (
+                _expression_to_dict(self.override_triggers)
+                if self.override_triggers
+                else None
+            ),
             "requirements": [
-                {"name": item.name, "expression": _expression_to_dict(item.expression)}
+                {
+                    "name": item.name,
+                    "expression": _expression_to_dict(item.expression),
+                }
                 for item in self.requirements
             ],
             "vetoes": [
-                {"name": item.name, "expression": _expression_to_dict(item.expression)}
+                {
+                    "name": item.name,
+                    "expression": _expression_to_dict(item.expression),
+                }
                 for item in self.vetoes
             ],
         }
@@ -452,20 +705,29 @@ class ConfluenceScoreCard:
             or len(order) != len(set(order))
             or set(order) != set(value["rules"])
         ):
-            raise ValueError("rule_order must list each named rule exactly once")
+            raise ValueError(
+                "rule_order must list each named rule exactly once"
+            )
         return cls(
             name=value["name"],
             rules={
                 name: ConfluenceScoreRule(
-                    _expression_from_dict(value["rules"][name]["expression"]), value["rules"][name]["group_weights"],
+                    _expression_from_dict(value["rules"][name]["expression"]),
+                    value["rules"][name]["group_weights"],
                 )
                 for name in order
             },
             group_thresholds=value.get("group_thresholds", {}),
             group_aggregation=value.get("group_aggregation", {}),
-            override_triggers=_expression_from_dict(value["override_triggers"]) if value.get("override_triggers") is not None else None,
+            override_triggers=(
+                _expression_from_dict(value["override_triggers"])
+                if value.get("override_triggers") is not None
+                else None
+            ),
             requirements=tuple(
-                Requirement(item["name"], _expression_from_dict(item["expression"]))
+                Requirement(
+                    item["name"], _expression_from_dict(item["expression"])
+                )
                 for item in value.get("requirements", ())
             ),
             vetoes=tuple(
@@ -477,20 +739,48 @@ class ConfluenceScoreCard:
     def __str__(self) -> str:
         if self.configuration is not None or self.symbol_cards is not None:
             return self._inspection_string()
-        lines = [f"ConfluenceScoreCard: {self.name}", "Qualification: requirements AND no veto AND (normal OR override)"]
+        lines = [
+            f"ConfluenceScoreCard: {self.name}",
+            "Qualification: requirements AND no veto AND (normal OR override)",
+        ]
         for name, rule in self.rules.items():
-            lines.append(f"  {name}: {_format_expression(rule.expression)}; weights={dict(rule.group_weights)}")
+            lines.append(
+                f"  {name}: {_format_expression(rule.expression)}; "
+                f"weights={dict(rule.group_weights)}"
+            )
         for group, method in self.group_aggregation.items():
             threshold = self.group_thresholds.get(group)
-            lines.append(f"  {group}: {method}; " + (f"score >= {threshold:g}" if threshold is not None else "optional"))
-        lines.append("Override: " + (_format_expression(self.override_triggers) if self.override_triggers else "none"))
-        for label, items in (("Requirement", self.requirements), ("Veto", self.vetoes)):
+            lines.append(
+                f"  {group}: {method}; "
+                + (
+                    f"score >= {threshold:g}"
+                    if threshold is not None
+                    else "optional"
+                )
+            )
+        lines.append(
+            "Override: "
+            + (
+                _format_expression(self.override_triggers)
+                if self.override_triggers
+                else "none"
+            )
+        )
+        for label, items in (
+            ("Requirement", self.requirements),
+            ("Veto", self.vetoes),
+        ):
             for item in items:
-                lines.append(f"{label} {item.name}: {_format_expression(item.expression)}")
+                lines.append(
+                    f"{label} {item.name}: "
+                    f"{_format_expression(item.expression)}"
+                )
         return "\n".join(lines)
 
     def _inspection_string(self) -> str:
-        inspections = self.symbol_cards if self.symbol_cards is not None else (self,)
+        inspections = (
+            self.symbol_cards if self.symbol_cards is not None else (self,)
+        )
         primary = inspections[0]
         config = primary.configuration
         indicators = primary.indicator_configs
@@ -502,51 +792,88 @@ class ConfluenceScoreCard:
         )
         lines = [
             f"ConfluenceScoreCard: {self.name}",
-            f"{symbol_label} | Side: {config.side.value} | Stage: {config.scale_in_stage}",
+            f"{symbol_label} | Side: {config.side.value} | "
+            f"Stage: {config.scale_in_stage}",
             f"Readiness: {config.readiness_policy}",
             "Qualification: requirements AND no veto AND (normal OR override)",
         ]
         if config.initial_delay:
-            lines.insert(2, f"Card delay: {config.initial_delay} evaluations ({config.initial_delay_mode})")
-        operators = {"le": "<=", "ge": ">=", "lt": "<", "gt": ">", "eq": "==", "ne": "!="}
+            lines.insert(
+                2,
+                f"Card delay: {config.initial_delay} evaluations "
+                f"({config.initial_delay_mode})",
+            )
+        operators = {
+            "le": "<=",
+            "ge": ">=",
+            "lt": "<",
+            "gt": ">",
+            "eq": "==",
+            "ne": "!=",
+        }
         rule_lines: dict[str, list[str]] = {}
         for name, rule in config.rules.items():
             indicator = indicators[rule.indicator_id]
             output = rule.selected_output or indicator.outputs[0]
             reference = f"{rule.indicator_id}.{output}"
-            expression = f"{reference} {operators[rule.comparison]} {rule.threshold:g}"
+            expression = (
+                f"{reference} {operators[rule.comparison]} {rule.threshold:g}"
+            )
             if rule.lower_bound is not None:
                 expression += f" AND {reference} >= {rule.lower_bound:g}"
             if rule.upper_bound is not None:
                 expression += f" AND {reference} <= {rule.upper_bound:g}"
             details = [
                 f"  {name}: {expression}",
-                f"    Delay: {rule.initial_delay} evaluations ({rule.initial_delay_mode})",
-                f"    Lookback: {rule.lookback_period} native bars ({rule.lookback_scope})",
+                f"    Delay: {rule.initial_delay} evaluations "
+                f"({rule.initial_delay_mode})",
+                f"    Lookback: {rule.lookback_period} native bars "
+                f"({rule.lookback_scope})",
             ]
             for inspection in inspections:
-                bound_indicators, sources = inspection.indicator_configs, inspection.data_sources
+                bound_indicators, sources = (
+                    inspection.indicator_configs,
+                    inspection.data_sources,
+                )
                 assert bound_indicators is not None and sources is not None
                 identifier = bound_indicators[rule.indicator_id].data_source
                 assert isinstance(identifier, str)
                 source = sources[identifier]
                 assert source.time_frame is not None
-                source_label = f"Source ({inspection.symbol})" if len(inspections) > 1 else "Source"
+                source_label = (
+                    f"Source ({inspection.symbol})"
+                    if len(inspections) > 1
+                    else "Source"
+                )
                 details.append(
-                    f"    {source_label}: {source.get_identifier()} | {source.symbol} | {source.market} | {source.time_frame.value}"
+                    f"    {source_label}: {source.get_identifier()} | "
+                    f"{source.symbol} | {source.market} | "
+                    f"{source.time_frame.value}"
                 )
             if indicator.calculate is not None:
                 details.append(f"    Parameters: {dict(indicator.parameters)}")
             else:
                 parameters = (
-                    f"short={indicator.short_period}, long={indicator.long_period}, signal={indicator.signal_period}"
-                    if indicator.indicator == "macd" else
-                    f"period={indicator.period}, k_slowing={indicator.k_slowing}, d_period={indicator.d_period}"
-                    if indicator.indicator == "stochastic" else
-                    f"period={indicator.period}, scale={indicator.scale:g}"
-                    if indicator.indicator == "z_score" else f"period={indicator.period}"
+                    f"short={indicator.short_period}, "
+                    f"long={indicator.long_period}, "
+                    f"signal={indicator.signal_period}"
+                    if indicator.indicator == "macd"
+                    else (
+                        f"period={indicator.period}, "
+                        f"k_slowing={indicator.k_slowing}, "
+                        f"d_period={indicator.d_period}"
+                        if indicator.indicator == "stochastic"
+                        else (
+                            f"period={indicator.period}, "
+                            f"scale={indicator.scale:g}"
+                            if indicator.indicator == "z_score"
+                            else f"period={indicator.period}"
+                        )
+                    )
                 )
-                details.append(f"    Indicator: {indicator.indicator}; {parameters}")
+                details.append(
+                    f"    Indicator: {indicator.indicator}; {parameters}"
+                )
             rule_lines[name] = details
         for group, method in self.group_aggregation.items():
             weights = [
@@ -555,8 +882,14 @@ class ConfluenceScoreCard:
             ]
             capacity = sum(weights) if method == "sum" else max(weights)
             threshold = self.group_thresholds.get(group)
-            gate = f"score >= {threshold:g}" if threshold is not None else "optional"
-            lines.extend(("", f"Group {group}: {method}; {gate}; capacity={capacity:g}"))
+            gate = (
+                f"score >= {threshold:g}"
+                if threshold is not None
+                else "optional"
+            )
+            lines.extend(
+                ("", f"Group {group}: {method}; {gate}; capacity={capacity:g}")
+            )
             for name, rule in config.rules.items():
                 weights = self.rules[name].group_weights
                 if group not in weights:
@@ -573,8 +906,21 @@ class ConfluenceScoreCard:
             for name in unweighted:
                 lines.extend(rule_lines[name])
         lines.append("")
-        lines.append("Override: " + (_format_expression(self.override_triggers) if self.override_triggers else "none"))
-        for label, items in (("Requirement", self.requirements), ("Veto", self.vetoes)):
+        lines.append(
+            "Override: "
+            + (
+                _format_expression(self.override_triggers)
+                if self.override_triggers
+                else "none"
+            )
+        )
+        for label, items in (
+            ("Requirement", self.requirements),
+            ("Veto", self.vetoes),
+        ):
             for item in items:
-                lines.append(f"{label} {item.name}: {_format_expression(item.expression)}")
+                lines.append(
+                    f"{label} {item.name}: "
+                    f"{_format_expression(item.expression)}"
+                )
         return _render_card_box(lines)

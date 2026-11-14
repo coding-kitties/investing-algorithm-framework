@@ -21,9 +21,12 @@ class NativeExecutionUnsupported(ValueError):
 def native_events(symbol_data, rows, initial_amount, strategy, *,
                   dynamic_position_sizing, hedge_mode, deposit_events,
                   index=None):
-    if any(data.get('position_exit_evaluators') for data in symbol_data.values()):
+    if any(
+        data.get('position_exit_evaluators') for data in symbol_data.values()
+    ):
         raise NativeExecutionUnsupported(
-            "Position-scoped confluence lookbacks require Python vector execution"
+            "Position-scoped confluence lookbacks require "
+            "Python vector execution"
         )
     if any(data.get('staged_scale_in') for data in symbol_data.values()):
         raise NativeExecutionUnsupported(

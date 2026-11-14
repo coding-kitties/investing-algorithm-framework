@@ -3199,8 +3199,9 @@ class BacktestService:
                                         algorithm_id=algorithm_id,
                                         strategy_ids=[
                                             strategy.strategy_id
-                                            for strategy
-                                            in algorithm.strategies
+                                            for strategy in (
+                                                algorithm.strategies
+                                            )
                                         ],
                                         started_at=timestamp,
                                         completed_at=timestamp,
@@ -3218,7 +3219,8 @@ class BacktestService:
                                         ),
                                         trade_service=self._trade_service,
                                         portfolio_configuration_service=(
-                                            self._portfolio_configuration_service
+                                            self
+                                            ._portfolio_configuration_service
                                         ),
                                         number_of_iterations=1,
                                         **outcome,

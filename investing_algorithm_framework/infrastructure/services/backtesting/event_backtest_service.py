@@ -125,7 +125,7 @@ class EventBacktestService:
         )
 
     def prepare_indicators(self, algorithm, backtest_date_range):
-        """Create fresh run-local engines and prepare explicitly eligible functions."""
+        """Create run-local engines and prepare eligible functions."""
         for strategy in algorithm.strategies:
             if not getattr(strategy, "indicator_configs", ()):
                 continue
@@ -137,10 +137,14 @@ class EventBacktestService:
                 frames = {}
                 for identifier in engine.required_windows:
                     source = engine.data_sources[identifier]
-                    frames[identifier] = self._data_provider_service.get_backtest_data(
-                        source,
-                        start_date=source.create_start_date_data(backtest_date_range.start_date),
-                        end_date=backtest_date_range.end_date,
+                    frames[identifier] = (
+                        self._data_provider_service.get_backtest_data(
+                            source,
+                            start_date=source.create_start_date_data(
+                                backtest_date_range.start_date
+                            ),
+                            end_date=backtest_date_range.end_date,
+                        )
                     )
                 engine.prepare(frames)
             strategy._indicator_engine = engine

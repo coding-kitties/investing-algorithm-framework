@@ -34,12 +34,33 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     DecisionTrace, DecisionTraceEntry, DECISION_TRACE_METADATA_KEY, \
     DECISION_TRACE_VERSION, ScoreCard, ScoreCardEntry, \
     SCORE_CARD_METADATA_KEY, SCORE_CARD_VERSION
-from .models import AllOf, AnyOf, AtLeast, Condition, ConditionExpression, \
-    condition, \
-    ConfluenceCard, ConfluenceResult, EvaluationContext, Expression, Not, \
-    Operator, PrimaryGroup, EvidenceGroup, GroupEvaluation, Requirement, \
-    RuleEvaluation, ScoreRule, ConfluenceScoreCard, ConfluenceScoreRule, Rule, Threshold, \
-    ScoreType, Veto, CONFLUENCE_CARD_VERSION
+from .models import (
+    AllOf,
+    AnyOf,
+    AtLeast,
+    Condition,
+    ConditionExpression,
+    condition,
+    ConfluenceCard,
+    ConfluenceResult,
+    EvaluationContext,
+    Expression,
+    Not,
+    Operator,
+    PrimaryGroup,
+    EvidenceGroup,
+    GroupEvaluation,
+    Requirement,
+    RuleEvaluation,
+    ScoreRule,
+    ConfluenceScoreCard,
+    ConfluenceScoreRule,
+    Rule,
+    Threshold,
+    ScoreType,
+    Veto,
+    CONFLUENCE_CARD_VERSION,
+)
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \

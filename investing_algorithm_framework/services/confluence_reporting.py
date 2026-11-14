@@ -24,7 +24,8 @@ def skipped_confluence_trace(name, side, reason, indicator_snapshot):
         for name, value in indicator_snapshot.items()
     )
     return DecisionTrace(
-        entries=entries, summary=f"{name}: not triggered; evaluation skipped ({reason})",
+        entries=entries,
+        summary=f"{name}: not triggered; evaluation skipped ({reason})",
     )
 
 
@@ -44,9 +45,15 @@ def confluence_report_details(card, payload):
             f"{group} >= {threshold:g}"
             for group, threshold in card.group_thresholds.items()
         )
-        qualification = f"All group thresholds: {thresholds}" if thresholds else "Normal path disabled"
+        qualification = (
+            f"All group thresholds: {thresholds}"
+            if thresholds
+            else "Normal path disabled"
+        )
         if card.override_triggers is not None:
-            qualification += f"; OR override: {_format_expression(card.override_triggers)}"
+            qualification += (
+                f"; OR override: {_format_expression(card.override_triggers)}"
+            )
     else:
         aggregation = {}
         for group in (card.primary, *card.secondary):

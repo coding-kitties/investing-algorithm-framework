@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-14, windows-2022]
+        os: [ubuntu-22.04, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -74,7 +74,7 @@ jobs:
           - {os: ubuntu-22.04, target: x86_64, platform: linux-x64}
           - {os: ubuntu-24.04-arm, target: aarch64, platform: linux-arm64}
           - {os: macos-15-intel, target: x86_64, platform: macos-x64}
-          - {os: macos-14, target: aarch64, platform: macos-arm64}
+          - {os: macos-15, target: aarch64, platform: macos-arm64}
           - {os: windows-2022, target: x86_64, platform: windows-x64}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -105,7 +105,7 @@ jobs:
           - {platform: linux-x64, os: ubuntu-22.04}
           - {platform: linux-arm64, os: ubuntu-24.04-arm}
           - {platform: macos-x64, os: macos-15-intel}
-          - {platform: macos-arm64, os: macos-14}
+          - {platform: macos-arm64, os: macos-15}
           - {platform: windows-x64, os: windows-2022}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30

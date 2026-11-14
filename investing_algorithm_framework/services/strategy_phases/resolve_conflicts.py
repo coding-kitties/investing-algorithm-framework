@@ -315,22 +315,35 @@ class ResolveConflictsPhase(StrategyPhase):
         )
         if blocked:
             if vetoing_rule is None:
-                raise RuntimeError("Blocked cooldown did not identify its rule")
+                raise RuntimeError(
+                    "Blocked cooldown did not identify its rule"
+                )
             state.trace(
                 "resolve_conflicts.cooldown_rule",
-                (sig, repr(vetoing_rule), {"reason_details": {
-                    "cooldown_bars": vetoing_rule.bars,
-                    "remaining_bars": strategy._cooldown_tracker.remaining_bars(
-                        vetoing_rule, symbol=symbol, bar_index=state.bar_index,
-                        position_side=position_side,
-                    ),
-                    "scope": (
-                        "portfolio" if vetoing_rule.is_portfolio_scoped
-                        else "symbol"
-                    ),
-                    "trigger": vetoing_rule.trigger.value,
-                    "blocks": vetoing_rule.blocks.value,
-                }}),
+                (
+                    sig,
+                    repr(vetoing_rule),
+                    {
+                        "reason_details": {
+                            "cooldown_bars": vetoing_rule.bars,
+                            "remaining_bars": (
+                                strategy._cooldown_tracker.remaining_bars(
+                                    vetoing_rule,
+                                    symbol=symbol,
+                                    bar_index=state.bar_index,
+                                    position_side=position_side,
+                                )
+                            ),
+                            "scope": (
+                                "portfolio"
+                                if vetoing_rule.is_portfolio_scoped
+                                else "symbol"
+                            ),
+                            "trigger": vetoing_rule.trigger.value,
+                            "blocks": vetoing_rule.blocks.value,
+                        }
+                    },
+                ),
             )
             return False
         return True

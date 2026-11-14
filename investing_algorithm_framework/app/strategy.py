@@ -45,7 +45,8 @@ class TradingStrategy(ConfluenceSignalSupport):
     Pipeline composition:
         ``run_strategy`` is a thin loop over :pyattr:`phases` — by
         default the nine canonical phases (pipelines → indicators → collect
-        → resolve → size → risk-budget → emit → attach-rules → record-cooldown).
+        → resolve → size → risk-budget → emit → attach-rules
+        → record-cooldown).
         Override :pyattr:`phases` to insert/replace/reorder; override
         :pyattr:`conflict_policy` to change how same-symbol signal
         clashes are resolved; override :pyattr:`executor` to swap
@@ -147,24 +148,39 @@ class TradingStrategy(ConfluenceSignalSupport):
         flip_on_opposite_signal: bool = None,
         exposure_rule: ExposureRule = None,
         decorated=None,
-        signal_cards: Dict[SignalSide, ConfluenceCard | ConfluenceScoreCard] = None,
+        signal_cards: Dict[
+            SignalSide, ConfluenceCard | ConfluenceScoreCard
+        ] = None,
         indicator_configs=None,
         confluence_cards=None,
     ):
         configured_indicators = (
-            self.indicator_configs if indicator_configs is None else indicator_configs
+            self.indicator_configs
+            if indicator_configs is None
+            else indicator_configs
         )
         self.indicator_configs = (
-            dict(configured_indicators) if isinstance(configured_indicators, Mapping)
-            else list(configured_indicators) if isinstance(configured_indicators, list)
-            else tuple(configured_indicators)
+            dict(configured_indicators)
+            if isinstance(configured_indicators, Mapping)
+            else (
+                list(configured_indicators)
+                if isinstance(configured_indicators, list)
+                else tuple(configured_indicators)
+            )
         )
         configured_confluence = (
-            self.confluence_cards if confluence_cards is None else confluence_cards
+            self.confluence_cards
+            if confluence_cards is None
+            else confluence_cards
         )
         self.confluence_cards = (
-            dict(configured_confluence) if isinstance(configured_confluence, Mapping)
-            else list(configured_confluence) if configured_confluence is not None else {}
+            dict(configured_confluence)
+            if isinstance(configured_confluence, Mapping)
+            else (
+                list(configured_confluence)
+                if configured_confluence is not None
+                else {}
+            )
         )
         self._configure_signal_cards(signal_cards)
         self._pending_decision_traces = []

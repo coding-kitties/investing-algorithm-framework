@@ -2,7 +2,11 @@
 from collections.abc import Mapping
 from dataclasses import replace
 
-from investing_algorithm_framework.domain import ConfluenceScoreCard, DataType, SignalSide
+from investing_algorithm_framework.domain import (
+    ConfluenceScoreCard,
+    DataType,
+    SignalSide,
+)
 from investing_algorithm_framework.domain.indicators import (
     ConfluenceScoreConfig, IndicatorConfig,
 )
@@ -158,8 +162,10 @@ class ConfluenceIndicatorEngine:
         self.entry_watermarks = {}
         self.position_anchors = {}
 
-    def get_confluence_score_cards(self, *, merge_symbols: bool = True) -> list[ConfluenceScoreCard]:
-        """Inspect bound cards, optionally merging identical symbol definitions."""
+    def get_confluence_score_cards(
+        self, *, merge_symbols: bool = True
+    ) -> list[ConfluenceScoreCard]:
+        """Inspect cards, optionally merging identical symbol definitions."""
         if not isinstance(merge_symbols, bool):
             raise TypeError("merge_symbols must be a boolean")
         cards = [
@@ -179,9 +185,17 @@ class ConfluenceIndicatorEngine:
             else:
                 groups.append((definition, [card]))
         return [
-            members[0] if len(members) == 1 else replace(
-                members[0], symbol=None, configuration=None,
-                indicator_configs=None, data_sources=None, symbol_cards=tuple(members),
+            (
+                members[0]
+                if len(members) == 1
+                else replace(
+                    members[0],
+                    symbol=None,
+                    configuration=None,
+                    indicator_configs=None,
+                    data_sources=None,
+                    symbol_cards=tuple(members),
+                )
             )
             for _, members in groups
         ]
@@ -195,10 +209,18 @@ class ConfluenceIndicatorEngine:
             engine.prepare(data)
         return self
 
-    def evaluate(self, data, as_of, *, inactive_cards=None, position_opened_at=None):
-        if inactive_cards is not None and set(inactive_cards) - self.engines.keys():
+    def evaluate(
+        self, data, as_of, *, inactive_cards=None, position_opened_at=None
+    ):
+        if (
+            inactive_cards is not None
+            and set(inactive_cards) - self.engines.keys()
+        ):
             raise ValueError("Inactive cards reference unknown symbols")
-        if position_opened_at is not None and set(position_opened_at) - self.engines.keys():
+        if (
+            position_opened_at is not None
+            and set(position_opened_at) - self.engines.keys()
+        ):
             raise ValueError("Position entry times reference unknown symbols")
         return {
             symbol: engine.evaluate(

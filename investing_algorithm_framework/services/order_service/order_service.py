@@ -276,7 +276,9 @@ class OrderService(RepositoryService):
             order.metadata, 0, order.get_filled(), order.get_price(),
             order.updated_at, order.status,
         )
-        if hasattr(order, "metadata_json") and order.metadata.get("protective_fills"):
+        if hasattr(order, "metadata_json") and order.metadata.get(
+            "protective_fills"
+        ):
             import json
             order.metadata_json = json.dumps(order.metadata)
 
@@ -424,7 +426,9 @@ class OrderService(RepositoryService):
         previous_order = self.order_repository.get(object_id)
         if data.get("filled", previous_order.get_filled()) \
                 > previous_order.get_filled():
-            metadata = dict(data.get("metadata", previous_order.metadata) or {})
+            metadata = dict(
+                data.get("metadata", previous_order.metadata) or {}
+            )
             if metadata.get("order_reason") in _PROTECTIVE_EXIT_REASONS:
                 self._append_protective_fill(
                     metadata, previous_order.get_filled(), data["filled"],

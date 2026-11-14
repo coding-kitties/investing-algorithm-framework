@@ -141,7 +141,9 @@ class TradeOrderEvaluator(ABC):
             )
             self._dispatch_hook_for_trades(trades, hook_name)
 
-    def _record_protective_trigger(self, order_data, references, kind, timestamp):
+    def _record_protective_trigger(
+        self, order_data, references, kind, timestamp
+    ):
         service = (
             self.trade_stop_loss_service if kind == "stop_loss"
             else self.trade_take_profit_service

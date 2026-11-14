@@ -5,12 +5,14 @@
 provide a custom ``phases = [...]`` override. The ordering
 reproduces the legacy ``run_strategy`` behaviour:
 
-    Pipelines → Indicators → Collect → Resolve → Size → Risk-budget → Emit → Attach → Record
+    Pipelines → Indicators → Collect → Resolve → Size → Risk-budget
+    → Emit → Attach → Record
 
 :func:`build_default_phases` returns a fresh list of phase
 *instances* so each strategy gets its own (currently stateless,
 but the contract leaves room for future per-instance state).
 """
+
 from __future__ import annotations
 
 from typing import List, Tuple, Type

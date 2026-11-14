@@ -53,9 +53,13 @@ class ConfluenceScoringStrategy(TradingStrategy):
                     )
         return engine
 
-    def get_confluence_score_cards(self, *, merge_symbols: bool = True) -> list[ConfluenceScoreCard]:
-        """Build printable configuration snapshots on demand, not during execution."""
-        return self._indicator_engine.get_confluence_score_cards(merge_symbols=merge_symbols)
+    def get_confluence_score_cards(
+        self, *, merge_symbols: bool = True
+    ) -> list[ConfluenceScoreCard]:
+        """Build printable configuration snapshots only on demand."""
+        return self._indicator_engine.get_confluence_score_cards(
+            merge_symbols=merge_symbols
+        )
 
     def _next_scale_in_stage(self, context, symbol):
         engine = self._indicator_engine
@@ -119,7 +123,8 @@ class ConfluenceScoringStrategy(TradingStrategy):
         if not trades:
             raise ValueError(
                 f"{symbol}: position-scoped lookback requires a filled trade "
-                "with an entry timestamp; asset holdings alone are insufficient"
+                "with an entry timestamp; asset holdings alone are "
+                "insufficient"
             )
         key = symbol, short
         anchor = self._indicator_engine.position_anchors.get(key)
@@ -130,10 +135,15 @@ class ConfluenceScoringStrategy(TradingStrategy):
             if trade.is_short == short and trade.filled_amount
         ]
         if any(trade.opened_at is None for trade in filled):
-            raise ValueError(f"{symbol}: a filled trade has no entry timestamp")
-        since = min(pd.to_datetime(trade.opened_at, utc=True) for trade in trades)
+            raise ValueError(
+                f"{symbol}: a filled trade has no entry timestamp"
+            )
+        since = min(
+            pd.to_datetime(trade.opened_at, utc=True) for trade in trades
+        )
         for trade in sorted(
-            filled, key=lambda trade: pd.to_datetime(trade.opened_at, utc=True),
+            filled,
+            key=lambda trade: pd.to_datetime(trade.opened_at, utc=True),
             reverse=True,
         ):
             opened = pd.to_datetime(trade.opened_at, utc=True)
@@ -157,7 +167,9 @@ class ConfluenceScoringStrategy(TradingStrategy):
                     continue
                 side = native.cards[name].side
                 if side not in by_side:
-                    by_side[side] = self._position_opened_at(context, symbol, side)
+                    by_side[side] = self._position_opened_at(
+                        context, symbol, side
+                    )
                 bounds.setdefault(symbol, {})[name] = by_side[side]
         return {"inactive_cards": inactive, "position_opened_at": bounds}
 
@@ -175,7 +187,9 @@ class ConfluenceScoringStrategy(TradingStrategy):
             options = self.get_confluence_evaluation_options(context)
         inactive = options["inactive_cards"]
         evaluations = data.get("indicators")
-        if evaluations is None or (options["position_opened_at"] and not supplied_options):
+        if evaluations is None or (
+            options["position_opened_at"] and not supplied_options
+        ):
             evaluations = engine.evaluate(
                 data, context.config[INDEX_DATETIME],
                 **options,
@@ -190,7 +204,8 @@ class ConfluenceScoringStrategy(TradingStrategy):
                 reason = inactive.get(symbol, {}).get(name)
                 if reason is not None:
                     evaluation.cards[name] = {
-                        "evaluation_status": "skipped", "signal_reason": reason,
+                        "evaluation_status": "skipped",
+                        "signal_reason": reason,
                     }
                 payload = evaluation.cards[name]
                 if payload.get("evaluation_status") == "skipped":
@@ -233,7 +248,8 @@ class ConfluenceScoringStrategy(TradingStrategy):
         for symbol, native in engine.engines.items():
             index = native.decision_index
             if any(
-                card.initial_delay or any(rule.initial_delay for rule in card.rules.values())
+                card.initial_delay
+                or any(rule.initial_delay for rule in card.rules.values())
                 for card in native.cards.values()
             ):
                 index = data.get("_confluence_decision_index")
@@ -278,7 +294,9 @@ class ConfluenceScoringStrategy(TradingStrategy):
     def _position_scoped_exit_evaluators(self):
         engine = getattr(self, "_vector_indicator_engine", None)
         if engine is None:
-            raise RuntimeError("Position-scoped vector candidates must be prepared first")
+            raise RuntimeError(
+                "Position-scoped vector candidates must be prepared first"
+            )
         evaluators = {
             symbol: {
                 side: partial(native.position_scoped_exit_signal, side=side)

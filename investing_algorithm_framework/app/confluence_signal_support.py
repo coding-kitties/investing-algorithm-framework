@@ -78,11 +78,15 @@ class ConfluenceSignalSupport:
                 not getattr(trade, "is_short", False) for trade in trades
             )
             if not has_long and not context.has_position(symbol=symbol):
-                reasons[SignalSide.CLOSE_LONG] = "confluence.long_exit_requires_position"
+                reasons[SignalSide.CLOSE_LONG] = (
+                    "confluence.long_exit_requires_position"
+                )
         if SignalSide.CLOSE_SHORT in sides and not any(
             getattr(trade, "is_short", False) for trade in trades
         ):
-            reasons[SignalSide.CLOSE_SHORT] = "confluence.short_exit_requires_position"
+            reasons[SignalSide.CLOSE_SHORT] = (
+                "confluence.short_exit_requires_position"
+            )
         return reasons
 
     def _generate_card_signals(self, data, context):
@@ -102,14 +106,21 @@ class ConfluenceSignalSupport:
             for side, card in self.signal_cards.items():
                 if side in inactive:
                     trace = skipped_confluence_trace(
-                        card.name, side, inactive[side], evaluation_context.values,
+                        card.name,
+                        side,
+                        inactive[side],
+                        evaluation_context.values,
                     )
-                    self._pending_confluence_scores.append({
-                        "symbol": symbol, "card_id": card.name, "side": side.value,
-                        "evaluation_status": "skipped",
-                        "signal_reason": inactive[side],
-                        "decision_trace": trace.to_dict(),
-                    })
+                    self._pending_confluence_scores.append(
+                        {
+                            "symbol": symbol,
+                            "card_id": card.name,
+                            "side": side.value,
+                            "evaluation_status": "skipped",
+                            "signal_reason": inactive[side],
+                            "decision_trace": trace.to_dict(),
+                        }
+                    )
                     self.record_decision_trace(trace, symbol=symbol)
                     continue
                 availability = card.evaluate_series(recent)["available"]
@@ -138,12 +149,17 @@ class ConfluenceSignalSupport:
         trace.entries.append(DecisionTraceEntry(
             name="ready", value=True, group="decision",
         ))
-        self._pending_confluence_scores.append({
-            **confluence_report_details(card, result.to_dict()), "symbol": symbol,
-            "card_id": card.name, "side": side.value,
-            "ready": True, "passed": result.qualified,
-            "decision_trace": trace.to_dict(),
-        })
+        self._pending_confluence_scores.append(
+            {
+                **confluence_report_details(card, result.to_dict()),
+                "symbol": symbol,
+                "card_id": card.name,
+                "side": side.value,
+                "ready": True,
+                "passed": result.qualified,
+                "decision_trace": trace.to_dict(),
+            }
+        )
         if result.qualified:
             yield Signal(
                 symbol=symbol, side=side, source=card.name,

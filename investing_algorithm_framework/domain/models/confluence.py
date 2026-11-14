@@ -170,7 +170,9 @@ class AllOf(Expression):
             if isinstance(expressions, Expression)
             else (*expressions, *additional)
         )
-        if not children or not all(isinstance(item, Expression) for item in children):
+        if not children or not all(
+            isinstance(item, Expression) for item in children
+        ):
             raise ValueError("AllOf requires at least one expression")
         object.__setattr__(self, "expressions", children)
 
@@ -190,7 +192,9 @@ class AnyOf(Expression):
             if isinstance(expressions, Expression)
             else (*expressions, *additional)
         )
-        if not children or not all(isinstance(item, Expression) for item in children):
+        if not children or not all(
+            isinstance(item, Expression) for item in children
+        ):
             raise ValueError("AnyOf requires at least one expression")
         object.__setattr__(self, "expressions", children)
 
