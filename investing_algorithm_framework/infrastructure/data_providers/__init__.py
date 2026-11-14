@@ -5,6 +5,7 @@ from .json_url import JSONURLDataProvider
 from .parquet_url import ParquetURLDataProvider
 from .pandas import PandasOHLCVDataProvider
 from .ohlcv_base import OHLCVDataProviderBase
+from .fxmacrodata import FXMacroDataOHLCVDataProvider
 
 
 def _make_optional_provider_placeholder(name, package, extra):
@@ -65,6 +66,7 @@ def get_default_data_providers():
         CSVURLDataProvider(),
         JSONURLDataProvider(),
         ParquetURLDataProvider(),
+        FXMacroDataOHLCVDataProvider(),
     ]
 
     if _yahoo_available:
@@ -88,6 +90,7 @@ def get_default_ohlcv_data_providers():
     """
     providers = [
         CCXTOHLCVDataProvider(),
+        FXMacroDataOHLCVDataProvider(),
     ]
 
     if _yahoo_available:
@@ -114,6 +117,7 @@ __all__ = [
     'get_default_ohlcv_data_providers',
     'OHLCVDataProviderBase',
     'PandasOHLCVDataProvider',
+    'FXMacroDataOHLCVDataProvider',
     'YahooOHLCVDataProvider',
     'AlphaVantageOHLCVDataProvider',
     'PolygonOHLCVDataProvider',
