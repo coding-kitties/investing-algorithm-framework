@@ -51,20 +51,40 @@ class BacktestHistory(Sequence):
         self._index = None
         try:
             count = 0
+            offset = 0
+            data_buffer = bytearray()
+            index_buffer = bytearray()
+            dumps = pickle.dumps
+            protocol = pickle.HIGHEST_PROTOCOL
             for record in records:
                 if self._data is None:
                     self._files = _HistoryFiles()
                     self._data = self._files.data
                     self._index = self._files.index
-                payload = pickle.dumps(
+                    write_data = self._data.write
+                    write_index = self._index.write
+                    pack = self._offset.pack
+                payload = dumps(
                     record.to_dict() if model is not None else record,
-                    protocol=pickle.HIGHEST_PROTOCOL,
+                    protocol=protocol,
                 )
-                offset = self._data.tell()
-                self._data.write(payload)
-                self._index.write(self._offset.pack(offset, len(payload)))
+                size = len(payload)
+                if len(data_buffer) + size > 65536:
+                    write_data(data_buffer)
+                    data_buffer.clear()
+                if size >= 65536:
+                    write_data(payload)
+                else:
+                    data_buffer.extend(payload)
+                index_buffer.extend(pack(offset, size))
+                if len(index_buffer) >= 65536:
+                    write_index(index_buffer)
+                    index_buffer.clear()
+                offset += size
                 count += 1
             if self._data is not None:
+                write_data(data_buffer)
+                write_index(index_buffer)
                 self._data.flush()
                 self._index.flush()
             self._selection = range(count)
