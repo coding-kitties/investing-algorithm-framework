@@ -134,7 +134,7 @@ jobs:
         run: python -I native/confluence/tests/wheel_smoke.py
       - name: Native and Python exact parity
         run: |
-          python -c "import iaf_confluence_native; assert iaf_confluence_native.NETTING_SEMANTICS_VERSION == 'netting-accounting-v5'"
+          python -c "import iaf_confluence_native; assert iaf_confluence_native.NETTING_SEMANTICS_VERSION == 'netting-accounting-v6'"
           python -m pytest -q tests/domain/models/test_confluence_native.py tests/infrastructure/services/backtesting/test_vector_snapshot_events.py tests/services/metrics/test_drawdowns.py tests/services/test_order_backtest_service.py tests/services/test_backtest_trade_order_evaluator.py tests/app/test_eventloop.py
           python -m pytest -q tests/services/trade_hooks/test_trade_hooks_event_backtest.py::TestRustRiskHookParity tests/app/backtesting/test_backtest_memory_options.py::TestBacktestMemoryOptions::test_rust_accounting_workers_match_sql_and_resume tests/app/backtesting/test_backtest_memory_options.py::TestBacktestMemoryOptions::test_strict_native_accounting_preflights_before_execution
           python -m pytest -q tests/infrastructure/repositories/test_event_memory.py::TestEventMemoryState::test_native_index_filters_streams_and_observes_updates

@@ -31,7 +31,7 @@ class TestInstalledWheels(unittest.TestCase):
             'EVENT_ACCOUNTING_SEMANTICS_VERSION': 'event-accounting-v1',
             'EVENT_SETTLEMENT_SEMANTICS_VERSION': 'event-settlement-v1',
             'EVENT_LIFECYCLE_SEMANTICS_VERSION': 'event-lifecycle-v1',
-            'EVENT_ARCHIVE_SEMANTICS_VERSION': 'event-archive-v2',
+            'EVENT_ARCHIVE_SEMANTICS_VERSION': 'event-archive-v3',
         }
         for name, value in expected.items():
             self.assertEqual(getattr(native, name), value)

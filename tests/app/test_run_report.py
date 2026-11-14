@@ -370,17 +370,28 @@ class TestRunReport(TestCase):
         self.assertEqual({"entry", "exit"}, {
             card["card_id"] for card in report["confluence_scores"]
         })
-        for card in report["confluence_scores"]:
-            self.assertTrue(card["ready"])
-            self.assertFalse(card["qualified"])
-            self.assertFalse(card["passed"])
-            self.assertEqual("not_emitted", card["signal_status"])
-            self.assertEqual("confluence.not_qualified", card["signal_reason"])
+        cards = {
+            card["card_id"]: card for card in report["confluence_scores"]
+        }
+        for card in cards.values():
             self.assertEqual("ConfluenceSnapshotStrategy", card["strategy_id"])
             self.assertEqual("BTC", card["symbol"])
             self.assertIsNotNone(card["timestamp"])
-            self.assertTrue(card["groups"])
-            self.assertTrue(card["evaluations"])
+        entry = cards["entry"]
+        self.assertTrue(entry["ready"])
+        self.assertFalse(entry["qualified"])
+        self.assertFalse(entry["passed"])
+        self.assertEqual("not_emitted", entry["signal_status"])
+        self.assertEqual("confluence.not_qualified", entry["signal_reason"])
+        self.assertTrue(entry["groups"])
+        self.assertTrue(entry["evaluations"])
+        exit_card = cards["exit"]
+        self.assertEqual("skipped", exit_card["evaluation_status"])
+        self.assertEqual("not_triggered", exit_card["signal_status"])
+        self.assertEqual(
+            "confluence.long_exit_requires_position",
+            exit_card["signal_reason"],
+        )
         self.assertEqual(
             report["confluence_scores"],
             app.get_run_reports()[0]["confluence_scores"],
@@ -418,14 +429,22 @@ class TestRunReport(TestCase):
             report = app.run(number_of_iterations=1)
         self.assertEqual([], report["signals"])
         self.assertEqual(2, len(report["confluence_scores"]))
-        self.assertTrue(all(
-            not card["ready"] for card in report["confluence_scores"]
-        ))
-        self.assertTrue(all(
-            card["signal_status"] == "not_emitted"
-            and card["signal_reason"] == "confluence.indicators_not_ready"
-            for card in report["confluence_scores"]
-        ))
+        cards = {
+            card["card_id"]: card for card in report["confluence_scores"]
+        }
+        entry = cards["entry"]
+        self.assertFalse(entry["ready"])
+        self.assertEqual("not_emitted", entry["signal_status"])
+        self.assertEqual(
+            "confluence.indicators_not_ready", entry["signal_reason"],
+        )
+        exit_card = cards["exit"]
+        self.assertEqual("skipped", exit_card["evaluation_status"])
+        self.assertEqual("not_triggered", exit_card["signal_status"])
+        self.assertEqual(
+            "confluence.long_exit_requires_position",
+            exit_card["signal_reason"],
+        )
         self.assertEqual({}, report["data_sources"][0]["values"])
         self.assertIsNone(report["data_sources"][0]["source_timestamp"])
         self.assertEqual(None, report["indicators"][0]["value"])
