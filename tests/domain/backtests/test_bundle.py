@@ -163,6 +163,62 @@ class TestBundleRoundTrip(TestCase):
         self.assertEqual(version, BUNDLE_FORMAT_VERSION)
         self.assertEqual(restored, document)
 
+    def test_stream_encoder_large_strings_do_not_add_full_buffer_copy(self):
+        import tracemalloc
+        from investing_algorithm_framework.domain.backtesting.bundle import (
+            _atomic_write_document, _decode_payload,
+        )
+
+        class Text(str):
+            pass
+
+        text = 'x' * (16 * 1024 * 1024)
+        documents = (
+            text,
+            [1, text, 2],
+            {'before': 1, text: 2, 'after': 3},
+            {'before': 1, 'text': text, 'after': 2},
+            Text(text),
+        )
+        target = Path(self.tmp) / 'large-text.obtf'
+        for index, document in enumerate(documents):
+            with self.subTest(case=index):
+                tracemalloc.start()
+                try:
+                    _atomic_write_document(
+                        target, document,
+                        format_version=BUNDLE_FORMAT_VERSION,
+                    )
+                    _, peak = tracemalloc.get_traced_memory()
+                finally:
+                    tracemalloc.stop()
+                # Allow MessagePack's encoding allocations, but not another
+                # full-size copy in the output buffer.
+                self.assertLess(peak, 3 * len(text) + 1024 * 1024)
+                self.assertEqual(
+                    _decode_payload(target.read_bytes())[1], document,
+                )
+
+    def test_stream_encoder_preserves_bytes_at_scalar_buffer_boundary(self):
+        import msgpack
+        from investing_algorithm_framework.domain.backtesting.bundle import (
+            _iter_msgpack_chunks,
+        )
+
+        for text in ('x' * 65532, 'x' * 65533, 'x' * 65534,
+                     '\u20ac' * 24000):
+            for document in (
+                text,
+                [1, text, b'b' * 65536, 2],
+                {'before': 1, text: text, 'after': 2},
+            ):
+                with self.subTest(length=len(text), kind=type(document)):
+                    packer = msgpack.Packer(use_bin_type=True)
+                    encoded = b''.join(_iter_msgpack_chunks(document, packer))
+                    self.assertEqual(
+                        encoded, msgpack.packb(document, use_bin_type=True),
+                    )
+
     def test_stream_failure_preserves_target_and_cleans_temporary_files(self):
         from investing_algorithm_framework.domain.backtesting.bundle import (
             _atomic_write_document, _atomic_bundle_file,

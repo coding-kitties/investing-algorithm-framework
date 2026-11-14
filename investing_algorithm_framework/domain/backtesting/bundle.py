@@ -499,6 +499,15 @@ def _iter_msgpack_chunks(value, packer, depth=0):
         buffer.clear()
         return chunk
 
+    def pack_buffered(value):
+        payload = pack(value)
+        if len(payload) >= limit:
+            if buffer:
+                return flush(), payload
+            return (payload,)
+        write(payload)
+        return ()
+
     def walk(value, depth):
         if depth > 256:
             raise ValueError('Bundle nesting exceeds 256 levels')
@@ -509,11 +518,11 @@ def _iter_msgpack_chunks(value, packer, depth=0):
                 raise ValueError('Bundle nesting exceeds 256 levels')
             for key, item in value.items():
                 if type(key) in scalar_types:
-                    write(pack(key))
+                    yield from pack_buffered(key)
                 else:
                     yield from walk(key, child_depth)
                 if type(item) in scalar_types:
-                    write(pack(item))
+                    yield from pack_buffered(item)
                 else:
                     yield from walk(item, child_depth)
                 if len(buffer) >= limit:
@@ -525,7 +534,7 @@ def _iter_msgpack_chunks(value, packer, depth=0):
                 if child_depth > 256:
                     raise ValueError('Bundle nesting exceeds 256 levels')
                 if type(item) in scalar_types:
-                    write(pack(item))
+                    yield from pack_buffered(item)
                 else:
                     yield from walk(item, child_depth)
                 if len(buffer) >= limit:
@@ -545,7 +554,7 @@ def _iter_msgpack_chunks(value, packer, depth=0):
             for offset in range(0, len(view), 65536):
                 yield view[offset:offset + 65536]
         else:
-            write(pack(value))
+            yield from pack_buffered(value)
 
     yield from walk(value, depth)
     if buffer:
