@@ -16,6 +16,10 @@ class DataProviderIndex:
     """
     Efficient lookup for data providers in O(1) time.
 
+    OHLCV execution lookups prefer the finest timeframe. Re-registering an
+    equal timeframe refreshes those lookups to the newly selected provider,
+    including its prepared backtest window.
+
     Attributes:
         data_providers (List[DataProvider]): List of data providers
         data_providers_lookup (dict): Dictionary to store the lookup
@@ -101,7 +105,10 @@ class DataProviderIndex:
                         (symbol, market)
                     ]
 
-                    if existing_provider.time_frame > best_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= best_provider.time_frame
+                    ):
                         self.ohlcv_data_providers[(symbol, market)] =\
                             best_provider
 
@@ -109,7 +116,10 @@ class DataProviderIndex:
                         symbol
                     ]
 
-                    if existing_provider.time_frame > best_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= best_provider.time_frame
+                    ):
                         self.ohlcv_data_providers_no_market[symbol] =\
                             best_provider
 
@@ -167,7 +177,10 @@ class DataProviderIndex:
                         (symbol, market)
                     ]
 
-                    if existing_provider.time_frame > data_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= data_provider.time_frame
+                    ):
                         self.ohlcv_data_providers[(symbol, market)] = \
                             data_provider
 
@@ -175,7 +188,10 @@ class DataProviderIndex:
                         symbol
                     ]
 
-                    if existing_provider.time_frame > data_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= data_provider.time_frame
+                    ):
                         self.ohlcv_data_providers_no_market[symbol] = \
                             data_provider
 
@@ -261,7 +277,10 @@ class DataProviderIndex:
                     existing_provider = self.ohlcv_data_providers[
                         (symbol.upper(), market.upper())
                     ]
-                    if existing_provider.time_frame > best_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= best_provider.time_frame
+                    ):
                         self.ohlcv_data_providers[
                             (symbol.upper(), market.upper())
                         ] =\
@@ -271,7 +290,10 @@ class DataProviderIndex:
                         symbol
                     ]
 
-                    if existing_provider.time_frame > best_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= best_provider.time_frame
+                    ):
                         self.ohlcv_data_providers_no_market[symbol] = \
                             best_provider
 
