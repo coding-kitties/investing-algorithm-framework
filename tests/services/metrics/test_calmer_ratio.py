@@ -62,14 +62,18 @@ class TestGetCalmarRatio(unittest.TestCase):
     def test_calmar_ratio_zero_drawdown(self):
         """
         Test Calmar ratio when there are no drawdowns (only gains).
-        Should return 0.0 since we can't divide by zero.
+
+        There is no downside risk to divide by and CAGR is positive, so
+        the ratio is unbounded. This mirrors the division-by-zero
+        convention used by get_sortino_ratio, get_profit_factor and
+        get_omega_ratio.
         """
         report = self._create_report(
             [1000, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000],
             [datetime(2024, 1, i) for i in range(1, 11)]
         )
         ratio = get_calmar_ratio(report.portfolio_snapshots)
-        self.assertEqual(ratio, 0.0)
+        self.assertEqual(ratio, float('inf'))
 
     def test_calmar_ratio_with_only_drawdown(self):
         """

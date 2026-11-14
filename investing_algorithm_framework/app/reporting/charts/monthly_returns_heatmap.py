@@ -1,5 +1,7 @@
 import pandas as pd
-import plotly.graph_objects as go
+from finterion_charts import ChartSpec, Heatmap
+
+from ._finterion_render import FinterionChart
 
 
 def get_monthly_returns_heatmap_chart(monthly_return_series):
@@ -32,39 +34,17 @@ def get_monthly_returns_heatmap_chart(monthly_return_series):
     pivot_df = pivot_df.reindex(columns=month_order)
     pivot_df = pivot_df.sort_index(ascending=True)  # Change to ascending order
 
-    z = pivot_df.values
-    text = [
-        [f"{v * 100:.2f}%" if pd.notna(v) else "" for v in row] for row in z
-    ]
-    hover_template = "Year %{y}<br>Month %{x}<br>" + \
-        "Return: %{z:.2%}<extra></extra>"
-    fig = go.Figure(data=go.Heatmap(
-        z=z,
-        x=pivot_df.columns,
-        y=pivot_df.index,
-        text=text,
-        texttemplate="%{text}",
-        textfont={"size": 12},
-        colorscale="RdYlGn",
-        showscale=False,
-        hovertemplate=hover_template,
-        zmin=-0.1,
-        zmax=0.1
+    spec = ChartSpec(theme="finterion-light")
+    spec.add_panel(Heatmap(
+        id="monthly_returns",
+        weight=1,
+        title="Monthly Returns Heatmap (%)",
+        rows=[str(year) for year in pivot_df.index],
+        cols=list(pivot_df.columns),
+        values=pivot_df.values.tolist(),
+        format="pct2",
+        range=0.1,
+        color_scale=("#ef4444", "#f8fafc", "#10b981"),
     ))
 
-    fig.update_layout(
-        title="Monthly Returns Heatmap (%)",
-        xaxis_title="Month",
-        yaxis=dict(
-            title=None,
-            tickmode='array',
-            tickvals=list(pivot_df.index),
-            ticktext=[str(year) for year in pivot_df.index],
-            autorange=True  # Remove 'reversed' to match ascending order
-        ),
-        template="plotly_white",
-        margin=dict(l=0, r=0, t=40, b=20),
-        height=350,
-        showlegend=False
-    )
-    return fig
+    return FinterionChart(spec.validate(), height=350)

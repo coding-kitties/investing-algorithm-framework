@@ -1,8 +1,6 @@
 import os
 import logging
-import boto3
 import stat
-from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 from investing_algorithm_framework.domain import OperationalException, \
     StateHandler
 
@@ -59,6 +57,10 @@ class AWSS3StorageStateHandler(StateHandler):
         self.s3_client = None
 
     def initialize(self):
+        # Imported lazily so boto3 (an optional `aws` extra) is only
+        # required when this state handler is actually used.
+        import boto3
+
         self.bucket_name = self.bucket_name or os.getenv("AWS_S3_BUCKET_NAME")
 
         if not self.bucket_name:
@@ -80,6 +82,10 @@ class AWSS3StorageStateHandler(StateHandler):
         Returns:
             None
         """
+        from botocore.exceptions import (
+            NoCredentialsError, PartialCredentialsError
+        )
+
         logger.info("Saving state to AWS S3 ...")
 
         try:
@@ -114,6 +120,10 @@ class AWSS3StorageStateHandler(StateHandler):
         """
         Load the state from AWS S3.
         """
+        from botocore.exceptions import (
+            NoCredentialsError, PartialCredentialsError
+        )
+
         logger.info("Loading state from AWS S3 ...")
 
         try:

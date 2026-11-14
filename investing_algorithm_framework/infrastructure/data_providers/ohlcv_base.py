@@ -122,7 +122,9 @@ class OHLCVDataProviderBase(DataProvider):
             data = self._get_data_from_storage(
                 symbol=data_source.symbol,
                 time_frame=data_source.time_frame,
-                storage_path=data_source.storage_path,
+                storage_path=(
+                    data_source.storage_path or self.get_storage_directory()
+                ),
                 start_date=start_date,
                 end_date=end_date,
             )
@@ -217,19 +219,36 @@ class OHLCVDataProviderBase(DataProvider):
         if self.data is None:
             return None
 
-        if self.window_size is not None:
+        if backtest_index_date is None:
+            # Vectorized backtests do not iterate over a moving index date.
+            # Fall back to the full requested range instead of applying a
+            # trailing window, which would previously crash with a
+            # TypeError (None - timedelta) / Polars comparison against None.
+            start = backtest_start_date
+            end = backtest_end_date
+        elif self.window_size is not None:
             n_minutes = TimeFrame.from_value(
                 self.time_frame
             ).amount_of_minutes
             start = backtest_index_date - timedelta(
                 minutes=n_minutes * self.window_size
             )
+            end = backtest_index_date
         else:
             start = backtest_start_date
+            end = backtest_index_date
+
+        if start is None:
+            # No explicit lower bound: fall back to the earliest data point.
+            start = self.data["Datetime"].min()
+
+        if end is None:
+            # No explicit upper bound: fall back to the latest data point.
+            end = self.data["Datetime"].max()
 
         filtered = self.data.filter(
             (pl.col("Datetime") >= start)
-            & (pl.col("Datetime") <= backtest_index_date)
+            & (pl.col("Datetime") <= end)
         )
 
         if self.pandas:
@@ -580,8 +599,9 @@ class OHLCVDataProviderBase(DataProvider):
 
         if self.config is not None \
                 and RESOURCE_DIRECTORY in self.config:
+            data_directory_name = self.config.get(DATA_DIRECTORY, "data")
             return os.path.join(
-                self.config[RESOURCE_DIRECTORY], DATA_DIRECTORY
+                self.config[RESOURCE_DIRECTORY], data_directory_name
             )
 
         return None

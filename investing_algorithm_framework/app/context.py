@@ -1,6 +1,7 @@
 import logging
+from math import isfinite
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Union
 
 from investing_algorithm_framework.services import ConfigurationService, \
     MarketCredentialService, OrderService, PortfolioConfigurationService, \
@@ -64,6 +65,48 @@ class Context:
         self._fx_rate_provider = None
         self._base_currency = None
         self._recorded_values = {}  # key -> list of (datetime, value)
+        # Set by EventLoopService right before it runs a strategy, so
+        # orders/trades created during that call can be attributed to
+        # the strategy that created them without every strategy author
+        # having to pass strategy_id explicitly.
+        self._current_strategy_id = None
+
+    def _attach_strategy_attribution(self, order_data: dict) -> None:
+        """
+        Stamps ``order_data`` with the strategy currently running (if
+        any), unless the caller already supplied an explicit
+        ``strategy_id`` or ``metadata['strategy_id']``.
+        """
+        strategy_id = self._current_strategy_id
+
+        if strategy_id is None:
+            return
+
+        order_data.setdefault("strategy_id", strategy_id)
+        metadata = order_data.setdefault("metadata", {}) or {}
+        order_data["metadata"] = metadata
+        metadata.setdefault("strategy_id", strategy_id)
+
+    @staticmethod
+    def _round_order_amount(amount, precision, allow_zero=False):
+        if precision is None:
+            return amount
+        if isinstance(precision, bool) or not isinstance(precision, int) \
+                or precision < 0:
+            raise OperationalException(
+                "`precision` must be a non-negative integer."
+            )
+        if amount is None or not isfinite(amount) or amount < 0:
+            raise OperationalException(
+                "Order amount must be finite and non-negative before rounding."
+            )
+        amount = RoundingService.round_down(amount, precision)
+        if amount == 0 and not allow_zero:
+            raise OperationalException(
+                "Order amount is zero after rounding to the requested "
+                "precision."
+            )
+        return amount
 
     def _validate_target_symbol(self, target_symbol, market=None):
         """
@@ -146,6 +189,7 @@ class Context:
         sync=True,
         validate_symbol=False,
         stop_price=None,
+        precision=None,
     ) -> Order:
         """
         Function to create an order. This function will create an order
@@ -167,6 +211,7 @@ class Context:
               validates that target_symbol is not the trading_symbol.
             stop_price: Required for STOP and STOP_LIMIT order types.
               The trigger price at which the order activates.
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             The order created
@@ -174,6 +219,7 @@ class Context:
         if validate_symbol:
             self._validate_target_symbol(target_symbol, market=market)
 
+        amount = self._round_order_amount(amount, precision)
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
             "target_symbol": target_symbol,
@@ -194,6 +240,7 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
+        self._attach_strategy_attribution(order_data)
         order_data["_execute"] = execute
         order_data["_validate"] = validate
         order_data["_sync"] = sync
@@ -314,9 +361,6 @@ class Context:
             size = net_size * (percentage / 100)
             amount = size / price
 
-        if precision is not None:
-            amount = RoundingService.round_down(amount, precision)
-
         if amount_trading_symbol is not None:
             amount = amount_trading_symbol / price
 
@@ -328,6 +372,7 @@ class Context:
                 "parameter must be specified."
             )
 
+        amount = self._round_order_amount(amount, precision)
         logger.info(
             f"Creating limit order: {target_symbol} "
             f"{order_side} {amount} @ {price}"
@@ -351,6 +396,7 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
+        self._attach_strategy_attribution(order_data)
         order_data["_execute"] = execute
         order_data["_validate"] = validate
         order_data["_sync"] = sync
@@ -449,9 +495,6 @@ class Context:
             size = net_size * (percentage / 100)
             amount = size / estimated_price
 
-        if precision is not None:
-            amount = RoundingService.round_down(amount, precision)
-
         if amount_trading_symbol is not None:
             amount = amount_trading_symbol / estimated_price
 
@@ -463,6 +506,7 @@ class Context:
                 "parameter must be specified."
             )
 
+        amount = self._round_order_amount(amount, precision)
         logger.info(
             f"Creating market order: {target_symbol} "
             f"{order_side} {amount} @ estimated {estimated_price}"
@@ -488,6 +532,198 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
+        self._attach_strategy_attribution(order_data)
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
+
+    # ------------------------------------------------------------------
+    # Short-selling order creation (#434 phase 1).
+    #
+    # Plumbing only: ``execute`` and ``sync`` default to ``False`` so
+    # the order is validated and persisted but never reaches the
+    # event-engine sync paths (which are implemented in phase 2). Use
+    # ``validate=True, execute=False, sync=False`` (the defaults) to
+    # exercise the SHORT/COVER validators in tests today. The vector
+    # backtest engine routes SHORT/COVER independently via
+    # ``generate_signal_series`` with SignalSide.OPEN_SHORT /
+    # SignalSide.CLOSE_SHORT (#433).
+    # ------------------------------------------------------------------
+    def create_short_order(
+        self,
+        target_symbol,
+        price,
+        amount=None,
+        percentage_of_portfolio=None,
+        order_type=OrderType.LIMIT,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True,
+        metadata=None,
+        precision=None,
+    ) -> Order:
+        """
+        Create a SHORT (short-entry) order.
+
+        Sizing: pass either ``amount`` (units of the underlying) or
+        ``percentage_of_portfolio`` (cash collateral as a percentage
+        of the portfolio's net size, full collateral, no leverage).
+
+        Args:
+            target_symbol (str): The symbol to short.
+            price (float): Limit price (or reference price for
+                MARKET/STOP orders).
+            amount (float, optional): Units of the underlying to
+                short.
+            percentage_of_portfolio (float, optional): Cash collateral
+                as a percentage of portfolio net size (1–100).
+            order_type (OrderType): Order type (defaults to LIMIT).
+            market (str, optional): Market the order routes through.
+            execute (bool): Whether to execute via the configured
+                order executor (default True).
+            validate (bool): Run the SHORT validator (default True).
+            sync (bool): Whether to sync the portfolio/position state
+                with the created order (default True).
+            metadata (dict, optional): Order metadata.
+            precision: Optional non-negative decimal precision for the amount.
+
+        Returns:
+            Order: The created order.
+        """
+        if amount is None and percentage_of_portfolio is None:
+            raise OperationalException(
+                "Either amount or percentage_of_portfolio must be "
+                "specified to create a short order."
+            )
+
+        portfolio = self.portfolio_service.find({"market": market})
+
+        if percentage_of_portfolio is not None:
+            if price is None or price <= 0:
+                raise OperationalException(
+                    "A positive price is required to size a short "
+                    "order by percentage_of_portfolio."
+                )
+            net_size = portfolio.get_net_size()
+            collateral = net_size * (percentage_of_portfolio / 100)
+            amount = collateral / price
+
+        amount = self._round_order_amount(amount, precision)
+        order_data = {
+            "target_symbol": target_symbol,
+            "price": price,
+            "amount": amount,
+            "order_type": OrderType.from_value(order_type).value,
+            "order_side": OrderSide.SHORT.value,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+        }
+
+        if metadata is not None:
+            order_data["metadata"] = metadata
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[INDEX_DATETIME]
+
+        self._attach_strategy_attribution(order_data)
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
+
+    def create_cover_order(
+        self,
+        target_symbol,
+        price,
+        amount=None,
+        percentage_of_position=None,
+        order_type=OrderType.LIMIT,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True,
+        metadata=None,
+        precision=None,
+    ) -> Order:
+        """
+        Create a COVER (short-close) order.
+
+        Sizing: pass either ``amount`` (units of the underlying) or
+        ``percentage_of_position`` (percentage of the open short to
+        close, 1–100).
+
+        Args:
+            target_symbol (str): The symbol of the open short.
+            price (float): Limit price (or reference price for
+                MARKET/STOP orders).
+            amount (float, optional): Units to cover.
+            percentage_of_position (float, optional): Percentage of
+                the open short to close.
+            order_type (OrderType): Order type (defaults to LIMIT).
+            market (str, optional): Market the order routes through.
+            execute (bool): Whether to execute via the configured
+                order executor (default True).
+            validate (bool): Run the COVER validator (default True).
+            sync (bool): Whether to sync the portfolio/position state
+                with the created order (default True).
+            metadata (dict, optional): Order metadata.
+            precision: Optional non-negative decimal precision for the amount.
+
+        Returns:
+            Order: The created order.
+        """
+        if amount is None and percentage_of_position is None:
+            raise OperationalException(
+                "Either amount or percentage_of_position must be "
+                "specified to create a cover order."
+            )
+
+        portfolio = self.portfolio_service.find({"market": market})
+
+        if percentage_of_position is not None:
+            position = self.position_service.find(
+                {
+                    "symbol": target_symbol,
+                    "portfolio": portfolio.id,
+                }
+            )
+            position_amount = position.get_amount() or 0
+            if position_amount >= 0:
+                raise OperationalException(
+                    f"Can't size cover by percentage_of_position: "
+                    f"no open short on {target_symbol} "
+                    f"(amount={position_amount})"
+                )
+            amount = abs(position_amount) * (percentage_of_position / 100)
+
+        amount = self._round_order_amount(amount, precision)
+        order_data = {
+            "target_symbol": target_symbol,
+            "price": price,
+            "amount": amount,
+            "order_type": OrderType.from_value(order_type).value,
+            "order_side": OrderSide.COVER.value,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+        }
+
+        if metadata is not None:
+            order_data["metadata"] = metadata
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[INDEX_DATETIME]
+
+        self._attach_strategy_attribution(order_data)
         order_data["_execute"] = execute
         order_data["_validate"] = validate
         order_data["_sync"] = sync
@@ -501,7 +737,8 @@ class Context:
         percentage_of_portfolio=None,
         market=None,
         portfolio_id=None,
-        metadata=None
+        metadata=None,
+        precision=None,
     ) -> Order:
         """
         Function to create a market buy order.
@@ -516,6 +753,7 @@ class Context:
             portfolio_id (str, optional): The ID of the portfolio to buy
                 the asset from.
             metadata (dict, optional): Additional metadata for the order
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The order created
@@ -533,7 +771,8 @@ class Context:
             amount=amount,
             percentage_of_portfolio=percentage_of_portfolio,
             market=market,
-            metadata=metadata
+            metadata=metadata,
+            precision=precision,
         )
 
     def create_market_sell_order(
@@ -543,7 +782,8 @@ class Context:
         percentage_of_position=None,
         market=None,
         portfolio_id=None,
-        metadata=None
+        metadata=None,
+        precision=None,
     ) -> Order:
         """
         Function to create a market sell order.
@@ -558,6 +798,7 @@ class Context:
             portfolio_id (str, optional): The ID of the portfolio to sell
                 the asset from.
             metadata (dict, optional): Additional metadata for the order
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The order created
@@ -575,7 +816,8 @@ class Context:
             amount=amount,
             percentage_of_position=percentage_of_position,
             market=market,
-            metadata=metadata
+            metadata=metadata,
+            precision=precision,
         )
 
     def create_limit_sell_order(
@@ -585,7 +827,8 @@ class Context:
         amount=None,
         percentage_of_position=None,
         market=None,
-        portfolio_id=None
+        portfolio_id=None,
+        precision=None,
     ) -> Order:
         """
         Function to create a limit sell order. This function will create
@@ -606,6 +849,7 @@ class Context:
                 to sell the asset
             portfolio_id: (str, optional): The ID of the portfolio to sell
                 the asset from.
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The order created
@@ -623,6 +867,7 @@ class Context:
             amount=amount,
             percentage_of_position=percentage_of_position,
             market=market,
+            precision=precision,
         )
 
     def create_limit_buy_order(
@@ -632,7 +877,8 @@ class Context:
         amount=None,
         percentage_of_portfolio=None,
         market=None,
-        portfolio_id=None
+        portfolio_id=None,
+        precision=None,
     ) -> Order:
         """
         Function to create a limit buy order. This function will create
@@ -653,6 +899,7 @@ class Context:
                 to buy the asset
             portfolio_id (str, optional): The ID of the portfolio to buy
                 the asset from.
+            precision: Optional non-negative decimal precision for the amount.
 
         Returns:
             Order: The order created
@@ -671,6 +918,7 @@ class Context:
             amount=amount,
             percentage_of_portfolio=percentage_of_portfolio,
             market=market,
+            precision=precision,
         )
 
     def order_value(
@@ -710,8 +958,6 @@ class Context:
                 "`price` must be a positive number."
             )
         amount = value / price
-        if precision is not None:
-            amount = RoundingService.round_down(amount, precision)
         return self.create_limit_order(
             target_symbol=target_symbol,
             price=price,
@@ -719,6 +965,7 @@ class Context:
             amount=amount,
             market=market,
             metadata=metadata,
+            precision=precision,
         )
 
     def order_percent(
@@ -814,7 +1061,9 @@ class Context:
         diff = target_amount - current_amount
         if precision is not None:
             sign = 1 if diff >= 0 else -1
-            diff = sign * RoundingService.round_down(abs(diff), precision)
+            diff = sign * self._round_order_amount(
+                abs(diff), precision, allow_zero=True
+            )
         if diff == 0:
             return None
         order_side = OrderSide.BUY if diff > 0 else OrderSide.SELL
@@ -1799,6 +2048,7 @@ class Context:
                 "trading symbol of the portfolio."
             )
 
+        amount = self._round_order_amount(position.get_amount(), precision)
         for order in self.order_service \
                 .get_all(
                     {
@@ -1826,10 +2076,9 @@ class Context:
         )
         return self.create_limit_order(
             target_symbol=position.symbol,
-            amount=position.get_amount(),
+            amount=amount,
             order_side=OrderSide.SELL.value,
             price=price,
-            precision=precision,
         )
 
     def get_allocated(self, market=None, identifier=None) -> float:
@@ -2144,6 +2393,7 @@ class Context:
         market=None,
         portfolio=None,
         status=None,
+        opened_since: datetime = None,
     ) -> List[Trade]:
         """
         Function to get all trades. This function will return all trades
@@ -2151,11 +2401,14 @@ class Context:
         is specified, the trades with the specified market will be returned.
 
         Args:
-            market: The market of the asset
-            portfolio: The portfolio of the asset
+            market: Resolve this market's portfolio before querying trades.
+            portfolio: Portfolio instance or portfolio id. When supplied
+                with market, the portfolio must belong to that market.
             status: The status of the trade
             target_symbol: The symbol of the asset
             trading_symbol: The trading symbol of the asset
+            opened_since: Inclusive lower bound on trade.opened_at,
+                applied by the repository before loading trade history.
 
         Returns:
             List[Trade]: A list of trades that match the query parameters
@@ -2163,11 +2416,17 @@ class Context:
 
         query_params = {}
 
-        if market is not None:
-            query_params["market"] = market
-
         if portfolio is not None:
-            query_params["portfolio"] = portfolio
+            portfolio_id = getattr(portfolio, "id", portfolio)
+            if market is not None:
+                scoped_portfolio = self.portfolio_service.get(portfolio_id)
+                if scoped_portfolio.market != market:
+                    return []
+            query_params["portfolio_id"] = portfolio_id
+        elif market is not None:
+            query_params["portfolio_id"] = self.portfolio_service.find({
+                "market": market,
+            }).id
 
         if status is not None:
             query_params["status"] = status
@@ -2178,7 +2437,10 @@ class Context:
         if trading_symbol is not None:
             query_params["trading_symbol"] = trading_symbol
 
-        return self.trade_service.get_all({"market": market})
+        if opened_since is not None:
+            query_params["opened_at_gte"] = opened_since
+
+        return self.trade_service.get_all(query_params)
 
     def get_closed_trades(self) -> List[Trade]:
         """
@@ -2280,14 +2542,22 @@ class Context:
 
     def add_stop_loss(
         self,
-        trade: Trade,
-        percentage: float,
+        trade: Trade = None,
+        percentage: float = None,
         trailing: bool = False,
         sell_percentage: float = 100,
         created_at: datetime = None,
-    ) -> TradeStopLoss:
+        order: Order = None,
+        mirror_on_exchange: bool = False,
+    ) -> Union[TradeStopLoss, None]:
         """
-        Function to add a stop loss to a trade.
+        Function to add a stop loss to a trade or a pending buy order.
+
+        v9.0 (#431) — you may now pass ``order=`` to attach a stop-loss
+        rule to a BUY order that has not been filled yet. The rule
+        will be materialized onto each trade created as the order
+        fills (one trade per fill event). This is the recommended
+        pattern since BUY orders no longer create trades eagerly.
 
         Example of fixed stop loss:
             * You buy BTC at $40,000.
@@ -2303,7 +2573,8 @@ class Context:
             * BTC price drops to $39,900 → SL level reached, trade closes.
 
         Args:
-            trade (Trade): Trade object representing the trade
+            trade (Trade): An already-open trade to attach the rule to.
+                Mutually exclusive with ``order``.
             percentage (float): float representing the percentage
                 of the open price that the stop loss should
                 be set at. This must be a positive
@@ -2316,30 +2587,82 @@ class Context:
             created_at: datetime: The date and time when the stop loss
                 was created. If not specified, the current date and time
                 will be used.
+            order (Order): A pending BUY order to attach the rule to.
+                The rule will be queued on the order and applied to
+                each trade created at fill time. Mutually exclusive
+                with ``trade``.
 
         Returns:
-            None
+            TradeStopLoss when attached to a trade, ``None`` when
+            queued on an unfilled order.
         """
+        if percentage is None:
+            raise OperationalException(
+                "add_stop_loss requires a 'percentage' argument."
+            )
+
+        if trade is None and order is None:
+            raise OperationalException(
+                "add_stop_loss requires either a 'trade' or an 'order' "
+                "argument."
+            )
+
+        if trade is not None and order is not None:
+            raise OperationalException(
+                "add_stop_loss accepts either 'trade' or 'order', "
+                "not both."
+            )
+
+        if order is not None:
+            stored = self.order_service.get(order.id)
+            # Preserve original updated_at so backtest fill checks
+            # (which filter OHLCV by Datetime >= updated_at) still
+            # match historical bars after a metadata-only save (#434).
+            prev_updated_at = stored.updated_at
+            stored.add_pending_stop_loss(
+                percentage=percentage,
+                trailing=trailing,
+                sell_percentage=sell_percentage,
+                mirror_on_exchange=mirror_on_exchange,
+            )
+            # SQLAlchemy doesn't observe in-place mutations of the
+            # JSON metadata dict — sync the persisted column manually
+            # so pending rules survive a reload at fill time (#434).
+            if hasattr(stored, "metadata_json"):
+                import json as _json
+                stored.metadata_json = _json.dumps(stored.metadata)
+            stored.updated_at = prev_updated_at
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(stored, "updated_at")
+            self.order_service.repository.save(stored)
+            return None
+
         return self.trade_service.add_stop_loss(
             trade,
             percentage=percentage,
             trailing=trailing,
             sell_percentage=sell_percentage,
             created_at=created_at,
+            mirror_on_exchange=mirror_on_exchange,
         )
 
     def add_take_profit(
         self,
-        trade: Trade,
-        percentage: float,
+        trade: Trade = None,
+        percentage: float = None,
         trailing: bool = False,
         sell_percentage: float = 100,
         created_at: datetime = None,
-    ) -> TradeTakeProfit:
+        order: Order = None,
+        mirror_on_exchange: bool = False,
+    ) -> Union[TradeTakeProfit, None]:
         """
-        Function to add a take profit to a trade. This function will add a
-        take profit to the specified trade. If the take profit is triggered,
-        the trade will be closed.
+        Function to add a take profit to a trade or a pending buy order.
+
+        v9.0 (#431) — you may now pass ``order=`` to attach a
+        take-profit rule to a BUY order that has not been filled yet.
+        The rule will be materialized onto each trade created as the
+        order fills (one trade per fill event).
 
         Example of take profit:
             * You buy BTC at $40,000.
@@ -2355,29 +2678,71 @@ class Context:
             * BTC drops to $42,750 → Trade closes, securing profit.
 
         Args:
-            trade (Trade): Trade object representing the trade
+            trade (Trade): An already-open trade to attach the rule to.
+                Mutually exclusive with ``order``.
             percentage (float): float representing the percentage
-                of the open price that the stop loss should
+                of the open price that the take profit should
                 be set at. This must be a positive
                 number, e.g. 5 for 5%, or 10 for 10%.
             trailing (bool): Whether the take profit should be trailing
                 or fixed.
             sell_percentage (float): float representing the
                 percentage of the trade that should be sold if the
-                stop loss is triggered
+                take profit is triggered
             created_at: datetime: The date and time when the take profit
                 was created. If not specified, the current date and time
                 will be used.
+            order (Order): A pending BUY order to attach the rule to.
+                The rule will be queued on the order and applied to
+                each trade created at fill time. Mutually exclusive
+                with ``trade``.
 
         Returns:
-            None
+            TradeTakeProfit when attached to a trade, ``None`` when
+            queued on an unfilled order.
         """
+        if percentage is None:
+            raise OperationalException(
+                "add_take_profit requires a 'percentage' argument."
+            )
+
+        if trade is None and order is None:
+            raise OperationalException(
+                "add_take_profit requires either a 'trade' or an 'order' "
+                "argument."
+            )
+
+        if trade is not None and order is not None:
+            raise OperationalException(
+                "add_take_profit accepts either 'trade' or 'order', "
+                "not both."
+            )
+
+        if order is not None:
+            stored = self.order_service.get(order.id)
+            prev_updated_at = stored.updated_at
+            stored.add_pending_take_profit(
+                percentage=percentage,
+                trailing=trailing,
+                sell_percentage=sell_percentage,
+                mirror_on_exchange=mirror_on_exchange,
+            )
+            if hasattr(stored, "metadata_json"):
+                import json as _json
+                stored.metadata_json = _json.dumps(stored.metadata)
+            stored.updated_at = prev_updated_at
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(stored, "updated_at")
+            self.order_service.repository.save(stored)
+            return None
+
         return self.trade_service.add_take_profit(
             trade,
             percentage=percentage,
             trailing=trailing,
             sell_percentage=sell_percentage,
             created_at=created_at,
+            mirror_on_exchange=mirror_on_exchange,
         )
 
     def close_trade(self, trade, precision=None) -> None:
@@ -2409,9 +2774,6 @@ class Context:
         )
         amount = trade.available_amount
 
-        if precision is not None:
-            amount = RoundingService.round_down(amount, precision)
-
         if position.get_amount() < amount:
             logger.warning(
                 f"Order amount {amount} is larger then amount "
@@ -2420,6 +2782,9 @@ class Context:
                 f"changing order amount to size of position"
             )
             amount = position.get_amount()
+
+        amount = self._round_order_amount(amount, precision)
+        self.order_service.cancel_mirror_orders_for_trade(trade.id)
 
         ticker = self.data_provider_service.get_ticker_data(
             symbol=trade.symbol,

@@ -1,19 +1,22 @@
 from dependency_injector import containers, providers
 
 from investing_algorithm_framework.app.algorithm import AlgorithmFactory
+from investing_algorithm_framework.app.algorithm_runner import \
+    AlgorithmRunner
 from investing_algorithm_framework.app.context import Context
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, BacktestService, \
     SQLPortfolioSnapshotRepository, SQLTradeRepository, \
     SQLPositionSnapshotRepository, SQLTradeStopLossRepository, \
-    SQLTradeTakeProfitRepository, SQLTradeAllocationRepository
+    SQLTradeTakeProfitRepository, SQLTradeAllocationRepository, \
+    SQLRunReportRepository
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, PortfolioConfigurationService, \
     ConfigurationService, PortfolioSnapshotService, \
     PositionSnapshotService, MarketCredentialService, TradeService, \
     PortfolioSyncService, OrderExecutorLookup, PortfolioProviderLookup, \
     DataProviderService, TradeTakeProfitService, TradeStopLossService, \
-    BrokerBalanceTracker
+    BrokerBalanceTracker, TradeHookDispatcher, RunReportService
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -35,6 +38,9 @@ class DependencyContainer(containers.DeclarativeContainer):
     market_credential_service = providers.ThreadSafeSingleton(
         MarketCredentialService
     )
+    algorithm_runner = providers.ThreadSafeSingleton(
+        AlgorithmRunner
+    )
     order_repository = providers.Factory(SQLOrderRepository)
     order_executor_lookup = providers.ThreadSafeSingleton(
         OrderExecutorLookup
@@ -49,6 +55,9 @@ class DependencyContainer(containers.DeclarativeContainer):
     broker_balance_tracker = providers.ThreadSafeSingleton(
         BrokerBalanceTracker,
     )
+    trade_hook_dispatcher = providers.ThreadSafeSingleton(
+        TradeHookDispatcher,
+    )
     portfolio_repository = providers.Factory(SQLPortfolioRepository)
     position_snapshot_repository = providers.Factory(
         SQLPositionSnapshotRepository
@@ -60,6 +69,11 @@ class DependencyContainer(containers.DeclarativeContainer):
     trade_take_profit_repository = providers\
         .Factory(SQLTradeTakeProfitRepository)
     trade_stop_loss_repository = providers.Factory(SQLTradeStopLossRepository)
+    run_report_repository = providers.Factory(SQLRunReportRepository)
+    run_report_service = providers.Factory(
+        RunReportService,
+        repository=run_report_repository,
+    )
     data_provider_service = providers.ThreadSafeSingleton(
         DataProviderService,
         configuration_service=configuration_service,
@@ -93,6 +107,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_repository=portfolio_repository,
         position_repository=position_repository,
         trade_allocation_repository=trade_allocation_repository,
+        trade_hook_dispatcher=trade_hook_dispatcher,
     )
     trade_take_profit_service = providers.Factory(
         TradeTakeProfitService,
@@ -117,6 +132,8 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_configuration_service=portfolio_configuration_service,
         portfolio_snapshot_service=portfolio_snapshot_service,
         trade_service=trade_service,
+        trade_stop_loss_service=trade_stop_loss_service,
+        trade_take_profit_service=trade_take_profit_service,
         order_executor_lookup=order_executor_lookup,
         portfolio_provider_lookup=portfolio_provider_lookup
     )

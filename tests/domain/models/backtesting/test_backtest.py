@@ -6,8 +6,16 @@ from pathlib import Path
 import polars as pl
 
 from investing_algorithm_framework.domain import Backtest, Order, Position, \
-    PortfolioSnapshot, BacktestMetrics, BacktestPermutationTest, \
-    Trade, BacktestRun, BacktestSummaryMetrics, BacktestDateRange
+    PortfolioSnapshot, BacktestMetrics, BacktestMonteCarloTest, \
+    Trade, BacktestRun, BacktestSummaryMetrics, BacktestDateRange, \
+    BacktestWindow
+
+
+def _backtest_window(start_date, end_date):
+    return BacktestWindow(train_range=BacktestDateRange(
+        start_date=start_date,
+        end_date=end_date,
+    ))
 
 
 class TestBacktestSaveOpen(unittest.TestCase):
@@ -51,8 +59,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
 
         # Test models
         self.backtest_metrics_run_one = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -158,9 +165,12 @@ class TestBacktestSaveOpen(unittest.TestCase):
         )
 
         self.backtest_run_one = BacktestRun(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
-            trading_symbol="EUR",
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1),
+                    end_date=datetime(2020, 12, 31),
+                )
+            ),
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -222,7 +232,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -235,7 +244,13 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # ohlcv_csv_path = os
         ohlcv_df = pl.read_csv(self.ohlcv_csv_path).to_pandas()
 
-        self.permutation_test_metrics_one = BacktestPermutationTest(
+        self.monte_carlo_test_metrics_one = BacktestMonteCarloTest(
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1),
+                    end_date=datetime(2020, 12, 31),
+                )
+            ),
             real_metrics=self.backtest_metrics_run_one,
             permutated_metrics=[self.backtest_metrics_run_one, self.backtest_metrics_run_one],
             p_values={
@@ -280,8 +295,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
     def test_save_and_open(self):
         # Mock save and open methods
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -387,9 +401,12 @@ class TestBacktestSaveOpen(unittest.TestCase):
         )
 
         backtest_run = BacktestRun(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
-            trading_symbol="EUR",
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1),
+                    end_date=datetime(2020, 12, 31),
+                )
+            ),
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -451,7 +468,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -464,7 +480,13 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # ohlcv_csv_path = os
         ohlcv_df = pl.read_csv(self.ohlcv_csv_path).to_pandas()
 
-        permutation_test_metrics = BacktestPermutationTest(
+        monte_carlo_test_metrics = BacktestMonteCarloTest(
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1),
+                    end_date=datetime(2020, 12, 31),
+                )
+            ),
             real_metrics=backtest_metrics,
             permutated_metrics=[backtest_metrics, backtest_metrics],
             p_values={
@@ -506,8 +528,8 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # Create a Backtest instance
         backtest = Backtest(
             algorithm_id="test_algorithm",
-            backtest_runs=[backtest_run],
-            backtest_permutation_tests=[permutation_test_metrics],
+            vector_runs=[backtest_run],
+            backtest_monte_carlo_tests=[monte_carlo_test_metrics],
             backtest_summary=backtest_metrics,
             metadata={"strategy": "test_strategy"},
             risk_free_rate=0.02
@@ -515,10 +537,10 @@ class TestBacktestSaveOpen(unittest.TestCase):
 
         # Save the backtest
         backtest.save(self.dir_path)
-        self.assertTrue((self.dir_path / "runs").exists())
+        self.assertTrue((self.dir_path / "vector_runs").exists())
 
         # Check that there is at least one results file
-        results_dir = (self.dir_path / "runs")
+        results_dir = (self.dir_path / "vector_runs")
         self.assertEqual(1, (len(os.listdir(results_dir))))
 
         # Get the first run
@@ -526,32 +548,29 @@ class TestBacktestSaveOpen(unittest.TestCase):
         self.assertTrue((first_run_dir / "run.json").exists())
         self.assertTrue((first_run_dir / "metrics.json").exists())
 
-        # Check that there is a permutation tests directory
-        self.assertTrue((self.dir_path / "permutation_tests").exists())
+        # Check that there is a Monte-Carlo tests directory
+        self.assertTrue((self.dir_path / "monte_carlo_tests").exists())
 
         # Check if there are 2 permutated_metrics folders
-        permutated_metrics_dir = (self.dir_path / "permutation_tests")
+        permutated_metrics_dir = (self.dir_path / "monte_carlo_tests")
 
         self.assertEqual(1, (len(os.listdir(permutated_metrics_dir))))
         self.assertTrue((self.dir_path / "metadata.json").exists())
-        self.assertTrue((self.dir_path / "summary.json").exists())
+        self.assertTrue((self.dir_path / "vector_summary.json").exists())
 
         loaded_backtest = Backtest.open(self.dir_path)
         self.assertEqual(
             len(loaded_backtest.get_all_backtest_runs()), 1
         )
         self.assertEqual(
-            len(loaded_backtest.get_all_backtest_permutation_tests()),
+            len(loaded_backtest.get_all_backtest_monte_carlo_tests()),
             1
         )
         self.assertEqual(
-            1, len(loaded_backtest.backtest_permutation_tests)
+            1, len(loaded_backtest.backtest_monte_carlo_tests)
         )
 
         first_backtest_run = loaded_backtest.get_all_backtest_runs()[0]
-        self.assertEqual(
-            first_backtest_run.trading_symbol, "EUR"
-        )
         self.assertEqual(
             first_backtest_run.backtest_start_date,
             datetime(2020, 1, 1, tzinfo=timezone.utc)
@@ -598,10 +617,9 @@ class TestBacktestSaveOpen(unittest.TestCase):
         )
         # Create two BacktestRuns for two date ranges
         backtest_run_one = BacktestRun(
-            backtest_start_date=backtest_date_range_one.start_date,
-            backtest_end_date=backtest_date_range_one.end_date,
-            backtest_date_range_name=backtest_date_range_one.name,
-            trading_symbol="EUR",
+            backtest_window=BacktestWindow(
+                train_range=backtest_date_range_one,
+            ),
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[],
@@ -609,7 +627,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
             orders=[],
             positions=[],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -619,10 +636,9 @@ class TestBacktestSaveOpen(unittest.TestCase):
             backtest_metrics=self.backtest_metrics_run_one
         )
         backtest_run_two = BacktestRun(
-            backtest_start_date=backtest_date_range_two.start_date,
-            backtest_end_date=backtest_date_range_two.end_date,
-            backtest_date_range_name=backtest_date_range_two.name,
-            trading_symbol="EUR",
+            backtest_window=BacktestWindow(
+                train_range=backtest_date_range_two,
+            ),
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[],
@@ -630,7 +646,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
             orders=[],
             positions=[],
             created_at=datetime(2021, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -642,7 +657,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # Save a Backtest with both runs
         backtest = Backtest(
             algorithm_id="test_algorithm",
-            backtest_runs=[backtest_run_one, backtest_run_two],
+            vector_runs=[backtest_run_one, backtest_run_two],
             backtest_summary=self.backtest_summary_metrics_one,
             metadata={"strategy": "test_strategy"},
             risk_free_rate=0.02
@@ -675,8 +690,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
     def test_backtest_hash(self):
         # Mock save and open methods
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -782,9 +796,12 @@ class TestBacktestSaveOpen(unittest.TestCase):
         )
 
         backtest_run = BacktestRun(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
-            trading_symbol="EUR",
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1),
+                    end_date=datetime(2020, 12, 31),
+                )
+            ),
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -846,7 +863,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -859,7 +875,13 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # ohlcv_csv_path = os
         ohlcv_df = pl.read_csv(self.ohlcv_csv_path).to_pandas()
 
-        permutation_test_metrics = BacktestPermutationTest(
+        monte_carlo_test_metrics = BacktestMonteCarloTest(
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1),
+                    end_date=datetime(2020, 12, 31),
+                )
+            ),
             real_metrics=backtest_metrics,
             permutated_metrics=[backtest_metrics, backtest_metrics],
             p_values={
@@ -901,8 +923,8 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # Create a Backtest instance
         backtest = Backtest(
             algorithm_id="alg_123",
-            backtest_runs=[backtest_run],
-            backtest_permutation_tests=[permutation_test_metrics],
+            vector_runs=[backtest_run],
+            backtest_monte_carlo_tests=[monte_carlo_test_metrics],
             backtest_summary=backtest_metrics,
             metadata={"strategy": "test_strategy"},
             risk_free_rate=0.02
@@ -910,8 +932,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
 
         # Mock save and open methods
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -1017,9 +1038,12 @@ class TestBacktestSaveOpen(unittest.TestCase):
         )
 
         backtest_run = BacktestRun(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
-            trading_symbol="EUR",
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1),
+                    end_date=datetime(2020, 12, 31),
+                )
+            ),
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -1081,7 +1105,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -1094,7 +1117,13 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # ohlcv_csv_path = os
         ohlcv_df = pl.read_csv(self.ohlcv_csv_path).to_pandas()
 
-        permutation_test_metrics = BacktestPermutationTest(
+        monte_carlo_test_metrics = BacktestMonteCarloTest(
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1),
+                    end_date=datetime(2020, 12, 31),
+                )
+            ),
             real_metrics=backtest_metrics,
             permutated_metrics=[backtest_metrics, backtest_metrics],
             p_values={
@@ -1136,8 +1165,8 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # Create a Backtest instance
         backtest = Backtest(
             algorithm_id="alg_123",
-            backtest_runs=[backtest_run],
-            backtest_permutation_tests=[permutation_test_metrics],
+            vector_runs=[backtest_run],
+            backtest_monte_carlo_tests=[monte_carlo_test_metrics],
             backtest_summary=backtest_metrics,
             metadata={"strategy": "test_strategy"},
             risk_free_rate=0.02
@@ -1145,8 +1174,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
 
         # Mock save and open methods
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -1252,9 +1280,12 @@ class TestBacktestSaveOpen(unittest.TestCase):
         )
 
         backtest_run_two = BacktestRun(
-            backtest_start_date=datetime(2021, 1, 1),
-            backtest_end_date=datetime(2023, 12, 31),
-            trading_symbol="EUR",
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2021, 1, 1),
+                    end_date=datetime(2023, 12, 31),
+                )
+            ),
             initial_unallocated=1000.0,
             number_of_runs=50,
             portfolio_snapshots=[
@@ -1316,7 +1347,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 )
             ],
             created_at=datetime(2020, 1, 1),
-            symbols=["BTC/EUR"],
             number_of_days=0,
             number_of_trades=0,
             number_of_trades_closed=0,
@@ -1329,7 +1359,13 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # ohlcv_csv_path = os
         ohlcv_df = pl.read_csv(self.ohlcv_csv_path).to_pandas()
 
-        permutation_test_metrics = BacktestPermutationTest(
+        monte_carlo_test_metrics = BacktestMonteCarloTest(
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1),
+                    end_date=datetime(2020, 12, 31),
+                )
+            ),
             real_metrics=backtest_metrics,
             permutated_metrics=[backtest_metrics, backtest_metrics],
             p_values={
@@ -1371,8 +1407,8 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # Create a Backtest instance
         backtest_two = Backtest(
             algorithm_id="alg-002",
-            backtest_runs=[backtest_run_two],
-            backtest_permutation_tests=[permutation_test_metrics],
+            vector_runs=[backtest_run_two],
+            backtest_monte_carlo_tests=[monte_carlo_test_metrics],
             backtest_summary=backtest_metrics,
             metadata={"strategy": "test_strategy"},
             risk_free_rate=0.02
@@ -1393,8 +1429,8 @@ class TestBacktestSaveOpen(unittest.TestCase):
     def test_add_permutation_metrics_after_backtest_has_been_save(self):
         backtest = Backtest(
             algorithm_id="alg-001",
-            backtest_runs=[self.backtest_run_one],
-            backtest_permutation_tests=[],
+            vector_runs=[self.backtest_run_one],
+            backtest_monte_carlo_tests=[],
             backtest_summary=self.backtest_summary_metrics_one,
             metadata={"strategy": "test_strategy"},
             risk_free_rate=0.02
@@ -1405,12 +1441,12 @@ class TestBacktestSaveOpen(unittest.TestCase):
         loaded_backtest = Backtest.open(self.dir_path)
 
         self.assertEqual(
-            len(loaded_backtest.get_all_backtest_permutation_tests()), 0
+            len(loaded_backtest.get_all_backtest_monte_carlo_tests()), 0
         )
 
-        # Add a permutation test
-        loaded_backtest.add_permutation_test(
-            self.permutation_test_metrics_one
+        # Add a Monte-Carlo test
+        loaded_backtest.add_monte_carlo_test(
+            self.monte_carlo_test_metrics_one
         )
 
         # Save again
@@ -1419,7 +1455,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # Load again
         reloaded_backtest = Backtest.open(self.dir_path)
         self.assertEqual(
-            len(reloaded_backtest.get_all_backtest_permutation_tests()),
+            len(reloaded_backtest.get_all_backtest_monte_carlo_tests()),
             1
         )
 
@@ -1428,14 +1464,14 @@ class TestBacktestSaveOpen(unittest.TestCase):
         meta_id = "unique-strategy-123"
         backtest1 = Backtest(
             algorithm_id="alg-023",
-            backtest_runs=[self.backtest_run_one],
+            vector_runs=[self.backtest_run_one],
             backtest_summary=self.backtest_summary_metrics_one,
             metadata={"id": meta_id, "other": 1},
             risk_free_rate=0.01
         )
         backtest2 = Backtest(
             algorithm_id="alg-025",
-            backtest_runs=[self.backtest_run_one],
+            vector_runs=[self.backtest_run_one],
             backtest_summary=self.backtest_summary_metrics_one,
             metadata={"id": meta_id, "other": 2},
             risk_free_rate=0.02
@@ -1443,7 +1479,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # Create a third Backtest with a different metadata["id"]
         backtest3 = Backtest(
             algorithm_id="alg-025",
-            backtest_runs=[self.backtest_run_one],
+            vector_runs=[self.backtest_run_one],
             backtest_summary=self.backtest_summary_metrics_one,
             metadata={"id": "another-id-456"},
             risk_free_rate=0.03
@@ -1459,14 +1495,14 @@ class TestBacktestSaveOpen(unittest.TestCase):
         # Now test fallback to id if metadata["id"] is missing
         backtest4 = Backtest(
             algorithm_id="alg-026",
-            backtest_runs=[self.backtest_run_one],
+            vector_runs=[self.backtest_run_one],
             backtest_summary=self.backtest_summary_metrics_one,
             metadata={},
             risk_free_rate=0.04
         )
         backtest5 = Backtest(
             algorithm_id="alg-027",
-            backtest_runs=[self.backtest_run_one],
+            vector_runs=[self.backtest_run_one],
             backtest_summary=self.backtest_summary_metrics_one,
             metadata={},
             risk_free_rate=0.05

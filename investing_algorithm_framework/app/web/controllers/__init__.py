@@ -1,13 +1,22 @@
 from investing_algorithm_framework.app.web.controllers.orders import \
-    blueprint as orders_blueprint
+    router as orders_router
 from investing_algorithm_framework.app.web.controllers.portfolio \
-    import blueprint as portfolio_blueprint
+    import router as portfolio_router
 from investing_algorithm_framework.app.web.controllers.positions import \
-    blueprint as positions_blueprint
+    router as positions_router
+from investing_algorithm_framework.app.web.controllers.trades import \
+    router as trades_router
+from investing_algorithm_framework.app.web.controllers.algorithm import \
+    router as algorithm_router
+from investing_algorithm_framework.app.web.controllers.run_reports \
+    import router as run_reports_router
 
 
-def setup_blueprints(flask_app):
-    flask_app.register_blueprint(portfolio_blueprint, prefix="/api")
-    flask_app.register_blueprint(orders_blueprint, prefix="/api")
-    flask_app.register_blueprint(positions_blueprint, prefix="/api")
-    return flask_app
+def setup_routers(fastapi_app):
+    fastapi_app.include_router(portfolio_router)
+    fastapi_app.include_router(orders_router)
+    fastapi_app.include_router(positions_router)
+    fastapi_app.include_router(trades_router)
+    fastapi_app.include_router(algorithm_router)
+    fastapi_app.include_router(run_reports_router)
+    return fastapi_app

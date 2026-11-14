@@ -68,6 +68,36 @@ class CooldownRuleTest(TestCase):
 
 
 class CooldownTrackerTest(TestCase):
+    def test_remaining_bars_matches_existing_gate_boundaries_and_scope(self):
+        for scope in (None, "BTC"):
+            for position_side in (None, "long", "short"):
+                with self.subTest(scope=scope, position_side=position_side):
+                    tracker = CooldownTracker()
+                    rule = CooldownRule(
+                        symbol=scope, trigger="sell", blocks="buy", bars=12,
+                    )
+                    tracker.record(
+                        symbol="BTC", order_side="sell", bar_index=10,
+                        position_side=position_side,
+                    )
+                    for bar, remaining in ((10, 12), (11, 11), (21, 1), (22, 0), (23, 0)):
+                        self.assertEqual(remaining, tracker.remaining_bars(
+                            rule, symbol="BTC", bar_index=bar,
+                            position_side=position_side,
+                        ))
+                        blocked, _ = tracker.is_blocked(
+                            [rule], signal_side="buy", symbol="BTC",
+                            bar_index=bar, position_side=position_side,
+                        )
+                        self.assertEqual(remaining > 0, blocked)
+                    self.assertEqual(11 if scope is None else 0, tracker.remaining_bars(
+                        rule, symbol="ETH", bar_index=11, position_side=position_side,
+                    ))
+                    if position_side == "long":
+                        self.assertEqual(0, tracker.remaining_bars(
+                            rule, symbol="BTC", bar_index=11, position_side="short",
+                        ))
+
     def setUp(self):
         self.tracker = CooldownTracker()
 

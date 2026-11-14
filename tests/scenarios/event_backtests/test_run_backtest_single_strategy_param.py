@@ -7,6 +7,7 @@ strategy class and produces a valid ``Backtest`` result.
 Uses a short (30-day) date range so this test runs well under 30s on CI,
 with all data sourced from ``tests/resources/test_data/``.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -18,6 +19,10 @@ from investing_algorithm_framework import (
     RESOURCE_DIRECTORY,
     DATA_DIRECTORY,
     SnapshotInterval,
+    Study,
+    Universe,
+    BacktestWindow,
+    BacktestEngine,
 )
 from tests.resources.strategies_for_testing.strategy_v1 import (
     CrossOverStrategyV1,
@@ -44,11 +49,19 @@ class Test(TestCase):
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
         )
-        backtest = app.run_backtest(
-            backtest_date_range=date_range,
-            strategy=CrossOverStrategyV1,
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+        backtests = app.run_backtest(
+            strategy=CrossOverStrategyV1,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
+        )
+        backtest = next(backtests.iter_backtests())
         elapsed_time = time.time() - start_time
         self.assertLess(
             elapsed_time, 30,
@@ -58,7 +71,7 @@ class Test(TestCase):
         metrics = backtest.get_backtest_metrics(date_range)
         run = backtest.get_backtest_run(date_range)
         self.assertEqual(run.initial_unallocated, 400)
-        self.assertEqual(run.trading_symbol, "EUR")
+        self.assertEqual(run.portfolio_snapshots[0].trading_symbol, "EUR")
         self.assertIsNotNone(metrics.total_growth)
         self.assertAlmostEqual(
             metrics.total_growth, metrics.total_net_gain, delta=0.01

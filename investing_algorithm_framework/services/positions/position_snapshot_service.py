@@ -11,6 +11,10 @@ class PositionSnapshotService(RepositoryService):
                 "symbol": position.symbol,
                 "amount": position.amount,
                 "cost": position.cost,
+                "long_amount": position.long_amount,
+                "short_amount": position.short_amount,
+                "long_cost": position.long_cost,
+                "short_cost": position.short_cost,
             }
         )
 

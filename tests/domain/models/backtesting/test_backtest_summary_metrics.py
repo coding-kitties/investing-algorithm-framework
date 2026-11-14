@@ -19,6 +19,21 @@ class TestBacktestMetrics(TestCase):
 
     def test_save(self):
         backtest_metrics = BacktestSummaryMetrics(
+            aggregation_semantics_version=2,
+            aggregation_mode="independent_windows",
+            return_definition="net_pnl_over_initial_capital",
+            drawdown_definition="worst_window_positive_magnitude",
+            window_count_expected=3,
+            window_count_evaluated=3,
+            window_count_missing=0,
+            complete=True,
+            capital_weighted_window_return=0.125,
+            median_window_return=0.20,
+            worst_window_return=-0.10,
+            best_window_return=0.30,
+            mean_window_duration_days=60.33,
+            duration_weighted_mean_window_cagr=0.42,
+            worst_window_max_drawdown=0.25,
             cagr = 0.0,
             sharpe_ratio = 0.0,
             sortino_ratio = 0.0,
@@ -57,3 +72,13 @@ class TestBacktestMetrics(TestCase):
 
         loaded_metrics = BacktestSummaryMetrics.open(file_path)
         self.assertEqual(backtest_metrics.to_dict(), loaded_metrics.to_dict())
+
+    def test_unversioned_summary_remains_legacy_unknown(self):
+        loaded_metrics = BacktestSummaryMetrics.from_dict({
+            "cagr": 1.5,
+            "max_drawdown": 0.2,
+        })
+
+        self.assertIsNone(loaded_metrics.aggregation_semantics_version)
+        self.assertIsNone(loaded_metrics.aggregation_mode)
+        self.assertEqual(loaded_metrics.cagr, 1.5)

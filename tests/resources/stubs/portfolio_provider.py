@@ -15,6 +15,7 @@ class PortfolioProviderTest(PortfolioProvider):
         self.order_amount = None
         self.order_amount_filled = None
         self.return_none_for_order = False
+        self.return_none_for_position = False
 
     def get_order(
         self, portfolio, order, market_credential
@@ -38,6 +39,9 @@ class PortfolioProviderTest(PortfolioProvider):
     def get_position(
         self, portfolio, symbol, market_credential
     ) -> Union[Position, None]:
+        if self.return_none_for_position:
+            return None
+
         if symbol not in self.external_balances:
             position = Position(
                 symbol=symbol,

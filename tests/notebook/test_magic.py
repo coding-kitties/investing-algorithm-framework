@@ -1,13 +1,38 @@
+from importlib import import_module
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch, sentinel
 
+from IPython.core.interactiveshell import InteractiveShell
+
+from investing_algorithm_framework import Schedule, TimeUnit
 from investing_algorithm_framework.notebook.magic import (
     _build_parser,
     _parse_date,
     _find_strategy_classes,
     BacktestMagics,
     load_ipython_extension,
+    _run_backtest,
 )
+
+
+class TestIndexResultLoading(TestCase):
+    def test_magic_explicitly_loads_one_backtest(self):
+        args = _build_parser().parse_args([
+            "--start", "2024-01-01", "--end", "2024-01-02",
+        ])
+        backtest = object()
+        app = MagicMock()
+        app.run_backtest.return_value.iter_backtests.return_value = iter(
+            [backtest],
+        )
+        with patch.object(
+            import_module("investing_algorithm_framework.create_app"),
+            "create_app",
+            return_value=app,
+        ):
+            result = _run_backtest(args, [MagicMock])
+        self.assertIs(result, backtest)
+        app.run_backtest.return_value.iter_backtests.assert_called_once()
 
 
 class TestParseDate(TestCase):
@@ -100,9 +125,7 @@ class TestFindStrategyClasses(TestCase):
         from investing_algorithm_framework.app.strategy import TradingStrategy
 
         class DummyStrategy(TradingStrategy):
-            time_unit = "DAY"
-            interval = 1
-
+            schedule = Schedule.every(1, TimeUnit.DAY)
         ns = {"DummyStrategy": DummyStrategy, "x": 42, "s": "hello"}
         found = _find_strategy_classes(ns)
         self.assertEqual(len(found), 1)
@@ -112,13 +135,9 @@ class TestFindStrategyClasses(TestCase):
         from investing_algorithm_framework.app.strategy import TradingStrategy
 
         class StratA(TradingStrategy):
-            time_unit = "DAY"
-            interval = 1
-
+            schedule = Schedule.every(1, TimeUnit.DAY)
         class StratB(TradingStrategy):
-            time_unit = "HOUR"
-            interval = 4
-
+            schedule = Schedule.every(4, TimeUnit.HOUR)
         ns = {"StratA": StratA, "StratB": StratB}
         found = _find_strategy_classes(ns)
         self.assertEqual(len(found), 2)
@@ -149,3 +168,37 @@ class TestLoadExtension(TestCase):
         mock_ipython = MagicMock()
         top_load(mock_ipython)
         mock_ipython.register_magics.assert_called_once()
+
+
+class TestBacktestMagicDispatch(TestCase):
+
+    def setUp(self):
+        self.shell = InteractiveShell()
+        self.shell.register_magics(BacktestMagics)
+
+    def test_line_magic_dispatches_to_strategy_file_handler(self):
+        line = "strategy.py --start 2026-01-01"
+
+        with patch.object(
+            BacktestMagics,
+            "_backtest_line",
+            return_value=sentinel.backtest,
+        ) as backtest_line:
+            result = self.shell.run_line_magic("backtest", line)
+
+        self.assertIs(result, sentinel.backtest)
+        backtest_line.assert_called_once_with(line)
+
+    def test_cell_magic_dispatches_to_inline_handler(self):
+        line = "--start 2026-01-01"
+        cell = "class Strategy: pass"
+
+        with patch.object(
+            BacktestMagics,
+            "_backtest_cell",
+            return_value=sentinel.backtest,
+        ) as backtest_cell:
+            result = self.shell.run_cell_magic("backtest", line, cell)
+
+        self.assertIs(result, sentinel.backtest)
+        backtest_cell.assert_called_once_with(line, cell)

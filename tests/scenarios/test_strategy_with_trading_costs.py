@@ -24,6 +24,8 @@ from investing_algorithm_framework import (
     TradingStrategy, DataSource, TimeUnit, DataType,
     create_app, BacktestDateRange, PositionSize,
     RESOURCE_DIRECTORY, CSVOHLCVDataProvider, TradingCost,
+    Schedule, SignalSide, signal_series_from_column,
+    Study, Universe, BacktestWindow, BacktestEngine, ExecutionConfig,
 )
 
 
@@ -48,101 +50,97 @@ def _make_data_source():
 
 # ── Strategy with NO costs (baseline) ──────────────────────────────
 class NoCostStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
 
-
-# ── Strategy with symbol-level TradingCost ─────────────────────────
+# ── Strategy with symbol-level TradingCost via Study.execution_config ──
 class SymbolCostStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
     ]
-    trading_costs = [
-        TradingCost(
-            symbol="BTC",
-            fee_percentage=0.1,        # 0.1 %
-            slippage_percentage=0.5,   # 0.5 %
-        ),
-    ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 # ── Strategy with fee only (no slippage) ───────────────────────────
 class FeeOnlyStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
     ]
-    trading_costs = [
-        TradingCost(
-            symbol="BTC",
-            fee_percentage=1.0,  # 1 % fee (big for clear effect)
-        ),
-    ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 # ── Strategy with slippage only (no fee) ───────────────────────────
 class SlippageOnlyStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
     ]
-    trading_costs = [
-        TradingCost(
-            symbol="BTC",
-            slippage_percentage=1.0,  # 1 % slippage (big for clear effect)
-        ),
-    ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
-def _run_backtest(strategy_class, fee_pct=0.0, slippage_pct=0.0):
-    """Run a vector backtest and return the single closed trade."""
+def _run_backtest(
+    strategy_class, fee_pct=0.0, slippage_pct=0.0, trading_costs=None
+):
+    """Run a vector backtest and return the single closed trade.
+
+    ``trading_costs`` (per-symbol overrides) are configured on the
+    Study's ``execution_config`` — the backtest-side replacement for
+    the removed per-strategy ``trading_costs`` attribute.
+    """
     app = create_app()
     app.add_market(
         market="BITVAVO",
@@ -167,12 +165,22 @@ def _run_backtest(strategy_class, fee_pct=0.0, slippage_pct=0.0):
     )
     strategy = strategy_class()
     app.add_strategy(strategy)
-    backtest = app.run_vector_backtest(
-        backtest_date_range=BacktestDateRange(
-            start_date=START_DATE, end_date=END_DATE
-        ),
+    execution_config = (
+        ExecutionConfig(trading_costs=list(trading_costs))
+        if trading_costs else None
     )
-    runs = backtest.backtest_runs
+    study = Study(
+        universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+        backtest_windows=[
+            BacktestWindow(train_range=BacktestDateRange(
+                start_date=START_DATE, end_date=END_DATE,
+            ))
+        ],
+        engines=[BacktestEngine.VECTOR],
+        execution_config=execution_config,
+    )
+    backtests = app.run_backtest(study=study)
+    runs = next(backtests.iter_backtests()).get_all_backtest_runs()
     assert len(runs) == 1, f"Expected 1 run, got {len(runs)}"
     trades = runs[0].trades
     closed = [t for t in trades if t.status == "CLOSED"]
@@ -199,8 +207,18 @@ class TestTradingCostVectorBacktest(TestCase):
     # Symbol-level: fee + slippage
     # ------------------------------------------------------------------
     def test_symbol_level_fee_and_slippage(self):
-        """Symbol-level TradingCost applies slippage and fee."""
-        trade = _run_backtest(SymbolCostStrategy)
+        """Symbol-level TradingCost (via Study.execution_config) applies
+        slippage and fee."""
+        trade = _run_backtest(
+            SymbolCostStrategy,
+            trading_costs=[
+                TradingCost(
+                    symbol="BTC",
+                    fee_percentage=0.1,        # 0.1 %
+                    slippage_percentage=0.5,   # 0.5 %
+                ),
+            ],
+        )
         # Slippage 0.5%: buy fills at 110*1.005=110.55
         buy_fill = 110.0 * 1.005
         # Fee 0.1% on capital: buy_fee = 2000 * 0.001 = 2
@@ -225,7 +243,15 @@ class TestTradingCostVectorBacktest(TestCase):
     # ------------------------------------------------------------------
     def test_fee_only(self):
         """Fee reduces capital and proceeds, slippage=0 → price unchanged."""
-        trade = _run_backtest(FeeOnlyStrategy)
+        trade = _run_backtest(
+            FeeOnlyStrategy,
+            trading_costs=[
+                TradingCost(
+                    symbol="BTC",
+                    fee_percentage=1.0,  # 1 % fee (big for clear effect)
+                ),
+            ],
+        )
         # buy at exactly 110 (no slippage)
         self.assertAlmostEqual(trade.open_price, 110.0, places=4)
         # Fee 1%: buy_fee = 2000*0.01 = 20
@@ -243,7 +269,15 @@ class TestTradingCostVectorBacktest(TestCase):
     # ------------------------------------------------------------------
     def test_slippage_only(self):
         """Slippage moves fill prices; no fee deducted."""
-        trade = _run_backtest(SlippageOnlyStrategy)
+        trade = _run_backtest(
+            SlippageOnlyStrategy,
+            trading_costs=[
+                TradingCost(
+                    symbol="BTC",
+                    slippage_percentage=1.0,  # 1 % (big for clear effect)
+                ),
+            ],
+        )
         buy_fill = 110.0 * 1.01  # +1 % slippage
         sell_fill = 90.0 * 0.99  # -1 % slippage
         amount = 2000.0 / buy_fill
@@ -253,7 +287,7 @@ class TestTradingCostVectorBacktest(TestCase):
         self.assertEqual(trade.total_fees, 0)
 
     # ------------------------------------------------------------------
-    # Market-level defaults (no TradingCost on strategy)
+    # Market-level defaults (no per-symbol TradingCost configured)
     # ------------------------------------------------------------------
     def test_market_level_defaults(self):
         """Fee/slippage set on add_market applies to all symbols."""
@@ -273,10 +307,17 @@ class TestTradingCostVectorBacktest(TestCase):
     # ------------------------------------------------------------------
     def test_symbol_overrides_market(self):
         """Per-symbol TradingCost should override market defaults."""
-        # SymbolCostStrategy has fee=0.1%, slip=0.5% on BTC
-        # Market defaults: fee=5%, slip=5% (intentionally large)
+        # Study-level trading cost: fee=0.1%, slip=0.5% on BTC.
+        # Market defaults: fee=5%, slip=5% (intentionally large).
         trade_symbol = _run_backtest(
-            SymbolCostStrategy, fee_pct=5.0, slippage_pct=5.0
+            SymbolCostStrategy, fee_pct=5.0, slippage_pct=5.0,
+            trading_costs=[
+                TradingCost(
+                    symbol="BTC",
+                    fee_percentage=0.1,
+                    slippage_percentage=0.5,
+                ),
+            ],
         )
         # The symbol-level values should be used, not market-level
         buy_fill = 110.0 * 1.005  # 0.5%, not 5%
@@ -289,7 +330,15 @@ class TestTradingCostVectorBacktest(TestCase):
     # ------------------------------------------------------------------
     def test_orders_have_fee_fields(self):
         """Buy and sell orders should have order_fee set."""
-        trade = _run_backtest(SymbolCostStrategy)
+        trade = _run_backtest(
+            SymbolCostStrategy,
+            trading_costs=[
+                TradingCost(
+                    symbol="BTC", fee_percentage=0.1,
+                    slippage_percentage=0.5,
+                ),
+            ],
+        )
         buy_orders = [
             o for o in trade.orders if o.order_side == "BUY"
         ]

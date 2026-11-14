@@ -7,6 +7,7 @@ Verifies that ``app.run_backtest(algorithm=...)`` produces a valid
 
 Uses a short (30-day) date range so this test runs well under 30s on CI.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,10 @@ from investing_algorithm_framework import (
     RESOURCE_DIRECTORY,
     DATA_DIRECTORY,
     SnapshotInterval,
+    Study,
+    Universe,
+    BacktestWindow,
+    BacktestEngine,
 )
 from tests.resources.strategies_for_testing.strategy_v1 import (
     CrossOverStrategyV1,
@@ -47,11 +52,19 @@ class Test(TestCase):
         )
         algorithm = Algorithm()
         algorithm.add_strategy(CrossOverStrategyV1)
-        backtest = app.run_backtest(
-            backtest_date_range=date_range,
-            algorithm=algorithm,
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
         )
+        backtests = app.run_backtest(
+            algorithm=algorithm,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+            ),
+        )
+        backtest = next(backtests.iter_backtests())
         elapsed_time = time.time() - start_time
         # Guard against regressions that would blow up CI runtime.
         self.assertLess(
@@ -62,7 +75,9 @@ class Test(TestCase):
         backtest_metrics = backtest.get_backtest_metrics(date_range)
         backtest_run = backtest.get_backtest_run(date_range)
         self.assertEqual(backtest_run.initial_unallocated, 400)
-        self.assertEqual(backtest_run.trading_symbol, "EUR")
+        self.assertEqual(
+            backtest_run.portfolio_snapshots[0].trading_symbol, "EUR"
+        )
         self.assertIsNotNone(backtest_metrics.total_growth)
         self.assertIsNotNone(backtest_metrics.total_net_gain)
         self.assertAlmostEqual(

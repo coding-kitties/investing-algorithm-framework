@@ -90,7 +90,9 @@ class TestProductionOrderMetadata(TestBase):
 
     def test_create_order_without_metadata_returns_empty_dict(self):
         """
-        Production path: order without metadata has empty dict.
+        Production path: order without metadata persists only the
+        framework-injected ``_reservation_price`` (v9.0 #431) and no
+        user-supplied keys.
         """
         self.app.context.create_limit_order(
             target_symbol="BTC",
@@ -100,7 +102,11 @@ class TestProductionOrderMetadata(TestBase):
         )
         order_repository = self.app.container.order_repository()
         order = order_repository.find({"target_symbol": "BTC"})
-        self.assertEqual(order.metadata, {})
+        user_metadata = {
+            k: v for k, v in order.metadata.items()
+            if not k.startswith("_")
+        }
+        self.assertEqual(user_metadata, {})
 
     def test_metadata_with_custom_fields_persists(self):
         """

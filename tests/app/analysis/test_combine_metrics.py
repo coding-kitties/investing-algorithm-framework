@@ -1,7 +1,16 @@
 from unittest import TestCase
 from datetime import datetime, date
-from investing_algorithm_framework.domain import Trade, BacktestMetrics
+from investing_algorithm_framework.domain import Trade, BacktestMetrics, \
+    BacktestWindow, BacktestDateRange
 from investing_algorithm_framework.analysis.ranking import combine_backtest_metrics
+
+
+def _backtest_window(start_date, end_date):
+    return BacktestWindow(train_range=BacktestDateRange(
+        start_date=start_date,
+        end_date=end_date,
+    ))
+
 
 class TestCombineMetrics(TestCase):
 
@@ -9,8 +18,7 @@ class TestCombineMetrics(TestCase):
 
         # Variation 1
         backtest_metrics_1 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (1.0, datetime(2020, 1, 1)),
                 (1.5, datetime(2020, 6, 30)),
@@ -78,8 +86,7 @@ class TestCombineMetrics(TestCase):
 
         # Variation 2
         backtest_metrics_2 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (1.0, datetime(2020, 1, 1)),
                 (1.2, datetime(2020, 6, 30)),

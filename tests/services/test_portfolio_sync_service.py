@@ -96,6 +96,52 @@ class TestPortfolioSyncService(TestBase):
             str(context.exception)
         )
 
+    def test_sync_unallocated_with_initial_balance_and_no_position(self):
+        """
+        Regression test: the exchange returns no position at all for
+        the trading symbol (e.g. a genuinely zero balance that most
+        exchanges omit from their balance response) while an
+        initial_balance is configured. This must raise an
+        OperationalException instead of an AttributeError.
+        """
+        self.app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                identifier="test",
+                market="binance",
+                trading_symbol="EUR",
+                initial_balance=1000
+            )
+        )
+        self.app.add_market_credential(
+            MarketCredential(
+                market="binance",
+                api_key="test",
+                secret_key="test"
+            )
+        )
+        self.app.add_algorithm(Algorithm())
+
+        portfolio_provider_lookup = \
+            self.app.container.portfolio_provider_lookup()
+        portfolio_provider_lookup\
+            .register_portfolio_provider_for_market(
+                "binance"
+            )
+        portfolio_provider = \
+            portfolio_provider_lookup.get_portfolio_provider("binance")
+        portfolio_provider.return_none_for_position = True
+
+        self.app.initialize_config()
+        self.app.initialize_storage()
+        self.app.initialize_services()
+
+        with self.assertRaises(OperationalException) as context:
+            self.app.initialize_portfolios()
+
+        self.assertIn(
+            "no available balance on the exchange", str(context.exception)
+        )
+
     def test_sync_unallocated_with_reserved(self):
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(

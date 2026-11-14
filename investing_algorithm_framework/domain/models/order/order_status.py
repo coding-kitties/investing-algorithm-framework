@@ -35,3 +35,16 @@ class OrderStatus(Enum):
 
     def equals(self, other):
         return OrderStatus.from_value(other) == self
+
+    @staticmethod
+    def is_pending(value) -> bool:
+        """Return True if the given status represents an order that is
+        still working at the venue (i.e. not in a terminal state).
+
+        In v9.0 ``OPEN`` is the only non-terminal status. A STOP order
+        that has been triggered but not yet filled is still ``OPEN``;
+        callers that need to distinguish that case should use
+        :meth:`Order.is_triggered` (an orthogonal axis based on
+        ``triggered_at``).
+        """
+        return OrderStatus.from_value(value) == OrderStatus.OPEN

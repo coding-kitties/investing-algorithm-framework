@@ -152,11 +152,18 @@ class CSVOHLCVDataProvider(DataProvider):
         """
         windows_size = self.window_size
 
+        if date is not None and windows_size is not None:
+            time_frame = TimeFrame.from_value(self.time_frame)
+            start_date = date - timedelta(
+                minutes=time_frame.amount_of_minutes * windows_size
+            )
+            end_date = date
+
         if start_date is None and end_date is None:
             end_date = datetime.now(tz=timezone.utc)
             time_frame = TimeFrame.from_value(self.time_frame)
             start_date = end_date - timedelta(
-                minutes=time_frame.amount_of_minutes() * windows_size
+                minutes=time_frame.amount_of_minutes * windows_size
             )
         elif start_date is None and end_date is not None:
             start_date = end_date - timedelta(

@@ -1,4 +1,5 @@
 from .ccxt_portfolio_provider import CCXTPortfolioProvider
+from .paper_trading_portfolio_provider import PaperTradingPortfolioProvider
 
 
 def get_default_portfolio_providers():
@@ -15,5 +16,6 @@ def get_default_portfolio_providers():
 
 __all__ = [
     "CCXTPortfolioProvider",
+    "PaperTradingPortfolioProvider",
     "get_default_portfolio_providers",
 ]

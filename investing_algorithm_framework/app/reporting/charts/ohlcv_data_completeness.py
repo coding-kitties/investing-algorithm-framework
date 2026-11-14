@@ -1,6 +1,8 @@
-import plotly.graph_objects as go
 import pandas as pd
-import plotly.io as pio
+from finterion_charts import ChartSpec, Marker, Price
+
+from ._finterion_render import render_chart_html
+
 
 def get_ohlcv_data_completeness_chart(
     df,
@@ -21,31 +23,23 @@ def get_ohlcv_data_completeness_chart(
     # Calculte the percentage completeness
     completeness = len(actual) / len(expected) * 100
     title += f" ({completeness:.2f}% complete)"
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=actual,
-            y=[1]*len(actual),
-            mode='markers',
-            name='Present',
-            marker=dict(color='green', size=6)
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=missing,
-            y=[1]*len(missing),
-            mode='markers',
-            name='Missing',
-            marker=dict(color='red', size=6, symbol='x')
-        )
-    )
-    fig.update_layout(
-        title=title,
-        xaxis_title='Datetime',
-        yaxis=dict(showticklabels=False),
-        height=300,
-        showlegend=True
+
+    actual_ms = actual.astype("datetime64[ms]").astype("int64").to_numpy()
+    flat = [1.0] * len(actual_ms)
+
+    spec = ChartSpec(theme="finterion-light", grid="horizontal")
+    spec.with_bars(time=actual_ms, open=flat, high=flat, low=flat, close=flat)
+    spec.add_panel(
+        Price(id="ohlcv_completeness", weight=1, title=title, type="line")
     )
 
-    return pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
+    # Missing bars are plotted as red markers on the flat presence line.
+    for ts in missing:
+        spec.add_marker(Marker(
+            time=ts.value // 1_000_000,
+            side="sell",
+            price=1.0,
+            label="Missing",
+        ))
+
+    return render_chart_html(spec.validate(), height=300)

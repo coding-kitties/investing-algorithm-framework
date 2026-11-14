@@ -1,5 +1,7 @@
 import pandas as pd
-import plotly.graph_objects as go
+from finterion_charts import ChartSpec, Marker, Price
+
+from ._finterion_render import FinterionChart
 
 
 def get_entry_and_exit_signals(
@@ -20,47 +22,33 @@ def get_entry_and_exit_signals(
             data with datetime index and 'Close'
 
     Returns:
-        go.Figure: Plotly figure with price chart and signals.
+        FinterionChart: A chart wrapper with the price chart and
+        entry/exit signal markers, renderable via ``.to_html()``.
     """
-    # Create the base candlestick or line chart
-    fig = go.Figure()
+    close = price_data["Close"].to_numpy()
+    time_ms = pd.to_datetime(price_data.index) \
+        .astype("datetime64[ms]").astype("int64").to_numpy()
 
-    fig.add_trace(go.Scatter(
-        x=price_data.index,
-        y=price_data["Close"],
-        mode="lines",
-        name="Close Price",
-        line=dict(color="blue")
-    ))
-
-    # Entry points
-    entry_points = price_data[entry_signals]
-    fig.add_trace(go.Scatter(
-        x=entry_points.index,
-        y=entry_points["Close"],
-        mode="markers",
-        name="Entry",
-        marker=dict(symbol="triangle-up", color="green", size=10)
-    ))
-
-    # Exit points
-    exit_points = price_data[exit_signals]
-    fig.add_trace(go.Scatter(
-        x=exit_points.index,
-        y=exit_points["Close"],
-        mode="markers",
-        name="Exit",
-        marker=dict(symbol="triangle-down", color="red", size=10)
-    ))
-
-    # Layout settings
-    fig.update_layout(
-        title="Entry and Exit Signals",
-        xaxis_title="Date",
-        yaxis_title="Price",
-        legend=dict(x=0, y=1),
-        height=600,
-        template="plotly_white"
+    spec = ChartSpec(theme="finterion-light", grid="horizontal")
+    spec.with_bars(time=time_ms, open=close, high=close, low=close, close=close)
+    spec.add_panel(
+        Price(id="price", weight=1, title="Entry and Exit Signals", type="line")
     )
 
-    return fig
+    for ts, price in price_data.loc[entry_signals, "Close"].items():
+        spec.add_marker(Marker(
+            time=pd.Timestamp(ts).value // 1_000_000,
+            side="buy",
+            price=float(price),
+            label="Entry",
+        ))
+
+    for ts, price in price_data.loc[exit_signals, "Close"].items():
+        spec.add_marker(Marker(
+            time=pd.Timestamp(ts).value // 1_000_000,
+            side="sell",
+            price=float(price),
+            label="Exit",
+        ))
+
+    return FinterionChart(spec.validate(), height=600)

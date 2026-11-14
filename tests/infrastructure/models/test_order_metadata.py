@@ -125,6 +125,38 @@ class TestSQLOrderMetadataDBPersistence(TestBase):
             retrieved.metadata.get("order_reason"), "buy_signal"
         )
 
+    def test_legacy_trace_loaded_and_updated_without_rewriting_on_read(self):
+        import json
+        from investing_algorithm_framework.infrastructure.database \
+            .sql_alchemy import Session
+
+        order = self._create_order()
+        order_id = order.id
+        legacy = {"score_card": {
+            "score_card_version": 2, "summary": "Old", "entries": [],
+        }}
+        session = Session()
+        session.query(SQLOrder).filter(SQLOrder.id == order_id).update({
+            SQLOrder.metadata_json: json.dumps(legacy),
+        })
+        session.commit()
+        session.expunge_all()
+        retrieved = self.repository.get(order_id)
+        self.assertEqual(2, retrieved.metadata["decision_trace"][
+            "decision_trace_version"
+        ])
+        self.assertEqual(legacy, json.loads(retrieved.metadata_json))
+        self.repository.update(order_id, {"metadata": {
+            "decision_trace": {"decision_trace_version": 3, "entries": []},
+        }})
+        session.expunge_all()
+        retrieved = self.repository.get(order_id)
+        self.assertEqual(retrieved.metadata["decision_trace"],
+                         retrieved.metadata["score_card"])
+        self.assertEqual(3, retrieved.metadata["score_card"][
+            "score_card_version"
+        ])
+
     def test_metadata_with_multiple_keys_persists(self):
         order = self._create_order(
             metadata={
@@ -137,10 +169,19 @@ class TestSQLOrderMetadataDBPersistence(TestBase):
         self.assertEqual(retrieved.metadata["stop_loss_id"], 42)
 
     def test_no_metadata_returns_empty_dict(self):
-        """Order created without metadata returns {} when read back."""
+        """Order created without metadata has no user-supplied keys.
+
+        v9.0 (#431) — the framework injects ``_reservation_price`` on
+        every BUY order to track slippage; filter underscore-prefixed
+        framework keys before comparing.
+        """
         order = self._create_order()
         retrieved = self.repository.get(order.id)
-        self.assertEqual(retrieved.metadata, {})
+        user_metadata = {
+            k: v for k, v in retrieved.metadata.items()
+            if not k.startswith("_")
+        }
+        self.assertEqual(user_metadata, {})
 
     def test_update_metadata(self):
         """Metadata can be updated via the update method."""

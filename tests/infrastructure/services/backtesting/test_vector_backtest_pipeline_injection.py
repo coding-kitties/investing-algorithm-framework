@@ -178,15 +178,23 @@ class TestVectorBacktestPipelineInjection(unittest.TestCase):
 
         strategy = _StubStrategy(data_sources=sources, pipelines=[_Broken])
 
-        with self.assertRaises(Exception):
-            VectorBacktestService._inject_pipelines(
-                strategy=strategy,
-                data=data,
-                backtest_date_range=BacktestDateRange(
-                    start_date=datetime(2024, 1, 2),
-                    end_date=datetime(2024, 1, 4),
-                ),
-            )
+        logger_name = (
+            "investing_algorithm_framework.infrastructure.services."
+            "backtesting.vector_backtest_service"
+        )
+        # Failure is expected here — assertLogs both captures the
+        # traceback (keeping it out of the test console) and confirms
+        # it was actually logged.
+        with self.assertLogs(logger_name, level=logging.ERROR):
+            with self.assertRaises(Exception):
+                VectorBacktestService._inject_pipelines(
+                    strategy=strategy,
+                    data=data,
+                    backtest_date_range=BacktestDateRange(
+                        start_date=datetime(2024, 1, 2),
+                        end_date=datetime(2024, 1, 4),
+                    ),
+                )
 
 
 # Suppress the unused import warning — kept for symmetry with other

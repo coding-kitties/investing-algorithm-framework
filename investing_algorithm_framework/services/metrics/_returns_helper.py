@@ -16,8 +16,10 @@ from __future__ import annotations
 from typing import Iterable
 
 import pandas as pd
+from .inputs import shared_snapshot_calculation
 
 
+@shared_snapshot_calculation
 def snapshots_to_dataframe(snapshots: Iterable) -> pd.DataFrame:
     """Build a 3-column dataframe ``(created_at, total_value, cash_flow)``
     indexed by ``created_at``."""
@@ -34,6 +36,7 @@ def snapshots_to_dataframe(snapshots: Iterable) -> pd.DataFrame:
     return df
 
 
+@shared_snapshot_calculation
 def daily_twr_returns(snapshots: Iterable, ffill: bool = True) -> pd.Series:
     """Return a daily TWR series indexed by date.
 

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from investing_algorithm_framework.app.context import Context
+from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
 from investing_algorithm_framework.domain import (
     BacktestRun, BACKTESTING_FLAG, INDEX_DATETIME,
 )
@@ -105,9 +106,12 @@ class TestBacktestRunRecordedValues(TestCase):
     def test_to_dict_includes_recorded_values(self):
         dt = datetime(2023, 1, 1, tzinfo=timezone.utc)
         run = BacktestRun(
-            backtest_start_date=dt,
-            backtest_end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
-            trading_symbol="USD",
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=dt,
+                    end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
+                )
+            ),
             recorded_values={
                 "rsi": [(dt, 70.5)],
                 "sma": [(dt, 100.0)],
@@ -123,9 +127,12 @@ class TestBacktestRunRecordedValues(TestCase):
     def test_save_and_load_recorded_values(self):
         dt = datetime(2023, 1, 1, tzinfo=timezone.utc)
         run = BacktestRun(
-            backtest_start_date=dt,
-            backtest_end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
-            trading_symbol="USD",
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=dt,
+                    end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
+                )
+            ),
             initial_unallocated=1000.0,
             created_at=dt,
             recorded_values={
@@ -151,9 +158,12 @@ class TestBacktestRunRecordedValues(TestCase):
     def test_empty_recorded_values_by_default(self):
         dt = datetime(2023, 1, 1, tzinfo=timezone.utc)
         run = BacktestRun(
-            backtest_start_date=dt,
-            backtest_end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
-            trading_symbol="USD",
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=dt,
+                    end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
+                )
+            ),
         )
         self.assertEqual(run.recorded_values, {})
         d = run.to_dict()

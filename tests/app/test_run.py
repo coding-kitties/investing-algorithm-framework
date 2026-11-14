@@ -9,47 +9,26 @@ Merged from:
 import os
 import shutil
 from unittest import TestCase
-from typing import Dict, Any
-import pandas as pd
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
-    Algorithm, MarketCredential
+    Algorithm, MarketCredential, Schedule
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 from tests.resources import random_string, OrderExecutorTest, \
     PortfolioProviderTest
 
 
-# ---------------------------------------------------------------------------
-# Shared test strategies
-# ---------------------------------------------------------------------------
-
 class EmptyStrategyOne(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 2
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
+    schedule = Schedule.every(2, TimeUnit.SECOND)
 
 
 class EmptyStrategyTwo(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 2
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
+    schedule = Schedule.every(2, TimeUnit.SECOND)
 
 
 class CountingStrategyOne(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.SECOND)
     number_of_runs = 0
 
     def __init__(self, strategy_id=None, time_unit=None, interval=None,
@@ -61,16 +40,9 @@ class CountingStrategyOne(TradingStrategy):
     def apply_strategy(self, context, data):
         CountingStrategyOne.number_of_runs += 1
 
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
 
 class CountingStrategyTwo(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.SECOND)
     number_of_runs = 0
 
     def __init__(self, strategy_id=None, time_unit=None, interval=None,
@@ -81,12 +53,6 @@ class CountingStrategyTwo(TradingStrategy):
 
     def apply_strategy(self, context, data):
         CountingStrategyTwo.number_of_runs += 1
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
 
 
 # ---------------------------------------------------------------------------

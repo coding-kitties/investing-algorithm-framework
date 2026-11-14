@@ -5,6 +5,7 @@ These tests verify that when a checkpoint is loaded and the backtest
 passes (or fails) the window filter function, the filtered_out metadata
 is correctly updated.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import json
 import os
 import shutil
@@ -32,8 +33,17 @@ from investing_algorithm_framework import (
     RESOURCE_DIRECTORY,
     SnapshotInterval,
     Backtest,
+    BacktestIndex,
     OperationalException,
+    Schedule,
+    Study,
+    Universe,
+    BacktestWindow,
+    BacktestEngine,
+    SignalSide,
+    signal_series_from_column,
 )
+from investing_algorithm_framework.domain import BUNDLE_EXT
 from investing_algorithm_framework.infrastructure import BacktestService
 
 
@@ -66,9 +76,7 @@ class SimpleVectorStrategy(TradingStrategy):
     Simple vector strategy for testing purposes.
     Always generates a buy signal at the start and sell signal at the end.
     """
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id: str,
@@ -92,47 +100,39 @@ class SimpleVectorStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             symbols=[symbol],
             position_sizes=[
                 PositionSize(symbol=symbol, percentage_of_portfolio=50.0)
             ],
         )
 
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        """Generate buy signals - buy at every 10th candle."""
-        signals = {}
+    def generate_signal_series(self, data: Dict[str, Any]):
+        """Buy every 10th candle, sell 5 candles after each buy."""
         for symbol in self.symbols:
-            df = data[f"{symbol}_ohlcv"]
+            df = data[f"{symbol}_ohlcv"].copy()
             buy_signal = pd.Series(False, index=df.index)
-            # Generate buy signal every 10 candles
             buy_signal.iloc[::10] = True
-            signals[symbol] = buy_signal
-        return signals
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        """Generate sell signals - sell 5 candles after each buy."""
-        signals = {}
-        for symbol in self.symbols:
-            df = data[f"{symbol}_ohlcv"]
             sell_signal = pd.Series(False, index=df.index)
-            # Generate sell signal 5 candles after each buy
             sell_signal.iloc[5::10] = True
-            signals[symbol] = sell_signal
-        return signals
+            df["_buy_signal"] = buy_signal
+            df["_sell_signal"] = sell_signal
+            yield signal_series_from_column(
+                df, "_buy_signal",
+                side=SignalSide.OPEN_LONG, symbol=symbol,
+                source="test_fixture",
+            )
+            yield signal_series_from_column(
+                df, "_sell_signal",
+                side=SignalSide.CLOSE_LONG, symbol=symbol,
+                source="test_fixture",
+            )
 
 
 class SimpleEventStrategy(TradingStrategy):
     """Simple event-driven strategy for testing purposes."""
     strategy_id = "simple_event_strategy"
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(self, algorithm_id: str = None):
         super().__init__(algorithm_id=algorithm_id)
 
@@ -169,14 +169,14 @@ class TestFilteredOutMetadataUpdate(TestCase):
         With min_trades=100, most strategies will be filtered out.
         """
         def window_filter(
-            backtests: List[Backtest],
+            backtests: BacktestIndex,
             date_range: BacktestDateRange
-        ) -> List[Backtest]:
-            return [
-                b for b in backtests
-                if b.backtest_summary is not None
-                and b.backtest_summary.number_of_trades_closed >= min_trades
-            ]
+        ) -> BacktestIndex:
+            return backtests.filter(
+                lambda row: (
+                    row["summary.number_of_trades_closed"] >= min_trades
+                ),
+            )
         return window_filter
 
     def _create_lenient_filter(self, min_trades: int = 0):
@@ -185,17 +185,13 @@ class TestFilteredOutMetadataUpdate(TestCase):
         This filter passes everything regardless of trades.
         """
         def window_filter(
-            backtests: List[Backtest],
+            backtests: BacktestIndex,
             date_range: BacktestDateRange
-        ) -> List[Backtest]:
+        ) -> BacktestIndex:
             # Pass all backtests - this is a lenient filter
             return backtests
         return window_filter
 
-    @unittest.skip(
-        "Framework does not currently set filtered_out metadata "
-        "flag when window filter removes a backtest"
-    )
     def test_vector_backtest_filtered_out_then_passes(self):
         """
         Test that when a vector backtest is:
@@ -225,26 +221,35 @@ class TestFilteredOutMetadataUpdate(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
 
         # Run first backtest with STRICT filter (will filter out the strategy)
-        strict_filter = self._create_strict_filter(min_trades=100)
+        # SimpleVectorStrategy produces ~438 closed trades over this
+        # 365-day/2h window (buy every 10th candle), so the threshold
+        # must be well above that to actually filter it out.
+        strict_filter = self._create_strict_filter(min_trades=1000)
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run1 = app.run_backtests(
             strategies=[strategy],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            window_filter_function=strict_filter,
+            study=study,
+            window_metrics_filter_function=strict_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the backtest was filtered out
-        # (should return empty list or strategy marked as filtered)
-        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
+        self.assertIsInstance(backtests_run1, BacktestIndex)
+        self.assertTrue(backtests_run1.df.empty)
+        backtest_dir = os.path.join(storage_dir, algorithm_id + BUNDLE_EXT)
 
         if os.path.exists(backtest_dir):
             saved_backtest = Backtest.open(backtest_dir)
@@ -264,24 +269,22 @@ class TestFilteredOutMetadataUpdate(TestCase):
 
         lenient_filter = self._create_lenient_filter(min_trades=0)
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy2],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            window_filter_function=lenient_filter,
+            study=study,
+            window_metrics_filter_function=lenient_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the filtered_out flag is now cleared
         if os.path.exists(backtest_dir):
             saved_backtest = Backtest.open(backtest_dir)
             self.assertFalse(
-                saved_backtest.metadata.get('filtered_out', True),
+                saved_backtest.metadata.get('filtered_out', False),
                 "filtered_out flag should be cleared after passing "
                 "lenient filter"
             )
@@ -291,10 +294,6 @@ class TestFilteredOutMetadataUpdate(TestCase):
                 "filtered_out_at_date_range should be removed from metadata"
             )
 
-    @unittest.skip(
-        "Framework does not currently set filtered_out metadata "
-        "flag when window filter removes a backtest"
-    )
     def test_vector_backtest_passes_then_filtered_out(self):
         """
         Test that when a vector backtest is:
@@ -324,25 +323,30 @@ class TestFilteredOutMetadataUpdate(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
 
         # Run first backtest with LENIENT filter (will pass)
         lenient_filter = self._create_lenient_filter(min_trades=0)
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run1 = app.run_backtests(
             strategies=[strategy],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            window_filter_function=lenient_filter,
+            study=study,
+            window_metrics_filter_function=lenient_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify backtest exists and is NOT filtered out
-        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
+        backtest_dir = os.path.join(storage_dir, algorithm_id + BUNDLE_EXT)
         self.assertTrue(
             os.path.exists(backtest_dir),
             "Backtest directory should exist after first run"
@@ -362,19 +366,20 @@ class TestFilteredOutMetadataUpdate(TestCase):
             symbol="BTC",
         )
 
-        strict_filter = self._create_strict_filter(min_trades=100)
+        # SimpleVectorStrategy produces ~438 closed trades over this
+        # 365-day/2h window, so the threshold must be well above that
+        # to actually filter it out.
+        strict_filter = self._create_strict_filter(min_trades=1000)
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy2],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            window_filter_function=strict_filter,
+            study=study,
+            window_metrics_filter_function=strict_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the filtered_out flag is now set
@@ -425,33 +430,36 @@ class TestFilteredOutMetadataUpdate(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
 
         # Run first backtest with STRICT filter
         strict_filter = self._create_strict_filter(min_trades=100)
 
-        backtests_run1 = app.run_backtests(
-            algorithms=[algorithm],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            window_filter_function=strict_filter,
+        backtests_run1 = app.run_backtest(
+            algorithm=algorithm,
+            study=study,
+            window_metrics_filter_function=strict_filter,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the backtest was filtered out
-        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
+        backtest_dir = os.path.join(storage_dir, algorithm_id + BUNDLE_EXT)
 
-        if os.path.exists(backtest_dir):
-            try:
-                saved_backtest = Backtest.open(backtest_dir)
-                self.assertTrue(
-                    saved_backtest.metadata.get('filtered_out', False),
-                    "Event backtest should be marked as filtered_out after "
-                    "failing strict filter"
-                )
-            except Exception as e:
-                # If we can't load the backtest, skip the assertion
-                pass
+        self.assertTrue(backtests_run1.df.empty)
+        saved_backtest = Backtest.open(backtest_dir)
+        self.assertTrue(
+            saved_backtest.metadata.get('filtered_out', False),
+            "Event backtest should be marked as filtered_out after "
+            "failing strict filter",
+        )
 
         # Now run again with LENIENT filter
         algorithm2 = Algorithm(algorithm_id=algorithm_id)
@@ -459,31 +467,29 @@ class TestFilteredOutMetadataUpdate(TestCase):
 
         lenient_filter = self._create_lenient_filter(min_trades=0)
 
-        backtests_run2 = app.run_backtests(
-            algorithms=[algorithm2],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            window_filter_function=lenient_filter,
+        backtests_run2 = app.run_backtest(
+            algorithm=algorithm2,
+            study=study,
+            window_metrics_filter_function=lenient_filter,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the filtered_out flag is now cleared
         if os.path.exists(backtest_dir):
-            try:
-                saved_backtest = Backtest.open(backtest_dir)
-                self.assertFalse(
-                    saved_backtest.metadata.get('filtered_out', True),
-                    "Event backtest filtered_out flag should be cleared after "
-                    "passing lenient filter"
-                )
-                self.assertNotIn(
-                    'filtered_out_at_date_range',
-                    saved_backtest.metadata,
-                    "filtered_out_at_date_range should be removed from metadata"
-                )
-            except Exception as e:
-                self.skipTest(f"Could not load backtest: {e}")
+            saved_backtest = Backtest.open(backtest_dir)
+            self.assertFalse(
+                saved_backtest.metadata.get('filtered_out', False),
+                "Event backtest filtered_out flag should be cleared after "
+                "passing lenient filter"
+            )
+            self.assertNotIn(
+                'filtered_out_at_date_range',
+                saved_backtest.metadata,
+                "filtered_out_at_date_range should be removed from metadata"
+            )
 
     def test_event_backtest_passes_then_filtered_out(self):
         """
@@ -522,37 +528,35 @@ class TestFilteredOutMetadataUpdate(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
 
         # Run first backtest with LENIENT filter (will pass)
         lenient_filter = self._create_lenient_filter(min_trades=0)
 
-        backtests_run1 = app.run_backtests(
-            algorithms=[algorithm],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            window_filter_function=lenient_filter,
+        backtests_run1 = app.run_backtest(
+            algorithm=algorithm,
+            study=study,
+            window_metrics_filter_function=lenient_filter,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify backtest exists and is NOT filtered out
-        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
+        backtest_dir = os.path.join(storage_dir, algorithm_id + BUNDLE_EXT)
 
-        if not os.path.exists(backtest_dir):
-            self.skipTest(
-                f"Backtest directory {backtest_dir} was not created. "
-                "This may indicate the backtest was not saved to storage."
-            )
-
-        try:
-            saved_backtest = Backtest.open(backtest_dir)
-            self.assertFalse(
-                saved_backtest.metadata.get('filtered_out', False),
-                "Event backtest should NOT be marked as filtered_out after "
-                "passing lenient filter"
-            )
-        except Exception as e:
-            self.skipTest(f"Could not load backtest: {e}")
+        saved_backtest = Backtest.open(backtest_dir)
+        self.assertFalse(
+            saved_backtest.metadata.get('filtered_out', False),
+            "Event backtest should NOT be marked as filtered_out after "
+            "passing lenient filter",
+        )
 
         # Now run again with STRICT filter
         algorithm2 = Algorithm(algorithm_id=algorithm_id)
@@ -560,29 +564,27 @@ class TestFilteredOutMetadataUpdate(TestCase):
 
         strict_filter = self._create_strict_filter(min_trades=100)
 
-        backtests_run2 = app.run_backtests(
-            algorithms=[algorithm2],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            window_filter_function=strict_filter,
+        backtests_run2 = app.run_backtest(
+            algorithm=algorithm2,
+            study=study,
+            window_metrics_filter_function=strict_filter,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the filtered_out flag is now set
-        try:
-            saved_backtest = Backtest.open(backtest_dir)
-            self.assertTrue(
-                saved_backtest.metadata.get('filtered_out', False),
-                "filtered_out flag should be set after failing strict filter"
-            )
-            self.assertIn(
-                'filtered_out_at_date_range',
-                saved_backtest.metadata,
-                "filtered_out_at_date_range should be in metadata"
-            )
-        except Exception as e:
-            self.skipTest(f"Could not load backtest after second run: {e}")
+        saved_backtest = Backtest.open(backtest_dir)
+        self.assertTrue(
+            saved_backtest.metadata.get('filtered_out', False),
+            "filtered_out flag should be set after failing strict filter",
+        )
+        self.assertIn(
+            'filtered_out_at_date_range',
+            saved_backtest.metadata,
+            "filtered_out_at_date_range should be in metadata",
+        )
 
 
 class TestFilteredOutMetadataMultipleDateRanges(TestCase):
@@ -647,26 +649,35 @@ class TestFilteredOutMetadataMultipleDateRanges(TestCase):
         # Create a filter that returns all backtests
         # (we just want to verify the backtest runs and storage works)
         def pass_all_filter(
-            backtests: List[Backtest],
+            backtests: BacktestIndex,
             date_range: BacktestDateRange
-        ) -> List[Backtest]:
+        ) -> BacktestIndex:
             return backtests
 
-        backtests = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range_1, date_range_2],
-            strategies=[strategy],
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            window_filter_function=pass_all_filter,
+            backtest_windows=[
+                BacktestWindow(train_range=date_range_1),
+                BacktestWindow(train_range=date_range_2),
+            ],
+            engines=[BacktestEngine.VECTOR],
+        )
+
+        backtests = app.run_backtests(
+            strategies=[strategy],
+            study=study,
+            window_metrics_filter_function=pass_all_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify the backtest was saved
-        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
+        backtest_dir = os.path.join(storage_dir, algorithm_id + BUNDLE_EXT)
         self.assertTrue(
             os.path.exists(backtest_dir),
             "Backtest directory should exist"
@@ -729,6 +740,14 @@ class TestStorageDirectoryIsolation(TestCase):
             name="Test Period"
         )
 
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
+
         # --- First run: Strategy A ---
         algorithm_id_a = "strategy_a_" + str(uuid.uuid4())[:4]
         strategy_a = SimpleVectorStrategy(
@@ -737,30 +756,28 @@ class TestStorageDirectoryIsolation(TestCase):
             symbol="BTC",
         )
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run1 = app.run_backtests(
             strategies=[strategy_a],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify Strategy A was saved
         self.assertEqual(
-            len(backtests_run1), 1,
+            backtests_run1.df["algorithm_id"].nunique(), 1,
             "First run should return exactly 1 backtest"
         )
         self.assertEqual(
-            backtests_run1[0].algorithm_id, algorithm_id_a,
+            backtests_run1.df["algorithm_id"].iloc[0], algorithm_id_a,
             "First run should return Strategy A"
         )
 
         # Verify Strategy A exists in storage (bundle format - issue #487)
-        backtest_dir_a = os.path.join(storage_dir, algorithm_id_a + ".iafbt")
+        backtest_dir_a = os.path.join(storage_dir, algorithm_id_a + BUNDLE_EXT)
         self.assertTrue(
             os.path.exists(backtest_dir_a),
             "Strategy A backtest bundle should exist"
@@ -774,30 +791,28 @@ class TestStorageDirectoryIsolation(TestCase):
             symbol="BTC",
         )
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify ONLY Strategy B is in results, NOT Strategy A
         self.assertEqual(
-            len(backtests_run2), 1,
+            backtests_run2.df["algorithm_id"].nunique(), 1,
             "Second run should return exactly 1 backtest (only Strategy B)"
         )
         self.assertEqual(
-            backtests_run2[0].algorithm_id, algorithm_id_b,
+            backtests_run2.df["algorithm_id"].iloc[0], algorithm_id_b,
             "Second run should return Strategy B, not Strategy A"
         )
 
         # Double-check that Strategy A is NOT in the results
-        result_algorithm_ids = [b.algorithm_id for b in backtests_run2]
+        result_algorithm_ids = backtests_run2.df["algorithm_id"].unique()
         self.assertNotIn(
             algorithm_id_a, result_algorithm_ids,
             "Strategy A from previous run should NOT be in current results"
@@ -826,6 +841,14 @@ class TestStorageDirectoryIsolation(TestCase):
             name="Test Period"
         )
 
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
+
         # --- First run: Strategy A ---
         algorithm_id_a = "strategy_a_" + str(uuid.uuid4())[:4]
         strategy_a = SimpleVectorStrategy(
@@ -834,16 +857,14 @@ class TestStorageDirectoryIsolation(TestCase):
             symbol="BTC",
         )
 
-        app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        app.run_backtests(
             strategies=[strategy_a],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # --- Second run: Strategy B with final filter that tracks what it receives ---
@@ -857,22 +878,21 @@ class TestStorageDirectoryIsolation(TestCase):
         # Track what the final filter receives
         received_algorithm_ids = []
 
-        def tracking_final_filter(backtests: List[Backtest]) -> List[Backtest]:
-            for b in backtests:
-                received_algorithm_ids.append(b.algorithm_id)
+        def tracking_final_filter(backtests: BacktestIndex) -> BacktestIndex:
+            received_algorithm_ids.extend(
+                backtests.df["algorithm_id"].unique(),
+            )
             return backtests  # Pass all through
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            final_filter_function=tracking_final_filter,
+            study=study,
+            final_metrics_filter_function=tracking_final_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify final filter only received Strategy B
@@ -921,20 +941,26 @@ class TestStorageDirectoryIsolation(TestCase):
                 )
             )
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
-            strategies=strategies_batch1,
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
+
+        backtests_run1 = app.run_backtests(
+            strategies=strategies_batch1,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         self.assertEqual(
-            len(backtests_run1), 3,
+            backtests_run1.df["algorithm_id"].nunique(), 3,
             "First run should return 3 backtests"
         )
 
@@ -952,25 +978,23 @@ class TestStorageDirectoryIsolation(TestCase):
                 )
             )
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=strategies_batch2,
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify only batch 2 strategies in results
         self.assertEqual(
-            len(backtests_run2), 2,
+            backtests_run2.df["algorithm_id"].nunique(), 2,
             "Second run should return exactly 2 backtests (only batch 2)"
         )
 
-        result_algorithm_ids = [b.algorithm_id for b in backtests_run2]
+        result_algorithm_ids = backtests_run2.df["algorithm_id"].unique()
 
         for alg_id in algorithm_ids_batch2:
             self.assertIn(
@@ -1010,22 +1034,29 @@ class TestStorageDirectoryIsolation(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
 
         # --- First run: Algorithm A ---
         algorithm_id_a = "algo_a_" + str(uuid.uuid4())[:4]
         algorithm_a = Algorithm(algorithm_id=algorithm_id_a)
         algorithm_a.add_strategy(SimpleEventStrategy())
 
-        backtests_run1 = app.run_backtests(
-            algorithms=[algorithm_a],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+        backtests_run1 = app.run_backtest(
+            algorithm=algorithm_a,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         self.assertEqual(
-            len(backtests_run1), 1,
+            backtests_run1.df["algorithm_id"].nunique(), 1,
             "First run should return exactly 1 backtest"
         )
 
@@ -1034,25 +1065,26 @@ class TestStorageDirectoryIsolation(TestCase):
         algorithm_b = Algorithm(algorithm_id=algorithm_id_b)
         algorithm_b.add_strategy(SimpleEventStrategy())
 
-        backtests_run2 = app.run_backtests(
-            algorithms=[algorithm_b],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+        backtests_run2 = app.run_backtest(
+            algorithm=algorithm_b,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify ONLY Algorithm B is in results
         self.assertEqual(
-            len(backtests_run2), 1,
+            backtests_run2.df["algorithm_id"].nunique(), 1,
             "Second run should return exactly 1 backtest (only Algorithm B)"
         )
         self.assertEqual(
-            backtests_run2[0].algorithm_id, algorithm_id_b,
+            backtests_run2.df["algorithm_id"].iloc[0], algorithm_id_b,
             "Second run should return Algorithm B, not Algorithm A"
         )
 
-        result_algorithm_ids = [b.algorithm_id for b in backtests_run2]
+        result_algorithm_ids = backtests_run2.df["algorithm_id"].unique()
         self.assertNotIn(
             algorithm_id_a, result_algorithm_ids,
             "Algorithm A from previous run should NOT be in current results"
@@ -2101,15 +2133,15 @@ class TestSessionCache(TestCase):
         self.assertEqual(len(session_cache["backtests"]), 2)
         self.assertIn("algo_1", session_cache["backtests"])
         self.assertIn("algo_2", session_cache["backtests"])
-        # New default save format is the .iafbt bundle (issue #487);
+        # New default save format is the .obtf bundle (issue #487);
         # the cache records the resolved on-disk path.
         self.assertEqual(
             session_cache["backtests"]["algo_1"],
-            os.path.join(self.temp_dir, "algo_1.iafbt")
+            os.path.join(self.temp_dir, f"algo_1{BUNDLE_EXT}")
         )
         self.assertEqual(
             session_cache["backtests"]["algo_2"],
-            os.path.join(self.temp_dir, "algo_2.iafbt")
+            os.path.join(self.temp_dir, f"algo_2{BUNDLE_EXT}")
         )
 
     def test_save_session_cache(self):
@@ -2210,6 +2242,17 @@ class TestSessionCacheIntegration(TestCase):
     current run are returned.
     """
 
+    def _assert_persisted_session_matches(self, index: BacktestIndex):
+        with (index.directory / "backtest_session.json").open() as handle:
+            session = json.load(handle)
+        self.assertEqual(
+            set(session["backtests"]), set(index.df["algorithm_id"]),
+        )
+        persisted = BacktestIndex.open(
+            index.directory, filename="backtest_session_index.parquet",
+        )
+        pd.testing.assert_frame_equal(index.df, persisted.df)
+
     def setUp(self) -> None:
         """Set up test fixtures."""
         self.resource_dir = os.path.abspath(
@@ -2249,6 +2292,13 @@ class TestSessionCacheIntegration(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
 
         # --- First run: Strategy A ---
         algorithm_id_a = "session_test_a_" + str(uuid.uuid4())[:4]
@@ -2258,30 +2308,26 @@ class TestSessionCacheIntegration(TestCase):
             symbol="BTC",
         )
 
-        backtests_run1 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run1 = app.run_backtests(
             strategies=[strategy_a],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
-        self.assertEqual(len(backtests_run1), 1)
-        self.assertEqual(backtests_run1[0].algorithm_id, algorithm_id_a)
+        self.assertEqual(backtests_run1.df["algorithm_id"].nunique(), 1)
+        self.assertEqual(
+            backtests_run1.df["algorithm_id"].iloc[0], algorithm_id_a,
+        )
 
         # Verify Strategy A exists in storage (bundle format - issue #487)
-        self.assertTrue(os.path.exists(os.path.join(storage_dir, algorithm_id_a + ".iafbt")))
+        self.assertTrue(os.path.exists(os.path.join(storage_dir, algorithm_id_a + BUNDLE_EXT)))
 
-        # Verify session file was cleaned up
-        session_file = os.path.join(storage_dir, "backtest_session.json")
-        self.assertFalse(
-            os.path.exists(session_file),
-            "Session file should be cleaned up after backtest completes"
-        )
+        # Index runs persist session metadata and the scalar index.
+        self._assert_persisted_session_matches(backtests_run1)
 
         # --- Second run: Strategy B ---
         algorithm_id_b = "session_test_b_" + str(uuid.uuid4())[:4]
@@ -2291,35 +2337,31 @@ class TestSessionCacheIntegration(TestCase):
             symbol="BTC",
         )
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify ONLY Strategy B is in results
-        self.assertEqual(len(backtests_run2), 1)
-        self.assertEqual(backtests_run2[0].algorithm_id, algorithm_id_b)
+        self.assertEqual(backtests_run2.df["algorithm_id"].nunique(), 1)
+        self.assertEqual(
+            backtests_run2.df["algorithm_id"].iloc[0], algorithm_id_b,
+        )
 
         # Strategy A should NOT be in results (session isolation)
-        result_ids = [b.algorithm_id for b in backtests_run2]
+        result_ids = backtests_run2.df["algorithm_id"].unique()
         self.assertNotIn(
             algorithm_id_a, result_ids,
             "Strategy A from previous run should NOT be in current results "
             "due to session isolation"
         )
 
-        # Verify session file was cleaned up
-        self.assertFalse(
-            os.path.exists(session_file),
-            "Session file should be cleaned up after second backtest completes"
-        )
+        self._assert_persisted_session_matches(backtests_run2)
 
     def test_event_backtest_session_isolation(self):
         """
@@ -2345,47 +2387,53 @@ class TestSessionCacheIntegration(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="bitvavo", trading_symbol="EUR"),
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.EVENT_DRIVEN],
+        )
 
         # --- First run: Algorithm A ---
         algorithm_id_a = "event_session_a_" + str(uuid.uuid4())[:4]
         algorithm_a = Algorithm(algorithm_id=algorithm_id_a)
         algorithm_a.add_strategy(SimpleEventStrategy())
 
-        backtests_run1 = app.run_backtests(
-            algorithms=[algorithm_a],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+        backtests_run1 = app.run_backtest(
+            algorithm=algorithm_a,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
-        self.assertEqual(len(backtests_run1), 1)
+        self.assertEqual(backtests_run1.df["algorithm_id"].nunique(), 1)
 
-        # Verify session file was cleaned up
-        session_file = os.path.join(storage_dir, "backtest_session.json")
-        self.assertFalse(
-            os.path.exists(session_file),
-            "Session file should be cleaned up after event backtest completes"
-        )
+        self._assert_persisted_session_matches(backtests_run1)
 
         # --- Second run: Algorithm B ---
         algorithm_id_b = "event_session_b_" + str(uuid.uuid4())[:4]
         algorithm_b = Algorithm(algorithm_id=algorithm_id_b)
         algorithm_b.add_strategy(SimpleEventStrategy())
 
-        backtests_run2 = app.run_backtests(
-            algorithms=[algorithm_b],
-            backtest_date_ranges=[date_range],
-            risk_free_rate=0.027,
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+        backtests_run2 = app.run_backtest(
+            algorithm=algorithm_b,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Verify ONLY Algorithm B is in results
-        self.assertEqual(len(backtests_run2), 1)
-        self.assertEqual(backtests_run2[0].algorithm_id, algorithm_id_b)
+        self.assertEqual(backtests_run2.df["algorithm_id"].nunique(), 1)
+        self.assertEqual(
+            backtests_run2.df["algorithm_id"].iloc[0], algorithm_id_b,
+        )
+        self._assert_persisted_session_matches(backtests_run2)
 
-        result_ids = [b.algorithm_id for b in backtests_run2]
+        result_ids = backtests_run2.df["algorithm_id"].unique()
         self.assertNotIn(
             algorithm_id_a, result_ids,
             "Algorithm A from previous run should NOT be in current results"
@@ -2408,6 +2456,13 @@ class TestSessionCacheIntegration(TestCase):
             end_date=end_date,
             name="Test Period"
         )
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[BacktestWindow(train_range=date_range)],
+            engines=[BacktestEngine.VECTOR],
+        )
 
         # --- First run: Strategy A ---
         algorithm_id_a = "filter_test_a_" + str(uuid.uuid4())[:4]
@@ -2417,16 +2472,14 @@ class TestSessionCacheIntegration(TestCase):
             symbol="BTC",
         )
 
-        app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        app.run_backtests(
             strategies=[strategy_a],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # --- Second run: Strategy B with final filter ---
@@ -2440,22 +2493,19 @@ class TestSessionCacheIntegration(TestCase):
         # Track what the final filter receives
         received_ids = []
 
-        def tracking_filter(backtests: List[Backtest]) -> List[Backtest]:
-            for b in backtests:
-                received_ids.append(b.algorithm_id)
+        def tracking_filter(backtests: BacktestIndex) -> BacktestIndex:
+            received_ids.extend(backtests.df["algorithm_id"].unique())
             return backtests
 
-        backtests_run2 = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range],
+        backtests_run2 = app.run_backtests(
             strategies=[strategy_b],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=storage_dir,
-            use_checkpoints=True,
-            final_filter_function=tracking_filter,
+            study=study,
+            final_metrics_filter_function=tracking_filter,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                backtest_storage_directory=storage_dir,
+                use_checkpoints=True,
+            ),
         )
 
         # Final filter should only receive Strategy B

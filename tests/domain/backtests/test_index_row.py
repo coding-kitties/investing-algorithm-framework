@@ -2,7 +2,7 @@
 
 These tests verify that:
 
-* ``Backtest.index_row()`` produces a typed row with the right fields.
+* ``Backtest.index_rows(bundle_path='/path')[0]`` produces a typed row with the right fields.
 * The flat-dict round-trip is lossless for canonical scalar fields.
 * The row can be built from a bundle opened with ``summary_only=True``
   \u2014 i.e. without decoding any v2 Parquet metric blobs. This is the
@@ -47,20 +47,20 @@ class TestBacktestIndexRow(TestCase):
     # In-memory derivation
     # ------------------------------------------------------------------
     def test_index_row_has_expected_identity(self):
-        row = self.fixture.index_row(bundle_path="/tmp/x.iafbt")
+        row = self.fixture.index_rows(bundle_path="/tmp/x.iafbt")[0]
 
         self.assertIsInstance(row, BacktestIndexRow)
         self.assertEqual(row.algorithm_id, self.fixture.algorithm_id)
         self.assertEqual(row.tag, self.fixture.tag)
         self.assertEqual(row.bundle_path, "/tmp/x.iafbt")
         self.assertEqual(
-            row.number_of_runs, len(self.fixture.backtest_runs or [])
+            row.number_of_runs, len(self.fixture.get_all_backtest_runs() or [])
         )
         # summary_metrics should be the live BacktestSummaryMetrics dataclass
-        self.assertIs(row.summary_metrics, self.fixture.backtest_summary)
+        self.assertIs(row.summary_metrics, self.fixture.vector_summary)
 
     def test_to_flat_dict_carries_summary_prefix(self):
-        row = self.fixture.index_row(bundle_path="bundle.iafbt")
+        row = self.fixture.index_rows(bundle_path="bundle.iafbt")[0]
         flat = row.to_flat_dict()
 
         # Identity columns are present and unprefixed.
@@ -68,7 +68,7 @@ class TestBacktestIndexRow(TestCase):
         self.assertEqual(flat["bundle_path"], "bundle.iafbt")
 
         # Summary-metric scalars are emitted with the canonical prefix.
-        if self.fixture.backtest_summary is not None:
+        if self.fixture.vector_summary is not None:
             summary_keys = [
                 k for k in flat if k.startswith("summary.")
             ]
@@ -80,7 +80,7 @@ class TestBacktestIndexRow(TestCase):
     def test_flat_dict_round_trip(self):
         import math
 
-        row = self.fixture.index_row(bundle_path="bundle.iafbt")
+        row = self.fixture.index_rows(bundle_path="bundle.iafbt")[0]
         flat = row.to_flat_dict()
         restored = BacktestIndexRow.from_flat_dict(flat)
 
@@ -129,12 +129,12 @@ class TestBacktestIndexRow(TestCase):
         # summary_only=True skips Parquet metric-blob decoding \u2014
         # the index row must still build without error.
         loaded = Backtest.open(path, summary_only=True)
-        row = loaded.index_row(bundle_path=path)
+        row = loaded.index_rows(bundle_path=path)[0]
 
         self.assertEqual(row.algorithm_id, self.fixture.algorithm_id)
         self.assertEqual(row.bundle_path, path)
         self.assertEqual(
-            row.number_of_runs, len(self.fixture.backtest_runs or [])
+            row.number_of_runs, len(self.fixture.get_all_backtest_runs() or [])
         )
 
         # Flat dict shape must also work in the summary-only path.

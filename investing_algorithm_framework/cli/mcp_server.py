@@ -70,23 +70,48 @@ def _fmt_dec(v, decimals=2):
     return f"{v:.{decimals}f}"
 
 
+def _primary_engine(bt):
+    """Return the engine name the MCP server should report on.
+
+    v9.0 bundles can carry both a vector and an event engine slot.
+    The MCP server's strategy-level views render one engine per
+    strategy; this picks the first populated engine (vector before
+    event, matching ``Backtest.engines()`` ordering). Returns
+    ``None`` if neither slot is populated.
+    """
+    engines = bt.engines()
+    return engines[0] if engines else None
+
+
+def _primary_summary(bt):
+    """Summary metrics for the strategy's primary engine, or ``None``."""
+    engine = _primary_engine(bt)
+    return bt.get_summary(engine) if engine else None
+
+
+def _primary_runs(bt):
+    """Run list for the strategy's primary engine (empty list if none)."""
+    engine = _primary_engine(bt)
+    return bt.get_runs(engine) if engine else []
+
+
 def _strategy_summary(bt):
     """Build a summary dict for one Backtest."""
-    s = bt.backtest_summary
+    s = _primary_summary(bt)
     summary = {}
     if s:
         summary = s.to_dict()
     return {
         "algorithm_id": bt.algorithm_id,
         "parameters": bt.parameters or {},
-        "num_windows": len(bt.backtest_runs),
+        "num_windows": len(_primary_runs(bt)),
         "summary": summary,
     }
 
 
 def _metrics_table(bt):
     """Build a markdown metrics table for a strategy."""
-    s = bt.backtest_summary
+    s = _primary_summary(bt)
     if not s:
         return "No summary metrics available."
     d = s.to_dict()
@@ -151,7 +176,7 @@ def _trading_activity_table(backtests, tags=None):
     )
     rows = [header, sep]
     for bt in backtests:
-        s = bt.backtest_summary
+        s = _primary_summary(bt)
         tag_col = ""
         if has_tags:
             t = (tags or {}).get(bt.algorithm_id, '')
@@ -190,7 +215,7 @@ def _ranking_table(
     has_tags = tags and any(tags.values())
     entries = []
     for bt in backtests:
-        s = bt.backtest_summary
+        s = _primary_summary(bt)
         val = getattr(s, metric, None) if s else None
         entries.append({
             "algorithm_id": bt.algorithm_id,
@@ -821,7 +846,7 @@ def _symbol_breakdown(bt):
 
 def _return_scenarios(bt):
     """Return scenario analysis (best/worst month/year, etc.)."""
-    s = bt.backtest_summary
+    s = _primary_summary(bt)
     md = ""
     if not s:
         return "No summary data."
@@ -1029,7 +1054,7 @@ def _filter_strategies(backtests, conditions):
     }
     result = []
     for bt in backtests:
-        s = bt.backtest_summary
+        s = _primary_summary(bt)
         if not s:
             continue
         passes = True
@@ -2172,7 +2197,7 @@ class BacktestMCPServer:
                     "|-----------|------------|"
                 )
             for bt in backtests:
-                s = bt.backtest_summary
+                s = _primary_summary(bt)
                 tag = self._bt_tags.get(
                     bt.algorithm_id, ''
                 )
@@ -2295,8 +2320,8 @@ class BacktestMCPServer:
             if not bt_b:
                 return f"Strategy '{b_id}' not found."
 
-            sa = bt_a.backtest_summary
-            sb = bt_b.backtest_summary
+            sa = _primary_summary(bt_a)
+            sb = _primary_summary(bt_b)
             md = f"# {a_id} vs {b_id}\n\n"
 
             metrics = [
@@ -2795,7 +2820,7 @@ class BacktestMCPServer:
                 "|----------|---------------|\n"
             )
             for bt in matched:
-                s = bt.backtest_summary
+                s = _primary_summary(bt)
                 if s:
                     md += (
                         f"| {bt.algorithm_id} "
@@ -2876,7 +2901,7 @@ class BacktestMCPServer:
             md += "| Strategy | CAGR | Sharpe | Trades/Yr |\n"
             md += "|----------|------|--------|----------|\n"
             for bt in matched:
-                s = bt.backtest_summary
+                s = _primary_summary(bt)
                 if s:
                     md += (
                         f"| {bt.algorithm_id} "

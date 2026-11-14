@@ -1,13 +1,19 @@
 import os
 import tempfile
 import shutil
-from datetime import datetime, timezone
-from unittest import TestCase
+import subprocess
+from contextlib import redirect_stdout
+from datetime import datetime, timedelta, timezone
+from io import StringIO
+from pathlib import Path
+from unittest import TestCase, skipUnless
 
 from investing_algorithm_framework.app.reporting import BacktestReport
+from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
 from investing_algorithm_framework.domain import (
     Backtest, BacktestRun, BacktestMetrics, PortfolioSnapshot,
-    BacktestDateRange, OperationalException,
+    BacktestDateRange, OperationalException, PositionSnapshot,
+    Order, Trade,
 )
 
 
@@ -31,11 +37,17 @@ def _make_backtest(algorithm_id="test_algo", n_runs=1, with_metrics=True):
                 unallocated=200,
             ),
         ]
+        window = BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=start,
+                end_date=end,
+                name=f"window_{j}",
+            )
+        )
         metrics = None
         if with_metrics:
             metrics = BacktestMetrics(
-                backtest_start_date=start,
-                backtest_end_date=end,
+                backtest_window=window,
                 equity_curve=[
                     (1000, start),
                     (1200, end),
@@ -71,14 +83,11 @@ def _make_backtest(algorithm_id="test_algo", n_runs=1, with_metrics=True):
             )
         runs.append(
             BacktestRun(
-                backtest_start_date=start,
-                backtest_end_date=end,
-                backtest_date_range_name=f"window_{j}",
+                backtest_window=window,
                 orders=[],
                 trades=[],
                 positions=[],
                 portfolio_snapshots=snapshots,
-                trading_symbol="EUR",
                 initial_unallocated=1000,
                 created_at=datetime.now(tz=timezone.utc),
                 backtest_metrics=metrics,
@@ -86,7 +95,7 @@ def _make_backtest(algorithm_id="test_algo", n_runs=1, with_metrics=True):
         )
     return Backtest(
         algorithm_id=algorithm_id,
-        backtest_runs=runs,
+        vector_runs=runs,
         risk_free_rate=0.0,
     )
 
@@ -119,6 +128,58 @@ class TestBacktestReportInit(TestCase):
         report = BacktestReport()
         with self.assertRaises(OperationalException):
             report.show()
+
+
+class TestBacktestReportPrettyPrint(TestCase):
+
+    def test_omits_signal_rejections_when_empty(self):
+        output = StringIO()
+
+        with redirect_stdout(output):
+            BacktestReport(backtests=[_make_backtest()]).pretty_print()
+
+        self.assertEqual(output.getvalue(), "")
+
+    def test_prints_signal_rejection_summary(self):
+        backtest = _make_backtest(n_runs=2)
+        first_run, second_run = backtest.vector_runs
+        first_run.signal_events = [
+            {
+                "date": datetime(2023, 1, 2, tzinfo=timezone.utc),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "cooldown",
+            },
+            {
+                "date": datetime(2023, 1, 3, tzinfo=timezone.utc),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "already_in_position",
+            },
+        ]
+        second_run.signal_events = [
+            {
+                "date": datetime(2023, 2, 2, tzinfo=timezone.utc),
+                "symbol": "ETH",
+                "signal": "sell",
+                "executed": False,
+                "reason": "cooldown",
+            },
+        ]
+        output = StringIO()
+
+        with redirect_stdout(output):
+            BacktestReport(backtests=[backtest]).pretty_print()
+
+        self.assertEqual(
+            output.getvalue(),
+            "Signal rejections:\n"
+            "  already_in_position : 1\n"
+            "  cooldown            : 2\n"
+            "  Total rejected      : 3\n",
+        )
 
 
 class TestBacktestReportHtml(TestCase):
@@ -259,8 +320,94 @@ class TestBacktestReportDataTransform(TestCase):
         self.assertIn("YR", r)
         self.assertIn("MONTHLY_HEATMAP", r)
         self.assertIn("TRADES", r)
+        self.assertIn("SIGNAL_REJECTIONS", r)
         self.assertIn("metrics", r)
         self.assertIn("snapshot", r)
+
+    def test_run_data_includes_net_gross_and_side_exposure(self):
+        run = self.report.backtests[0].vector_runs[0]
+        snapshots = run.portfolio_snapshots.materialize()
+        snapshots[-1].position_snapshots = [PositionSnapshot(
+            symbol="BTC/EUR",
+            amount=0.5,
+            cost=200.0,
+            long_amount=2.0,
+            short_amount=1.5,
+            long_cost=200.0,
+            short_cost=165.0,
+        )]
+        run.portfolio_snapshots = snapshots
+
+        snapshot = self.report._build_run_data()["run-0-0"]["snapshot"]
+
+        self.assertEqual(200.0, snapshot["long_exposure"])
+        self.assertEqual(165.0, snapshot["short_exposure"])
+        self.assertEqual(35.0, snapshot["net_exposure"])
+        self.assertEqual(365.0, snapshot["gross_exposure"])
+
+    def test_run_data_includes_only_rejected_signal_events(self):
+        report = BacktestReport(backtests=[_make_backtest()])
+        run = report.backtests[0].vector_runs[0]
+        run.signal_events = [
+            {
+                "date": datetime(2023, 1, 2, 8, 30, tzinfo=timezone.utc),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": False,
+                "reason": "cooldown",
+            },
+            {
+                "date": datetime(2023, 1, 3, tzinfo=timezone.utc),
+                "symbol": "BTC",
+                "signal": "buy",
+                "executed": True,
+                "reason": "executed",
+            },
+        ]
+
+        rejections = report._build_run_data()[
+            "run-0-0"
+        ]["SIGNAL_REJECTIONS"]
+
+        self.assertEqual(rejections, [{
+            "date": "2023-01-02T08:30:00+00:00",
+            "sym": "BTC",
+            "signal": "buy",
+            "reason": "cooldown",
+        }])
+
+    def test_html_renders_rejections_as_grey_x_markers(self):
+        html = self.report._build_html()
+
+        self.assertIn("p.series === 'rejected'", html)
+        self.assertIn("color: '#9ca3af', shape: 'x'", html)
+        self.assertIn("ctx.lineWidth = 1", html)
+
+    def test_run_data_preserves_intraday_trade_and_order_timestamps(self):
+        opened = datetime(2023, 1, 2, 8, 30, tzinfo=timezone.utc)
+        updated = opened + timedelta(hours=1)
+        closed = opened + timedelta(hours=2)
+        order = Order(
+            order_type="LIMIT", order_side="BUY", amount=1, price=100,
+            target_symbol="BTC", trading_symbol="EUR",
+            created_at=opened, updated_at=updated,
+        )
+        trade = Trade(
+            id=1, orders=[order], target_symbol="BTC", trading_symbol="EUR",
+            opened_at=opened, closed_at=closed, open_price=100,
+            amount=1, available_amount=0, cost=100, remaining=0,
+            filled_amount=1, status="CLOSED",
+        )
+        run = self.report.backtests[0].vector_runs[0]
+        run.orders = [order]
+        run.trades = [trade]
+
+        data = self.report._build_run_data()["run-0-0"]
+
+        self.assertEqual(data["TRADES"][0]["opened"], opened.isoformat())
+        self.assertEqual(data["TRADES"][0]["closed"], closed.isoformat())
+        self.assertEqual(data["ORDERS"][0]["created"], opened.isoformat())
+        self.assertEqual(data["ORDERS"][0]["updated"], updated.isoformat())
 
     def test_windows_meta(self):
         windows = self.report._build_windows_meta()
@@ -299,6 +446,177 @@ class TestBacktestReportDataTransform(TestCase):
         run_data = report._build_run_data()
         self.assertIn("run-0-0", run_data)
         self.assertIn("run-1-0", run_data)
+
+    def test_dual_engine_backtest_produces_two_strategy_entries(self):
+        """Stage 6: vector + event slots render as separate pages."""
+        bt = _make_backtest("dual", n_runs=1)
+        # Promote the legacy compat-shimmed runs into both engines.
+        vector_runs = list(bt.vector_runs)
+        bt.event_runs = list(vector_runs)
+        bt.vector_summary = None
+        bt.event_summary = None
+        # Sanity: bundle now reports both engines populated.
+        self.assertEqual(sorted(bt.engines()), ["event", "vector"])
+
+        report = BacktestReport(backtests=[bt])
+        strategies = report._build_strategies_data()
+        self.assertEqual(len(strategies), 2)
+        names = {s["name"] for s in strategies}
+        self.assertIn("dual (vector)", names)
+        self.assertIn("dual (event)", names)
+        # Strategy IDs stay contiguous across engine views.
+        self.assertEqual(strategies[0]["id"], "strat-0")
+        self.assertEqual(strategies[1]["id"], "strat-1")
+        # Each engine view owns its own run IDs.
+        run_data = report._build_run_data()
+        self.assertIn("run-0-0", run_data)
+        self.assertIn("run-1-0", run_data)
+
+        html = report._build_html()
+        # Dual-engine bundle behaves as a comparison view.
+        self.assertIn("const IS_SINGLE = false", html)
+        self.assertIn("dual (vector)", html)
+        self.assertIn("dual (event)", html)
+
+    def test_separate_engine_bundles_have_distinct_labels(self):
+        vector = _make_backtest("same_algo")
+        event = Backtest(
+            algorithm_id="same_algo", event_runs=list(vector.vector_runs),
+        )
+        report = BacktestReport(backtests=[vector, event])
+
+        strategies = report._build_strategies_data()
+
+        self.assertEqual(
+            [strategy["name"] for strategy in strategies],
+            ["same_alg (vector)", "same_alg (event)"],
+        )
+        self.assertEqual(
+            set(report._build_run_data()), {"run-0-0", "run-1-0"},
+        )
+
+
+@skipUnless(shutil.which("node"), "Dashboard behavior tests require Node.js")
+class TestDashboardJavascript(TestCase):
+    def run_javascript(self, code):
+        dashboard = Path(__file__).parents[3] / (
+            "investing_algorithm_framework/app/reporting/templates/dashboard.js"
+        )
+        harness = """
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+function load(name) {
+  const start = source.indexOf('function ' + name + '(');
+  assert.ok(start >= 0, name);
+  const end = source.indexOf('\\nfunction ', start + 1);
+  vm.runInThisContext(source.slice(start, end < 0 ? source.length : end));
+}
+global.initCollapseButtons = () => {};
+"""
+        result = subprocess.run(
+            ["node", "-e", harness + code, str(dashboard)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_monthly_returns_compound_in_rows_and_heatmap(self):
+        self.run_javascript("""
+load('compoundMonthlyReturns');
+load('buildStratMonthlyReturns');
+load('buildCompareMonthlyReturns');
+global.STRATEGIES = [
+  {name: 'vector', runIds: ['run'], runNameMap: {}},
+  {name: 'event', runIds: ['run'], runNameMap: {}},
+];
+global.stratSelectedRun = {};
+global.stratMonthlyData = {};
+global.stratMonthlyDisplay = {};
+global.stratMonthlyYear = {};
+global.compareMonthlyData = 'returns';
+global.compareMonthlyYear = 'all';
+global.challengerIdx = -1;
+global.getViewRunData = () => RUN_DATA.run;
+const container = {innerHTML: ''};
+global.document = {getElementById: () => container};
+for (const [months, expected] of [
+  [{1: 10, 2: -10}, '-1.0%'],
+  [{1: 10, 3: 10}, '+21.0%'],
+  [{1: -100, 2: 50}, '-100.0%'],
+]) {
+  global.RUN_DATA = {run: {MONTHLY_HEATMAP: {2024: months}}};
+  for (const display of ['rows', 'heatmap']) {
+    stratMonthlyDisplay[0] = display;
+    buildStratMonthlyReturns(0);
+    assert.ok(container.innerHTML.includes(expected), container.innerHTML);
+    global.compareMonthlyDisplay = display;
+    buildCompareMonthlyReturns([0, 1]);
+    assert.ok(container.innerHTML.includes(expected), container.innerHTML);
+  }
+}
+""")
+
+    def test_trading_ranking_displays_hour_based_duration(self):
+        self.run_javascript("""
+load('fmtDuration');
+load('rebuildOverviewTradingActivity');
+global.selectedForCompare = new Set();
+global.tradingSortCol = null;
+global.challengerIdx = -1;
+global.STRATEGIES = [{name: 'strategy', color: '#fff'}];
+global.TRADING_COLS = [['Avg Duration', 'average_trade_duration', 'ratio', 'neutral']];
+global.getViewMetrics = () => ({average_trade_duration: 16.128});
+const container = {innerHTML: ''};
+global.document = {getElementById: id => id === 'overview-trading-activity' ? container : null};
+rebuildOverviewTradingActivity();
+assert.ok(container.innerHTML.includes('16h'), container.innerHTML);
+assert.ok(!container.innerHTML.includes('16.1d'));
+""")
+
+    def test_equity_correlations_align_dates_and_keep_engine_labels(self):
+        self.run_javascript("""
+load('equityCorrelation');
+load('buildCorrelationMatrix');
+load('buildCompareCorrelation');
+const a = [[0, '2024-01-01'], [1, '2024-01-02'], [9, '2024-01-02'], [5, '2024-01-03']];
+const b = [[-100, '2023-12-31'], [0, '2024-01-01'], [18, '2024-01-02'], [10, '2024-01-03']];
+assert.equal(equityCorrelation(a, b), 1);
+assert.equal(equityCorrelation(a, b.slice(0, 2)), null);
+assert.equal(equityCorrelation(a, [[1, '2024-01-01'], [1, '2024-01-02'], [1, '2024-01-03']]), null);
+global.STRATEGIES = [{name: 'confluen (vector)'}, {name: 'confluen (event)'}];
+global.selectedRunView = 'window';
+global.selectedForCompare = new Set([0, 1]);
+global.getViewEquity = i => i === 0 ? a : b;
+global.getViewRunData = i => ({EQ: getViewEquity(i)});
+const container = {innerHTML: ''};
+global.document = {getElementById: () => container};
+for (const render of [buildCorrelationMatrix, () => buildCompareCorrelation([0, 1])]) {
+  render();
+  for (const strategy of STRATEGIES) {
+    assert.ok(container.innerHTML.includes('>' + strategy.name + '</th>'), container.innerHTML);
+  }
+}
+""")
+
+    def test_timeline_retains_asset_on_redraw_and_clears_missing_asset(self):
+        self.run_javascript("""
+load('buildTimelineScatter');
+global.getStratRunData = () => ({
+  ORDERS: [{created: '2024-01-01T08:00:00+00:00', price: 100, sym: 'BTC', side: 'BUY'}],
+});
+const container = {innerHTML: ''};
+const select = {value: 'BTC', addEventListener: () => {}};
+global.document = {getElementById: id => id === 'strat-0-timeline-scatter' ? container : select};
+let selected;
+global._drawTimelineCanvas = (sid, points, symbol) => {selected = symbol;};
+buildTimelineScatter(0);
+assert.equal(selected, 'BTC');
+assert.ok(container.innerHTML.includes('value="BTC" selected'));
+select.value = 'ETH';
+buildTimelineScatter(0);
+assert.equal(selected, '');
+""")
 
 
 class TestBacktestReportOpen(TestCase):

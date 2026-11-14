@@ -7,6 +7,7 @@ from investing_algorithm_framework.infrastructure.models import SQLPosition, \
 from investing_algorithm_framework.infrastructure.database import Session
 
 from .repository import Repository
+from .event_memory import event_memory_routed
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -25,6 +26,10 @@ class SQLTradeRepository(Repository):
         )
         trading_symbol = self.get_query_param("trading_symbol", query_params)
         order_id_query_param = self.get_query_param("order_id", query_params)
+        opened_at_gte = self.get_query_param("opened_at_gte", query_params)
+
+        if opened_at_gte is not None:
+            query = query.filter(SQLTrade.opened_at >= opened_at_gte)
 
         if order_id_query_param:
             query = query.filter(SQLTrade.orders.any(id=order_id_query_param))
@@ -37,10 +42,10 @@ class SQLTradeRepository(Repository):
             if portfolio is None:
                 raise ApiException("Portfolio not found")
 
-            # Query trades belonging to the portfolio
-            query = db.query(SQLTrade).join(SQLOrder, SQLTrade.orders) \
-                .join(SQLPosition, SQLOrder.position_id == SQLPosition.id) \
-                .filter(SQLPosition.portfolio_id == portfolio.id)
+            positions = db.query(SQLPosition.id).filter(
+                SQLPosition.portfolio_id == portfolio.id)
+            query = query.filter(SQLTrade.orders.any(
+                SQLOrder.position_id.in_(positions)))
 
         if status_query_param:
             status = TradeStatus.from_value(status_query_param)
@@ -57,6 +62,7 @@ class SQLTradeRepository(Repository):
 
         return query
 
+    @event_memory_routed
     def add_order_to_trade(self, trade, order):
         with Session() as db:
             try:

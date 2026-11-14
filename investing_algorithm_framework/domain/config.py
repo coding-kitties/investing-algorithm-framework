@@ -8,12 +8,31 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 class Environment(Enum):
     """
-    Class TimeUnit: Enum for data_provider base type
+    Execution environment, independent of the application's hosting platform.
     """
-    DEV = 'DEV'
     PROD = 'PROD'
+    PAPER = 'PAPER'
     TEST = 'TEST'
     BACKTEST = 'BACKTEST'
+
+    @classmethod
+    def for_portfolios(cls, environment, portfolios):
+        environment = (
+            environment if isinstance(environment, cls)
+            else cls.from_string(environment)
+        )
+        modes = {portfolio.paper_trading for portfolio in portfolios}
+        if len(modes) > 1:
+            raise OperationalException(
+                "Mixed real and paper portfolios are not supported."
+            )
+        if environment in (cls.TEST, cls.BACKTEST):
+            return environment
+        if environment == cls.PAPER and modes == {False}:
+            raise OperationalException(
+                "PAPER requires paper_trading=True on every portfolio."
+            )
+        return cls.PAPER if modes == {True} else environment
 
     # Static factory method to convert
     # a string to environment

@@ -34,7 +34,7 @@ def create_mock_backtest_metrics(
     calmar_ratio=1.2,
     profit_factor=2.0,
     annual_volatility=0.15,
-    max_drawdown=-0.10,
+    max_drawdown=0.10,
     max_drawdown_duration=30,
     trades_per_year=50,
     win_rate=60.0,
@@ -362,32 +362,40 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         self.assertEqual(result.number_of_trades_closed, 20)
 
     # ==========================================================
-    # Percentage Returns (Compounded)
+    # Percentage Returns (Money-Weighted, Overlap-Safe)
     # ==========================================================
 
-    def test_percentage_returns_compounded(self):
-        """Test that percentage returns are compounded, not summed."""
-        # Period 1: 10%, Period 2: 10% (decimals: 0.10)
-        # Compounded: (1.1 * 1.1) - 1 = 0.21 (21%), NOT 0.20
+    def test_percentage_returns_money_weighted(self):
+        """Aggregate net-gain % is sum(PnL) / sum(initial capital).
+
+        Each per-run backtest restarts at ``initial_unallocated`` and
+        is independent, so chained compounding is fictional.
+        Rolling windows further overlap, which would double-count
+        calendar periods. The aggregate uses the same definition as
+        the per-run metric (PnL / capital) but at bundle scale.
+        """
+        # Each run: net gain 100 on initial 1000 = 10%.
+        # Bundle: 200 / 2000 = 10% (NOT 21% from chained compounding).
         metrics1 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
         metrics2 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
         self.assertAlmostEqual(
-            result.total_net_gain_percentage, 0.21, places=4
+            result.total_net_gain_percentage, 0.10, places=4
         )
 
-    def test_growth_percentage_compounded(self):
-        """Test that growth percentage is compounded."""
+    def test_growth_percentage_money_weighted(self):
+        """Growth % uses the same money-weighted definition."""
         metrics1 = create_mock_backtest_metrics(total_growth_percentage=0.20)
         metrics2 = create_mock_backtest_metrics(total_growth_percentage=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
-        # (1.2 * 1.1) - 1 = 0.32
+        # mock helper sets total_growth=100 and initial_unallocated=1000
+        # for each run, so aggregate growth % = 200 / 2000 = 0.10.
         self.assertAlmostEqual(
-            result.total_growth_percentage, 0.32, places=4
+            result.total_growth_percentage, 0.10, places=4
         )
 
     # ==========================================================
@@ -439,6 +447,10 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
 
         # Equal weights: (0.20 + 0.10) / 2 = 0.15
         self.assertAlmostEqual(result.cagr, 0.15, places=5)
+        self.assertAlmostEqual(
+            result.duration_weighted_mean_window_cagr, 0.15, places=5
+        )
+        self.assertIsNone(result.portfolio_cagr)
 
     def test_sortino_ratio_weighted_by_time(self):
         """Test that Sortino ratio is weighted by time."""
@@ -458,16 +470,14 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
     # ==========================================================
 
     def test_max_drawdown_takes_minimum(self):
-        """Test that max drawdown takes the worst (minimum) value."""
-        # Drawdowns are negative, so -30% is worse than -10%
-        metrics1 = create_mock_backtest_metrics(max_drawdown=-0.10)
-        metrics2 = create_mock_backtest_metrics(max_drawdown=-0.30)
-        metrics3 = create_mock_backtest_metrics(max_drawdown=-0.15)
+        """Test that max drawdown takes the largest positive magnitude."""
+        metrics1 = create_mock_backtest_metrics(max_drawdown=0.10)
+        metrics2 = create_mock_backtest_metrics(max_drawdown=0.30)
+        metrics3 = create_mock_backtest_metrics(max_drawdown=0.15)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2, metrics3])
 
-        # Should be the worst (most negative): -30%
-        self.assertEqual(result.max_drawdown, -0.30)
+        self.assertEqual(result.max_drawdown, 0.30)
 
     def test_max_drawdown_duration_takes_maximum(self):
         """Test that max drawdown duration takes the longest."""
@@ -577,7 +587,7 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
             total_net_gain=1000,
             total_net_gain_percentage=0.10,
             sharpe_ratio=1.5,
-            max_drawdown=-0.15,
+            max_drawdown=0.15,
             number_of_trades=20,
             number_of_trades_closed=18,
             win_rate=60,
@@ -587,7 +597,7 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
             total_net_gain=500,
             total_net_gain_percentage=0.05,
             sharpe_ratio=1.0,
-            max_drawdown=-0.10,
+            max_drawdown=0.10,
             number_of_trades=10,
             number_of_trades_closed=8,
             win_rate=50,
@@ -601,17 +611,19 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         self.assertEqual(result.number_of_trades, 30)
         self.assertEqual(result.number_of_trades_closed, 26)
 
-        # Verify compounded percentage
-        # (1.10 * 1.05) - 1 = 0.155
+        # Verify money-weighted percentage:
+        # sum(net_gain) / sum(initial_unallocated)
+        # = (1000 + 500) / (1000 + 1000) = 0.75
         self.assertAlmostEqual(
-            result.total_net_gain_percentage, 0.155, places=4
+            result.total_net_gain_percentage, 0.75, places=4
         )
 
         # Verify weighted Sharpe (equal time weights)
         self.assertAlmostEqual(result.sharpe_ratio, 1.25, places=5)
 
         # Verify worst drawdown
-        self.assertEqual(result.max_drawdown, -0.15)
+        self.assertEqual(result.max_drawdown, 0.15)
+        self.assertEqual(result.worst_window_max_drawdown, 0.15)
 
         # Verify win rate weighted by trades
         # (60 * 18 + 50 * 8) / 26 = 1480 / 26 ≈ 56.92%
@@ -644,23 +656,31 @@ class TestGenerateBacktestSummaryMetricsCalculationValidity(unittest.TestCase):
     Tests to verify that the aggregation calculations make financial sense.
     """
 
-    def test_compounding_makes_sense_for_returns(self):
+    def test_money_weighted_aggregation_is_overlap_safe(self):
         """
-        Verify that compounding is mathematically correct for returns.
+        Verify the bundle-level percentage uses the money-weighted
+        formula (PnL / capital) rather than chained compounding.
 
-        Example: Start with $1000
-        - Period 1: +10% -> $1100
-        - Period 2: +10% -> $1210
-        Total return: ($1210 - $1000) / $1000 = 0.21 (21%), NOT 0.20
+        Per-run backtests in this framework each restart at the
+        configured initial balance and are independent, so chaining
+        ``(1+r1) * (1+r2)`` would invent compounding that never
+        actually happened. With overlapping rolling windows this also
+        double-counts calendar periods and inflates the result by
+        orders of magnitude. Money-weighted aggregation avoids both.
+
+        Example: two independent $1000 runs, each making +$100.
+          - Aggregate PnL: $200 over $2000 deployed = 10%.
+          - (Chained compounding would have given 21%, which would
+            only be correct if profits had been reinvested into a
+            single continuous run.)
         """
         metrics1 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
         metrics2 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
-        # Compound return should be 0.21 (21%)
         self.assertAlmostEqual(
-            result.total_net_gain_percentage, 0.21, places=4
+            result.total_net_gain_percentage, 0.10, places=4
         )
 
     def test_weighted_average_makes_sense_for_ratios(self):
@@ -690,16 +710,113 @@ class TestGenerateBacktestSummaryMetricsCalculationValidity(unittest.TestCase):
         """
         Verify that taking worst drawdown makes financial sense.
 
-        If one period had -30% drawdown and another had -10%,
-        the combined worst case is -30%, not an average.
+        If one period had 30% drawdown and another had 10%,
+        the combined worst case is 30%, not an average.
         """
-        metrics1 = create_mock_backtest_metrics(max_drawdown=-0.30)
-        metrics2 = create_mock_backtest_metrics(max_drawdown=-0.10)
+        metrics1 = create_mock_backtest_metrics(max_drawdown=0.30)
+        metrics2 = create_mock_backtest_metrics(max_drawdown=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
         # Should be the worst case
-        self.assertEqual(result.max_drawdown, -0.30)
+        self.assertEqual(result.max_drawdown, 0.30)
+
+    def test_positive_drawdown_magnitudes_select_largest_value(self):
+        metrics = [
+            create_mock_backtest_metrics(max_drawdown=value)
+            for value in (0.10, 0.40, 0.20)
+        ]
+
+        result = generate_backtest_summary_metrics(metrics)
+
+        self.assertEqual(result.max_drawdown, 0.40)
+        self.assertEqual(result.worst_window_max_drawdown, 0.40)
+
+    def test_consistently_signed_legacy_drawdowns_are_migrated(self):
+        metrics = [
+            create_mock_backtest_metrics(max_drawdown=value)
+            for value in (-0.10, -0.40, -0.20)
+        ]
+
+        result = generate_backtest_summary_metrics(metrics)
+
+        self.assertEqual(result.worst_window_max_drawdown, 0.40)
+
+    def test_mixed_drawdown_sign_conventions_are_rejected(self):
+        metrics = [
+            create_mock_backtest_metrics(max_drawdown=0.10),
+            create_mock_backtest_metrics(max_drawdown=-0.20),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "mixed max_drawdown"):
+            generate_backtest_summary_metrics(metrics)
+
+    def test_saved_three_window_example_uses_independent_window_semantics(self):
+        metrics = [
+            create_mock_backtest_metrics(
+                total_net_gain=-357.6371548259061,
+                total_net_gain_percentage=-0.3576371548259061,
+                initial_unallocated=1000.0,
+                cagr=-0.9322882280,
+                max_drawdown=0.4847104799801503,
+                total_number_of_days=60,
+            ),
+            create_mock_backtest_metrics(
+                total_net_gain=262.8139376550828,
+                total_net_gain_percentage=0.2628139376550828,
+                initial_unallocated=1000.0,
+                cagr=2.9499778284,
+                max_drawdown=0.3043275888,
+                total_number_of_days=62,
+            ),
+            create_mock_backtest_metrics(
+                total_net_gain=472.54325839797843,
+                total_net_gain_percentage=0.47254325839797843,
+                initial_unallocated=1000.0,
+                cagr=9.9582976849,
+                max_drawdown=0.1793435908,
+                total_number_of_days=59,
+            ),
+        ]
+
+        result = generate_backtest_summary_metrics(
+            metrics, expected_window_count=3
+        )
+
+        self.assertAlmostEqual(
+            result.capital_weighted_window_return,
+            0.1259066804090517,
+        )
+        self.assertAlmostEqual(result.median_window_return, 0.2628139376550828)
+        self.assertAlmostEqual(result.worst_window_return, -0.3576371548259061)
+        self.assertAlmostEqual(result.best_window_return, 0.47254325839797843)
+        self.assertAlmostEqual(
+            result.worst_window_max_drawdown, 0.4847104799801503
+        )
+        self.assertEqual(result.number_of_profitable_windows, 2)
+        self.assertAlmostEqual(result.mean_window_duration_days, 181 / 3)
+        self.assertEqual(result.aggregation_semantics_version, 2)
+        self.assertEqual(result.aggregation_mode, "independent_windows")
+        self.assertEqual(result.window_count_evaluated, 3)
+        self.assertEqual(result.window_count_expected, 3)
+        self.assertTrue(result.complete)
+        self.assertIsNone(result.portfolio_cagr)
+
+    def test_missing_capital_makes_capital_weighted_return_unavailable(self):
+        metrics1 = create_mock_backtest_metrics(
+            total_net_gain=100.0, initial_unallocated=1000.0
+        )
+        metrics2 = create_mock_backtest_metrics(
+            total_net_gain=50.0, initial_unallocated=None
+        )
+
+        result = generate_backtest_summary_metrics([metrics1, metrics2])
+
+        self.assertIsNone(result.total_net_gain_percentage)
+        self.assertIsNone(result.capital_weighted_window_return)
+        self.assertIsNotNone(
+            result.capital_weighted_return_unavailable_reason
+        )
 
     def test_win_rate_weighted_by_trades_makes_sense(self):
         """

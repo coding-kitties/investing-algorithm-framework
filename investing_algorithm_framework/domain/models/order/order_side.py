@@ -4,6 +4,13 @@ from enum import Enum
 class OrderSide(Enum):
     SELL = 'SELL'
     BUY = 'BUY'
+    # Short selling (#433 / #434). SHORT opens a short position
+    # (the underlying broker action is a sell), COVER closes one
+    # (the underlying broker action is a buy). Honoured by the
+    # vector backtest engine today; event-engine support arrives
+    # in phases of #434.
+    SHORT = 'SHORT'
+    COVER = 'COVER'
 
     @staticmethod
     def from_string(value: str):

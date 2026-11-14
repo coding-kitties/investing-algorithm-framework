@@ -1,0 +1,832 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Fixed
+
+- Order-amount rounding now handles scientific notation (#634).
+- Optional amount precision is consistent across generic, short/cover and
+  buy/sell convenience order APIs. Value-based sizing is rounded after
+  conversion, and trade closing rounds after clamping to the position.
+  Orders rounded to zero fail explicitly; zero target adjustments remain
+  no-ops. Omitting precision preserves existing sizing.
+
+## [9.0.0a22] - 2026-09-30
+
+### Fixed
+
+- Native raw-equity drawdown calculations now preserve losses at zero or
+  negative equity after a positive high-water mark, while cash-flow-adjusted
+  TWR drawdowns retain their existing nonpositive-value handling. The Rust
+  backend now matches the Python reference implementation across supported
+  platforms and Python versions.
+
+## [9.0.0a21] - 2026-09-26
+
+### Added
+
+- Backtest summaries now persist versioned independent-window aggregation
+  semantics, explicit capital-weighted/median/best/worst window returns,
+  evaluated-window counts, mean window duration, and explicitly named
+  duration-weighted window statistics. Portfolio metrics remain unavailable
+  unless a portfolio path exists, and legacy ratio fields remain readable as
+  compatibility aliases.
+- Sequential optimization batches now share a bounded, search-scoped prepared
+  market-data context for providers that explicitly opt in. CCXT OHLCV vector
+  runs reuse prepared full-range frames without rebuilding per-timestamp
+  rolling windows, while custom providers retain their existing lifecycle.
+- Terminal optimizer observations now include optional, versioned evaluation
+  evidence for completed, pruned and partially failed candidates. Evidence
+  records stable evaluation identity, resolved parameters, study/engine scope,
+  exact completed windows, scalar run metrics, framework-generated cumulative
+  summaries, consumed/required window counts and structured stop reasons.
+  Pruned and failed trials retain `score=None`; existing optimizer plugins can
+  ignore the additive field.
+
+### Fixed
+
+- Multi-window summaries now report the largest positive drawdown magnitude as
+  worst-window maximum drawdown instead of selecting the smallest magnitude.
+- Percentage drawdown keeps nonpositive equity observations after a positive
+  high-water mark, so leveraged losses can exceed 100% instead of being hidden.
+- Summary tables no longer label averaged window ratios as portfolio CAGR,
+  Sharpe, Sortino, or Calmar, and now use a real mean-window-duration field.
+- Vector and event runners select matching result checkpoints before data
+  registration and preparation, so fully checkpointed windows perform no
+  market-data preparation and pruned searches do not prepare later windows.
+
+## [9.0.0a20] - 2026-09-25
+
+### Added
+
+- Parameter optimizers can opt in to ordered `initial_parameters`, allowing a
+  known baseline to be evaluated before ordinary proposals through the same
+  `ask()`/`tell()` lifecycle. Initial points use normal resolution,
+  constraints, deduplication, budgets, trial records and checkpoint recovery;
+  changed points invalidate resume context, and unsupported optimizers fail
+  explicitly.
+- The optimization guide documents baseline-first bounded searches, objective
+  scoring from candidate summary metrics, optional access to individual
+  window metrics, and the distinction between initial candidates and random
+  number generator seeds.
+
+## [9.0.0a19] - 2026-09-25
+
+### Fixed
+
+- Streaming storage syncs directory metadata only on POSIX, matching the
+  definition store; file flushes remain enabled on Windows and use a writable
+  stream-index handle without truncating recorded data.
+- Windows test fixtures use UTF-8 notebook reads, portable mocked cgroup paths,
+  and explicit SQLite cleanup for checkpoint, optimizer, and memory comparisons.
+- Session-index persistence uses a writable flush handle for Windows.
+- Native parity tests respect the Python 3.12+ dynamic-sizing contract and
+  verify rejection and automatic fallback on older Python versions.
+- Temporary backtest tests release SQLite connections before directory cleanup.
+- Tutorial tests locate executable cells independently of notebook ID rewriting;
+  notebook magic mocks resolve consistently on Python 3.10.
+- The confluence example explicitly names its RSI output for compatibility with
+  the pinned indicator dependency.
+
+## [9.0.0a18] - 2026-09-23
+
+### Release Scope
+
+- Python remains the default and reference implementation. Rust stays an
+  optional, explicitly selected backend; installing it does not change defaults.
+  No general Rust speedup, Python-free engine, or hard whole-process memory
+  limit is promised. A stable release requires verified cross-platform gates.
+
+### Added
+
+- The Rust event backend now owns the archive's disk-backed scalar query index,
+  FIFO/explicit SELL reservation plans, lifecycle phase ordering, scheduled tick
+  traversal and market evaluation traversal. Native candle selection is enabled
+  automatically for this backend. Strategies, providers, custom fill models and
+  persistence remain Python adapters; this is not Python-free execution.
+  New `event-lifecycle-v1` and `event-archive-v2` capabilities require rebuilding
+  older extensions. The native wheel now bundles SQLite through rusqlite.
+- Strict opt-in `event_state_backend="rust"` for archive-backed event accounting
+  and built-in long/short fixed/trailing risk transitions. Actual services use
+  native order, exit, allocation and fee calculations; workers and callbacks
+  share the persisted state. Batched SELL/COVER planners now consume allocations,
+  apply explicit COVER priority and finalize trade/position/portfolio settlement
+  in Rust. Python retains candidate queries, entry reservations, persistence
+  and lifecycle orchestration. The extension requires `event-settlement-v1`
+  in addition to `event-accounting-v1`; incompatible builds fail before execution
+  without replay. Exact parity passes; no general speed or RSS gain is established.
+- Optional Rust kernels for confluence batches, eligible vector NETTING runs,
+  risk metrics, event fill selection and event timestamp traversal. Python
+  remains the default. The separate native broker is an unintegrated prototype,
+  not a replacement event engine.
+- Optional Python memory-state backtests with disk-backed snapshots, orders,
+  trades, allocations and risk rules. Sparse SQLite indexes support detached
+  reads, filtered queries and late corrections without retaining all history
+  objects. Verified workloads avoid ORM tick queries, not all SQLite I/O.
+  Active result sets, individual records and write batches are not capped;
+  this is not a whole-engine memory bound or native accounting integration.
+- Versioned language-neutral decision records and a local bounded chunk-writer
+  capability with manifests and atomic publication. Complete integration across
+  event/vector histories and retention policies remains open.
+- Paired fresh-process benchmarks reporting execution/metric runtime, worker
+  and process-tree peak RSS, exact result parity and persistence differences.
+  The latest long-vector improvement comes from Python metric optimization;
+  72 subsequent Python/Rust comparisons preserve exact execution parity but
+  establish no consistent Rust runtime or peak-memory advantage.
+
+### Changed
+
+- Shared event/vector provider conversion uses serial Arrow conversion for
+  frames up to 10,000 rows and avoids redundant deduplication copies when
+  indexed timestamps are unique. Larger frames retain the original path.
+  Event cooldown scans filter orders after the existing watermark in SQL,
+  Python archives and Rust archives; archive timestamp indexes avoid decoding
+  old rows. Python vector cooldown checks skip signal-free sides while keeping
+  same-bar post-fill checks. Native event users must rebuild for
+  `event-archive-v2`. Year-long real-provider comparisons preserve exact results;
+  event execution improves on the measured workload, while vector timings are
+  mixed and do not establish an overall speedup.
+- Archive decoding bulk-loads fresh detached scalar state while retaining
+  relationship instrumentation and subsequent edit/save tracking. Alternating
+  RSS-free BTC/DOT EMA runs show 9.8% and 10.4% lower median execution time over
+  365 and 650 days with exact result/bundle parity. This reduces Python overhead
+  on the Rust event backend; it is not a general Rust-versus-Python speed claim.
+- Native archive queries reuse prepared SELECT statements and avoid temporary
+  tables for up to 128 matched rows. Larger queries retain the bounded prefix
+  and spool only the remainder. Snapshot ordering and interleaved-update reads
+  are preserved. Small-query microbenchmarks improve substantially; the measured
+  30-day backtest does not establish an end-to-end speedup.
+- Archive reads avoid redundant per-row SQLite lookups and recursive copies of
+  already-detached objects, while preserving pending-graph and interleaved-write
+  behavior. Polars-to-pandas conversion avoids a redundant copy and datetime
+  parsing. Six paired event runs preserve exact results with 17.7% lower median
+  execution time on the measured workload; peak RSS is effectively unchanged.
+- Metric generation decodes trade/snapshot histories once into compact scalar
+  inputs and shares DataFrame, daily, monthly and yearly batch calculations.
+  Numeric types and exact metric values are preserved. Temporary metric memory
+  still grows with history length.
+- Python releases now depend on Python and native validation. Separate native
+  releases build platform ABI3 wheels and source distributions, with isolated
+  installation and parity checks before publishing.
+- Backtest result orders, trades, portfolio snapshots and metric time series
+  now use read-only, disk-backed `BacktestHistory` sequences by default.
+  Iteration, indexing, slicing and existing filters remain supported. Reads
+  are detached; use `.materialize()`, edit the resulting list and reassign it
+  to change a result. Scratch storage requires writable temporary disk space.
+- Bundle saves stream history records and batch metric Parquet encoding.
+  Public `to_dict()` and legacy JSON serialization still materialize history.
+  Bundle loading/merging and some metric computations remain eager; this is
+  not a whole-engine memory bound or native event-engine integration.
+
+### Fixed
+
+- Shared disk-backed histories explicitly close their temporary files when
+  the last view is collected or at normal interpreter shutdown, preventing
+  unclosed-file resource warnings without invalidating surviving slices.
+  Bundle Parquet scratch files also close when their blob wrapper is released.
+- Portfolio-filtered trade counts no longer multiply trades with multiple
+  orders, and combined portfolio/order filters preserve both constraints.
+- Live and paper bounded invocations return their persisted run report.
+  Continuous strategy ticks publish isolated reports, including no-signal
+  executions, without a duplicate shutdown summary. Failed/skipped outcomes
+  are explicit; synchronous failures still raise the original exception.
+  Manual invocation supports `invoke_now(wait=True, timeout=30)` and
+  `POST /api/algorithm/invoke?wait=true&timeout=30`. Waiting is correlated to
+  the requested tick; timeout does not cancel execution. Report persistence
+  requires working storage. Legacy report rows remain readable.
+- Archive numeric normalization no longer invokes legacy position setters that
+  collapsed hedge legs or retained incorrect cost after the final short cover.
+- SELL/COVER profit and closure now settle at fill time with FIFO allocation,
+  reservation release, partial fills and cumulative quote-fee reconciliation,
+  including late corrections. Hooks observe settled accounting. Rerun old
+  backtest checkpoints; existing live SQL ledgers need explicit reconciliation.
+- Deterministic symbol/order processing prevents generated IDs or set ordering
+  from changing capital contention and fresh-process backtest results.
+- Removed unnecessary detached relationship copies in Python memory state and
+  whole-state rollback copies in the native broker prototype.
+- Resolved all 28 findings from the full framework CI lint gate. Release
+  validation includes Rust tests, formatting, Clippy and installed-wheel parity;
+  cross-platform execution still needs its first verified GitHub run.
+
+## [9.0.0a17] — 2026-09-17
+
+### Added
+
+- **Declarative confluence scoring cards**: strategies can compose state and
+  crossover conditions with `AllOf`, `AnyOf`, `Not`, and `AtLeast`, then apply
+  primary qualification, hard requirements, signed score rules, vetoes, and a
+  minimum threshold. Definitions are versioned and JSON round-trippable, and
+  `DecisionTrace.from_confluence_result()` projects each decision into the existing
+  audit/reporting format.
+- **Canonical decision traces**: `DecisionTrace`/`DecisionTraceEntry`,
+  `record_decision_trace()`, and `RunReport.decision_traces` now span runtime,
+  API, and persistence. Legacy ScoreCard imports, methods, metadata keys, and
+  report fields remain supported. Existing SQL history columns are retained;
+  this does not change the backtest storage format.
+- Cross-sectional pipeline, confluence-card, decision-trace, open-backtest-format,
+  and strategy-showcase examples, with corresponding Advanced Concepts guides.
+
+### Changed
+
+- Signal-card strategies can use the same declarative definitions in event and
+  vector backtests by implementing `prepare_signal_data()`.
+- Examples and documentation now use the v9 `Study`, `Universe`,
+  `BacktestWindow`, scheduling, and strategy-phase APIs consistently.
+
+### Fixed
+
+- Monte Carlo tests now retain their requested backtest window and compute
+  one-sided p-values in the correct direction for volatility and drawdown.
+- Resumed event backtests verify that checkpointed windows still exist in the
+  persisted bundle before skipping an algorithm.
+- Non-CCXT OHLCV providers now handle vector requests with window sizes and a
+  missing start date correctly.
+
+## [9.0.0a16] — 2026-09-10
+
+### Added
+
+- **Resource-bounded vector and event backtesting**: backtest sweeps can now
+  limit parallel workers, recycle worker pools, and apply soft process-tree
+  memory and system-headroom guards. Event backtests support isolated spawned
+  workers across independent algorithms, while both engines persist completed
+  work incrementally instead of retaining an entire sweep in memory.
+- **Persistent scalar backtest indexes**: public backtest runs return a
+  `BacktestIndex` backed by durable storage. Index rows expose summary metrics
+  for filtering and selection without loading full backtest bundles, and
+  `iter_backtests()` supports lazy, deduplicated loading when full results are
+  needed.
+- Scalar window and final filter callbacks for progressive pruning across
+  rolling backtest windows.
+
+### Changed
+
+- `App.run_backtest()` and `App.run_backtests()` now consistently return a
+  `BacktestIndex`. Legacy full-object filter callbacks must be migrated to
+  `window_metrics_filter_function` and `final_metrics_filter_function`.
+- Backtest storage is created automatically when no directory is supplied, so
+  index results remain available after a run completes.
+
+### Fixed
+
+- Event checkpoint fingerprints no longer change because of transient counters
+  or process-specific executor addresses.
+- Event and vector results sharing dates no longer replace one another during
+  bundle merges, and resumed indexes preserve deterministic algorithm order.
+- Serialized summaries now retain gross profit and gross loss, while restored
+  stop-loss and take-profit records preserve their trigger prices and filled
+  amounts.
+
+## [9.0.0a15] — 2026-09-08
+
+### Added
+
+- **Reuse a study straight off a loaded/previously-saved `Backtest`**:
+  `Backtest.get_study_definition(name)` returns a single
+  `copy_definition()` clone of a named study (universe, windows,
+  execution assumptions carried over, `engine_results` reset) — the
+  singular counterpart of `get_study_definitions()`. Combined with the
+  new `get_backtest(storage_dir, algorithm_id)` /
+  `get_backtests(storage_dir, algorithm_ids)` (load specific saved
+  backtests by id, e.g. the top-N winners of a prior sweep), this
+  supports running a vector parameter sweep, picking winners, then
+  event-validating a window subset of the same study and merging the
+  results back into the same `.obtf` bundle — without rebuilding the
+  `Study` by hand.
+
+### Fixed
+
+- Bundle merge-on-save (`save_bundle(..., merge=True)`) now unions a
+  same-named study's `backtest_windows` catalogue across saves instead
+  of replacing it. Previously, saving a follow-up run over a subset of
+  windows (e.g. an event-engine validation pass on just the first
+  window of a study) silently shrunk the on-disk window catalogue to
+  that subset, even though older engine runs for the dropped windows
+  were still present.
+
+## [9.0.0a14] — 2026-09-04
+
+### Added
+
+- **Broker-native mirror stop-loss/take-profit safety net**: `StopLossRule`/
+  `TakeProfitRule` gain `mirror_on_exchange` — when `True`, a resting
+  broker-native `STOP` order is placed on the exchange alongside the
+  client-side tracked rule as soon as a trade opens, so the rule keeps
+  working even if the bot is offline when the price crosses the trigger.
+  The client-side check remains the primary mechanism; the mirror order
+  is a safety net underneath it. Trade allocation/P&L accounting is
+  deferred until the mirror order is actually observed to fill, so a
+  merely-resting order never prematurely closes a trade. Whichever side
+  fires first (mirror or client-side) cancels the other's resting order
+  for that trade — including a sibling rule's mirror order, so a
+  mirrored stop-loss and a mirrored take-profit on the same trade can
+  never double-commit the same shares or leave one another orphaned on
+  the exchange. `OrderExecutor` gains a `supports_mirror_orders`
+  capability flag (the local paper-trading executor opts out); the
+  feature is a no-op in backtests. See the new
+  "Broker-Native Mirror Stop-Loss / Take-Profit" page under Advanced
+  Concepts in the docs.
+
+### Changed
+
+- `trading_costs` moved off `TradingStrategy` onto
+  `PortfolioConfiguration`/`Study.execution_config` — trading costs are
+  now a property of the venue/scenario, not the strategy's signal logic,
+  matching how they're actually resolved for live/paper trading and
+  backtests. `trading_symbol` removed from `TradingStrategy` (`symbols`
+  is unaffected); all examples and docs updated accordingly.
+
+## [9.0.0a13] — 2026-09-01
+
+### Fixed
+
+- **`App.run_backtest()` event-driven engine required a manually-registered
+  `PortfolioConfiguration`, unlike the vector engine**: calling
+  `run_backtest(..., study=study)` with `study.engines=[BacktestEngine.EVENT_DRIVEN]`
+  raised `OperationalException: No portfolios configured` even when
+  `study.universe` (market + trading_symbol) and `study.initial_capital`
+  fully specified a portfolio — the exact same `Study` worked fine with
+  `BacktestEngine.VECTOR`. The event-driven branch now builds a default
+  `PortfolioConfiguration` from the Study the same way the vector branch
+  already did, and raises a clearer, engine-specific error message if the
+  Study still doesn't specify enough to build one.
+- **`RunReport.orders` silently dropping still-open orders**: orders were
+  only included when created or updated within the current run's time
+  window. A pending order that `check_pending_orders` re-fetched as
+  identical (no field changes) issues no UPDATE, so `updated_at` never
+  bumps and the order silently disappeared from every subsequent report
+  until it finally changed. `orders` now also includes any order that is
+  still pending, regardless of when it was last touched.
+
+### Added
+
+- **`load_backtests()`**: recursively loads every `.obtf` bundle and/or
+  legacy backtest directory found anywhere under a directory tree (a
+  single `os.walk` pass, pruned as soon as a backtest is matched), for
+  storage layouts that group backtests into nested subfolders (e.g. one
+  per study/window). `load_backtests_from_directory()` gained a matching
+  `recursive=False` parameter — `load_backtests()` is a thin
+  `recursive=True` convenience wrapper around it.
+
+## [9.0.0a12] — 2026-08-28
+
+### Fixed
+
+- **Downside-deviation-based metrics returning misleading zero/near-infinite
+  values**: `get_sortino_ratio`, `get_calmar_ratio`, and their
+  `analyze_backtest_windows` equivalents now consistently return `inf` when
+  there is no downside risk to divide by but the return is positive, and
+  `0.0` otherwise — matching the convention already used by
+  `get_profit_factor`/`get_omega_ratio`. Previously:
+  - `get_downside_std_of_daily_returns` measured the *dispersion among the
+    losing periods* rather than the shortfall over every period, so a
+    strategy with similarly-sized losses could send `sortino_ratio` toward
+    `~1e14` instead of a bounded, realistic value.
+  - A run with **no losing periods at all** reported `sortino_ratio` /
+    `calmar_ratio` of a flat `0.0`, which the HTML report then painted as
+    "Suboptimal", even though a profitable run with zero downside/drawdown
+    is an excellent outcome, not a bad one.
+
+  **Breaking**: `sortino_ratio` and `calmar_ratio` values in reports
+  generated before this release are not directly comparable to values
+  generated after it.
+
+### Added
+
+- **`<MARKET>_OVERRIDE_INITIAL_BALANCE`**: closes the same deployment-override
+  gap that `<MARKET>_OVERRIDE_API_KEY`/`_SECRET_KEY`/`_PAPER_TRADING`/
+  `_PAPER_TRADING_MODE` already covered — `initial_balance` passed to
+  `add_market()` (including a value hardcoded in an entry script) is now
+  replaced by this environment variable whenever it is set.
+
+## [9.0.0a11] — 2026-08-28
+
+### Fixed
+
+- **Missing `jinja2` runtime dependency**: the framework imports `jinja2`
+  directly (HTML backtest report generation) but did not declare it as a
+  dependency in `pyproject.toml`, causing
+  `ModuleNotFoundError: No module named 'jinja2'` in clean install
+  environments (e.g. serverless/Lambda deployments) that don't already have
+  it installed transitively. `jinja2` is now an explicit `>=3.1.6` runtime
+  dependency.
+
+## [9.0.0a10] — 2026-08-28
+
+
+### Added
+
+- **Market-scoped deployment overrides for `add_market()`**: `<MARKET>_OVERRIDE_API_KEY`,
+  `<MARKET>_OVERRIDE_SECRET_KEY`, `<MARKET>_OVERRIDE_PAPER_TRADING`, and
+  `<MARKET>_OVERRIDE_PAPER_TRADING_MODE` replace the corresponding `add_market()` argument
+  whenever set, regardless of what was explicitly passed — intended for hosting platforms that
+  need a guarantee that injected credentials/paper-mode settings take effect. The existing
+  `<MARKET>_API_KEY` and `<MARKET>_SECRET_KEY` variables keep their original, backward-compatible
+  fallback behavior (only used when the argument is `None`). `market` and `trading_symbol`
+  arguments are never affected by either mechanism.
+- **`GET /api/portfolios/order-costs`**: returns the effective order cost (fees and slippage) of
+  the connected portfolios, supporting the same query filters as `/api/portfolios`.
+- **`GET /api/portfolios/order-cost-specification`**: returns the order cost specification (the
+  fee/slippage that would apply to a *new* order) for the connected portfolios.
+
+### Removed
+
+- **`/api/backtest-results/*` endpoints and their schemas** removed in favor of the portfolio
+  order-cost endpoints above and the existing `/api/orders`, `/api/trades`, and `/api/positions`
+  endpoints, which already support backtest-scoped filtering.
+
+### Changed
+
+- `TradeOrderEvaluator` (and its backtest/default subclasses) and `PaperTradingOrderExecutor`
+  updated to support the new order cost overview/specification resolution used by the endpoints
+  above.
+
+### Docs
+
+- Corrected and restructured `Getting Started/portfolio-configuration.md` and
+  `Getting Started/credentials.md` to match current `add_market()`/`PortfolioConfiguration`
+  behavior: `.env` loading, credential/override precedence, initial balance semantics per trading
+  mode, market-level fees/slippage, HEDGE position-mode support, and local paper-trading fill
+  behavior.
+
+## [9.0.0a9] — 2026-08-27
+
+### Added
+
+- **`Schedule.every(interval, time_unit, anchor=None)`**: interval schedules now fire on fixed,
+  anchor-aligned wall-clock slots (default anchor: UNIX epoch UTC) instead of `last_run + step()`.
+  A manually/force-triggered run (`request_immediate_run()`) no longer shifts the next natural
+  scheduled run — e.g. "every 2 hours" always fires at `00:00`, `02:00`, ... regardless of when the
+  app started or a manual run happened. `Schedule.is_due`, `next_run_after`, and `iter_run_times`
+  (backtest schedule generation) all derive from the same anchor-aligned slot logic, so live and
+  backtest cadences agree.
+- **`TIMEZONE` app config**: alongside the existing `DATETIME_FORMAT`, lets logs display timestamps
+  in a local IANA timezone (e.g. `"Europe/Amsterdam"`) via the new `format_datetime_utc()` helper.
+  Applied consistently to the algorithm-level "next run" log and the per-strategy startup log.
+- Event loop now logs the next scheduled run for the algorithm as a whole (the earliest next run
+  across every registered strategy), not just per-strategy.
+
+### Fixed
+
+- **Windows CI flakiness from stale SQLite state leaking between tests**: `teardown_sqlalchemy()`
+  now calls `gc.collect()` after disposing the engine, since ORM reference cycles could keep the
+  underlying `sqlite3` connection/file handle open after `close_all_sessions()`/`engine.dispose()`.
+  Harmless on POSIX (unlinked-but-open files are still removable) but Windows' mandatory file
+  locking then blocked `shutil.rmtree()` of the database directory in test teardown, leaking a
+  contaminated database into whichever test ran next (mismatched portfolio/balance errors, missing
+  data providers) — only reproducible on Windows runners.
+- **`DATETIME_FORMAT` leaking into CCXT internals**: `CCXTOHLCVDataProvider.get_ohlcv()` used to
+  honor the app's user-facing `DATETIME_FORMAT` config when building its own CCXT API request
+  timestamps, which must stay in a fixed internal format — a custom display format (e.g.
+  `"%d-%m-%Y %H:%M:%S"`) made `ccxt.parse8601()` silently return `None`, causing
+  `'<' not supported between instances of 'NoneType' and 'NoneType'`. `DATETIME_FORMAT` now only
+  affects logging/display; CCXT request serialization always uses the fixed internal format.
+- `AlgorithmRunner`'s background loop error log now includes the traceback (`exc_info=True`)
+  instead of only the exception message, to aid diagnosing live/paper-trading crashes.
+
+## [9.0.0a8] — 2026-08-27
+
+### Added
+
+- **`RunReport.score_cards`**: a new top-level, flattened list of every `ScoreCard` recorded via
+  `TradingStrategy.record_score_card(...)` this run — each entry carries its own `strategy_id`,
+  `symbol`, `summary`, and `entries`, so a caller no longer has to dig through
+  `report["signals"][i]["score_cards"]` to find them.
+
+### Fixed
+
+- **`RunReport.orders` missed orders filled/updated after being created in a previous run**: the
+  report only included orders whose `created_at` fell inside the current run's window. An order
+  placed in an earlier run that got filled (or otherwise changed status) during this run is now
+  included too, matched on `created_at` **or** `updated_at`.
+
+## [9.0.0a7] — 2026-08-27
+
+### Added
+
+- **REST API migrated from Flask to FastAPI**: `create_app(web=True)` now serves a FastAPI
+  application (uvicorn) instead of Flask, with automatic Swagger docs at `/docs`. All controllers
+  (portfolio, orders, positions, trades, algorithm, backtest results, run reports) ported to
+  `APIRouter`. CORS, error handling, and response serialization all updated accordingly.
+- **`POST /api/algorithm/invoke`**: trigger an immediate, out-of-schedule strategy run on a live
+  algorithm via the REST API, with thread-safe queueing (`AlgorithmRunner.invoke_now`).
+- **`RunReport` / `App.get_last_run_report()` / `App.get_run_reports()`**: a first-class, persisted
+  snapshot of what a run did — portfolios (now including `net_size`, `realized`, `total_revenue`,
+  `total_cost`, `total_net_gain`, `total_trade_volume`), positions, orders, trades and per-tick
+  signal outcomes, plus a new `is_paper` flag (true only when every configured portfolio is
+  paper-traded). Generated automatically after every bounded run and after every live/paper
+  iteration, not just once at process exit — including the web/live mode, which previously never
+  produced one at all.
+- **`ScoreCard` / `ScoreCardEntry`**: a portable, versioned explanation object attachable to a
+  `Signal` (`Signal.with_score_card(...)`) or recorded independently of any signal via the new
+  `TradingStrategy.record_score_card(score_card, symbol=...)`, so a strategy can explain *why no
+  signal fired* on a given tick, not just why one did. Flows automatically into `RunReport.signals`.
+- **`ExposureRule`**: a new portfolio-wide risk rule capping total invested value across every
+  symbol combined (e.g. "never more than 80% invested"), enforced by `ApplyRiskBudgetPhase`
+  alongside the existing available-cash check. Complements the existing per-symbol
+  `PositionSize`/`ScalingRule`.
+- **`PositionSize`/`ScalingRule` default-with-override**: both now accept `symbol=None` as a
+  default entry applied to every symbol that doesn't have its own symbol-specific entry — a
+  symbol-specific entry always takes precedence.
+- **`App.run(run_immediately_on_start=True)`**: new flag controlling whether every strategy fires
+  on its very first tick regardless of schedule (default, unchanged behaviour) or instead waits for
+  its configured interval to elapse before the first run.
+- **`PaperTradingMode.LOCAL` / `.BROKER` / `.AUTO`**: explicit control over whether paper trading
+  always uses the framework's local, broker-agnostic simulator, always requires the broker's own
+  sandbox/testnet, or prefers the sandbox and falls back to the local simulator.
+- **`PositionMode.NETTING` / `.HEDGE`**: opt-in hedge position mode, allowing simultaneous long and
+  short positions on the same symbol instead of netting them into one.
+- Extensive startup/runtime logging narration: strategy registration, data source and
+  order-executor/portfolio-provider initialization counts, portfolio sync, next-scheduled-run
+  times per strategy, per-tick signal/order counts, and the web API/Swagger URLs on startup.
+
+### Fixed
+
+- **`AlgorithmRunner.stop(persist=True)`**: a plain process shutdown (e.g. Ctrl+C on a `web=True`
+  run) no longer persists a disabled control-file state — only an explicit
+  `POST /api/algorithm/stop` (or `stop()` without `persist=False`) disables future runs. Previously
+  every local Ctrl+C permanently disabled the next `python your_script.py` invocation.
+- **`Portfolio.to_dict()`**: was silently missing `net_size`, `realized`, `total_revenue`,
+  `total_cost`, `total_net_gain`, and `total_trade_volume` — all real attributes on the model, just
+  never serialized. Also fixed `SQLPortfolio.__init__` to accept them as optional kwargs so
+  portfolio creation from a full `to_dict()` payload doesn't raise.
+- **`TradingStrategy.strategy_id` class attribute** was silently ignored (always fell back to the
+  class name), inconsistent with how `algorithm_id` is resolved. Now matches `algorithm_id`'s
+  precedence: instance arg > class attribute > class name.
+- Two long-skipped `test_backtest_service.py` tests turned out to be test-authoring bugs, not
+  framework bugs (a wrong default value in `metadata.get('filtered_out', True)`, and a filter
+  threshold below the fixture strategy's actual trade count) — fixed and un-skipped.
+
+## [9.0.0a6] — 2026-08-20
+
+### Added
+
+- **`App.validate(require_portfolio=True)`**: new opt-in flag. When set to `False`, `validate()`
+  only checks config, `on_initialize` hooks, storage, and data source declarations — it skips
+  `initialize_services()`/`initialize_portfolios()`, so it no longer requires a configured
+  portfolio, market, or resolvable market credentials. Intended for sandboxes that validate a
+  strategy's definition without a connected exchange (the default, `True`, is unchanged and still
+  mirrors `run()` exactly).
+
+## [9.0.0a5] — 2026-08-20
+
+### Added
+
+- **`App.validate()`**: runs the same setup `run()` performs before entering its live event loop
+  (config, `on_initialize` hooks, storage, algorithm resolution, data sources, services,
+  portfolios) and then returns, without starting `EventLoopService`, the Flask thread, or executing
+  any strategy iteration/order placement. Intended for tooling that has imported an entry module
+  (e.g. one built via `create_app()` + `add_strategy(...)` + `add_market(...)`) to fail fast on
+  configuration errors (missing portfolio, failing `on_initialize` hook, etc.) before a real `run()`.
+
+### Fixed
+
+- **`CCXTOHLCVDataProvider.get_ohlcv`**: fetching a date range with zero returned candles (e.g. a
+  gap before a symbol's listing date) crashed with `polars.exceptions.SchemaError: invalid series
+  dtype: expected String, got null for series with name Datetime` instead of returning an empty
+  frame, because the OHLCV `DataFrame` was built with column names only and no dtypes, so Polars
+  inferred `Null` for an empty `data` list. An explicit schema is now passed so empty results are
+  typed correctly.
+- Reduced unrelated console noise from expected-exception test paths (pipeline evaluation errors,
+  vector pipeline injection errors, trade-hook dispatch errors) by capturing their logged
+  tracebacks with `assertLogs` instead of letting them print during test runs.
+
+## [9.0.0a4] — 2026-08-19
+
+### Added
+
+- **Combined multi-strategy event-driven backtests** (`app/app.py`): `run_backtest(algorithm=...)`
+  now runs every strategy on the given `Algorithm` TOGETHER, sharing one portfolio, in ONE
+  `Backtest` — the backtest-mode equivalent of how `app.run()` executes multiple strategies live.
+  Raises a clear `OperationalException` if it resolves to the vector engine (not supported for
+  combined multi-strategy backtests yet).
+- **`algorithms=` (independent Algorithms)** on both `run_backtest`/`run_backtests`: each Algorithm
+  runs on its own portfolio, yielding its own Backtest — the Algorithm-level equivalent of
+  `strategies=`. Only supported by the event-driven engine.
+- **`strategy_id` attribution on `Order`/`Trade`**: new DB column (auto-migrated via
+  `_apply_forward_only_migrations()`) plus a new `Context._attach_strategy_attribution()` /
+  `EventLoopService` wiring that stamps `strategy_id` on every order/trade created during a tick,
+  so combined multi-strategy backtests (and live runs) can be broken down per strategy. Exposed on
+  the `OrderSerializer`/`TradeSerializer`/`BacktestRunOrderSerializer`/`BacktestRunTradeSerializer`.
+- **`ipython` optional extra** (`pip install investing-algorithm-framework[notebook]`) for the
+  `%%backtest` Jupyter magic — previously undeclared, see Fixed below.
+
+### Changed — Breaking: consolidated backtest API around `Study`
+
+- `App.run_vector_backtest` / `App.run_vector_backtests` are **removed**. `App.run_backtest` /
+  `App.run_backtests` are now the only two backtest entry points; both accept `strategy=`/
+  `strategies=`/`algorithm=`/`algorithms=` (exactly one) and a required `study=Study(...)`, and
+  auto-detect the engine (vector vs event-driven) from whether the strategy overrides
+  `generate_signal_series` — unless `Study(engines=[BacktestEngine.VECTOR/EVENT_DRIVEN])` is set
+  explicitly.
+- The old backward-compat `backtest_date_range=`/`backtest_date_ranges=`/`market=`/
+  `trading_symbol=`/`initial_amount=` kwargs are **removed** from `run_backtest`/`run_backtests` —
+  use `Study(universe=Universe(market=..., trading_symbol=...), initial_capital=...,
+  backtest_windows=[BacktestWindow(train_range=...)])` instead. `run_backtest`/`run_backtests` now
+  always return `List[Backtest]` (previously returned a single `Backtest` when called with the old
+  `backtest_date_range=` shim).
+- `window_part` (which part of each `Study.backtest_windows` entry to run) is now purely a `Study`
+  attribute (`Study(window_part=...)`) — the redundant call-time override parameter was removed
+  from both methods.
+- Consolidated three separate post-run stamping helpers (`_apply_study_fields`, `_apply_universes`,
+  `_apply_backtest_windows`) into one `_apply_study_to_backtests(backtests, study, ...)` that takes
+  the `Study` object directly and does a single re-save pass instead of three.
+
+### Changed — legacy strategy protocol removed
+
+- The dead, never-called pre-v9.0 `generate_buy_signals`/`generate_sell_signals` protocol has been
+  fully removed from the test suite, examples, and documentation. Strategies must implement
+  `generate_signals` (event-driven) and/or `generate_signal_series` (vector) — see
+  `docs/architecture/strategy/strategy.md` and the `strategies.md` guide for the current API.
+
+### Fixed
+
+- **Release-breaking bug: `import investing_algorithm_framework` crashed on a clean install**
+  without the (correctly optional, per 9.0.0a3) `boto3`/`azure-*`/`ipython` packages. The
+  dependency-injector wiring step (`container.wire(packages=["investing_algorithm_framework"])`,
+  run by every `create_app()`) auto-imports every submodule in the package to discover `@inject`
+  usages, which forced eager top-level imports of `boto3` (`cli/deploy_to_aws_lambda.py`), the
+  Azure SDK (`cli/deploy_to_azure_function.py`), and `IPython` (`notebook/magic.py`, re-exported
+  from the top-level `__init__.py`) regardless of whether those features were ever used. All three
+  are now guarded with `try`/`except ImportError`, with a clear error raised only at the point of
+  actual use (the AWS Lambda / Azure Function deploy CLI commands) instead of at import time.
+  Verified in a from-scratch venv with zero extras installed.
+- Docusaurus documentation (`vector-backtesting.md`, `backtesting.md`, `backtest-storage.md`,
+  `backtest-reports.md`, `metrics.md`, `strategies.md`, `simple-example.md`, and others) and
+  `examples/` scripts updated to match the consolidated `run_backtest`/`run_backtests` + `Study`
+  API and the `generate_signals`/`generate_signal_series` protocol.
+
+## [9.0.0a3] — 2026-08-18
+
+### Added
+
+- **Web API: algorithm control and insights** (`app/web/controllers/algorithm.py`)
+  - `GET /api/algorithm/status` — run status plus the persisted enabled/disabled
+    control state.
+  - `POST /api/algorithm/start` / `POST /api/algorithm/stop` (`?wait=true`,
+    `?reason=...`) — start/stop the live event loop. The enabled/disabled flag
+    is persisted to the resource directory (and pushed immediately via a
+    configured `StateHandler`), so stateless deployments (AWS Lambda, Azure
+    Functions) honor it on their next scheduled invocation too. New
+    `App.start_algorithm()` / `App.stop_algorithm()` / `App.is_algorithm_enabled()`
+    / `App.get_algorithm_control_state()` expose the same control directly to
+    serverless handler code, without needing Flask at all.
+  - `GET /api/algorithm/insights` — equity curve, drawdown series, max drawdown,
+    win rate, Sharpe ratio, trade/portfolio counts, computed from live data.
+- **Web API: `GET /api/trades` / `GET /api/trades/count`** — trades previously
+  had no REST endpoint at all, unlike orders/positions/portfolios.
+- Wired the new algorithm start/stop/status controls into the AWS Lambda and
+  Azure Function project scaffolds (`iaf init --type aws_lambda|azure_function`).
+
+### Fixed
+
+- **Real bug in `EventLoopService.start()`** (`app/eventloop.py`): the live/
+  unbounded loop (no `schedule`, no `number_of_iterations`) ran exactly one
+  iteration and returned instead of looping indefinitely as documented. Fixed
+  by wrapping it in a `while` loop gated on a new stop flag
+  (`request_stop()`/`reset_stop()`), which is also what makes the new
+  start/stop API actually work.
+
+### Changed — reduced default install footprint
+
+- Removed `plotly` as a core dependency; all backtest-report charts now render
+  via `finterion-charts` (lighter, no bundled JS payload) instead.
+- Removed `jupyter` from core dependencies (never imported at runtime; moved to
+  the `dev` dependency group).
+- Removed the unused `Flask-Migrate` dependency (and its transitive `alembic`/
+  `Flask-SQLAlchemy`/`Mako`).
+- `boto3` and the Azure SDK packages (`azure-storage-blob`, `azure-identity`,
+  `azure-mgmt-*`) are now optional extras (`pip install
+  investing-algorithm-framework[aws]` / `[azure]`) instead of hard
+  dependencies — they were previously imported eagerly at package-import time
+  even for users who never touch cloud state storage.
+
+## [9.0.0a2] — 2026-08-10
+
+### Fixed
+
+- **`BacktestReport` multi-study bundles** (`app/reporting/backtest_report.py`)
+  - `BacktestReport`/`BacktestReport.open` accept a new `study=` argument
+    (a study name or `Study` instance) to scope a report to a single study
+    on a multi-study bundle. Previously, opening a report over a bundle
+    with more than one study always raised `OperationalException:
+    Backtest has N studies — pass study= to disambiguate`, with no way to
+    pass a `study=` through `BacktestReport` itself.
+  - Without an explicit `study=`, every study on a bundle is now rendered
+    as its own strategy entry (labelled with the study name) instead of
+    raising.
+  - Progressively-pruned strategies (via a `window_filter_function`) are
+    now labelled "Pruned after `<window>`" in the Window Coverage panel,
+    using the `filtered_out` / `filtered_out_at_date_range` metadata the
+    backtest service already persists on the bundle.
+- **Yearly returns in the HTML report** (#597)
+  - Fixed a scale mismatch where `_build_run_data()`'s yearly-returns
+    series embedded raw decimal ratios (e.g. `0.358`) while the chart
+    renders values as already-scaled percentages, showing `+0.4%`
+    instead of `+35.8%`.
+  - Fixed `get_yearly_returns()` (`services/metrics/returns.py`)
+    silently dropping a backtest's first calendar year: `shift(1)` has
+    no prior year-end for the first row, so it was `NaN` and removed by
+    `dropna()`. The first year's return is now anchored to the initial
+    portfolio snapshot when more than one snapshot exists in that year.
+
+## [9.0.0a1] — 2026-05-28
+
+### Headline
+
+`v9.0.0a1` makes the framework **dual-engine native**. Every `Backtest`
+object now carries an independent `vector` and `event` slot — runs,
+summary metrics, and on-disk layout are all engine-scoped. The
+`.iafbt` bundle format is bumped to **v3** with a nested envelope and
+namespaced metric blobs (`vector_runs/...` / `event_runs/...`).
+
+This release is **backwards compatible at read time**: v1, v2 bundles
+and pre-v9.0 directory layouts still open. Writers always emit v3.
+See [`docs/migration-v8-to-v9.md`](docs/migration-v8-to-v9.md) for the
+upgrade path.
+
+### Added
+
+- **`Backtest` dual-engine API** (`domain/backtesting/backtest.py`)
+  - Fields `vector_runs`, `vector_summary`, `event_runs`,
+    `event_summary` replace the single `backtest_runs` / `backtest_summary`.
+  - `engines()` returns engines with any populated slot (runs OR
+    summary), `get_runs(engine)` / `get_summary(engine)` select per
+    engine, `get_all_backtest_runs()` returns vector + event concat.
+  - `index_rows(bundle_path=...)` yields one `BacktestIndexRow` per
+    populated engine; `index_row(...)` is a singular shim.
+  - `regenerate_summaries()` rebuilds both engine summaries from
+    current run lists in place.
+- **Bundle format v3** (`domain/backtesting/bundle.py`)
+  - Nested `vector`/`event` slot dicts inside the envelope, each
+    holding its own `runs` list and `summary`.
+  - Metric blobs are namespaced as
+    `<engine>_runs/<i>/metrics/<field>.parquet`.
+  - `peek_bundle_format_version(path)` peeks the 8-byte header
+    (magic `IAFB` + uint32 LE version) without decoding the body.
+- **Merge-on-save** in `save_bundle(..., merge=True)` (default on).
+  Engines absent from the in-memory backtest are restored from the
+  on-disk envelope so writing one engine never erases the other.
+  Atomic write: `<target>.tmp.<pid>` + fsync + `os.replace` + dir
+  fsync. Set `merge=False` for legacy overwrite semantics.
+- **Engine-scoped ranking & CLI**
+  - `analysis.ranking.rank_results(..., engine="vector")` filters
+    backtests that lack the requested engine.
+  - `iaf list --engine vector|event` and `iaf rank --engine ...`
+    Click options.
+  - SQLite index schema **v3**: composite primary key
+    `(bundle_path, engine_type)`, automatic migration from v2 with
+    `COALESCE(engine_type, 'vector')` on NULL rows.
+- **HTML report per-engine pages** (`app/reporting/backtest_report.py`)
+  - Dual-engine bundles render as two strategy entries with name
+    suffix `(vector)` / `(event)`; single-engine reports are
+    unchanged.
+- **`iaf migrate-bundles --to v3 <dir>` CLI**
+  - In-place upgrade of v1/v2 bundles → v3 and legacy directory
+    layouts → `.iafbt`. Uses `peek_bundle_format_version` to skip
+    bundles already at the target version cheaply. Supports
+    `--keep-source`, `--no-index`, `--dry-run`, `--workers`.
+
+### Changed
+
+- `BUNDLE_FORMAT_VERSION = 3`. Writers emit v3 only; passing
+  `format_version=1` or `2` to `save_bundle` raises `ValueError`.
+- Directory `Backtest.save()` writes per-engine subdirectories
+  `vector_runs/` / `event_runs/` and per-engine summary files
+  `vector_summary.json` / `event_summary.json`. `Backtest.open()`
+  reads both the new layout AND pre-v9.0 `runs/`+`summary.json`
+  (legacy data is routed into the vector slot).
+- `combine_backtests()` now concatenates per engine (vector with
+  vector, event with event).
+- `migrate_backtests` directory discovery accepts both legacy
+  `runs/` and per-engine `vector_runs/`/`event_runs/` layouts.
+
+### Compatibility shims (legacy callers)
+
+- `Backtest.backtest_runs`, `Backtest.backtest_summary`,
+  `Backtest.engine_type` remain as read/write properties that
+  delegate to the vector slot.
+- `Backtest(..., backtest_runs=..., backtest_summary=...,
+  engine_type=...)` keyword arguments are accepted and routed via
+  `engine="vector"` default.
+
+### Removed
+
+- v1 / v2 bundle writers. v9.0 bundles are written as v3 only.
+- (Internal) `Backtest.scalar_summary()` — use `get_summary(engine)`
+  followed by `.to_dict()`.
+
+### Migration
+
+```bash
+# Upgrade an entire results directory in place — bundles AND legacy dirs.
+iaf migrate-bundles --to v3 ./backtest_results
+```
+
+See [`docs/migration-v8-to-v9.md`](docs/migration-v8-to-v9.md) for a
+detailed walkthrough.

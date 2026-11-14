@@ -1,7 +1,7 @@
 """Unit tests for the Pipeline base class introspection.
 
 See ``investing_algorithm_framework/domain/pipeline/pipeline.py`` and
-``docs/design/pipeline-api.md`` (Phase 1, #501).
+``docs/architecture/strategy/pipeline-api.md`` (Phase 1, #501).
 """
 from __future__ import annotations
 

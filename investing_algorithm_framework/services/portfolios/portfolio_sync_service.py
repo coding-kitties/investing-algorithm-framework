@@ -91,6 +91,17 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         if not portfolio.initialized:
             # Check if the portfolio has an initial balance set
             if portfolio.initial_balance is not None:
+                if position is None:
+                    raise OperationalException(
+                        f"There is no available balance on the exchange for "
+                        f"{portfolio.trading_symbol.upper()} on market "
+                        f"{portfolio.market}. Please make sure that you have "
+                        f"an available balance of at least "
+                        f"{portfolio.initial_balance} "
+                        f"{portfolio.trading_symbol.upper()} on the "
+                        f"exchange."
+                    )
+
                 available = position.amount
 
                 if portfolio.initial_balance > available:

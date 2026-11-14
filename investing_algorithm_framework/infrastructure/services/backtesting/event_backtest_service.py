@@ -1,14 +1,15 @@
 import logging
-from datetime import datetime, timezone, timedelta
-from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Dict, List
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
-    BacktestRun, TimeUnit, generate_backtest_summary_metrics, Backtest
+    BacktestRun, BacktestWindow, generate_backtest_summary_metrics, Backtest, \
+    PositionMode
 from investing_algorithm_framework.domain.models.trade.trade_status import \
     TradeStatus
 from investing_algorithm_framework.services import DataProviderService, \
     create_backtest_metrics
+from .schedule_generation import generate_backtest_schedule
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,7 @@ class EventBacktestService:
         event_loop_service,
         trade_order_evaluator,
         show_progress: bool = True,
+        metrics_backend: str = "python",
     ) -> BacktestRun:
         """
         Run an event-driven backtest for an algorithm.
@@ -87,6 +89,8 @@ class EventBacktestService:
             trade_order_evaluator: The trade order evaluator for handling
                 pending orders, stop losses, and take profits.
             show_progress: Whether to show progress bars.
+            metrics_backend: "python", "rust" for native risk metrics,
+                or "auto" with Python fallback. The event loop stays Python.
 
         Returns:
             BacktestRun: The backtest run containing results and metrics.
@@ -104,6 +108,7 @@ class EventBacktestService:
             algorithm=algorithm,
             trade_order_evaluator=trade_order_evaluator
         )
+        self.prepare_indicators(algorithm, backtest_date_range)
         event_loop_service.start(
             schedule=schedule, show_progress=show_progress
         )
@@ -116,7 +121,33 @@ class EventBacktestService:
             risk_free_rate=risk_free_rate,
             recorded_values=event_loop_service.context
             .get_recorded_values(),
+            metrics_backend=metrics_backend,
         )
+
+    def prepare_indicators(self, algorithm, backtest_date_range):
+        """Create run-local engines and prepare eligible functions."""
+        for strategy in algorithm.strategies:
+            if not getattr(strategy, "indicator_configs", ()):
+                continue
+            engine = strategy.create_indicator_engine()
+            if any(
+                config.calculate is None or config.execution == "precompute"
+                for config in engine.configs.values()
+            ):
+                frames = {}
+                for identifier in engine.required_windows:
+                    source = engine.data_sources[identifier]
+                    frames[identifier] = (
+                        self._data_provider_service.get_backtest_data(
+                            source,
+                            start_date=source.create_start_date_data(
+                                backtest_date_range.start_date
+                            ),
+                            end_date=backtest_date_range.end_date,
+                        )
+                    )
+                engine.prepare(frames)
+            strategy._indicator_engine = engine
 
     def generate_schedule(
         self,
@@ -139,39 +170,15 @@ class EventBacktestService:
 
         Returns:
             Dict mapping datetime to strategy_ids and task_ids to run.
+
+        Delegates to the shared implementation in
+        ``schedule_generation.py`` — kept in sync with
+        ``BacktestService.generate_schedule`` since both engines
+        drive the same event loop.
         """
-        schedule = defaultdict(
-            lambda: {"strategy_ids": set(), "task_ids": set(tasks)}
+        return generate_backtest_schedule(
+            strategies, tasks, start_date, end_date
         )
-
-        for strategy in strategies:
-            strategy_id = strategy.strategy_profile.strategy_id
-            interval = strategy.strategy_profile.interval
-            time_unit = strategy.strategy_profile.time_unit
-
-            if time_unit == TimeUnit.SECOND:
-                step = timedelta(seconds=interval)
-            elif time_unit == TimeUnit.MINUTE:
-                step = timedelta(minutes=interval)
-            elif time_unit == TimeUnit.HOUR:
-                step = timedelta(hours=interval)
-            elif time_unit == TimeUnit.DAY:
-                step = timedelta(days=interval)
-            else:
-                raise ValueError(f"Unsupported time unit: {time_unit}")
-
-            t = start_date
-            while t <= end_date:
-                schedule[t]["strategy_ids"].add(strategy_id)
-                t += step
-
-        return {
-            ts: {
-                "strategy_ids": sorted(data["strategy_ids"]),
-                "task_ids": sorted(data["task_ids"])
-            }
-            for ts, data in schedule.items()
-        }
 
     def _create_backtest_run(
         self,
@@ -180,6 +187,7 @@ class EventBacktestService:
         number_of_runs: int,
         risk_free_rate: float,
         recorded_values: dict = None,
+        metrics_backend: str = "python",
     ) -> BacktestRun:
         """
         Create a BacktestRun from the current state after event loop execution.
@@ -196,32 +204,37 @@ class EventBacktestService:
         """
         # Get the portfolio
         portfolio = self._portfolio_service.get_all()[0]
+        portfolio_configuration = self._portfolio_configuration_service \
+            .resolve_for_portfolio(portfolio)
+        position_mode = getattr(
+            portfolio_configuration, "position_mode", PositionMode.NETTING
+        )
 
         # Get initial unallocated amount
         initial_unallocated = self._get_initial_unallocated()
 
         # Create the backtest run
         run = BacktestRun(
-            backtest_start_date=backtest_date_range.start_date,
-            backtest_end_date=backtest_date_range.end_date,
-            backtest_date_range_name=backtest_date_range.name,
+            backtest_window=BacktestWindow(train_range=backtest_date_range),
             initial_unallocated=initial_unallocated,
-            trading_symbol=portfolio.trading_symbol,
             created_at=datetime.now(tz=timezone.utc),
-            portfolio_snapshots=self._portfolio_snapshot_service.get_all(
-                {"portfolio_id": portfolio.id}
+            portfolio_snapshots=(
+                self._portfolio_snapshot_service.repository.iter_all(
+                    {"portfolio_id": portfolio.id}
+                )
             ),
             number_of_runs=number_of_runs,
-            trades=self._trade_service.get_all(
-                {"portfolio": portfolio.id}
+            trades=self._trade_service.repository.iter_all(
+                {"portfolio_id": portfolio.id}
             ),
-            orders=self._order_service.get_all(
-                {"portfolio": portfolio.id}
+            orders=self._order_service.repository.iter_all(
+                {"portfolio_id": portfolio.id}
             ),
             positions=self._position_repository.get_all(
                 {"portfolio": portfolio.id}
             ),
             recorded_values=recorded_values or {},
+            metadata={"position_mode": PositionMode(position_mode).value},
         )
 
         # Populate summary counts so consumers (CLI/MCP/reports) don't see
@@ -247,7 +260,7 @@ class EventBacktestService:
 
         # Calculate and add metrics
         backtest_metrics = create_backtest_metrics(
-            run, risk_free_rate=risk_free_rate
+            run, risk_free_rate=risk_free_rate, metrics_backend=metrics_backend
         )
         run.backtest_metrics = backtest_metrics
 
@@ -302,13 +315,16 @@ class EventBacktestService:
             if hasattr(algorithm, 'algorithm_id')
             else algorithm.id
         )
+        strategy_ids = [
+            s.strategy_id for s in getattr(algorithm, 'strategies', [])
+        ]
 
         return Backtest(
             algorithm_id=algorithm_id,
-            backtest_runs=[run],
-            backtest_summary=generate_backtest_summary_metrics(
+            strategy_ids=strategy_ids,
+            event_runs=[run],
+            event_summary=generate_backtest_summary_metrics(
                 [run.backtest_metrics]
             ),
             risk_free_rate=risk_free_rate,
-            engine_type="event",
         )

@@ -5,7 +5,17 @@ on:
     types: [ published ]
 
 jobs:
+  python-checks:
+    if: ${{ !startsWith(github.event.release.tag_name, 'native-v') }}
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+
+  native-checks:
+    uses: ./.github/workflows/native.yml
+
   publish-service-client-package:
+    if: ${{ !startsWith(github.event.release.tag_name, 'native-v') }}
+    needs: [python-checks, native-checks]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,5 +34,55 @@ jobs:
       - name: Build package
         run: poetry build
 
+      - name: Verify Python release tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import tomllib
+          package = tomllib.loads(pathlib.Path('pyproject.toml').read_text())
+          version = package['tool']['poetry']['version']
+          assert os.environ['RELEASE_TAG'] in (version, f'v{version}')
+          PY
+
       - name: Publish to PyPI
-        run: poetry publish --username __token__ --password ${{ secrets.PYPI_TOKEN }}
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+        run: poetry publish --no-interaction
+
+  publish-native:
+    if: ${{ startsWith(github.event.release.tag_name, 'native-v') }}
+    needs: native-checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify native release tag matches package versions
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import tomllib
+          root = pathlib.Path('native/confluence')
+          package = tomllib.loads((root / 'pyproject.toml').read_text())
+          crate = tomllib.loads((root / 'Cargo.toml').read_text())
+          version = package['project']['version']
+          assert version == crate['package']['version']
+          assert os.environ['RELEASE_TAG'] == f'native-v{version}'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}

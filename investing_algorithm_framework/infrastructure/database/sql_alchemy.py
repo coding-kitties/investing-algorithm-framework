@@ -80,7 +80,133 @@ class SQLBaseModel(DeclarativeBase):
 
 
 def create_all_tables():
-    SQLBaseModel.metadata.create_all(bind=Session().bind)
+    bind = Session().bind
+    SQLBaseModel.metadata.create_all(bind=bind)
+    _apply_forward_only_migrations(bind)
+
+
+def _apply_forward_only_migrations(bind):
+    """
+    Tiny idempotent migration helper.
+
+    The framework has no Alembic; new tables come from
+    ``metadata.create_all`` but new *columns* on existing tables do not.
+    Live customer SQLite files therefore need an in-place ALTER for any
+    column we add post-1.0.
+
+    Each entry below is run once per startup, wrapped in try/except so
+    a column that already exists or a non-SQLite backend that handles
+    the change differently does not break boot.
+
+    Forward-only, additive, never destructive.
+    """
+    statements = [
+        # #433 — short selling support. ``is_short`` defaults to 0 so
+        # every existing long trade keeps its semantics.
+        "ALTER TABLE trades ADD COLUMN is_short BOOLEAN "
+        "NOT NULL DEFAULT 0",
+        # #434 phase 3 — SL/TP inversion for short trades. The
+        # ``is_short`` flag on stop-loss / take-profit rows tells the
+        # trigger logic to flip the price math.
+        "ALTER TABLE trade_stop_losses ADD COLUMN is_short BOOLEAN "
+        "NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_take_profits ADD COLUMN is_short BOOLEAN "
+        "NOT NULL DEFAULT 0",
+        # Strategy attribution — lets orders/trades be traced back to
+        # the strategy that created them (multi-strategy algorithms).
+        # NULL for any row created before this column existed.
+        "ALTER TABLE orders ADD COLUMN strategy_id VARCHAR",
+        "ALTER TABLE trades ADD COLUMN strategy_id VARCHAR",
+        # RunReport gained a top-level score_cards list after the
+        # run_reports table already shipped in 9.0.0a7.
+        "ALTER TABLE run_reports ADD COLUMN score_cards_json TEXT",
+        "ALTER TABLE run_reports ADD COLUMN status VARCHAR "
+        "NOT NULL DEFAULT 'completed'",
+        "ALTER TABLE run_reports ADD COLUMN error TEXT",
+        # Broker-native mirror stop-loss / take-profit safety net.
+        # ``mirror_on_exchange`` is the opt-in flag copied from the
+        # rule at attach time; the rest track the live exchange-side
+        # order that backs the rule, if any. NULL/0 for every rule
+        # created before this feature existed (no mirror order).
+        "ALTER TABLE trade_stop_losses ADD COLUMN mirror_on_exchange "
+        "BOOLEAN NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_stop_losses ADD COLUMN mirror_order_id VARCHAR",
+        "ALTER TABLE trade_stop_losses ADD COLUMN mirror_triggered "
+        "BOOLEAN NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_stop_losses ADD COLUMN mirror_triggered_at "
+        "DATETIME",
+        "ALTER TABLE trade_take_profits ADD COLUMN mirror_on_exchange "
+        "BOOLEAN NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_take_profits ADD COLUMN mirror_order_id VARCHAR",
+        "ALTER TABLE trade_take_profits ADD COLUMN mirror_triggered "
+        "BOOLEAN NOT NULL DEFAULT 0",
+        "ALTER TABLE trade_take_profits ADD COLUMN mirror_triggered_at "
+        "DATETIME",
+    ]
+    for stmt in statements:
+        try:
+            with bind.begin() as conn:
+                conn.exec_driver_sql(stmt)
+        except Exception:
+            # Column already exists, table missing, or non-SQLite
+            # dialect with different syntax — all benign at boot.
+            pass
+
+    _migrate_position_legs(bind, "positions")
+    _migrate_position_legs(bind, "position_snapshots")
+    inspector = inspect(bind)
+    if "run_reports" in inspector.get_table_names():
+        columns = {
+            column["name"] for column in inspector.get_columns("run_reports")
+        }
+        for column in ("stop_losses_json", "take_profits_json"):
+            if column not in columns:
+                with bind.begin() as conn:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE run_reports ADD COLUMN {column} TEXT"
+                    )
+
+
+def _migrate_position_legs(bind, table_name):
+    inspector = inspect(bind)
+    if table_name not in inspector.get_table_names():
+        return
+
+    existing_columns = {
+        column["name"] for column in inspector.get_columns(table_name)
+    }
+    backfills = {
+        "long_amount": (
+            "CASE WHEN CAST(amount AS REAL) >= 0 "
+            "THEN amount ELSE '0' END"
+        ),
+        "short_amount": (
+            "CASE WHEN CAST(amount AS REAL) < 0 "
+            "THEN LTRIM(amount, '-') ELSE '0' END"
+        ),
+        "long_cost": (
+            "CASE WHEN CAST(amount AS REAL) >= 0 "
+            "THEN LTRIM(cost, '-') ELSE '0' END"
+        ),
+        "short_cost": (
+            "CASE WHEN CAST(amount AS REAL) < 0 "
+            "THEN LTRIM(cost, '-') ELSE '0' END"
+        ),
+    }
+    for column, expression in backfills.items():
+        if column in existing_columns:
+            continue
+        try:
+            with bind.begin() as conn:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE {table_name} ADD COLUMN {column} "
+                    "VARCHAR NOT NULL DEFAULT '0'"
+                )
+                conn.exec_driver_sql(
+                    f"UPDATE {table_name} SET {column} = {expression}"
+                )
+        except Exception:
+            pass
 
 
 def teardown_sqlalchemy():
@@ -109,6 +235,17 @@ def teardown_sqlalchemy():
         bind.dispose()
 
     Session.configure(bind=None)
+
+    # ORM objects/sessions can be kept alive by reference cycles (e.g.
+    # mapped instances <-> identity map <-> session), so plain
+    # refcounting doesn't always close the underlying sqlite3
+    # connection/file handle right away. On POSIX this is harmless
+    # (an unlinked-but-open file is still removable), but on Windows
+    # file locks are mandatory, so a stale handle blocks deletion of
+    # the database file by callers that rmtree the database directory
+    # right after calling this. Force a collection cycle to release it.
+    import gc
+    gc.collect()
 
 
 from sqlalchemy import event

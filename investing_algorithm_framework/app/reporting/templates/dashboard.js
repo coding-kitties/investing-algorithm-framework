@@ -266,7 +266,11 @@ function rebuildWindowCoverage() {
       if (has) present++;
       return has;
     });
-    return { idx: i, name: s.name, color: s.color, windows: windows, present: present, pct: Math.round(present / totalWindows * 100) };
+    return {
+      idx: i, name: s.name, color: s.color, tag: s.tag, windows: windows,
+      present: present, pct: Math.round(present / totalWindows * 100),
+      filteredOut: !!s.filteredOut, filteredOutAt: s.filteredOutAt,
+    };
   });
 
   // Find shared windows (all selected strategies have this window)
@@ -279,6 +283,7 @@ function rebuildWindowCoverage() {
     if (allHave) sharedCount++;
   }
   var comparableByAll = indices.length > 1 ? sharedCount : totalWindows;
+  var prunedCount = coverageData.filter(function(d){return d.filteredOut;}).length;
 
   // Build HTML
   var html = '<div class="chart-card collapsed">';
@@ -295,14 +300,23 @@ function rebuildWindowCoverage() {
     var comparableColor = pctComparable === 100 ? 'var(--green)' : pctComparable >= 50 ? 'var(--amber)' : 'var(--red)';
     html += '<div class="wc-summary-item">Comparability: <strong style="color:' + comparableColor + '">' + pctComparable + '%</strong></div>';
   }
+  if (prunedCount > 0) {
+    html += '<div class="wc-summary-item">Pruned by window filter: <strong style="color:var(--purple)">' + prunedCount + '/' + indices.length + '</strong></div>';
+  }
   html += '</div>';
 
   // Coverage bars
   html += '<div style="margin-bottom:1rem">';
   coverageData.forEach(function(d) {
-    var barColor = d.pct === 100 ? 'var(--green)' : d.pct >= 50 ? 'var(--amber)' : 'var(--red)';
+    // A window_filter_function prune is expected, partial coverage —
+    // color it distinctly from a genuine (unexplained) coverage gap.
+    var barColor = d.filteredOut ? 'var(--purple)'
+      : d.pct === 100 ? 'var(--green)' : d.pct >= 50 ? 'var(--amber)' : 'var(--red)';
+    var prunedBadge = d.filteredOut
+      ? ' <span class="pruned-badge" title="Progressively pruned by window_filter_function">Pruned' + (d.filteredOutAt ? ' after ' + d.filteredOutAt : '') + '</span>'
+      : '';
     html += '<div class="wc-bar-wrap">';
-    html += '<div class="wc-bar-label"><span class="sb-dot" style="background:'+d.color+'"></span> '+d.name+(d.tag ? ' <span class="tag-badge">'+d.tag+'</span>' : '')+'</div>';
+    html += '<div class="wc-bar-label"><span class="sb-dot" style="background:'+d.color+'"></span> '+d.name+(d.tag ? ' <span class="tag-badge">'+d.tag+'</span>' : '')+prunedBadge+'</div>';
     html += '<div class="wc-bar"><div class="wc-bar-fill" style="width:'+d.pct+'%;background:'+barColor+'"></div>';
     html += '<div class="wc-bar-text">'+d.present+'/'+totalWindows+' ('+d.pct+'%)</div></div>';
     html += '</div>';
@@ -330,10 +344,15 @@ function rebuildWindowCoverage() {
 
   // Data rows
   coverageData.forEach(function(d) {
-    html += '<div class="wc-cell wc-strat" title="'+d.name+'"><span class="sb-dot" style="background:'+d.color+'"></span> '+d.name+(d.tag ? ' <span class="tag-badge">'+d.tag+'</span>' : '')+'</div>';
+    var rowTitle = d.filteredOut
+      ? d.name + ' \u2013 pruned by window_filter_function' + (d.filteredOutAt ? ' after ' + d.filteredOutAt : '')
+      : d.name;
+    html += '<div class="wc-cell wc-strat" title="'+rowTitle+'"><span class="sb-dot" style="background:'+d.color+'"></span> '+d.name+(d.tag ? ' <span class="tag-badge">'+d.tag+'</span>' : '')+'</div>';
     d.windows.forEach(function(has, wi) {
-      var cls = has ? 'present' : 'missing';
-      var title = d.name + ' \u2013 ' + RUN_LABELS[wi][1] + ': ' + (has ? 'Run' : 'Missing');
+      var missingIsPrune = !has && d.filteredOut;
+      var cls = has ? 'present' : (missingIsPrune ? 'pruned' : 'missing');
+      var title = d.name + ' \u2013 ' + RUN_LABELS[wi][1] + ': '
+        + (has ? 'Run' : (missingIsPrune ? 'Pruned' : 'Missing'));
       html += '<div class="wc-cell" title="'+title+'"><div class="wc-dot '+cls+'"></div></div>';
     });
   });
@@ -398,7 +417,7 @@ function rebuildOverviewTradingActivity() {
       const v = m[key];
       const isBest = bestVals[key]===i;
       const cls = (isBest && indices.length>1) ? ' class="best-cell"' : '';
-      if (key==='average_trade_duration' && v!=null) html += '<td'+cls+'>'+v.toFixed(1)+'d</td>';
+      if (key==='average_trade_duration' && v!=null) html += '<td'+cls+'>'+fmtDuration(v)+'</td>';
       else html += '<td'+cls+'>' + fmtVal(v,ftype) + '</td>';
     });
     html += '</tr>';
@@ -925,6 +944,10 @@ function drawPnlBar(id, symStats) {
 }
 
 // ===== HEATMAP =====
+function compoundMonthlyReturns(months) {
+  return (Object.values(months).reduce((growth, value) => growth * (1 + value / 100), 1) - 1) * 100;
+}
+
 function buildHeatmap(containerId, heatmapData) {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const years = Object.keys(heatmapData).sort();
@@ -934,11 +957,10 @@ function buildHeatmap(containerId, heatmapData) {
   html += '<th>Year</th></tr></thead><tbody>';
   years.forEach(y => {
     html += '<tr><th>'+y+'</th>';
-    let yTotal = 0;
+    const yTotal = compoundMonthlyReturns(heatmapData[y]);
     months.forEach((_, mi) => {
       const v = heatmapData[y]?.[mi+1];
       if (v !== undefined) {
-        yTotal += v;
         let cls = 'hm-zero';
         if (v > 10) cls = 'hm-strong-pos';
         else if (v > 0) cls = 'hm-pos';
@@ -1927,7 +1949,7 @@ function rebuildRankingTable() {
       var star = isBest ? ' ★' : '';
       var txt;
       if (key==='max_drawdown' && v!=null) txt = (Math.abs(v)*100).toFixed(1)+'%';
-      else if (key==='average_trade_duration' && v!=null) txt = v.toFixed(1)+'d';
+      else if (key==='average_trade_duration' && v!=null) txt = fmtDuration(v);
       else txt = fmtVal(v,ftype);
       if (colorStyle) {
         html += '<td onclick="showPage(\'strat-'+i+'\')"><span style="'+colorStyle+';font-weight:600">'+txt+star+'</span></td>';
@@ -2241,9 +2263,8 @@ function buildStratMonthlyReturns(stratIdx) {
         html += '<tr style="background:var(--surface2);font-weight:600"><td class="sticky-col" style="background:var(--surface2)">' + y + ' End</td>';
         html += '<td style="font-weight:600"><span style="color:'+color+'">' + peekCum.toFixed(1) + '</span></td></tr>';
       } else {
-        var yearTotal = 0;
         var hmY = hm[y] || {};
-        for (var mi = 1; mi <= 12; mi++) yearTotal += hmY[String(mi)] || 0;
+        var yearTotal = compoundMonthlyReturns(hmY);
         var color = yearTotal >= 0 ? 'var(--green)' : 'var(--red)';
         html += '<tr style="background:var(--surface2);font-weight:600"><td class="sticky-col" style="background:var(--surface2)">' + y + ' Total</td>';
         html += '<td style="font-weight:600"><span style="color:'+color+'">' + (yearTotal >= 0 ? '+' : '') + yearTotal.toFixed(1) + '%</span></td></tr>';
@@ -2288,11 +2309,10 @@ function buildStratMonthlyReturns(stratIdx) {
         var ycls = yearGain > 0 ? 'hm-pos' : yearGain < 0 ? 'hm-neg' : 'hm-zero';
         html += '<td class="'+ycls+'" style="font-weight:600">' + stratCum.toFixed(0) + '</td></tr>';
       } else {
-        var yTotal = 0;
+        var yTotal = compoundMonthlyReturns(hm[y] || {});
         for (var mi = 1; mi <= 12; mi++) {
           var v = (hm[y] && hm[y][String(mi)] != null) ? hm[y][String(mi)] : undefined;
           if (v !== undefined) {
-            yTotal += v;
             var cls = 'hm-zero';
             if (v > 10) cls = 'hm-strong-pos';
             else if (v > 0) cls = 'hm-pos';
@@ -3371,7 +3391,7 @@ function buildCompareTradingActivityRanking(indices) {
       var v = m[key];
       var isBest = bestVals[key] === i;
       var cls = isBest && indices.length > 1 ? ' class="best-cell"' : '';
-      if (key === 'average_trade_duration' && v != null) html += '<td'+cls+'>'+v.toFixed(1)+'d</td>';
+      if (key === 'average_trade_duration' && v != null) html += '<td'+cls+'>'+fmtDuration(v)+'</td>';
       else html += '<td'+cls+'>' + fmtVal(v, ftype) + '</td>';
     });
     html += '</tr>';
@@ -3573,9 +3593,8 @@ function buildCompareMonthlyReturns(indices) {
         });
       } else {
         stratData.forEach(function(sd) {
-          var yearTotal = 0;
           var hm = sd.hm[y] || {};
-          for (var mi = 1; mi <= 12; mi++) { yearTotal += hm[String(mi)] || 0; }
+          var yearTotal = compoundMonthlyReturns(hm);
           var color = yearTotal >= 0 ? 'var(--green)' : 'var(--red)';
           html += '<td style="font-weight:600"><span style="color:'+color+'">' + (yearTotal >= 0 ? '+' : '') + yearTotal.toFixed(1) + '%</span></td>';
         });
@@ -3662,11 +3681,10 @@ function buildCompareMonthlyReturns(indices) {
           var ycls = yearGain > 0 ? 'hm-pos' : yearGain < 0 ? 'hm-neg' : 'hm-zero';
           html += '<td class="'+ycls+'" style="font-weight:600">' + stratCum.toFixed(0) + '</td></tr>';
         } else {
-          var yTotal = 0;
+          var yTotal = compoundMonthlyReturns(hm[y] || {});
           for (var mi = 1; mi <= 12; mi++) {
             var v = (hm[y] && hm[y][mi] != null) ? hm[y][mi] : undefined;
             if (v !== undefined) {
-              yTotal += v;
               var cls = 'hm-zero';
               if (v > 10) cls = 'hm-strong-pos';
               else if (v > 0) cls = 'hm-pos';
@@ -3908,8 +3926,24 @@ function drawCompareReturnDist(indices) {
     });
 
     ctx.fillStyle = COL.dim; ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(sr.name.slice(0,8), cx2, h-8);
+    ctx.fillText(sr.name, cx2, h-8);
   });
+}
+
+function equityCorrelation(a, b) {
+  const aByDate = new Map(a.map(([value, date]) => [date, value]));
+  const bByDate = new Map(b.map(([value, date]) => [date, value]));
+  const dates = Array.from(aByDate.keys()).filter(date => bByDate.has(date));
+  const n = dates.length;
+  if (n < 3) return null;
+  let sumA = 0, sumB = 0, sumAB = 0, sumA2 = 0, sumB2 = 0;
+  dates.forEach(date => {
+    const av = aByDate.get(date), bv = bByDate.get(date);
+    sumA += av; sumB += bv; sumAB += av * bv;
+    sumA2 += av * av; sumB2 += bv * bv;
+  });
+  const denom = Math.sqrt((n * sumA2 - sumA * sumA) * (n * sumB2 - sumB * sumB));
+  return denom > 0 ? (n * sumAB - sumA * sumB) / denom : null;
 }
 
 function buildCompareCorrelation(indices) {
@@ -3926,26 +3960,13 @@ function buildCompareCorrelation(indices) {
     const s = STRATEGIES[si];
     const rd = getViewRunData(si);
     if (rd && rd.EQ && rd.EQ.length > 1) {
-      equities.push({ name: s.name, color: s.color, eq: rd.EQ.map(d => d[0]) });
+      equities.push({ name: s.name, color: s.color, eq: rd.EQ });
     }
   });
 
   if (equities.length < 2) {
     container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--dim);font-size:13px;">Need at least 2 strategies</div>';
     return;
-  }
-
-  function correlation(a, b) {
-    const n = Math.min(a.length, b.length);
-    if (n < 3) return 0;
-    let sumA = 0, sumB = 0, sumAB = 0, sumA2 = 0, sumB2 = 0;
-    for (let i = 0; i < n; i++) {
-      sumA += a[i]; sumB += b[i]; sumAB += a[i]*b[i];
-      sumA2 += a[i]*a[i]; sumB2 += b[i]*b[i];
-    }
-    const denom = Math.sqrt((n*sumA2-sumA*sumA)*(n*sumB2-sumB*sumB));
-    if (denom === 0) return 0;
-    return (n*sumAB - sumA*sumB) / denom;
   }
 
   function corrColor(v) {
@@ -3958,13 +3979,16 @@ function buildCompareCorrelation(indices) {
   }
 
   let html = '<table class="corr-table"><thead><tr><th></th>';
-  equities.forEach(e => { html += '<th title="'+e.name+'">'+e.name.slice(0,8)+'</th>'; });
+  equities.forEach(e => { html += '<th title="'+e.name+'">'+e.name+'</th>'; });
   html += '</tr></thead><tbody>';
   equities.forEach((ei, i) => {
-    html += '<tr><th style="text-align:right">'+ei.name.slice(0,8)+'</th>';
+    html += '<tr><th style="text-align:right">'+ei.name+'</th>';
     equities.forEach((ej, j) => {
       if (i === j) html += '<td class="corr-self">1.00</td>';
-      else { const corr = correlation(ei.eq, ej.eq); html += '<td style="'+corrColor(corr)+'">'+corr.toFixed(2)+'</td>'; }
+      else {
+        const corr = equityCorrelation(ei.eq, ej.eq);
+        html += corr == null ? '<td>\u2014</td>' : '<td style="'+corrColor(corr)+'">'+corr.toFixed(2)+'</td>';
+      }
     });
     html += '</tr>';
   });
@@ -4332,7 +4356,7 @@ function drawReturnDistribution() {
 
     // Label
     ctx.fillStyle = COL.dim; ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(sr.name.slice(0,8), cx, h-8);
+    ctx.fillText(sr.name, cx, h-8);
   });
 }
 
@@ -4354,26 +4378,12 @@ function buildCorrelationMatrix() {
   const equities = [];
   vis.forEach(si => {
     const eq = getViewEquity(si);
-    equities.push({ name: STRATEGIES[si].name, color: STRATEGIES[si].color, eq: eq.map(d => d[0]) });
+    equities.push({ name: STRATEGIES[si].name, color: STRATEGIES[si].color, eq: eq });
   });
 
   if (equities.length < 2) {
     container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--dim);font-size:13px;">Need at least 2 strategies</div>';
     return;
-  }
-
-  // Pearson correlation
-  function correlation(a, b) {
-    const n = Math.min(a.length, b.length);
-    if (n < 3) return 0;
-    let sumA = 0, sumB = 0, sumAB = 0, sumA2 = 0, sumB2 = 0;
-    for (let i = 0; i < n; i++) {
-      sumA += a[i]; sumB += b[i]; sumAB += a[i]*b[i];
-      sumA2 += a[i]*a[i]; sumB2 += b[i]*b[i];
-    }
-    const denom = Math.sqrt((n*sumA2-sumA*sumA)*(n*sumB2-sumB*sumB));
-    if (denom === 0) return 0;
-    return (n*sumAB - sumA*sumB) / denom;
   }
 
   function corrColor(v) {
@@ -4386,17 +4396,17 @@ function buildCorrelationMatrix() {
   }
 
   let html = '<table class="corr-table"><thead><tr><th></th>';
-  equities.forEach(e => { html += '<th title="'+e.name+'">'+e.name.slice(0,8)+'</th>'; });
+  equities.forEach(e => { html += '<th title="'+e.name+'">'+e.name+'</th>'; });
   html += '</tr></thead><tbody>';
 
   equities.forEach((ei, i) => {
-    html += '<tr><th style="text-align:right">'+ei.name.slice(0,8)+'</th>';
+    html += '<tr><th style="text-align:right">'+ei.name+'</th>';
     equities.forEach((ej, j) => {
       if (i === j) {
         html += '<td class="corr-self">1.00</td>';
       } else {
-        const corr = correlation(ei.eq, ej.eq);
-        html += '<td style="'+corrColor(corr)+'">'+corr.toFixed(2)+'</td>';
+        const corr = equityCorrelation(ei.eq, ej.eq);
+        html += corr == null ? '<td>\u2014</td>' : '<td style="'+corrColor(corr)+'">'+corr.toFixed(2)+'</td>';
       }
     });
     html += '</tr>';
@@ -6298,6 +6308,7 @@ function onPageSizeChange(tableKey, val) {
 var tradesHeaders = [
   {key: 'id', label: '#'},
   {key: 'sym', label: 'Symbol'},
+  {key: 'side', label: 'Position Side'},
   {key: 'opened', label: 'Opened'},
   {key: 'closed', label: 'Closed'},
   {key: 'open_price', label: 'Open Price', align: 'right'},
@@ -6333,8 +6344,14 @@ var ordersHeaders = [
 
 var positionsHeaders = [
   {key: 'sym', label: 'Symbol'},
-  {key: 'amount', label: 'Amount', align: 'right'},
-  {key: 'cost', label: 'Cost', align: 'right'},
+  {key: 'amount', label: 'Net Amount', align: 'right'},
+  {key: 'gross_amount', label: 'Gross Amount', align: 'right'},
+  {key: 'long_amount', label: 'Long Amount', align: 'right'},
+  {key: 'short_amount', label: 'Short Amount', align: 'right'},
+  {key: 'net_cost', label: 'Net Exposure', align: 'right'},
+  {key: 'gross_cost', label: 'Gross Exposure', align: 'right'},
+  {key: 'long_cost', label: 'Long Exposure', align: 'right'},
+  {key: 'short_cost', label: 'Short Exposure', align: 'right'},
 ];
 
 function buildTradesTable(stratIdx) {
@@ -6384,10 +6401,13 @@ function buildTimelineScatter(stratIdx) {
   if (!el) return;
   var rd = getStratRunData(stratIdx);
   if (!rd) { el.innerHTML = ''; return; }
+  var previousSelect = document.getElementById('sel-' + sid + '-timeline-sym');
+  var selectedSymbol = previousSelect ? previousSelect.value : '';
 
   var trades = rd.TRADES || [];
   var orders = rd.ORDERS || [];
-  if (trades.length === 0 && orders.length === 0) { el.innerHTML = ''; return; }
+  var signalRejections = rd.SIGNAL_REJECTIONS || [];
+  if (trades.length === 0 && orders.length === 0 && signalRejections.length === 0) { el.innerHTML = ''; return; }
 
   // Collect all points with symbol info
   var allPoints = [];
@@ -6411,6 +6431,14 @@ function buildTimelineScatter(stratIdx) {
       });
     }
   });
+  signalRejections.forEach(function(event) {
+    if (!event.date) return;
+    allPoints.push({
+      date: event.date, y: null, sym: event.sym,
+      label: event.sym + ' ' + event.signal + ' rejected: ' + event.reason,
+      reason: event.reason, series: 'rejected'
+    });
+  });
   if (allPoints.length === 0) { el.innerHTML = ''; return; }
 
   // Collect unique symbols sorted
@@ -6418,9 +6446,11 @@ function buildTimelineScatter(stratIdx) {
   allPoints.forEach(function(p) { if (p.sym) symSet[p.sym] = true; });
   var symbols = Object.keys(symSet).sort();
 
-  // Build dropdown HTML — default is empty prompt
-  var optionsHtml = '<option value="" selected>Select asset\u2026</option>';
-  symbols.forEach(function(s) { optionsHtml += '<option value="' + s + '">' + s + '</option>'; });
+  if (!symbols.includes(selectedSymbol)) selectedSymbol = '';
+  var optionsHtml = '<option value=""' + (selectedSymbol ? '' : ' selected') + '>Select asset\u2026</option>';
+  symbols.forEach(function(s) {
+    optionsHtml += '<option value="' + s + '"' + (s === selectedSymbol ? ' selected' : '') + '>' + s + '</option>';
+  });
 
   el.innerHTML = '<div class="chart-card">'
     + '<div class="chart-title" style="display:flex;align-items:center;gap:12px;">'
@@ -6438,8 +6468,7 @@ function buildTimelineScatter(stratIdx) {
   el._allPoints = allPoints;
   el._stratIdx = stratIdx;
 
-  // Draw initial prompt message (no symbol selected)
-  _drawTimelineCanvas(sid, allPoints, '');
+  _drawTimelineCanvas(sid, allPoints, selectedSymbol);
 
   // Dropdown change handler
   var sel = document.getElementById('sel-' + sid + '-timeline-sym');
@@ -6488,9 +6517,9 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
   points.forEach(function(p) { if (!seen[p.date]) { uniqueDates.push(p.date); seen[p.date] = true; } });
 
   // Y range
-  var ys = points.map(function(p) { return p.y; });
-  var yMin = Math.min.apply(null, ys);
-  var yMax = Math.max.apply(null, ys);
+  var ys = points.filter(function(p) { return p.y !== null; }).map(function(p) { return p.y; });
+  var yMin = ys.length ? Math.min.apply(null, ys) : 0;
+  var yMax = ys.length ? Math.max.apply(null, ys) : 1;
   if (yMin === yMax) { yMin -= 1; yMax += 1; }
   var yPad = (yMax - yMin) * 0.08;
   yMin -= yPad; yMax += yPad;
@@ -6539,6 +6568,13 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
     { label: 'Trade Close +', color: COL.green, shape: 'rect' },
     { label: 'Trade Close \u2212', color: COL.red, shape: 'rect' },
   ];
+  var rejectionReasons = {};
+  points.forEach(function(p) {
+    if (p.series === 'rejected') rejectionReasons[p.reason] = true;
+  });
+  Object.keys(rejectionReasons).sort().forEach(function(reason) {
+    legendItems.push({ label: reason, color: '#9ca3af', shape: 'x' });
+  });
   ctx.font = '10px JetBrains Mono, monospace';
   var lx = pad.l + 5;
   legendItems.forEach(function(item) {
@@ -6549,6 +6585,9 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
       ctx.beginPath(); ctx.moveTo(lx, pad.t - 8); ctx.lineTo(lx + 8, pad.t - 8); ctx.lineTo(lx + 4, pad.t - 16); ctx.closePath(); ctx.fill();
     } else if (item.shape === 'triangleDown') {
       ctx.beginPath(); ctx.moveTo(lx, pad.t - 16); ctx.lineTo(lx + 8, pad.t - 16); ctx.lineTo(lx + 4, pad.t - 8); ctx.closePath(); ctx.fill();
+    } else if (item.shape === 'x') {
+      ctx.strokeStyle = item.color; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(lx, pad.t - 16); ctx.lineTo(lx + 8, pad.t - 8); ctx.moveTo(lx + 8, pad.t - 16); ctx.lineTo(lx, pad.t - 8); ctx.stroke();
     } else {
       ctx.fillRect(lx, pad.t - 16, 8, 8);
     }
@@ -6564,12 +6603,17 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
     var di = uniqueDates.indexOf(p.date);
     var xFrac = uniqueDates.length > 1 ? di / (uniqueDates.length - 1) : 0.5;
     var px = pad.l + xFrac * cw;
-    var py = pad.t + ch - ((p.y - yMin) / yRange) * ch;
+    var py = p.series === 'rejected'
+      ? pad.t + ch - 5
+      : pad.t + ch - ((p.y - yMin) / yRange) * ch;
     var radius = 5;
-    var sc = seriesColors[p.series];
+    var sc = seriesColors[p.series] || {};
     var fillC, strokeC;
 
-    if (p.series === 'tradeClose') {
+    if (p.series === 'rejected') {
+      fillC = null;
+      strokeC = '#9ca3af';
+    } else if (p.series === 'tradeClose') {
       fillC = p.gain >= 0 ? COL.green : COL.red;
       strokeC = fillC;
     } else {
@@ -6588,6 +6632,12 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
       ctx.closePath(); ctx.fill(); ctx.stroke();
     } else if (p.series === 'tradeOpen') {
       ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (p.series === 'rejected') {
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px - radius, py - radius); ctx.lineTo(px + radius, py + radius);
+      ctx.moveTo(px + radius, py - radius); ctx.lineTo(px - radius, py + radius);
+      ctx.stroke();
     } else {
       var s = radius * 1.4;
       ctx.beginPath();
@@ -6628,7 +6678,8 @@ function _drawTimelineCanvas(sid, allPoints, filterSym) {
         if (dx * dx + dy * dy <= b.r * b.r) { hit = b; break; }
       }
       if (hit) {
-        tooltip.textContent = hit.date + ': ' + hit.label + ' @ ' + hit.price.toFixed(2);
+        tooltip.textContent = hit.date + ': ' + hit.label
+          + (hit.price === null ? '' : ' @ ' + hit.price.toFixed(2));
         tooltip.classList.add('visible');
         tooltip.style.left = (mx + 12) + 'px';
         tooltip.style.top = (my - 20) + 'px';

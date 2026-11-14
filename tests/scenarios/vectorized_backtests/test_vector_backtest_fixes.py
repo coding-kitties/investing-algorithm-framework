@@ -13,6 +13,7 @@ These tests verify the fixes applied to the vector backtest engine:
     7. (Removed — SL/TP does not belong in vectorized backtests.)
     8. Raw signals exposed on BacktestRun.signals.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -34,6 +35,13 @@ from investing_algorithm_framework import (
     SnapshotInterval,
     generate_algorithm_id,
     TradeStatus,
+    Schedule,
+    SignalSeries,
+    SignalSide,
+    Study,
+    Universe,
+    BacktestWindow,
+    BacktestEngine,
 )
 
 
@@ -41,16 +49,13 @@ from investing_algorithm_framework import (
 # Shared strategy used by most tests (simple RSI + EMA crossover)
 # ---------------------------------------------------------------------------
 class RSIEMACrossoverStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id,
         symbols,
         position_sizes,
-        time_unit: TimeUnit,
-        interval: int,
+        schedule: Schedule,
         market: str,
         rsi_time_frame: str = "2h",
         rsi_period: int = 14,
@@ -102,8 +107,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval,
+            schedule=schedule,
             symbols=symbols,
             position_sizes=position_sizes,
         )
@@ -141,10 +145,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         )
         return ema_data, rsi_data
 
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals = {}
+    def generate_signal_series(self, data: Dict[str, Any]):
         for symbol in self.symbols:
             ema_data, rsi_data = self.prepare_indicators(
                 data[f"{symbol}_rsi_data"].copy(),
@@ -156,36 +157,37 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                 .max()
                 .astype(bool)
             )
-            rsi_oversold = (
-                rsi_data[self.rsi_result_column]
-                < self.rsi_oversold_threshold
-            )
-            buy_signal = rsi_oversold & ema_crossover_lookback
-            signals[symbol] = buy_signal.fillna(False).astype(bool)
-        return signals
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals = {}
-        for symbol in self.symbols:
-            ema_data, rsi_data = self.prepare_indicators(
-                data[f"{symbol}_rsi_data"].copy(),
-                data[f"{symbol}_ema_data"].copy(),
-            )
             ema_crossunder_lookback = (
                 ema_data[self.ema_crossunder_result_column]
                 .rolling(window=self.ema_cross_lookback_window)
                 .max()
                 .astype(bool)
             )
+            rsi_oversold = (
+                rsi_data[self.rsi_result_column]
+                < self.rsi_oversold_threshold
+            )
             rsi_overbought = (
                 rsi_data[self.rsi_result_column]
                 >= self.rsi_overbought_threshold
             )
-            sell_signal = rsi_overbought & ema_crossunder_lookback
-            signals[symbol] = sell_signal.fillna(False).astype(bool)
-        return signals
+            buy_signal = (rsi_oversold & ema_crossover_lookback)\
+                .fillna(False).astype(bool)
+            sell_signal = (rsi_overbought & ema_crossunder_lookback)\
+                .fillna(False).astype(bool)
+
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.OPEN_LONG,
+                series=buy_signal,
+                source="rsi_ema_cross",
+            )
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.CLOSE_LONG,
+                series=sell_signal,
+                source="rsi_ema_cross",
+            )
 
 
 def _resource_directory():
@@ -220,8 +222,7 @@ def _make_strategy(
         algorithm_id=generate_algorithm_id(
             params={"fix_test": True}
         ),
-        time_unit=TimeUnit.HOUR,
-        interval=2,
+        schedule=Schedule.every(2, TimeUnit.HOUR),
         market="BITVAVO",
         symbols=symbols,
         position_sizes=position_sizes,
@@ -237,17 +238,25 @@ def _run_backtest(app, strategy, days=730, **kwargs):
     date_range = BacktestDateRange(
         start_date=start_date, end_date=end_date, name="TestPeriod"
     )
-    backtest = app.run_vector_backtest(
-        initial_amount=1000,
-        backtest_date_range=date_range,
-        strategy=strategy,
-        snapshot_interval=SnapshotInterval.DAILY,
+    study = Study(
+        universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+        initial_capital=1000,
         risk_free_rate=0.027,
-        trading_symbol="EUR",
-        market="BITVAVO",
-        use_checkpoints=False,
-        **kwargs,
+        backtest_windows=[BacktestWindow(train_range=date_range)],
+        engines=[BacktestEngine.VECTOR],
     )
+    dynamic_position_sizing = kwargs.pop("dynamic_position_sizing", False)
+    backtests = app.run_backtest(
+        strategy=strategy,
+        study=study,
+        **kwargs,
+        run_configuration=BacktestRunConfiguration(
+            snapshot_interval=SnapshotInterval.DAILY,
+            use_checkpoints=False,
+            dynamic_position_sizing=dynamic_position_sizing,
+        ),
+    )
+    backtest = next(backtests.iter_backtests())
     runs = backtest.get_all_backtest_runs()
     return runs[0] if runs else None
 
@@ -394,8 +403,7 @@ class TestRawSignalsExposed(TestCase):
 
     def test_signals_field_present_and_populated(self):
         """
-        After a vector backtest, BacktestRun.signals should be a dict
-        keyed by symbol, each containing 'buy' and 'sell' pd.Series.
+        Loaded runs expose persisted sparse buy/sell timestamp lists.
         """
         app = _make_app()
         strategy = _make_strategy(symbols=["BTC"])
@@ -410,23 +418,15 @@ class TestRawSignalsExposed(TestCase):
             signal_data = run.signals[symbol]
             self.assertIn("buy", signal_data)
             self.assertIn("sell", signal_data)
-            self.assertIsInstance(signal_data["buy"], pd.Series)
-            self.assertIsInstance(signal_data["sell"], pd.Series)
-            # Series should contain boolean values
-            self.assertTrue(
-                signal_data["buy"].dtype == bool,
-                f"Expected bool dtype for {symbol} buy signals, "
-                f"got {signal_data['buy'].dtype}"
-            )
-            self.assertTrue(
-                signal_data["sell"].dtype == bool,
-                f"Expected bool dtype for {symbol} sell signals, "
-                f"got {signal_data['sell'].dtype}"
-            )
+            self.assertIsInstance(signal_data["buy"], list)
+            self.assertIsInstance(signal_data["sell"], list)
+            for timestamp in signal_data["buy"] + signal_data["sell"]:
+                self.assertIsInstance(timestamp, str)
+                self.assertIsNotNone(pd.Timestamp(timestamp).tzinfo)
 
-    def test_signals_have_datetimeindex(self):
+    def test_persisted_signals_can_be_loaded_as_datetimeindex(self):
         """
-        Each signal Series should have a DatetimeIndex.
+        Sparse signal dates can be used directly as a DatetimeIndex.
         """
         app = _make_app()
         strategy = _make_strategy(symbols=["BTC"])
@@ -434,7 +434,7 @@ class TestRawSignalsExposed(TestCase):
         self.assertIsNotNone(run)
 
         btc_buy = run.signals["BTC"]["buy"]
-        self.assertIsInstance(btc_buy.index, pd.DatetimeIndex)
+        self.assertIsInstance(pd.to_datetime(btc_buy), pd.DatetimeIndex)
 
     def test_signals_contain_at_least_one_true(self):
         """
@@ -448,7 +448,7 @@ class TestRawSignalsExposed(TestCase):
 
         # At least one symbol should have at least one buy signal
         any_buy = any(
-            run.signals[sym]["buy"].any()
+            bool(run.signals[sym]["buy"])
             for sym in run.signals
         )
         self.assertTrue(

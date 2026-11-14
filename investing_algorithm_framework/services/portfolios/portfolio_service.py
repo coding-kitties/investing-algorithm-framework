@@ -186,3 +186,120 @@ class PortfolioService(RepositoryService):
                     portfolio.get_total_trade_volume() + filled_size,
             }
         )
+
+    def get_order_cost_overview(self, query_params=None):
+        """
+        Build an overview of order costs (fees and slippage) per
+        connected portfolio.
+
+        Args:
+            query_params: Optional filters applied to the portfolio
+                selection (e.g. {"identifier": ...} or {"market": ...}).
+
+        Returns:
+            list[dict]: One entry per matching portfolio with the
+                number of orders and the aggregated order fee/slippage
+                figures for that portfolio.
+        """
+        portfolios = self.get_all(query_params)
+        overview = []
+
+        for portfolio in portfolios:
+            logger.info(
+                f"Reading order costs for market {portfolio.market}"
+            )
+            orders = self.order_service.get_all(
+                {"portfolio_id": portfolio.id}
+            )
+            filled_orders = [
+                order for order in orders if (order.filled or 0) > 0
+            ]
+            total_order_fee = sum(
+                order.order_fee or 0 for order in orders
+            )
+            total_slippage = sum(
+                order.slippage or 0 for order in orders
+            )
+
+            overview.append({
+                "portfolio_id": portfolio.id,
+                "identifier": portfolio.identifier,
+                "market": portfolio.market,
+                "trading_symbol": portfolio.trading_symbol,
+                "number_of_orders": len(orders),
+                "number_of_filled_orders": len(filled_orders),
+                "total_order_fee": total_order_fee,
+                "total_slippage": total_slippage,
+            })
+
+        return overview
+
+    def get_order_cost_specification(self, query_params=None):
+        """
+        Build the order cost specification (the fee/slippage that
+        would apply to a *new* order) per connected portfolio/market —
+        as opposed to ``get_order_cost_overview``, which reports costs
+        already incurred by past orders.
+
+        Uses the market-level ``fee_percentage``/``slippage_percentage``
+        configured on the portfolio's ``PortfolioConfiguration`` when
+        set. Otherwise falls back to the connected exchange's default
+        (lowest-tier) taker fee, read from ccxt's static exchange
+        metadata (no network call, no credentials required).
+
+        Args:
+            query_params: Optional filters applied to the portfolio
+                selection (e.g. {"identifier": ...} or {"market": ...}).
+
+        Returns:
+            list[dict]: One entry per matching portfolio.
+        """
+        # Local import to avoid a circular import between
+        # `services` and `infrastructure` at module load time.
+        from investing_algorithm_framework.infrastructure \
+            .order_executors.paper_trading_order_executor import \
+            resolve_ccxt_default_fee_percentages
+
+        portfolios = self.get_all(query_params)
+        specification = []
+
+        for portfolio in portfolios:
+            logger.info(
+                f"Reading order cost specification for "
+                f"market {portfolio.market}"
+            )
+            portfolio_configuration = self.portfolio_configuration_service \
+                .get(portfolio.market)
+            configured_fee = 0.0
+            slippage_percentage = 0.0
+
+            if portfolio_configuration is not None:
+                configured_fee = getattr(
+                    portfolio_configuration, "fee_percentage", 0.0
+                ) or 0.0
+                slippage_percentage = getattr(
+                    portfolio_configuration, "slippage_percentage", 0.0
+                ) or 0.0
+
+            if configured_fee:
+                fee_percentage = configured_fee
+                source = "configured"
+            else:
+                taker_fee, _ = resolve_ccxt_default_fee_percentages(
+                    portfolio.market
+                )
+                fee_percentage = taker_fee
+                source = "exchange_default" if taker_fee is not None \
+                    else "unknown"
+
+            specification.append({
+                "portfolio_id": portfolio.id,
+                "identifier": portfolio.identifier,
+                "market": portfolio.market,
+                "trading_symbol": portfolio.trading_symbol,
+                "fee_percentage": fee_percentage,
+                "slippage_percentage": slippage_percentage,
+                "source": source,
+            })
+
+        return specification

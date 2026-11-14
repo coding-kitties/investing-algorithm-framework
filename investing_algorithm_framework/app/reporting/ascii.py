@@ -657,6 +657,8 @@ def pretty_print_trades(
         target_symbol=target_symbol,
         trade_status=status
     )
+    # trading_symbol lives on Trade, not BacktestRun
+    trading_symbol = selection[0].trading_symbol if selection else ""
 
     def get_status(trade):
         status = "OPEN"
@@ -731,7 +733,7 @@ def pretty_print_trades(
         f"{float(trade.amount):.{amount_precision}f} ({float(trade.remaining):.{amount_precision}f}) {trade.target_symbol}"
         for trade in selection
     ]
-    trades_table[f"Net gain ({run.trading_symbol})"] = [
+    trades_table[f"Net gain ({trading_symbol})"] = [
         f"{float(trade.net_gain):.{price_precision}f}"
         for trade in selection
     ]
@@ -745,15 +747,15 @@ def pretty_print_trades(
         f"{trade.duration:.{time_precision}f} hours" for trade in selection
     ]
     # Add (unrealized) to the net gain if the trade is still open
-    trades_table[f"Net gain ({run.trading_symbol})"] = [
+    trades_table[f"Net gain ({trading_symbol})"] = [
         f"{float(trade.net_gain_absolute):.{price_precision}f} ({float(trade.net_gain_percentage):.{percentage_precision}f}%)" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
         for trade in selection
     ]
-    trades_table[f"Open price ({run.trading_symbol})"] = [
+    trades_table[f"Open price ({trading_symbol})"] = [
         f"{trade.open_price:.{price_precision}f}"  for trade in selection
     ]
     trades_table[
-        f"Close price's ({run.trading_symbol})"
+        f"Close price's ({trading_symbol})"
     ] = [
         get_close_prices(trade) for trade in selection
     ]

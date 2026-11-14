@@ -1,13 +1,10 @@
 import os
 import shutil
-from typing import Dict, Any
 from unittest import TestCase
-
-import pandas as pd
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, Algorithm, \
-    MarketCredential
+    MarketCredential, Schedule
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 from tests.resources import random_string, OrderExecutorTest, \
@@ -16,27 +13,11 @@ from tests.resources import random_string, OrderExecutorTest, \
 
 class StrategyOne(TradingStrategy):
     id = "strategy_one"
-    time_unit = TimeUnit.SECOND
-    interval = 2
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
+    schedule = Schedule.every(2, TimeUnit.SECOND)
 
 class StrategyTwo(TradingStrategy):
     id = "strategy_two"
-    time_unit = TimeUnit.SECOND
-    interval = 2
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        pass
+    schedule = Schedule.every(2, TimeUnit.SECOND)
 
 class Test(TestCase):
     portfolio_configurations = [

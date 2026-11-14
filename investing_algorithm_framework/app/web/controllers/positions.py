@@ -1,18 +1,24 @@
 import logging
 
 from dependency_injector.wiring import inject, Provide
-from flask import Blueprint, request
+from fastapi import APIRouter, Depends, Request
+from werkzeug.datastructures import MultiDict
 
 from investing_algorithm_framework.app.web.responses import create_response
 from investing_algorithm_framework.app.web.schemas import PositionSerializer
 
 logger = logging.getLogger("investing_algorithm_framework")
 
-blueprint = Blueprint("position-views", __name__)
+router = APIRouter()
 
 
-@blueprint.route("/api/positions", methods=["GET"])
+@router.get("/api/positions")
 @inject
-def list_positions(position_service=Provide["position_service"]):
-    positions = position_service.get_all(request.args)
+def list_positions(
+    request: Request,
+    position_service=Depends(Provide["position_service"]),
+):
+    positions = position_service.get_all(
+        MultiDict(request.query_params.multi_items())
+    )
     return create_response(positions, PositionSerializer())

@@ -1,9 +1,19 @@
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import List
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("investing_algorithm_framework")
+
+
+def _model_params(instance) -> Dict[str, Any]:
+    """Return the public instance attributes of ``instance`` as a JSON-
+    friendly dict, used by the default ``to_dict()`` on the pluggable
+    model base classes below."""
+    return {
+        k: v for k, v in vars(instance).items()
+        if not k.startswith("_")
+    }
 
 
 class SlippageModel(ABC):
@@ -13,7 +23,25 @@ class SlippageModel(ABC):
     Slippage models determine how the execution price deviates from
     the intended order price. This is used by the SimulationBlotter
     to model realistic order fills during backtesting.
+
+    Serialisation:
+        Subclasses inherit :meth:`to_dict` / :meth:`from_dict`
+        (backed by ``_registry``) so they can be persisted inside a
+        backtest bundle's :class:`ExecutionConfig`. The default
+        :meth:`to_dict` snapshots public instance attributes; if a
+        subclass's ``__init__`` signature does not match its public
+        attributes, override :meth:`to_dict` / :meth:`from_dict`
+        accordingly.
     """
+
+    #: Populated by :meth:`__init_subclass__` — maps class name to
+    #: subclass, used by :meth:`from_dict` to reconstruct instances
+    #: from the ``{"type": ..., "params": ...}`` form.
+    _registry: Dict[str, type] = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        SlippageModel._registry[cls.__name__] = cls
 
     @abstractmethod
     def calculate_slippage(
@@ -47,6 +75,37 @@ class SlippageModel(ABC):
             float: The maximum amount that can be filled.
         """
         return order_amount
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-friendly ``{"type": ..., "params": ...}`` form
+        suitable for embedding in a bundle's :class:`ExecutionConfig`."""
+        return {
+            "type": type(self).__name__,
+            "params": _model_params(self),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict[str, Any]]) -> Optional[
+        "SlippageModel"
+    ]:
+        """Reconstruct a :class:`SlippageModel` from a
+        :meth:`to_dict` payload. Returns ``None`` for ``None`` input
+        or when the type is not in the registry (e.g. a user-defined
+        subclass that isn't imported at load time)."""
+        if data is None:
+            return None
+        type_name = data.get("type")
+        params = data.get("params") or {}
+        target = SlippageModel._registry.get(type_name)
+        if target is None:
+            logger.warning(
+                "Unknown SlippageModel type %r — cannot reconstruct. "
+                "Import the class before opening the bundle or "
+                "handle the missing model explicitly.",
+                type_name,
+            )
+            return None
+        return target(**params)
 
 
 class NoSlippage(SlippageModel):
@@ -265,7 +324,18 @@ class CommissionModel(ABC):
 
     Commission models determine the fee charged for each trade.
     Used by the SimulationBlotter during backtesting.
+
+    Serialisation:
+        Subclasses inherit :meth:`to_dict` / :meth:`from_dict` for
+        persistence inside a bundle's :class:`ExecutionConfig`.
+        See :class:`SlippageModel` for the shape.
     """
+
+    _registry: Dict[str, type] = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        CommissionModel._registry[cls.__name__] = cls
 
     @abstractmethod
     def calculate_commission(self, price, amount, order_side):
@@ -281,6 +351,34 @@ class CommissionModel(ABC):
             float: The commission amount
         """
         raise NotImplementedError
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-friendly ``{"type": ..., "params": ...}`` form
+        suitable for embedding in a bundle's :class:`ExecutionConfig`."""
+        return {
+            "type": type(self).__name__,
+            "params": _model_params(self),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict[str, Any]]) -> Optional[
+        "CommissionModel"
+    ]:
+        """Reconstruct a :class:`CommissionModel` from a
+        :meth:`to_dict` payload. Returns ``None`` for ``None`` input
+        or when the type is not in the registry."""
+        if data is None:
+            return None
+        type_name = data.get("type")
+        params = data.get("params") or {}
+        target = CommissionModel._registry.get(type_name)
+        if target is None:
+            logger.warning(
+                "Unknown CommissionModel type %r — cannot reconstruct.",
+                type_name,
+            )
+            return None
+        return target(**params)
 
 
 class NoCommission(CommissionModel):
@@ -332,7 +430,18 @@ class FillModel(ABC):
     Fill models determine how much of an order can be filled
     in a single evaluation step. This enables partial fill
     simulation during backtesting.
+
+    Serialisation:
+        Subclasses inherit :meth:`to_dict` / :meth:`from_dict` for
+        persistence inside a bundle's :class:`ExecutionConfig`.
+        See :class:`SlippageModel` for the shape.
     """
+
+    _registry: Dict[str, type] = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        FillModel._registry[cls.__name__] = cls
 
     @abstractmethod
     def get_fill_amount(self, order_amount, available_volume=None):
@@ -348,6 +457,34 @@ class FillModel(ABC):
             float: The amount that can be filled (up to order_amount).
         """
         raise NotImplementedError
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-friendly ``{"type": ..., "params": ...}`` form
+        suitable for embedding in a bundle's :class:`ExecutionConfig`."""
+        return {
+            "type": type(self).__name__,
+            "params": _model_params(self),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict[str, Any]]) -> Optional[
+        "FillModel"
+    ]:
+        """Reconstruct a :class:`FillModel` from a :meth:`to_dict`
+        payload. Returns ``None`` for ``None`` input or when the type
+        is not in the registry."""
+        if data is None:
+            return None
+        type_name = data.get("type")
+        params = data.get("params") or {}
+        target = FillModel._registry.get(type_name)
+        if target is None:
+            logger.warning(
+                "Unknown FillModel type %r — cannot reconstruct.",
+                type_name,
+            )
+            return None
+        return target(**params)
 
 
 class FullFill(FillModel):

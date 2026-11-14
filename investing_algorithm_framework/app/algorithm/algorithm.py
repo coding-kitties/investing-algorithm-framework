@@ -5,7 +5,7 @@ from typing import List
 from investing_algorithm_framework.app.app_hook import AppHook
 from investing_algorithm_framework.app.strategy import TradingStrategy
 from investing_algorithm_framework.domain import OperationalException, \
-    DataSource
+    DataSource, Schedule
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -152,6 +152,15 @@ class Algorithm:
                 )
             else:
                 return
+
+        if not isinstance(strategy.schedule, Schedule):
+            raise OperationalException(
+                f"Schedule not set for strategy instance "
+                f"{strategy.strategy_id}. Set ``schedule = "
+                f"Schedule.every(...)`` or ``schedule = "
+                f"Schedule.on(...)`` on the class, or pass "
+                f"``schedule=`` to the constructor."
+            )
 
         strategy_ids = []
 

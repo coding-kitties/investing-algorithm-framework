@@ -153,7 +153,6 @@ class MyStrategy(TradingStrategy):
     time_unit = TimeUnit.DAY
     interval = 1
     symbols = ["AAPL"]
-    trading_symbol = "USD"
 
     data_sources = [
         DataSource(

@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from typing import Dict, Any
 import logging.config
 
-from investing_algorithm_framework import TimeUnit, \
+from investing_algorithm_framework import TimeUnit, Schedule, \
     DataSource, TradingStrategy, create_app, DEFAULT_LOGGING_CONFIG, Context
 """
 Coinbase trading bot example. Coinbase requires you to have an API key
@@ -18,8 +18,7 @@ load_dotenv()
 # Define your coinbase trading strategy and register the data sources
 class CoinbaseTradingStrategy(TradingStrategy):
     algorithm_id = "coinbase-trading-strategy"
-    time_unit = TimeUnit.SECOND
-    interval = 10
+    schedule = Schedule.every(10, TimeUnit.SECOND)
     data_sources = [
         DataSource(data_type="OHLCV", market="coinbase", symbol="BTC/EUR", warmup_window=200, time_frame="2h", identifier="BTC/EUR-ohlcv"),
         DataSource(data_type="Ticker", market="coinbase", symbol="BTC/EUR", identifier="BTC/EUR-ticker")

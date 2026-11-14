@@ -157,13 +157,24 @@ class Portfolio(BaseModel):
         )
 
     def to_dict(self):
+        def ensure_iso(value):
+            if hasattr(value, "isoformat"):
+                return value.isoformat()
+            return value
+
         return {
             "trading_symbol": self.trading_symbol,
             "market": self.market,
             "unallocated": self.unallocated,
             "identifier": self.identifier,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
+            "created_at": ensure_iso(self.created_at),
+            "updated_at": ensure_iso(self.updated_at),
             "initialized": self.initialized,
             "initial_balance": self.initial_balance,
+            "net_size": self.net_size,
+            "realized": self.realized,
+            "total_revenue": self.total_revenue,
+            "total_cost": self.total_cost,
+            "total_net_gain": self.total_net_gain,
+            "total_trade_volume": self.total_trade_volume,
         }

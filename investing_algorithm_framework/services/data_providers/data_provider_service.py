@@ -16,13 +16,20 @@ class DataProviderIndex:
     """
     Efficient lookup for data providers in O(1) time.
 
+    OHLCV execution lookups prefer the finest timeframe. Re-registering an
+    equal timeframe refreshes those lookups to the newly selected provider,
+    including its prepared backtest window.
+
     Attributes:
         data_providers (List[DataProvider]): List of data providers
         data_providers_lookup (dict): Dictionary to store the lookup
             for order executors based on market.
     """
-    def __init__(self, data_providers=[]):
-        self.data_providers = data_providers
+    def __init__(self, data_providers=None):
+        # Mutable default avoided: a `[]` default would be created once
+        # at function-definition time and shared/mutated across every
+        # instance created without an explicit argument.
+        self.data_providers = list(data_providers or [])
         self.data_providers_lookup = defaultdict()
         self.ohlcv_data_providers = defaultdict()
         self.ohlcv_data_providers_no_market = defaultdict()
@@ -84,7 +91,7 @@ class DataProviderIndex:
         time_frame = data_source.time_frame
 
         if DataType.OHLCV.equals(data_source.data_type):
-            if symbol not in self.ohlcv_data_providers:
+            if (symbol, market) not in self.ohlcv_data_providers:
                 self.ohlcv_data_providers[(symbol, market)] = best_provider
                 self.ohlcv_data_providers_no_market[symbol] = best_provider
                 self.ohlcv_data_providers_with_timeframe[
@@ -98,7 +105,10 @@ class DataProviderIndex:
                         (symbol, market)
                     ]
 
-                    if existing_provider.time_frame > best_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= best_provider.time_frame
+                    ):
                         self.ohlcv_data_providers[(symbol, market)] =\
                             best_provider
 
@@ -106,7 +116,10 @@ class DataProviderIndex:
                         symbol
                     ]
 
-                    if existing_provider.time_frame > best_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= best_provider.time_frame
+                    ):
                         self.ohlcv_data_providers_no_market[symbol] =\
                             best_provider
 
@@ -150,7 +163,7 @@ class DataProviderIndex:
         time_frame = data_source.time_frame
 
         if DataType.OHLCV.equals(data_source.data_type):
-            if symbol not in self.ohlcv_data_providers:
+            if (symbol, market) not in self.ohlcv_data_providers:
                 self.ohlcv_data_providers[(symbol, market)] = data_provider
                 self.ohlcv_data_providers_no_market[symbol] = data_provider
                 self.ohlcv_data_providers_with_timeframe[
@@ -164,7 +177,10 @@ class DataProviderIndex:
                         (symbol, market)
                     ]
 
-                    if existing_provider.time_frame > data_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= data_provider.time_frame
+                    ):
                         self.ohlcv_data_providers[(symbol, market)] = \
                             data_provider
 
@@ -172,7 +188,10 @@ class DataProviderIndex:
                         symbol
                     ]
 
-                    if existing_provider.time_frame > data_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= data_provider.time_frame
+                    ):
                         self.ohlcv_data_providers_no_market[symbol] = \
                             data_provider
 
@@ -245,7 +264,7 @@ class DataProviderIndex:
 
         if DataType.OHLCV.equals(data_source.data_type):
 
-            if symbol not in self.ohlcv_data_providers:
+            if (symbol, market) not in self.ohlcv_data_providers:
                 self.ohlcv_data_providers[(symbol, market)] = best_provider
                 self.ohlcv_data_providers_no_market[symbol] = best_provider
                 self.ohlcv_data_providers_with_timeframe[
@@ -258,7 +277,10 @@ class DataProviderIndex:
                     existing_provider = self.ohlcv_data_providers[
                         (symbol.upper(), market.upper())
                     ]
-                    if existing_provider.time_frame > best_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= best_provider.time_frame
+                    ):
                         self.ohlcv_data_providers[
                             (symbol.upper(), market.upper())
                         ] =\
@@ -268,7 +290,10 @@ class DataProviderIndex:
                         symbol
                     ]
 
-                    if existing_provider.time_frame > best_provider.time_frame:
+                    if (
+                        existing_provider.time_frame
+                        >= best_provider.time_frame
+                    ):
                         self.ohlcv_data_providers_no_market[symbol] = \
                             best_provider
 
@@ -437,7 +462,7 @@ class DataProviderService:
         self,
         configuration_service=None,
         market_credential_service=None,
-        default_data_providers: List[DataProvider] = [],
+        default_data_providers: List[DataProvider] = None,
     ):
         """
         Initialize the DataProviderService with a list of data providers.
@@ -446,10 +471,14 @@ class DataProviderService:
             default_data_providers (List[DataProvider]): A list of default
                 data providers to use.
         """
-        self.default_data_providers = default_data_providers
-        self.data_provider_index = DataProviderIndex(default_data_providers)
+        # Mutable default avoided: see DataProviderIndex.__init__.
+        self.default_data_providers = list(default_data_providers or [])
+        self.data_provider_index = DataProviderIndex(
+            self.default_data_providers
+        )
         self.configuration_service = configuration_service
         self.market_credential_service = market_credential_service
+        self.prepared_market_data_context = None
 
     def initialize(self, data_sources, data_providers):
         """
@@ -804,8 +833,9 @@ class DataProviderService:
             end_date (datetime): The end date for the backtest data.
 
         Returns:
-            Dict[str, Any]: The vectorized backtest data for the
-                given data sources.
+            Dict[str, Any]: Native-timeframe data keyed by each source's
+                ``get_identifier()``. Named sources for the same pair
+                retain their own frames; no pair-key alias is added.
         """
         vectorized_data = {}
 
@@ -900,7 +930,10 @@ class DataProviderService:
         self,
         data_sources: List[DataSource],
         backtest_date_range: BacktestDateRange,
-        show_progress: bool = True
+        show_progress: bool = True,
+        access_pattern: str = "rolling",
+        fill_missing_data: bool = False,
+        save_filled_data_points: bool = False,
     ):
         """
         Index the data providers in the service.
@@ -921,6 +954,39 @@ class DataProviderService:
         # Filter out duplicate data_sources
         unique_data_sources = set(data_sources)
 
+        cache_plan = {}
+        context = self.prepared_market_data_context
+
+        def register(data_source):
+            cache_key = None
+            cached_provider = None
+            if context is not None:
+                cache_key = context.key(
+                    data_source,
+                    backtest_date_range,
+                    self.data_provider_index.data_providers,
+                    access_pattern=access_pattern,
+                    fill_missing_data=fill_missing_data,
+                    save_filled_data_points=save_filled_data_points,
+                )
+                cached_provider = context.get(cache_key)
+            if cached_provider is not None:
+                self.data_provider_index \
+                    .register_data_source_and_backtest_data_provider(
+                        data_source,
+                        cached_provider,
+                    )
+                cache_plan[data_source] = (cache_key, True)
+            else:
+                self.data_provider_index.register_backtest_data_source(
+                    data_source, backtest_date_range
+                )
+                cache_plan[data_source] = (cache_key, False)
+            logger.debug(
+                "Registered backtest data provider for data source: %s",
+                data_source,
+            )
+
         if show_progress:
 
             for data_source in tqdm(
@@ -928,24 +994,13 @@ class DataProviderService:
                 desc="Registering backtest data providers for data sources",
                 colour="green"
             ):
-                self.data_provider_index.register_backtest_data_source(
-                    data_source, backtest_date_range
-                )
-                logger.debug(
-                    "Registered backtest "
-                    f"data provider for data source: {data_source}"
-                )
+                register(data_source)
         else:
             for data_source in unique_data_sources:
-                self.data_provider_index.register_backtest_data_source(
-                    data_source, backtest_date_range
-                )
-                logger.debug(
-                    "Registered backtest "
-                    f"data provider for data source: {data_source}"
-                )
+                register(data_source)
 
         self.backtest_mode = True
+        return cache_plan
 
     def prepare_backtest_data(
         self,

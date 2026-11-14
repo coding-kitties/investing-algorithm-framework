@@ -67,8 +67,9 @@ class TestGetStandardDeviationDownsideReturns(unittest.TestCase):
         """Test with two snapshots and negative return."""
         snapshots = self._create_snapshots([100, 90])
         result = get_standard_deviation_downside_returns(snapshots)
-        # Only one negative return, std of single value is NaN -> returns 0.0
-        self.assertEqual(result, 0.0)
+        # One period, a 10% shortfall: sqrt(0.1**2 / 1) = 0.1. A single losing
+        # period has downside risk; only its DISPERSION is undefined.
+        self.assertAlmostEqual(result, 0.1, places=6)
 
     # ==========================================================
     # Basic Functionality
@@ -85,18 +86,18 @@ class TestGetStandardDeviationDownsideReturns(unittest.TestCase):
         """Test with all negative returns."""
         snapshots = self._create_snapshots([100, 90, 81, 72.9])
         result = get_standard_deviation_downside_returns(snapshots)
-        # Returns: -10%, -10%, -10%
-        expected_std = np.std([-0.1, -0.1, -0.1], ddof=1)
-        self.assertAlmostEqual(result, expected_std, places=6)
+        # Returns: -10%, -10%, -10%. Every period is a 10% shortfall, so the
+        # downside deviation is 0.1 -- not the ~0 dispersion among them.
+        self.assertAlmostEqual(result, 0.1, places=6)
 
     def test_mixed_returns(self):
         """Test with mixed positive and negative returns."""
         # 100 -> 90 (-10%), 90 -> 99 (+10%), 99 -> 89.1 (-10%)
         snapshots = self._create_snapshots([100, 90, 99, 89.1])
         result = get_standard_deviation_downside_returns(snapshots)
-        # Downside returns: -0.1, -0.1
-        expected_std = np.std([-0.1, -0.1], ddof=1)
-        self.assertAlmostEqual(result, expected_std, places=4)
+        # Shortfalls over the three periods: -0.1, 0, -0.1
+        # sqrt((0.01 + 0 + 0.01) / 3) = 0.0816497
+        self.assertAlmostEqual(result, 0.0816497, places=6)
 
     def test_constant_values(self):
         """Test with constant portfolio values (zero returns)."""
@@ -396,8 +397,8 @@ class TestGetDownsideStdOfDailyReturns(unittest.TestCase):
         """Test with two snapshots and negative return."""
         snapshots = self._create_daily_snapshots([100, 90])
         result = get_downside_std_of_daily_returns(snapshots)
-        # Single negative return, std is NaN (can't compute std of 1 value)
-        self.assertTrue(math.isnan(result) or result == 0.0)
+        # One period, a 10% shortfall: sqrt(0.1**2 / 1) = 0.1
+        self.assertAlmostEqual(result, 0.1, places=6)
 
     # ==========================================================
     # Basic Functionality
@@ -414,8 +415,21 @@ class TestGetDownsideStdOfDailyReturns(unittest.TestCase):
         # Returns: -10%, -10%, -10%
         snapshots = self._create_daily_snapshots([100, 90, 81, 72.9])
         result = get_downside_std_of_daily_returns(snapshots)
-        # All returns are -10%, std should be 0
-        self.assertAlmostEqual(result, 0.0, places=5)
+        # All three periods are 10% shortfalls, so the downside deviation is
+        # 0.1. Zero here would say a strategy losing 10% every day carries no
+        # downside risk, which is the defect this change removes.
+        self.assertAlmostEqual(result, 0.1, places=6)
+
+    def test_mixed_returns_average_over_every_period(self):
+        """A winning day still counts in the denominator.
+
+        Returns: +10%, -10%. The shortfall vector is [0, -0.1], so the downside
+        deviation is sqrt((0 + 0.01) / 2) = 0.0707107 -- averaged over every
+        period, not over the losing ones only.
+        """
+        snapshots = self._create_daily_snapshots([100, 110, 99])
+        result = get_downside_std_of_daily_returns(snapshots)
+        self.assertAlmostEqual(result, 0.0707107, places=6)
 
     def test_varied_negative_returns(self):
         """Test with varied negative returns."""

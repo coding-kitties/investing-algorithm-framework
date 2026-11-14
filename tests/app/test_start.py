@@ -2,19 +2,16 @@ import os
 import shutil
 from unittest import TestCase
 
-from typing import Dict, Any
-import pandas as pd
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, Algorithm, \
-    MarketCredential
+    MarketCredential, Schedule
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 from tests.resources import OrderExecutorTest, PortfolioProviderTest
 
 
 class StrategyOne(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.SECOND)
     number_of_runs = 0
 
     def __init__(
@@ -43,18 +40,9 @@ class StrategyOne(TradingStrategy):
     ):
         StrategyOne.number_of_runs += 1
 
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
-
 
 class StrategyTwo(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.SECOND)
     number_of_runs = 0
 
     def __init__(
@@ -82,14 +70,6 @@ class StrategyTwo(TradingStrategy):
         data,
     ):
         StrategyTwo.number_of_runs += 1
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
-
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
-        str, pd.Series]:
-        pass
 
 class Test(TestCase):
 

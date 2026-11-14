@@ -41,17 +41,10 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h"
         )
-        data_source = DataSource(
-            market="binance",
-            symbol="BTC/EUR",
-            time_frame="2h",
-            data_type="OHLCV",
-            warmup_window=200
-        )
         date = datetime(
             2023, 8, 7, 8, 0, tzinfo=timezone.utc
         )
-        df = data_provider.get_data(data_source, start_date=date)
+        df = data_provider.get_data(start_date=date)
         self.assertEqual(
             ["Datetime", "Open", "High", "Low", "Close", "Volume"],
             df.columns

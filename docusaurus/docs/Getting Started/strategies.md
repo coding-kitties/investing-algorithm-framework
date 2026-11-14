@@ -18,159 +18,284 @@ The `TradingStrategy` class has the following key attributes:
 |-----------|------|-------------|
 | `algorithm_id` | `str` | Unique identifier for your combined strategy instances. Used for backtesting results, logging, and monitoring. |
 | `strategy_id` | `str` | Optional identifier for the strategy. Defaults to the class name. |
-| `time_unit` | `TimeUnit` | The time unit that defines when the strategy should run (e.g., `HOUR`, `DAY`, `WEEK`, `MONTH`). **Required**. |
-| `interval` | `int` | How often the strategy runs within the time unit (e.g., every 5 hours). **Required**. |
+| `schedule` | `Schedule` | Defines when the strategy runs — see [Defining Schedules](#defining-schedules) below. **Required** (either this or `time_unit`/`interval`). |
+| `time_unit` | `TimeUnit` | Legacy alternative to `schedule`: the time unit that defines when the strategy should run (e.g., `HOUR`, `DAY`). |
+| `interval` | `int` | Legacy alternative to `schedule`: how often the strategy runs within `time_unit` (e.g., every 5 hours). |
 | `symbols` | `List[str]` | List of symbols to trade (e.g., `["BTC", "ETH"]`). |
-| `trading_symbol` | `str` | The quote currency for trading (e.g., `"EUR"`, `"USDT"`). |
 | `data_sources` | `List[DataSource]` | Data sources that provide market data to the strategy. |
 | `position_sizes` | `List[PositionSize]` | Position sizing rules for each symbol. |
 | `stop_losses` | `List[StopLossRule]` | Stop loss rules for each symbol. |
 | `take_profits` | `List[TakeProfitRule]` | Take profit rules for each symbol. |
 | `scaling_rules` | `List[ScalingRule]` | Position scaling rules for pyramiding and partial closes. |
+| `exposure_rule` | `ExposureRule` | Caps total invested value across the whole portfolio (all symbols combined), e.g. never more than 80% invested. Singular, not a list — see [Risk Rules: ExposureRule](../Risk%20Rules/exposure-rule.md). |
+| `flip_on_opposite_signal` | `bool` | When `True`, an opposite open signal closes the current position and opens the new direction on the same bar or tick. Defaults to `False`. |
 | `metadata` | `Dict[str, Any]` | Dictionary for storing additional strategy information (author, version, params, etc.). |
+
+## Defining Schedules
+
+A `Schedule` object decides *when* a strategy runs. It's the
+recommended replacement for the legacy `time_unit`/`interval` pair
+(still supported, but `Schedule` is more expressive) and is passed to
+`super().__init__(schedule=schedule, ...)` from your strategy's
+constructor, or set as a `schedule` class attribute.
+
+There are two ways to build one:
+
+### Interval schedules — `Schedule.every(...)`
+
+```python
+from investing_algorithm_framework import Schedule, TimeUnit
+
+# Fires every 2 hours
+schedule = Schedule.every(2, TimeUnit.HOUR)
+```
+
+`TimeUnit` supports `SECOND`, `MINUTE`, `HOUR`, and `DAY`. Fire times
+land on fixed, anchor-aligned clock boundaries rather than drifting
+relative to whenever the strategy happened to start or was last run —
+`Schedule.every(2, TimeUnit.HOUR)` fires at `00:00`, `02:00`, `04:00`,
+... `08:00`, `10:00`, `12:00` UTC, every day. A manually or
+force-triggered run (e.g. via `request_immediate_run()`) never shifts
+this grid: it only "claims" the slot it ran in, and the next fixed
+boundary still fires on time.
+
+Pass an explicit `anchor` (any reference datetime — only its offset
+modulo the step matters, not the date) to shift the grid, e.g. to
+align with a specific time of day:
+
+```python
+from datetime import datetime, timezone
+
+# Fires at 09:30, 11:30, 13:30, ... every day instead of on the hour
+schedule = Schedule.every(
+    2, TimeUnit.HOUR,
+    anchor=datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc),
+)
+```
+
+### Rule-based schedules — `Schedule.on(...)`
+
+For calendar-driven cadences (e.g. "the first trading day of every
+month at 09:30"), combine a `DateRule` (which days) with a `TimeRule`
+(what time on those days):
+
+```python
+from investing_algorithm_framework import Schedule, DateRule, TimeRule
+
+# Fires at 09:30 on the first trading day of every month
+schedule = Schedule.on(DateRule.month_start(), TimeRule.at(9, 30))
+```
+
+`DateRule` factories: `every_day()`, `week_start(days_offset=0)`,
+`week_end(days_offset=0)`, `month_start(days_offset=0)`,
+`month_end(days_offset=0)`. `TimeRule` factories: `at(hour, minute=0,
+second=0)`; `market_open(minutes=0)`, `market_close(minutes=0)`, and
+`every_minute()` additionally require a `TradingCalendar`. Without a
+calendar, every calendar day is treated as a trading day — the
+appropriate default for 24/7 crypto venues.
+
+### Using a schedule in your strategy
+
+```python
+class MyStrategy(TradingStrategy):
+    schedule = Schedule.every(1, TimeUnit.HOUR)
+    symbols = ["BTC"]
+    # ...
+```
+
+Or accept it via the constructor when the schedule should vary per
+instance (see the [Example Application](example-application) for a
+full example that does this):
+
+```python
+class MyStrategy(TradingStrategy):
+    def __init__(self, schedule, **kwargs):
+        super().__init__(schedule=schedule, **kwargs)
+```
+
+## Position Modes
+
+Markets use `PositionMode.NETTING` by default, where a symbol has one net
+direction. Backtests can opt into `PositionMode.HEDGE` to hold independent long
+and short legs for the same symbol:
+
+```python
+from investing_algorithm_framework import PositionMode
+
+app.add_market(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    initial_balance=10_000,
+    position_mode=PositionMode.HEDGE,
+)
+```
+
+Both event-driven and vector backtests support `OPEN_LONG`, `CLOSE_LONG`,
+`OPEN_SHORT`, and `CLOSE_SHORT` independently in HEDGE mode. Stop-loss,
+take-profit, and cooldown rules are evaluated per leg, and reports include net,
+gross, long, and short exposure.
+
+Live HEDGE trading is validated at startup against whatever `OrderExecutor`/
+`PortfolioProvider` adapters are registered for the market
+(`supports_position_mode()`), not unconditionally rejected — but the
+built-in CCXT-based adapters only support `NETTING`, so a live app with
+`PositionMode.HEDGE` fails fast with a clear error unless you register your
+own HEDGE-capable adapters. Use `NETTING` for live trading with the default
+CCXT integration, run `HEDGE` in a backtest, or supply adapters that
+implement `supports_position_mode()` for `HEDGE`.
 
 ## Creating Your First Strategy
 
 ### Basic Strategy Structure
 
-There are two main approaches to creating strategies:
+There are two main approaches. Prefer the signal-based API when possible: the
+framework can then apply its normal conflict resolution, position sizing, risk,
+order-emission, and cooldown phases.
 
-#### Approach 1: Signal-Based Strategy (Recommended)
+#### Event and vector strategy (recommended)
 
-Implement `generate_buy_signals` and `generate_sell_signals` methods that return pandas Series with boolean signals:
+Override both signal hooks to make one strategy usable by both backtest engines:
+
+- `generate_signals` is called once per bar by event-driven backtests, paper
+  trading, and live trading.
+- `generate_signal_series` is called once with the full window by the vector
+  backtest engine.
+
+Keep the indicator calculation shared so both hooks express the same rules.
+`signals_from_column` reads only the latest row for event mode, while
+`signal_series_from_column` returns the complete boolean series for vector mode.
 
 ```python
-from investing_algorithm_framework import TradingStrategy, TimeUnit, DataSource, PositionSize
-import pandas as pd
+from investing_algorithm_framework import (
+    DataSource,
+    PositionSize,
+    Schedule,
+    SignalSide,
+    TimeUnit,
+    TradingStrategy,
+    signal_series_from_column,
+    signals_from_column,
+)
 
-class MySignalStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 1
-    symbols = ["BTC", "ETH"]
-    trading_symbol = "EUR"
 
+class MovingAverageStrategy(TradingStrategy):
+    schedule = Schedule.every(1, TimeUnit.HOUR)
+    symbols = ["BTC"]
     data_sources = [
         DataSource(
             identifier="btc_eur_1h",
             symbol="BTC/EUR",
             time_frame="1h",
-            warmup_window=100,
-            market="BITVAVO"
+            warmup_window=30,
+            market="BITVAVO",
+            pandas=True,
         ),
-        DataSource(
-            identifier="eth_eur_1h",
-            symbol="ETH/EUR",
-            time_frame="1h",
-            warmup_window=100,
-            market="BITVAVO"
-        )
     ]
-
     position_sizes = [
-        PositionSize(symbol="BTC", percentage=0.5),  # 50% of portfolio
-        PositionSize(symbol="ETH", percentage=0.3),  # 30% of portfolio
+        PositionSize(symbol="BTC", percentage_of_portfolio=25),
     ]
 
-    def generate_buy_signals(self, data):
-        """
-        Generate buy signals for each symbol.
+    def _with_signals(self, frame):
+        frame = frame.copy()
+        moving_average = frame["Close"].rolling(20).mean()
+        frame["open_long"] = frame["Close"] > moving_average
+        frame["close_long"] = frame["Close"] < moving_average
+        return frame
 
-        Args:
-            data: Dictionary with data source identifiers as keys
+    def generate_signals(self, context, data):
+        """Event-driven backtest, paper, and live hook."""
+        frame = self._with_signals(data["btc_eur_1h"])
+        yield from signals_from_column(
+            frame,
+            "open_long",
+            side=SignalSide.OPEN_LONG,
+            symbol="BTC",
+        )
+        yield from signals_from_column(
+            frame,
+            "close_long",
+            side=SignalSide.CLOSE_LONG,
+            symbol="BTC",
+        )
 
-        Returns:
-            Dict[str, pd.Series]: Boolean series for each symbol
-        """
-        signals = {}
-
-        # BTC buy signal logic
-        btc_data = data["btc_eur_1h"]
-        btc_close = btc_data["Close"]
-        btc_ma20 = btc_close.rolling(20).mean()
-        signals["BTC"] = btc_close > btc_ma20  # Buy when price above MA20
-
-        # ETH buy signal logic
-        eth_data = data["eth_eur_1h"]
-        eth_close = eth_data["Close"]
-        eth_ma20 = eth_close.rolling(20).mean()
-        signals["ETH"] = eth_close > eth_ma20
-
-        return signals
-
-    def generate_sell_signals(self, data):
-        """
-        Generate sell signals for each symbol.
-
-        Args:
-            data: Dictionary with data source identifiers as keys
-
-        Returns:
-            Dict[str, pd.Series]: Boolean series for each symbol
-        """
-        signals = {}
-
-        # BTC sell signal logic
-        btc_data = data["btc_eur_1h"]
-        btc_close = btc_data["Close"]
-        btc_ma20 = btc_close.rolling(20).mean()
-        signals["BTC"] = btc_close < btc_ma20  # Sell when price below MA20
-
-        # ETH sell signal logic
-        eth_data = data["eth_eur_1h"]
-        eth_close = eth_data["Close"]
-        eth_ma20 = eth_close.rolling(20).mean()
-        signals["ETH"] = eth_close < eth_ma20
-
-        return signals
+    def generate_signal_series(self, data):
+        """Vector backtest hook."""
+        frame = self._with_signals(data["btc_eur_1h"])
+        yield signal_series_from_column(
+            frame,
+            "open_long",
+            side=SignalSide.OPEN_LONG,
+            symbol="BTC",
+        )
+        yield signal_series_from_column(
+            frame,
+            "close_long",
+            side=SignalSide.CLOSE_LONG,
+            symbol="BTC",
+        )
 ```
 
-#### Approach 2: Custom Strategy Logic
+If a strategy only implements `generate_signals`, it can run event-driven,
+paper, and live, but not as a vector backtest. If it only implements
+`generate_signal_series`, it is vector-only.
 
-Override the `apply_strategy` method for full control over trading logic:
+#### Direct event-mode strategy with `run_strategy`
+
+Override `run_strategy` when the strategy needs direct access to `Context` and
+must create its own orders. This bypasses the default signal-processing phases,
+so the strategy is responsible for order conditions, sizing, and routing.
 
 ```python
-from investing_algorithm_framework import TradingStrategy, TimeUnit, OrderSide
+from investing_algorithm_framework import (
+    DataSource,
+    OrderSide,
+    Schedule,
+    TimeUnit,
+    TradingStrategy,
+)
 
-class MyCustomStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 1
 
-    def apply_strategy(self, context, data):
-        """
-        Custom strategy logic with full control.
+class DirectOrderStrategy(TradingStrategy):
+    schedule = Schedule.every(1, TimeUnit.HOUR)
+    symbols = ["BTC"]
+    data_sources = [
+        DataSource(
+            identifier="btc_eur_1h",
+            symbol="BTC/EUR",
+            time_frame="1h",
+            warmup_window=30,
+            market="BITVAVO",
+            pandas=True,
+        ),
+    ]
 
-        Args:
-            context: Context object for portfolio operations
-            data: Dictionary containing market data from data sources
-        """
-        symbol = "BTC"
-        full_symbol = f"{symbol}/{context.get_trading_symbol()}"
+    def run_strategy(self, context, data):
+        frame = data["btc_eur_1h"]
+        price = float(frame["Close"].iloc[-1])
+        moving_average = float(frame["Close"].rolling(20).mean().iloc[-1])
 
-        # Get current price
-        price = context.get_latest_price(full_symbol)
-
-        # Check if we have a position
-        if not self.has_position(symbol):
-            # Create a buy order
-            self.create_limit_order(
-                target_symbol=symbol,
-                order_side=OrderSide.BUY,
-                amount=0.01,
+        if price > moving_average and not context.has_position("BTC"):
+            context.create_limit_order(
+                target_symbol="BTC",
                 price=price,
-                execute=True
+                order_side=OrderSide.BUY,
+                percentage_of_portfolio=25,
             )
-        else:
-            # Check for sell condition
-            position = self.get_position(symbol)
-            if price > position.cost * 1.05:  # 5% profit
-                self.create_limit_order(
-                    target_symbol=symbol,
-                    order_side=OrderSide.SELL,
-                    amount=position.amount,
-                    price=price,
-                    execute=True
-                )
+        elif price < moving_average and context.has_position("BTC"):
+            context.create_limit_order(
+                target_symbol="BTC",
+                price=price,
+                order_side=OrderSide.SELL,
+                percentage_of_position=100,
+            )
 ```
+
+`run_strategy` is used by the event loop for event-driven backtests, paper
+trading, and live trading. The vector engine does not create a `Context` or call
+`run_strategy`; it requires `generate_signal_series`. A direct-order strategy
+must therefore be rewritten in terms of `SignalSeries` before it can use vector
+backtesting. Overriding both methods does not make the direct `run_strategy`
+orders part of a vector run.
 
 ### Registering Your Strategy
 
@@ -201,14 +326,16 @@ app.run()
 ### Moving Average Crossover Strategy
 
 ```python
-from investing_algorithm_framework import TradingStrategy, TimeUnit, DataSource, PositionSize
+from investing_algorithm_framework import (
+    TradingStrategy, TimeUnit, DataSource, PositionSize,
+    SignalSide, signals_from_column,
+)
 import pandas as pd
 
 class MovingAverageCrossover(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 1
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     data_sources = [
         DataSource(
@@ -229,7 +356,7 @@ class MovingAverageCrossover(TradingStrategy):
         self.short_window = short_window
         self.long_window = long_window
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         df = data["btc_eur_1h"]
         close = df["Close"]
 
@@ -237,21 +364,20 @@ class MovingAverageCrossover(TradingStrategy):
         long_ma = close.rolling(window=self.long_window).mean()
 
         # Golden cross: short MA crosses above long MA
-        buy_signal = (short_ma > long_ma) & (short_ma.shift(1) <= long_ma.shift(1))
-
-        return {"BTC": buy_signal}
-
-    def generate_sell_signals(self, data):
-        df = data["btc_eur_1h"]
-        close = df["Close"]
-
-        short_ma = close.rolling(window=self.short_window).mean()
-        long_ma = close.rolling(window=self.long_window).mean()
-
+        df["buy_signal"] = (
+            (short_ma > long_ma) & (short_ma.shift(1) <= long_ma.shift(1))
+        )
         # Death cross: short MA crosses below long MA
-        sell_signal = (short_ma < long_ma) & (short_ma.shift(1) >= long_ma.shift(1))
+        df["sell_signal"] = (
+            (short_ma < long_ma) & (short_ma.shift(1) >= long_ma.shift(1))
+        )
 
-        return {"BTC": sell_signal}
+        yield from signals_from_column(
+            df, "buy_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "sell_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
 ### RSI Strategy with Stop Loss and Take Profit
@@ -259,7 +385,8 @@ class MovingAverageCrossover(TradingStrategy):
 ```python
 from investing_algorithm_framework import (
     TradingStrategy, TimeUnit, DataSource,
-    PositionSize, StopLossRule, TakeProfitRule
+    PositionSize, StopLossRule, TakeProfitRule,
+    SignalSide, signals_from_column,
 )
 import pandas as pd
 
@@ -267,7 +394,6 @@ class RSIStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 4
     symbols = ["BTC"]
-    trading_symbol = "EUR"
 
     data_sources = [
         DataSource(
@@ -306,23 +432,25 @@ class RSIStrategy(TradingStrategy):
         rs = gain / loss
         return 100 - (100 / (1 + rs))
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         df = data["btc_eur_4h"]
         rsi = self.calculate_rsi(df["Close"])
 
         # Buy when RSI crosses above oversold level
-        buy_signal = (rsi > self.oversold) & (rsi.shift(1) <= self.oversold)
-
-        return {"BTC": buy_signal}
-
-    def generate_sell_signals(self, data):
-        df = data["btc_eur_4h"]
-        rsi = self.calculate_rsi(df["Close"])
-
+        df["buy_signal"] = (
+            (rsi > self.oversold) & (rsi.shift(1) <= self.oversold)
+        )
         # Sell when RSI crosses below overbought level
-        sell_signal = (rsi < self.overbought) & (rsi.shift(1) >= self.overbought)
+        df["sell_signal"] = (
+            (rsi < self.overbought) & (rsi.shift(1) >= self.overbought)
+        )
 
-        return {"BTC": sell_signal}
+        yield from signals_from_column(
+            df, "buy_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "sell_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
 ## Key Methods
@@ -536,12 +664,16 @@ Without a `ScalingRule`, behavior is identical to the default: one entry, one fu
 A **sell signal always takes priority** over scale-out. If both fire on the same bar/step, the position is fully closed. This ensures you can always exit a position completely, regardless of scaling rules.
 :::
 
-### Minimal API — No Extra Methods Needed
+### Signals Drive Scaling — No Extra Methods Needed
 
-In the common case, you only need `generate_buy_signals` and `generate_sell_signals`. The `ScalingRule` handles the rest:
+`ScalingRule` doesn't add new methods to override. It's driven entirely by the `SignalSide` values your `generate_signals` method yields via `signals_from_column`:
 
-- **`generate_scale_in_signals()`** defaults to `None` → **buy signals are automatically reused as scale-in triggers**
-- **`generate_scale_out_signals()`** defaults to `None` → **no automatic scale-out** (only full sell via `generate_sell_signals`)
+- **`SignalSide.OPEN_LONG`** — first entry, opens with the full `PositionSize`
+- **`SignalSide.SCALE_IN`** — adds `scale_in_percentage` of the original `PositionSize` (requires an existing position, capped by `max_entries`)
+- **`SignalSide.SCALE_OUT`** — partially closes `scale_out_percentage` of the current position
+- **`SignalSide.CLOSE_LONG`** — full exit, always wins over `SCALE_OUT` if both fire on the same bar
+
+Each side must be emitted explicitly. Unlike the vector engine's legacy fallback, an event-driven strategy gets **no automatic reuse** of the open signal as a scale-in signal — a plain `OPEN_LONG` signal is simply dropped while a position is already open, so you must yield a `SCALE_IN` signal for every add.
 
 ```python
 class MyStrategy(TradingStrategy):
@@ -549,25 +681,34 @@ class MyStrategy(TradingStrategy):
         ScalingRule(symbol="BTC", max_entries=3, scale_in_percentage=50),
     ]
 
-    def generate_buy_signals(self, data):
-        # This is also used for scale-in decisions automatically
-        ...
+    def generate_signals(self, context, data):
+        df = data["btc_eur_1h"]
+        ma20 = df["Close"].rolling(20).mean()
+        df["entry_signal"] = df["Close"] > ma20
+        df["exit_signal"] = df["Close"] < ma20
 
-    def generate_sell_signals(self, data):
-        # This always triggers a full exit
-        ...
+        # Same condition drives both the initial entry and every scale-in
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "exit_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
-You only need to override `generate_scale_in_signals` or `generate_scale_out_signals` when the conditions to **add to** or **trim** a position differ from your regular buy/sell logic. For example:
-- Buy on RSI oversold, but scale-in only on new highs
-- No scale-out on sell signal — instead trim 25% when volatility spikes
+Only add a `SCALE_OUT` signal when the conditions to **trim** a position should differ from your full-exit logic. For example:
+- Buy/scale-in on RSI oversold and new highs, but full-exit only on RSI overbought
+- Trim 25% when volatility spikes, independent of the exit signal
 
 ### Basic Pyramiding Example
 
 ```python
 from investing_algorithm_framework import (
     TradingStrategy, TimeUnit, DataSource,
-    PositionSize, ScalingRule
+    PositionSize, ScalingRule, SignalSide, signals_from_column,
 )
 import pandas as pd
 
@@ -601,18 +742,22 @@ class PyramidingStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
+    def generate_signals(self, context, data):
         df = data["btc_eur_1h"]
-        close = df["Close"]
-        ma20 = close.rolling(20).mean()
-        # Buy signal also used as scale-in (default fallback)
-        return {"BTC": close > ma20}
+        ma20 = df["Close"].rolling(20).mean()
+        df["entry_signal"] = df["Close"] > ma20
+        df["exit_signal"] = df["Close"] < ma20
 
-    def generate_sell_signals(self, data):
-        df = data["btc_eur_1h"]
-        close = df["Close"]
-        ma20 = close.rolling(20).mean()
-        return {"BTC": close < ma20}
+        # Same condition drives the initial entry and every scale-in
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "exit_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 ```
 
 In this example:
@@ -625,7 +770,7 @@ The `cooldown_in_bars=3` prevents back-to-back signals from triggering on every 
 
 ### Separate Scale-In and Scale-Out Signals
 
-For more control, override `generate_scale_in_signals` and `generate_scale_out_signals`:
+For more control, yield distinct `SignalSide.SCALE_IN` / `SignalSide.SCALE_OUT` signals from different conditions than your open/close signals:
 
 ```python
 class AdvancedScalingStrategy(TradingStrategy):
@@ -656,32 +801,36 @@ class AdvancedScalingStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        """Initial entry: RSI crosses above oversold."""
-        df = data["btc_eur_1h"]
-        rsi = self._calculate_rsi(df["Close"])
-        return {"BTC": (rsi > 30) & (rsi.shift(1) <= 30)}
-
-    def generate_sell_signals(self, data):
-        """Full exit: RSI crosses below overbought."""
-        df = data["btc_eur_1h"]
-        rsi = self._calculate_rsi(df["Close"])
-        return {"BTC": (rsi < 70) & (rsi.shift(1) >= 70)}
-
-    def generate_scale_in_signals(self, data):
-        """Add to position when price makes a new high."""
+    def generate_signals(self, context, data):
         df = data["btc_eur_1h"]
         close = df["Close"]
+        rsi = self._calculate_rsi(close)
+
+        # Initial entry / full exit: RSI crosses oversold / overbought
+        df["entry_signal"] = (rsi > 30) & (rsi.shift(1) <= 30)
+        df["exit_signal"] = (rsi < 70) & (rsi.shift(1) >= 70)
+
+        # Scale-in: price makes a new high
         rolling_high = close.rolling(20).max()
-        return {"BTC": close >= rolling_high}
+        df["scale_in_signal"] = close >= rolling_high
 
-    def generate_scale_out_signals(self, data):
-        """Reduce position when volatility spikes."""
-        df = data["btc_eur_1h"]
-        close = df["Close"]
+        # Scale-out: volatility spikes
         vol = close.pct_change().rolling(20).std()
         avg_vol = vol.rolling(50).mean()
-        return {"BTC": vol > avg_vol * 2}
+        df["scale_out_signal"] = vol > avg_vol * 2
+
+        yield from signals_from_column(
+            df, "entry_signal", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "exit_signal", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "scale_in_signal", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "scale_out_signal", side=SignalSide.SCALE_OUT, symbol="BTC",
+        )
 
     def _calculate_rsi(self, prices, period=14):
         delta = prices.diff()
@@ -692,10 +841,10 @@ class AdvancedScalingStrategy(TradingStrategy):
 ```
 
 **Signal priority:**
-- If `generate_scale_in_signals` is not overridden → buy signals are reused for scale-in decisions
-- If `generate_scale_out_signals` is not overridden → no automatic scale-out (only full sell signals apply)
-- **Sell always takes priority over scale-out**: if both fire on the same step, the position is fully closed
-- Cooldown applies after any action (buy, sell, scale-in, scale-out) — see `cooldown_in_bars`
+- `SCALE_IN` requires an existing position and an available `ScalingRule` entry slot — there is no fallback to the `OPEN_LONG` condition, so emit it explicitly whenever it differs
+- `SCALE_OUT` requires an existing position; emitting no `SCALE_OUT` signal means no partial trims ever happen
+- **`CLOSE_LONG` always takes priority over `SCALE_OUT`**: if both fire on the same bar, the position is fully closed
+- Cooldown applies after any action (open, close, scale-in, scale-out) — see `cooldown_in_bars`
 
 ## Metadata
 
@@ -789,12 +938,12 @@ print(f"Number of trades: {results.number_of_trades}")
 Check for sufficient data before generating signals:
 
 ```python
-def generate_buy_signals(self, data):
+def generate_signals(self, context, data):
     df = data["btc_eur_1h"]
 
     if len(df) < self.required_window:
-        # Return empty signals if not enough data
-        return {"BTC": pd.Series([False] * len(df), index=df.index)}
+        # Not enough data yet — yield no signals
+        return
 
     # Generate signals...
 ```

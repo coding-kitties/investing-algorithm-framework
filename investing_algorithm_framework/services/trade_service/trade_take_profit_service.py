@@ -12,7 +12,8 @@ class TradeTakeProfitService(RepositoryService):
     def mark_triggered(
         self,
         take_profit_ids,
-        trigger_date: datetime
+        trigger_date: datetime,
+        mirror: bool = False,
     ) -> None:
         """
         Mark take profits as triggered.
@@ -22,15 +23,29 @@ class TradeTakeProfitService(RepositoryService):
                 mark as triggered.
             trigger_date (datetime): The date and time when the
                 take profits were triggered.
+            mirror (bool): When True, records that the broker-native
+                mirror order (not the client-side price check) is
+                what closed the position, by setting
+                ``mirror_triggered``/``mirror_triggered_at`` instead
+                of ``triggered``/``triggered_at``. Default False.
 
         Returns:
             None
         """
-        update_data = {
-            "triggered": True,
-            "triggered_at": trigger_date,
-            "updated_at": trigger_date
-        }
+        if mirror:
+            update_data = {
+                "triggered": True,
+                "triggered_at": trigger_date,
+                "mirror_triggered": True,
+                "mirror_triggered_at": trigger_date,
+                "updated_at": trigger_date
+            }
+        else:
+            update_data = {
+                "triggered": True,
+                "triggered_at": trigger_date,
+                "updated_at": trigger_date
+            }
 
         for id in take_profit_ids:
             try:

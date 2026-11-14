@@ -1,6 +1,7 @@
 """
 Test that strategy metadata is preserved when running vector backtests.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import shutil
 import unittest
@@ -15,21 +16,20 @@ import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import create_app, BacktestDateRange, \
-    SnapshotInterval, RESOURCE_DIRECTORY, DATA_DIRECTORY, TimeUnit, TradingStrategy, \
-    DataSource, DataType, PositionSize, generate_algorithm_id
+    SnapshotInterval, RESOURCE_DIRECTORY, DATA_DIRECTORY, TimeUnit, \
+    TradingStrategy, DataSource, DataType, PositionSize, \
+    generate_algorithm_id, Schedule, Study, Universe, BacktestWindow, \
+    BacktestEngine, SignalSide, signal_series_from_column
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id,
         symbols,
         position_sizes,
-        time_unit: TimeUnit,
-        interval: int,
+        schedule: Schedule,
         market: str,
         rsi_time_frame: str,
         rsi_period: int,
@@ -82,8 +82,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval,
+            schedule=schedule,
             symbols=symbols,
             position_sizes=position_sizes
         )
@@ -128,19 +127,10 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
         return ema_data, rsi_data
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+    def generate_signal_series(self, data: Dict[str, Any]):
         """
-        Generate buy signals based on the moving average crossover.
-
-        data (Dict[str, Any]): Dictionary containing all the data for
-            the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating buy signals (True/False).
+        Generate buy/sell signal series based on the RSI + EMA crossover.
         """
-
-        signals = {}
         for symbol in self.symbols:
             ema_data_identifier = f"{symbol}_ema_data"
             rsi_data_identifier = f"{symbol}_rsi_data"
@@ -161,31 +151,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
             # Combine both conditions
             buy_signal = rsi_oversold & ema_crossover_lookback
-            buy_signals = buy_signal.fillna(False).astype(bool)
-            signals[symbol] = buy_signals
-        return signals
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        """
-        Generate sell signals based on the moving average crossover.
-
-        Args:
-            data (Dict[str, Any]): Dictionary containing all the data for
-                the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating sell signals (True/False).
-        """
-
-        signals = {}
-        for symbol in self.symbols:
-            ema_data_identifier = f"{symbol}_ema_data"
-            rsi_data_identifier = f"{symbol}_rsi_data"
-            ema_data, rsi_data = self.prepare_indicators(
-                data[ema_data_identifier].copy(),
-                data[rsi_data_identifier].copy()
-            )
+            buy_signal = buy_signal.fillna(False).astype(bool)
 
             # Confirmed by crossover between short-term EMA and long-term EMA
             # within a given lookback window
@@ -201,8 +167,19 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             # Combine both conditions
             sell_signal = rsi_overbought & ema_crossunder_lookback
             sell_signal = sell_signal.fillna(False).astype(bool)
-            signals[symbol] = sell_signal
-        return signals
+
+            buy_df = pd.DataFrame({"_buy_signal": buy_signal})
+            sell_df = pd.DataFrame({"_sell_signal": sell_signal})
+            yield signal_series_from_column(
+                buy_df, "_buy_signal",
+                side=SignalSide.OPEN_LONG, symbol=symbol,
+                source="test_fixture",
+            )
+            yield signal_series_from_column(
+                sell_df, "_sell_signal",
+                side=SignalSide.CLOSE_LONG, symbol=symbol,
+                source="test_fixture",
+            )
 
 
 class Test(TestCase):
@@ -246,8 +223,7 @@ class Test(TestCase):
         }
         strategy = RSIEMACrossoverStrategy(
             algorithm_id=generate_algorithm_id(params=param_set),
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             market="BITVAVO",
             rsi_time_frame=param_set["rsi_time_frame"],
             rsi_period=param_set["rsi_period"],
@@ -276,17 +252,23 @@ class Test(TestCase):
             "description": "Test strategy",
             "custom_param": "custom_value"
         }
-        backtest = app.run_vector_backtest(
-            initial_amount=1000,
-            backtest_date_range=date_range_1,
-            strategy=strategy,
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            use_checkpoints=False,
-            backtest_storage_directory=self.backtest_storage_dir
+            backtest_windows=[BacktestWindow(train_range=date_range_1)],
+            engines=[BacktestEngine.VECTOR],
         )
+        backtests = app.run_backtest(
+            strategy=strategy,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+                backtest_storage_directory=self.backtest_storage_dir,
+            ),
+        )
+        backtest = next(backtests.iter_backtests())
 
         # Verify metadata is preserved
         self.assertIsNotNone(backtest.metadata)
@@ -339,8 +321,7 @@ class Test(TestCase):
         }
         strategy_one = RSIEMACrossoverStrategy(
             algorithm_id=generate_algorithm_id(params=param_set_one),
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             market="BITVAVO",
             rsi_time_frame=param_set_one["rsi_time_frame"],
             rsi_period=param_set_one["rsi_period"],
@@ -372,8 +353,7 @@ class Test(TestCase):
 
         strategy_two = RSIEMACrossoverStrategy(
             algorithm_id=generate_algorithm_id(params=param_set_two),
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             market="BITVAVO",
             rsi_time_frame=param_set_two["rsi_time_frame"],
             rsi_period=param_set_two["rsi_period"],
@@ -402,19 +382,24 @@ class Test(TestCase):
             "description": "Test strategy",
             "custom_param": "custom_value"
         }
-        backtests = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_range=date_range_1,
-            strategies=[strategy_one, strategy_two],
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            use_checkpoints=False,
-            backtest_storage_directory=self.backtest_storage_dir
+            backtest_windows=[BacktestWindow(train_range=date_range_1)],
+            engines=[BacktestEngine.VECTOR],
+        )
+        backtests = app.run_backtests(
+            strategies=[strategy_one, strategy_two],
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+                backtest_storage_directory=self.backtest_storage_dir,
+            ),
         )
 
-        for backtest in backtests:
+        for backtest in backtests.iter_backtests():
             # Verify metadata is preserved
             self.assertIsNotNone(backtest.metadata)
             self.assertEqual(backtest.metadata.get("author"), "Test User")

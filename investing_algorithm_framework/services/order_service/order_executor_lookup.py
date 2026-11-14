@@ -14,8 +14,8 @@ class OrderExecutorLookup:
         order_executor_lookup (dict): Dictionary to store the lookup
             for order executors based on market.
     """
-    def __init__(self, order_executors=[]):
-        self.order_executors = order_executors
+    def __init__(self, order_executors=None):
+        self.order_executors = list(order_executors or [])
 
         # These will be our lookup tables
         self.order_executor_lookup = defaultdict()

@@ -1,6 +1,7 @@
 import pandas as pd
-from plotly.subplots import make_subplots
-from plotly import graph_objects as go
+from finterion_charts import ChartSpec, Indicator
+
+from ._finterion_render import FinterionChart
 
 
 def get_equity_curve_with_drawdown_chart(equity_curve_series, drawdown_series):
@@ -16,59 +17,35 @@ def get_equity_curve_with_drawdown_chart(equity_curve_series, drawdown_series):
         equity_curve_df["value"] / equity_curve_df["value"].iloc[0]
     )
 
-    fig = make_subplots(
-        rows=2,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.05,
-        row_heights=[0.7, 0.3],
-        subplot_titles=["", ""]
-    )
+    # Equity curve and drawdown series are derived from the same portfolio
+    # snapshots, so they share the same timestamps/length.
+    equity_values = equity_curve_df["value"].to_numpy()
+    time_ms = pd.to_datetime(equity_curve_df["datetime"]) \
+        .astype("datetime64[ms]").astype("int64").to_numpy()
+    drawdown_values = drawdown_df["value"].to_numpy()
 
-    # Draw equity curve
-    fig.add_trace(
-        go.Scatter(
-            x=equity_curve_df["datetime"],
-            y=equity_curve_df["value"],
-            mode="lines",
-            line=dict(color="rgba(0, 128, 0, 0.8)", width=1),
-            name="Equity Curve",
-            hovertemplate="<b>Equity</b><br>%{x}<br>Value: %{y:.2f}<extra></extra>"
-        ),
-        row=1,
-        col=1
+    spec = ChartSpec(theme="finterion-light", grid="horizontal")
+    spec.with_bars(
+        time=time_ms, open=equity_values, high=equity_values,
+        low=equity_values, close=equity_values,
     )
+    spec.with_column("equity", equity_values)
+    spec.with_column("drawdown", drawdown_values)
+    spec.add_panel(Indicator.panel(
+        id="equity",
+        weight=0.7,
+        values="equity",
+        kind="line",
+        color="#10b981",
+        title="Equity Curve",
+    ))
+    spec.add_panel(Indicator.panel(
+        id="drawdown",
+        weight=0.3,
+        values="drawdown",
+        kind="area",
+        color="#ef4444",
+        title="Drawdown",
+    ))
 
-    # Drawdown area
-    fig.add_trace(
-        go.Scatter(
-            x=drawdown_df["datetime"],
-            y=drawdown_df["value"],
-            mode="lines",
-            fill="tozeroy",
-            fillcolor="rgba(255, 99, 71, 0.3)",
-            line=dict(color="rgba(255, 99, 71, 0.8)", width=1),
-            name="Drawdown"
-        ),
-        row=2,
-        col=1
-    )
-
-    # Final layout
-    fig.update_layout(
-        xaxis=dict(title=None),
-        yaxis=dict(title="Cumulative Equity (log)", type="log"),
-        xaxis2=dict(title=None),
-        yaxis2=dict(
-            title="Drawdown",
-            tickformat=".0%",
-            tickvals=[-0.2, -0.15, -0.1, -0.05, 0]  # Clean % ticks
-        ),
-        template="plotly_white",
-        height=600,
-        showlegend=False,
-        hovermode="x unified",  # Enables vertical hover line
-        margin=dict(l=0, r=0, t=0, b=0),
-    )
-
-    return fig
+    return FinterionChart(spec.validate(), height=600)

@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.orm import relationship
+import json
+
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, text
+from sqlalchemy.orm import relationship, reconstructor
 
 from investing_algorithm_framework.domain import Trade, TradeStatus
 from investing_algorithm_framework.infrastructure.database import (
@@ -52,25 +54,46 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         'SQLOrder',
         secondary=order_trade_association,
         back_populates='trades',
+        order_by=(
+            '(SQLOrder.created_at, SQLOrder.target_symbol, '
+            'SQLOrder.trading_symbol, SQLOrder.strategy_id, '
+            'SQLOrder.order_side, SQLOrder.order_type, '
+            'SQLOrder.price, SQLOrder.amount, SQLOrder.id)'
+        ),
         lazy='joined'
     )
     target_symbol = Column(String)
     trading_symbol = Column(String)
     closed_at = Column(DateTime, default=None)
-    opened_at = Column(DateTime, default=None)
+    opened_at = Column(DateTime, default=None, index=True)
     open_price = Column(SqliteDecimal(), default=None)
     amount = Column(SqliteDecimal(), default=None)
     available_amount = Column(SqliteDecimal(), default=None)
     filled_amount = Column(SqliteDecimal(), default=None)
     remaining = Column(SqliteDecimal(), default=None)
     net_gain = Column(SqliteDecimal(), default=0)
+    total_fees = Column(SqliteDecimal(), default=0)
     cost = Column(SqliteDecimal(), default=0)
     last_reported_price = Column(SqliteDecimal(), default=None)
     last_reported_price_datetime = Column(DateTime, default=None)
     high_water_mark = Column(SqliteDecimal(), default=None)
     high_water_mark_datetime = Column(DateTime, default=None)
+    low_water_mark = Column(SqliteDecimal(), default=None)
+    low_water_mark_datetime = Column(DateTime, default=None)
     updated_at = Column(DateTime, default=None)
     status = Column(String, default=TradeStatus.CREATED.value)
+    # Direction flag (#433). SHORT trades open with a SELL order and
+    # close with a BUY (cover) order; long trades are the opposite.
+    # ``server_default`` ensures existing rows backfill to False on
+    # SQLite ALTER TABLE without an explicit data migration.
+    is_short = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("0"),
+    )
+    metadata_json = Column(Text, default=None)
+    strategy_id = Column(String, default=None)
     # Stop losses should be actively loaded
     stop_losses = relationship(
         'SQLTradeStopLoss',
@@ -98,14 +121,20 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         closed_at=None,
         updated_at=None,
         net_gain=0,
+        total_fees=0,
         cost=0,
         last_reported_price=None,
         last_reported_price_datetime=None,
         high_water_mark=None,
         high_water_mark_datetime=None,
+        low_water_mark=None,
+        low_water_mark_datetime=None,
         sell_orders=[],
         stop_losses=[],
         take_profits=[],
+        is_short=False,
+        metadata=None,
+        strategy_id=None,
     ):
         self.orders = [buy_order]
         self.open_price = buy_order.price
@@ -117,16 +146,50 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         self.filled_amount = filled_amount
         self.remaining = remaining
         self.net_gain = net_gain
+        self.total_fees = total_fees or 0
         self.cost = cost
         self.last_reported_price = last_reported_price
         self.last_reported_price_datetime = last_reported_price_datetime
         self.high_water_mark = high_water_mark
         self.high_water_mark_datetime = high_water_mark_datetime
+        self.low_water_mark = low_water_mark
+        self.low_water_mark_datetime = low_water_mark_datetime
         self.opened_at = opened_at
         self.updated_at = updated_at
         self.status = status
         self.stop_losses = stop_losses
         self.take_profits = take_profits
+        self.is_short = bool(is_short)
+        self.metadata = metadata if metadata is not None else {}
+        if self.metadata:
+            self.metadata_json = json.dumps(self.metadata)
+
+        # Strategy that opened this trade, if known. Falls back to
+        # metadata['strategy_id'], then the opening order's strategy_id.
+        if strategy_id is None:
+            if isinstance(self.metadata, dict) and \
+                    "strategy_id" in self.metadata:
+                strategy_id = self.metadata.get("strategy_id")
+            else:
+                strategy_id = getattr(buy_order, "strategy_id", None)
+        self.strategy_id = strategy_id
 
         if sell_orders is not None:
             self.orders.extend(sell_orders)
+
+    @reconstructor
+    def init_on_load(self):
+        """Deserialize metadata from JSON when loaded from DB."""
+        if self.metadata_json:
+            self.metadata = json.loads(self.metadata_json)
+        else:
+            self.metadata = {}
+
+    def update(self, data):
+        if "metadata" in data:
+            metadata_val = data.pop("metadata")
+            self.metadata = metadata_val if metadata_val else {}
+            self.metadata_json = json.dumps(self.metadata) \
+                if self.metadata else None
+
+        super().update(data)

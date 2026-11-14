@@ -1,6 +1,6 @@
 import inspect
 
-from flask import jsonify
+from fastapi.responses import JSONResponse
 
 
 def create_response(data, serializer, status_code=200):
@@ -11,10 +11,13 @@ def create_response(data, serializer, status_code=200):
     if isinstance(data, dict):
         item_selection = data["items"]
         data["items"] = serializer.dump(item_selection, many=True)
-        return data, status_code
+        return JSONResponse(content=data, status_code=status_code)
     elif isinstance(data, list):
         data = serializer.dump(data, many=True)
-        return jsonify({"items": data, "total": len(data)}), status_code
+        return JSONResponse(
+            content={"items": data, "total": len(data)},
+            status_code=status_code,
+        )
     else:
         data = serializer.dump(data)
-        return jsonify(data), status_code
+        return JSONResponse(content=data, status_code=status_code)

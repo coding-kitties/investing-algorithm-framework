@@ -5,8 +5,11 @@ import pandas as pd
 
 from investing_algorithm_framework.domain import PortfolioSnapshot, Trade, \
     OperationalException
+from ._returns_helper import snapshots_to_dataframe
+from .inputs import shared_snapshot_calculation
 
 
+@shared_snapshot_calculation
 def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, datetime]]:
     """
     Calculate the monthly time-weighted returns from a list of portfolio
@@ -18,7 +21,11 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
 
         r_month = (V_end - cash_flow_in_month) / V_prev_end - 1
 
-    With no cash flows this is identical to ``pct_change()``.
+    The first month is measured from the initial snapshot when that month
+    contains at least two snapshots. A mid-month start therefore produces
+    a partial-month return, labelled with that month's end date.
+
+    With no cash flows, subsequent months are identical to ``pct_change()``.
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
@@ -29,14 +36,7 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
     """
 
     # Create DataFrame from snapshots
-    data = [
-        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
-        for s in snapshots
-    ]
-    df = pd.DataFrame(data, columns=["created_at", "total_value", "cash_flow"])
-    df['created_at'] = pd.to_datetime(df['created_at'])
-    df = df.sort_values('created_at').drop_duplicates('created_at')\
-        .set_index('created_at')
+    df = snapshots_to_dataframe(snapshots)
 
     monthly_value = df['total_value'].resample('ME').last().dropna()
     monthly_cf = df['cash_flow'].resample('ME').sum()
@@ -46,6 +46,12 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
     })
 
     prev_value = monthly_df['total_value'].shift(1)
+
+    # Measure the first month from the initial snapshot, as
+    # get_yearly_returns does for the first year, instead of dropping it.
+    if len(df) > 1 and df['total_value'].resample('ME').count().iloc[0] > 1:
+        prev_value.iloc[0] = df['total_value'].iloc[0]
+
     monthly_df['return'] = (
         (monthly_df['total_value'] - monthly_df['cash_flow']) / prev_value - 1
     )
@@ -58,6 +64,7 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
     return monthly_returns
 
 
+@shared_snapshot_calculation
 def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, date]]:
     """
     Calculate the yearly time-weighted returns from a list of portfolio
@@ -75,14 +82,7 @@ def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, 
     """
 
     # Create DataFrame from snapshots
-    data = [
-        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
-        for s in snapshots
-    ]
-    df = pd.DataFrame(data, columns=["created_at", "total_value", "cash_flow"])
-    df['created_at'] = pd.to_datetime(df['created_at'])
-    df = df.sort_values('created_at').drop_duplicates('created_at')\
-        .set_index('created_at')
+    df = snapshots_to_dataframe(snapshots).copy(deep=False)
 
     # Remove timezone information if present to avoid warning
     if df.index.tz is not None:
@@ -96,6 +96,17 @@ def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, 
     })
 
     prev_value = yearly_df['total_value'].shift(1)
+    if len(prev_value) > 0 and pd.isna(prev_value.iloc[0]):
+        # There is no prior year-end for the first row, so shift(1)
+        # leaves it NaN and dropna() below would silently drop the
+        # backtest's first calendar year. Anchor it to the very first
+        # snapshot (the initial portfolio value) instead — but only
+        # when more than one snapshot actually falls within/before
+        # that first year; a single snapshot has no meaningful return
+        # to report (keeps ``[]`` for single-snapshot inputs).
+        first_year_end = yearly_df.index[0]
+        if (df.index <= first_year_end).sum() > 1:
+            prev_value.iloc[0] = df['total_value'].iloc[0]
     yearly_df['return'] = (
         (yearly_df['total_value'] - yearly_df['cash_flow']) / prev_value - 1
     )

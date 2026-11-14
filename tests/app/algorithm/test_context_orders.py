@@ -303,7 +303,8 @@ class TestGetPendingOrders(TestBase):
         )
 
         trade_service = self.app.container.trade_service()
-        self.assertEqual(3, trade_service.count())
+        # v9.0 (#431) — only the CLOSED order creates a trade at fill.
+        self.assertEqual(1, trade_service.count())
         self.assertEqual(
             1, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}
@@ -421,7 +422,8 @@ class TestGetUnfilledBuyValue(TestBase):
         )
 
         trade_service = self.app.container.trade_service()
-        self.assertEqual(3, trade_service.count())
+        # v9.0 (#431) — only the CLOSED order creates a trade at fill.
+        self.assertEqual(1, trade_service.count())
         self.assertEqual(
             1, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}
@@ -524,10 +526,13 @@ class TestGetUnfilledSellValue(TestBase):
         trade_service = self.app.container.trade_service()
         self.assertEqual(3, trade_service.count())
         self.assertEqual(
-            0, trade_service.count(
+            2, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}
             )
         )
+        self.assertEqual(3, trade_service.count({"portfolio_id": portfolio.id}))
+        self.assertEqual(2, len(trade_service.get_all(
+            {"portfolio_id": portfolio.id, "status": "OPEN"})))
 
         position_service = self.app.container.position_service()
         self.assertEqual(4, position_service.count())
@@ -557,4 +562,3 @@ class TestGetUnfilledSellValue(TestBase):
 
         unfilled_sell_value = self.app.context.get_unfilled_sell_value()
         self.assertEqual(200, unfilled_sell_value)
-

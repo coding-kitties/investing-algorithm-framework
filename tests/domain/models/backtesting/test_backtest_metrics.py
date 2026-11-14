@@ -3,10 +3,30 @@ from datetime import datetime, date
 import tempfile
 from pathlib import Path
 
-from investing_algorithm_framework.domain import BacktestMetrics, Trade
+from investing_algorithm_framework.domain import BacktestMetrics, Trade, \
+    BacktestWindow, BacktestDateRange
+
+
+def _backtest_window(start_date, end_date):
+    return BacktestWindow(train_range=BacktestDateRange(
+        start_date=start_date,
+        end_date=end_date,
+    ))
 
 
 class TestBacktestMetrics(TestCase):
+
+    def test_gross_totals_survive_round_trip_for_summary_recalculation(self):
+        metrics = BacktestMetrics(
+            backtest_window=_backtest_window(
+                datetime(2024, 1, 1), datetime(2024, 1, 2),
+            ),
+            gross_profit=0.0,
+            gross_loss=-25.0,
+        )
+        restored = BacktestMetrics.from_dict(metrics.to_dict())
+        self.assertEqual(restored.gross_profit, 0.0)
+        self.assertEqual(restored.gross_loss, -25.0)
 
     def setUp(self):
         # Create a temporary directory for each test
@@ -18,8 +38,7 @@ class TestBacktestMetrics(TestCase):
 
     def test_save(self):
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve = [
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -121,8 +140,7 @@ class TestBacktestMetrics(TestCase):
 
     def test_open(self):
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),

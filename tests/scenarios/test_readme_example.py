@@ -5,6 +5,7 @@ This test dynamically extracts the Python code from README.md and executes it
 to verify that the documented examples actually work. This ensures the README
 stays in sync with the actual codebase.
 """
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import re
 import unittest
@@ -14,9 +15,13 @@ from unittest import TestCase
 
 from investing_algorithm_framework import (
     BacktestDateRange,
+    BacktestEngine,
+    BacktestWindow,
     DATA_DIRECTORY,
     RESOURCE_DIRECTORY,
     SnapshotInterval,
+    Study,
+    Universe,
     create_app,
 )
 
@@ -114,8 +119,8 @@ class TestReadmeExample(TestCase):
         # Verify the main strategy example exists
         main_example = extract_main_example_from_readme(self.readme_path)
         self.assertIn('RSIEMACrossoverStrategy', main_example)
-        self.assertIn('generate_buy_signals', main_example)
-        self.assertIn('generate_sell_signals', main_example)
+        self.assertIn('signal_cards', main_example)
+        self.assertIn('prepare_signal_data', main_example)
 
     def test_readme_strategy_class_is_valid_python(self):
         """The RSIEMACrossoverStrategy code from README compiles."""
@@ -149,8 +154,8 @@ class TestReadmeExample(TestCase):
         cls = namespace['RSIEMACrossoverStrategy']
 
         # Verify class attributes
-        self.assertTrue(hasattr(cls, 'generate_buy_signals'))
-        self.assertTrue(hasattr(cls, 'generate_sell_signals'))
+        self.assertTrue(hasattr(cls, 'generate_signals'))
+        self.assertTrue(hasattr(cls, 'generate_signal_series'))
         self.assertTrue(hasattr(cls, 'scaling_rules'))
         self.assertTrue(hasattr(cls, 'stop_losses'))
         self.assertTrue(hasattr(cls, 'position_sizes'))
@@ -182,19 +187,27 @@ class TestReadmeExample(TestCase):
         )
 
         strategy = strategy_class(algorithm_id="readme-example-test")
-        backtest = app.run_vector_backtest(
-            initial_amount=1000,
-            backtest_date_range=BacktestDateRange(
-                start_date=datetime(2023, 9, 1, tzinfo=timezone.utc),
-                end_date=datetime(2023, 11, 15, tzinfo=timezone.utc),
-            ),
-            strategy=strategy,
-            snapshot_interval=SnapshotInterval.DAILY,
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
             risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            use_checkpoints=False,
+            backtest_windows=[
+                BacktestWindow(train_range=BacktestDateRange(
+                    start_date=datetime(2023, 9, 1, tzinfo=timezone.utc),
+                    end_date=datetime(2023, 11, 15, tzinfo=timezone.utc),
+                ))
+            ],
+            engines=[BacktestEngine.VECTOR],
         )
+        backtests = app.run_backtest(
+            strategy=strategy,
+            study=study,
+            run_configuration=BacktestRunConfiguration(
+                snapshot_interval=SnapshotInterval.DAILY,
+                use_checkpoints=False,
+            ),
+        )
+        backtest = next(backtests.iter_backtests())
 
         self.assertIsNotNone(backtest)
         self.assertEqual(len(backtest.get_all_backtest_runs()), 1)

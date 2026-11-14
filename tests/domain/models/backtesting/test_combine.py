@@ -4,6 +4,15 @@ from investing_algorithm_framework.domain import BacktestMetrics, \
     BacktestSummaryMetrics, Trade, generate_backtest_summary_metrics, \
     combine_backtests, Backtest
 from datetime import datetime, date
+from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
+
+
+def _backtest_window(start_date, end_date):
+    return BacktestWindow(train_range=BacktestDateRange(
+        start_date=start_date,
+        end_date=end_date,
+    ))
+
 
 class TestCombine(TestCase):
 
@@ -23,8 +32,7 @@ class TestCombine(TestCase):
     def test_add(self):
         # Metrics one: a winning backtest
         metrics_one = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[(1000, datetime(2020, 1, 1)),
                           (1500, datetime(2020, 12, 31))],
             initial_unallocated=1000,
@@ -88,8 +96,7 @@ class TestCombine(TestCase):
 
         # Metrics two: a losing backtest
         metrics_two = BacktestMetrics(
-            backtest_start_date=datetime(2021, 1, 1),
-            backtest_end_date=datetime(2021, 12, 31),
+            backtest_window=_backtest_window(datetime(2021, 1, 1), datetime(2021, 12, 31)),
             equity_curve=[(2000, datetime(2021, 1, 1)),
                           (1800, datetime(2021, 12, 31))],
             initial_unallocated=2000,
@@ -181,9 +188,8 @@ class TestCombine(TestCase):
         self.assertAlmostEqual(summary.win_rate, (0.7 * 10 + 0.3 * 20) / 30, places=2)
 
         # Extreme metrics
-        # max_drawdown uses min() - since values are positive here, min(0.15, 0.2) = 0.15
-        # Note: If drawdowns were negative (e.g., -0.15, -0.2), min would correctly pick -0.2 as worst
-        self.assertEqual(summary.max_drawdown, 0.15)
+        # Drawdowns use positive magnitudes, so the largest value is worst.
+        self.assertEqual(summary.max_drawdown, 0.2)
         self.assertEqual(summary.max_drawdown_duration, 30)  # longest
 
     def test_add_from_storage(self):

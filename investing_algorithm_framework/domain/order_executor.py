@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from investing_algorithm_framework.domain import Order
+from investing_algorithm_framework.domain import Order, PositionMode
 
 
 class OrderExecutor(ABC):
@@ -43,6 +43,17 @@ class OrderExecutor(ABC):
         to the config of the Application when the app is started.
         """
         self._config = config
+
+    @property
+    def supports_mirror_orders(self) -> bool:
+        """
+        Whether this executor can place a resting broker-native order
+        (e.g. a STOP order backing a ``mirror_on_exchange`` rule) that
+        sits on the venue independent of the bot's own event loop.
+        True by default; local simulators that have no real venue to
+        rest an order on should override this to False.
+        """
+        return True
 
     @abstractmethod
     def execute_order(self, portfolio, order, market_credential) -> Order:
@@ -104,6 +115,15 @@ class OrderExecutor(ABC):
         raise NotImplementedError(
             "Subclasses must implement this method."
         )
+
+    def supports_position_mode(self, market, position_mode) -> bool:
+        """Return whether this executor can safely route the position mode.
+
+        Custom executors must explicitly opt into HEDGE support. Keeping the
+        default at NETTING prevents an existing live adapter from being
+        treated as hedge-capable merely because it supports the venue.
+        """
+        return PositionMode(position_mode) == PositionMode.NETTING
 
     def __repr__(self):
         """

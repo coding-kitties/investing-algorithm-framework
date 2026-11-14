@@ -9,6 +9,8 @@ from investing_algorithm_framework.domain.datetime_parsing import (
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.models.decision_trace import \
+    normalize_trace_metadata
 from investing_algorithm_framework.domain.models.order.order_side import \
     OrderSide
 from investing_algorithm_framework.domain.models.order.order_status import \
@@ -48,6 +50,7 @@ class Order(BaseModel):
         metadata=None,
         stop_price=None,
         triggered_at=None,
+        strategy_id=None,
     ):
         if target_symbol is None:
             raise OperationalException("Target symbol is not specified")
@@ -93,9 +96,17 @@ class Order(BaseModel):
         self.slippage = slippage
         self.id = id
         self.cost = cost
-        self.metadata = metadata if metadata is not None else {}
+        self.metadata = normalize_trace_metadata(metadata or {})
         self.stop_price = stop_price
         self.triggered_at = triggered_at
+        # Strategy that created this order, if known — populated
+        # automatically by Context.create_*_order() from the strategy
+        # currently running. Falls back to metadata['strategy_id'] for
+        # orders created before this field existed.
+        self.strategy_id = strategy_id or (
+            self.metadata.get("strategy_id")
+            if isinstance(self.metadata, dict) else None
+        )
 
     def get_id(self):
         return self.id
@@ -293,6 +304,7 @@ class Order(BaseModel):
             "triggered_at": ensure_iso(self.triggered_at)
             if self.triggered_at else None,
             "metadata": self.metadata if hasattr(self, 'metadata') else {},
+            "strategy_id": getattr(self, "strategy_id", None),
         }
 
     @staticmethod
@@ -341,6 +353,7 @@ class Order(BaseModel):
             metadata=data.get("metadata", {}),
             stop_price=data.get("stop_price", None),
             triggered_at=triggered_at,
+            strategy_id=data.get("strategy_id", None),
         )
         return order
 
@@ -422,18 +435,76 @@ class Order(BaseModel):
     def estimated_price(self, value):
         self.metadata["estimated_price"] = value
 
+    @property
+    def reservation_price(self):
+        """Price used to reserve cash at order-creation time.
+
+        v9.0 (#431) — with deferred trade creation, BUY orders no
+        longer have an eager trade row to anchor the cost, so the
+        reservation must be computed from the best available price
+        known at creation time. Resolution order:
+
+        1. ``price`` (limit price, set for LIMIT / STOP_LIMIT)
+        2. ``stop_price`` (set for STOP / STOP_LIMIT)
+        3. ``estimated_price`` (stored on metadata for MARKET orders)
+        """
+        if self.price is not None:
+            return self.price
+        if self.stop_price is not None:
+            return self.stop_price
+        return self.estimated_price
+
+    # ------------------------------------------------------------------
+    # Pending stop-loss / take-profit rules (queued on BUY orders until
+    # the trade is created at fill time — v9.0 issue #431).
+    # ------------------------------------------------------------------
+    @property
+    def pending_stop_losses(self):
+        return list(self.metadata.get("pending_stop_losses", []))
+
+    @property
+    def pending_take_profits(self):
+        return list(self.metadata.get("pending_take_profits", []))
+
+    def add_pending_stop_loss(
+        self, percentage, trailing=False, sell_percentage=100,
+        mirror_on_exchange=False,
+    ):
+        """Queue a stop-loss spec on this order. The rule will be
+        materialized onto each trade created when the order fills."""
+        rules = self.metadata.setdefault("pending_stop_losses", [])
+        rules.append({
+            "percentage": percentage,
+            "trailing": bool(trailing),
+            "sell_percentage": sell_percentage,
+            "mirror_on_exchange": bool(mirror_on_exchange),
+        })
+
+    def add_pending_take_profit(
+        self, percentage, trailing=False, sell_percentage=100,
+        mirror_on_exchange=False,
+    ):
+        """Queue a take-profit spec on this order. The rule will be
+        materialized onto each trade created when the order fills."""
+        rules = self.metadata.setdefault("pending_take_profits", [])
+        rules.append({
+            "percentage": percentage,
+            "trailing": bool(trailing),
+            "sell_percentage": sell_percentage,
+            "mirror_on_exchange": bool(mirror_on_exchange),
+        })
+
     def get_size(self):
         """
-        Get the size of the order. For market orders with an estimated
-        price, uses the estimated price for size calculation.
+        Get the size of the order using the reservation price.
+
+        Falls back through ``price`` → ``stop_price`` → ``estimated_price``
+        so that STOP orders (which carry no ``price`` until trigger)
+        and MARKET orders (which only know an ``estimated_price`` at
+        creation time) still expose a meaningful notional value.
 
         Returns:
-            float: The size of the order
+            float: The size of the order, or 0 if no price is known.
         """
-        price = self.get_price()
-
-        if price is None or price == 0:
-            # Fall back to estimated_price for market orders
-            price = self.estimated_price
-
+        price = self.reservation_price
         return self.get_amount() * price if price is not None else 0

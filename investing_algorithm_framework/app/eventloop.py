@@ -1,21 +1,87 @@
-from datetime import datetime, timedelta, timezone
+from copy import deepcopy
+from datetime import datetime, timezone
+from concurrent.futures import Future
+from threading import Event, Lock
 from time import sleep
-from typing import List, Set, Dict, FrozenSet, Tuple, Optional, Type
+from typing import Callable, List, Optional, Set, Dict
 from logging import getLogger
-
-import polars as pl
 
 from investing_algorithm_framework.domain import Environment, ENVIRONMENT, \
     OrderStatus, DataSource, DataType, tqdm, \
     TradeStatus, SNAPSHOT_INTERVAL, SnapshotInterval, OperationalException, \
-    LAST_SNAPSHOT_DATETIME, INDEX_DATETIME
+    LAST_SNAPSHOT_DATETIME, INDEX_DATETIME, Signal, DATETIME_FORMAT, \
+    DEFAULT_DATETIME_FORMAT, format_datetime_utc, TIMEZONE
 from investing_algorithm_framework.services import TradeOrderEvaluator
-from investing_algorithm_framework.services.pipeline import PipelineEngine
-
+from investing_algorithm_framework.services.run_reports.snapshot import \
+    indicator_snapshots, data_source_snapshots, confluence_score_snapshots, \
+    confluence_position_snapshots
 from .algorithm import Algorithm
 from .strategy import TradingStrategy
 
 logger = getLogger("investing_algorithm_framework")
+
+
+def _build_signal_report(strategy: TradingStrategy, timestamp) -> Dict:
+    """Summarize one strategy's signals for this tick: every signal it
+    emitted, and whether it was approved by the phase pipeline or
+    rejected (with the phase-pipeline reason it was dropped).
+
+    Best-effort: a rejection is detected by matching a raw signal's
+    ``(symbol, side, source)`` against any trace payload carrying a
+    ``Signal`` with the same key. Synthetic signals created internally
+    (e.g. by an atomic flip) are not part of ``last_signals`` and are
+    therefore not reported here.
+    """
+    raw_signals = getattr(strategy, "last_signals", None) or []
+    traces = getattr(strategy, "traces", None) or []
+
+    rejection_reasons = {}
+    rejection_details = {}
+    for tag, payload in traces:
+        candidates = (
+            payload if isinstance(payload, (list, tuple)) else [payload]
+        )
+        for item in candidates:
+            if isinstance(item, Signal):
+                key = (item.symbol, item.side.value, item.source)
+                if key not in rejection_reasons:
+                    rejection_reasons[key] = tag
+                    details = next((
+                        part["reason_details"] for part in candidates
+                        if isinstance(part, dict) and "reason_details" in part
+                    ), None)
+                    if details is not None:
+                        if not isinstance(details, dict):
+                            raise TypeError(
+                                "Signal reason_details must be a mapping"
+                            )
+                        rejection_details[key] = deepcopy(details)
+
+    signals = []
+    for sig in raw_signals:
+        key = (sig.symbol, sig.side.value, sig.source)
+        reason = rejection_reasons.get(key)
+        record = {
+            "symbol": sig.symbol,
+            "side": sig.side.value,
+            "strength": sig.strength,
+            "source": sig.source,
+            "metadata": dict(sig.metadata),
+            "status": "rejected" if reason else "approved",
+            "reason": reason,
+        }
+        if key in rejection_details:
+            record["reason_details"] = rejection_details[key]
+        signals.append(record)
+
+    decision_traces = list(strategy.last_decision_traces or [])
+    return {
+        "strategy_id": strategy.strategy_id,
+        "timestamp": timestamp,
+        "signals": signals,
+        "decision_traces": decision_traces,
+        "score_cards": decision_traces,
+    }
 
 
 class EventLoopService:
@@ -82,20 +148,61 @@ class EventLoopService:
         self._portfolio_snapshot_service = portfolio_snapshot_service
         self.data_sources = set()
         self.next_run_times = {}
+        self._scheduled_function_last_runs = {}
+        self._task_last_runs = {}
         self.history = {}
-        self._pipeline_engine = PipelineEngine()
+        self.signal_log = []
+        self.indicator_log = []
+        self.confluence_score_log = []
+        self.data_source_log = []
 
-        # Per (strategy_id, pipeline_cls) cache of the most recent
-        # universe-refresh: (refresh_at, frozen surviving-symbol set).
-        # Populated when a pipeline declares
-        # ``refresh_universe_every`` so the engine can skip re-running
-        # the universe filter every bar.
-        self._pipeline_universe_cache: Dict[
-            Tuple[str, Type], Tuple[datetime, FrozenSet[str]]
-        ] = {}
+        # Thread-safe inbox for "run now" requests (e.g. from the web
+        # API's POST /api/algorithm/invoke), consumed by the loop's
+        # own thread on its next tick so strategies are still only
+        # ever executed from a single thread.
+        self._immediate_lock = Lock()
+        self._immediate_run_all = False
+        self._immediate_run_ids: Set[str] = set()
+        self._immediate_requests = []
+        self._active_immediate_requests = []
+        self._immediate_closed = False
+
+        # Optional callback invoked (with the strategies that just
+        # ran) after each live iteration that actually ran at least
+        # one strategy. Wired by ``App.run()`` for continuous
+        # (unbounded) runs so a RunReport gets built/persisted after
+        # every tick, not just once when the loop eventually stops.
+        self.on_iteration_complete = None
+        self.on_iteration_report = None
+        self.on_historical_iteration_report = None
+        self._iteration_signal_log = None
+
         # One-shot flag: live-mode envelope validation runs once per
         # process. Reset by ``cleanup`` so a new run re-validates.
         self._pipelines_live_validated: bool = False
+
+        # Set by ``request_stop`` to gracefully break out of the live
+        # (unbounded) loop in ``start``. Cleared by ``reset_stop`` so
+        # the loop can be (re)started again afterwards.
+        self._stop_event = Event()
+
+    def request_stop(self) -> None:
+        """
+        Signals a running (unbounded) ``start()`` call to stop after
+        it finishes its current iteration. Safe to call from another
+        thread.
+        """
+        self._stop_event.set()
+
+    def reset_stop(self) -> None:
+        """Clears a previous stop request so ``start()`` can run again."""
+        self._stop_event.clear()
+        with self._immediate_lock:
+            self._immediate_closed = False
+
+    @property
+    def stop_requested(self) -> bool:
+        return self._stop_event.is_set()
 
     @staticmethod
     def _get_data_sources_for_iteration(
@@ -152,10 +259,9 @@ class EventLoopService:
                 symbol_set.add(trade.symbol)
 
         for symbol in symbol_set:
-            data[symbol] = self._data_provider_service\
-                .get_ohlcv_data(
-                    symbol=symbol, date=date
-                )
+            data[symbol] = self._data_provider_service.get_ohlcv_data(
+                symbol=symbol, date=date
+            )
         return data
 
     def _get_strategies(
@@ -180,9 +286,41 @@ class EventLoopService:
             for strategy_id in strategy_ids
         ]
 
+    def _log_next_algorithm_run(self, current_datetime) -> None:
+        """
+        Logs the next time the algorithm as a whole is due to run,
+        i.e. the earliest next run time across every strategy
+        registered on it (not just the ones that ran this tick — a
+        strategy on a different schedule may fire sooner).
+        """
+        next_runs = []
+        for strategy in self.strategies:
+            last_run = self.next_run_times[strategy.strategy_id].get(
+                "last_run"
+            )
+            reference = last_run if last_run is not None \
+                else current_datetime
+            next_run = strategy.schedule.next_run_after(reference)
+            if next_run is not None:
+                next_runs.append(next_run)
+
+        if next_runs:
+            config = self._configuration_service.config
+            datetime_format = config.get(
+                DATETIME_FORMAT, DEFAULT_DATETIME_FORMAT
+            )
+            next_run_formatted = format_datetime_utc(
+                min(next_runs), datetime_format, config.get(TIMEZONE)
+            )
+            logger.info(
+                f"Next run for algorithm "
+                f"'{getattr(self._algorithm, 'algorithm_id', None)}' "
+                f"scheduled at {next_run_formatted}"
+            )
+
     def _get_due_strategies(self, current_datetime=None):
         """
-        Checks which strategies are due to run based on their defined intervals
+        Checks which strategies are due to run based on their Schedule.
 
         Args:
             current_datetime: Optional; the datetime to check against.
@@ -197,18 +335,152 @@ class EventLoopService:
             current_datetime = datetime.now(timezone.utc)
 
         for strategy in self.strategies:
-            time_unit = strategy.time_unit
-            interval = strategy.interval
-            interval = timedelta(
-                minutes=time_unit.amount_of_minutes * interval
+            entry = self.next_run_times[strategy.strategy_id]
+            last_run = entry.get("last_run")
+            if strategy.schedule.is_due(current_datetime, last_run):
+                due.append(strategy)
+                entry["last_run"] = current_datetime
+
+        return due
+
+    def request_immediate_run(self, strategy_ids=None) -> Future:
+        """
+        Queues strategies to run on the loop's very next tick,
+        regardless of their configured schedule. Thread-safe — meant
+        to be called from another thread (e.g. the web API's request
+        handler) while the loop itself runs in the background; the
+        actual execution still only ever happens on the loop's own
+        thread.
+
+        Args:
+            strategy_ids: Optional; specific strategy IDs to run. When
+                None, every registered strategy is queued to run.
+        """
+        with self._immediate_lock:
+            if self._immediate_closed or self._stop_event.is_set():
+                raise OperationalException("The algorithm loop has stopped.")
+            if strategy_ids is not None:
+                unknown = set(strategy_ids) - {
+                    strategy.strategy_id for strategy in self.strategies
+                }
+                if unknown:
+                    raise OperationalException(
+                        f"Unknown strategy IDs: {sorted(unknown)}")
+            completion = Future()
+            self._immediate_requests.append(completion)
+            if strategy_ids is None:
+                self._immediate_run_all = True
+            else:
+                self._immediate_run_ids.update(strategy_ids)
+
+        logger.info(
+            "Immediate run requested for: "
+            f"{'all strategies' if strategy_ids is None else strategy_ids}"
+        )
+        return completion
+
+    def _pop_immediate_strategies(self, current_datetime):
+        """
+        Atomically consumes any pending ``request_immediate_run()``
+        requests, resolves them to strategy instances, and marks them
+        as just-run (so their schedule doesn't immediately fire again
+        right after being force-run).
+
+        Returns:
+            List[TradingStrategy]: The strategies to run immediately.
+        """
+        with self._immediate_lock:
+            run_all = self._immediate_run_all
+            ids = self._immediate_run_ids
+            self._immediate_run_all = False
+            self._immediate_run_ids = set()
+            self._active_immediate_requests = self._immediate_requests
+            self._immediate_requests = []
+
+        if run_all:
+            strategies = list(self.strategies)
+        elif ids:
+            strategies = [
+                s for s in self.strategies if s.strategy_id in ids
+            ]
+        else:
+            strategies = []
+
+        for strategy in strategies:
+            self.next_run_times[strategy.strategy_id]["last_run"] = \
+                current_datetime
+
+        if strategies:
+            logger.info(
+                "Force-running strategies (immediate run requested): "
+                f"{[s.strategy_id for s in strategies]}"
             )
 
-            if current_datetime >= \
-                    self.next_run_times[strategy.strategy_id]["next_run"]:
-                due.append(strategy)
-                self.next_run_times[strategy.strategy_id]["next_run"] = \
-                    current_datetime + interval
+        return strategies
 
+    def _get_tasks_by_ids(self, task_ids: List[str]):
+        """
+        Returns the tasks matching the given worker IDs. Unlike
+        ``_get_strategies``, an empty/None ``task_ids`` means "no
+        tasks are due" (not "all tasks") — the backtest schedule
+        always provides an explicit (possibly empty) list per tick.
+
+        Args:
+            task_ids: A list of task worker IDs to retrieve.
+
+        Returns:
+            List[Task]: The tasks matching the provided IDs.
+        """
+        if not task_ids:
+            return []
+
+        return [
+            self._tasks_lookup[task_id]
+            for task_id in task_ids
+            if task_id in self._tasks_lookup
+        ]
+
+    def _get_due_tasks(self, current_datetime=None):
+        """
+        Checks which tasks are due to run based on their Schedule.
+
+        Args:
+            current_datetime: Optional; the datetime to check against.
+                If None, uses the current datetime in UTC.
+
+        Returns:
+            List[Task]: A list of tasks that are due to run.
+        """
+        due = []
+
+        if current_datetime is None:
+            current_datetime = datetime.now(timezone.utc)
+
+        for task in self.tasks:
+            last_run = self._task_last_runs.get(task.worker_id)
+            if task.schedule.is_due(current_datetime, last_run):
+                due.append(task)
+                self._task_last_runs[task.worker_id] = current_datetime
+
+        return due
+
+    def _get_due_scheduled_functions(self, current_datetime=None):
+        """
+        Returns a list of (strategy, ScheduledFunction) tuples whose
+        per-function schedule is due to fire at ``current_datetime``.
+        """
+        if current_datetime is None:
+            current_datetime = datetime.now(timezone.utc)
+
+        due = []
+        for strategy in self.strategies:
+            sfs = getattr(strategy, "scheduled_functions", None) or []
+            for sf in sfs:
+                key = (strategy.strategy_id, sf.func)
+                last = self._scheduled_function_last_runs.get(key)
+                if sf.schedule.is_due(current_datetime, last):
+                    due.append((strategy, sf))
+                    self._scheduled_function_last_runs[key] = current_datetime
         return due
 
     def _snapshot(
@@ -293,6 +565,7 @@ class EventLoopService:
         self,
         algorithm: Algorithm,
         trade_order_evaluator: TradeOrderEvaluator,
+        run_immediately_on_start: bool = True,
     ):
         """
         Initializes the event loop service by calculating the schedule for
@@ -309,6 +582,12 @@ class EventLoopService:
             trade_order_evaluator (TradeOrderEvaluator): The evaluator
                 responsible for checking and updating pending orders,
                 stop losses, and take profits.
+            run_immediately_on_start (bool): When True (default), every
+                strategy fires on the very first tick regardless of its
+                schedule (there is no ``last_run`` yet to compare
+                against). When False, each strategy's ``last_run`` is
+                seeded to now instead, so the first run only happens
+                once its normal interval has actually elapsed.
 
         Returns:
             None
@@ -324,14 +603,26 @@ class EventLoopService:
             )
 
         self._trade_order_evaluator = trade_order_evaluator
-        start_date = self._configuration_service.config[INDEX_DATETIME]
 
+        dispatcher = getattr(
+            self._trade_service, "trade_hook_dispatcher", None
+        )
+        if dispatcher is not None:
+            dispatcher.configure(self.strategies, self.context)
+
+        seed_last_run = None if run_immediately_on_start \
+            else datetime.now(timezone.utc)
         self.next_run_times = {
             strategy.strategy_id: {
-                "next_run": start_date,
+                "last_run": seed_last_run,
                 "data_sources": strategy.data_sources
             }
             for strategy in self.strategies
+        }
+        self._scheduled_function_last_runs = {}
+        self._task_last_runs = {}
+        self._tasks_lookup = {
+            task.worker_id: task for task in self.tasks
         }
 
         # Collect all data sources and initialize history
@@ -363,17 +654,69 @@ class EventLoopService:
             None
         """
         self._portfolio_snapshot_service.save_all(self._snapshots)
-        # Reset per-run pipeline state so a subsequent run re-runs
-        # live envelope validation and starts with a fresh universe
-        # cache.
-        self._pipeline_universe_cache.clear()
+        self._snapshots = []
+        # Reset per-run live-envelope validation so a subsequent
+        # run re-validates. Per-strategy pipeline universe caches
+        # live on the strategy instances themselves now
+        # (EvaluatePipelinesPhase manages them) and are reset by
+        # the framework on bootstrap.
         self._pipelines_live_validated = False
 
     def start(
         self,
         number_of_iterations=None,
-        schedule: pl.DataFrame = None,
-        show_progress: bool = False
+        schedule: Optional[Dict[datetime, dict]] = None,
+        show_progress: bool = False,
+        resource_check: Optional[Callable[[], None]] = None,
+        snapshot_batch_size: Optional[int] = None,
+        event_schedule_backend: str = 'python',
+    ):
+        try:
+            return self._start(
+                number_of_iterations, schedule, show_progress, resource_check,
+                snapshot_batch_size, event_schedule_backend,
+            )
+        finally:
+            with self._immediate_lock:
+                self._immediate_closed = True
+                pending = (self._active_immediate_requests
+                           + self._immediate_requests)
+                self._active_immediate_requests = []
+                self._immediate_requests = []
+                self._immediate_run_all = False
+                self._immediate_run_ids = set()
+            if pending:
+                self.signal_log = []
+                self.indicator_log = []
+                self.confluence_score_log = []
+                self.data_source_log = []
+                try:
+                    report = None
+                    if self.on_iteration_report is not None:
+                        report = self.on_iteration_report(
+                            datetime.now(timezone.utc), status="loop_stopped",
+                        )
+                    self._complete_immediate_requests(pending, report)
+                except Exception as error:
+                    self._complete_immediate_requests(pending, error=error)
+                    logger.exception("Could not report skipped manual runs")
+
+    @staticmethod
+    def _complete_immediate_requests(requests, report=None, error=None):
+        for completion in requests:
+            if error is not None:
+                completion.set_exception(error)
+            else:
+                completion.set_result(report)
+
+    def _start(
+        self,
+        number_of_iterations=None,
+        schedule: Optional[Dict[datetime, dict]] = None,
+        show_progress: bool = False,
+        resource_check: Optional[Callable[[], None]] = None,
+        snapshot_batch_size: Optional[int] = None,
+        event_schedule_backend: str = 'python',
     ):
         """
         Runs the event loop for the trading algorithm. You can run the
@@ -391,56 +734,106 @@ class EventLoopService:
             schedule: Dict Optional; a schedule to run the event loop with.
             show_progress: Optional; whether to show progress bar for the
                 event loop. Defaults to False.
+            resource_check: Optional resource safeguard for scheduled
+                backtests. Exceptions propagate and abort the current run.
+            snapshot_batch_size: Flush scheduled backtest snapshots in
+                bounded batches instead of retaining the full window.
+            event_schedule_backend: python (default), rust (strict), or auto
+                for scheduled timestamp traversal. Tick services stay Python.
         Returns:
             None
         """
 
+        if snapshot_batch_size is not None and (
+            type(snapshot_batch_size) is not int or snapshot_batch_size <= 0
+        ):
+            raise OperationalException(
+                "snapshot_batch_size must be a positive integer."
+            )
+        if event_schedule_backend not in ('python', 'rust', 'auto'):
+            raise ValueError(
+                'event_schedule_backend must be python, rust or auto'
+            )
+        if schedule is None and event_schedule_backend != 'python':
+            raise ValueError('Native scheduling requires a backtest schedule')
         if schedule is not None:
+            from .native_schedule import prepare_native_schedule
+            from investing_algorithm_framework.domain.native_event import \
+                native_event_engine
+
             sorted_times = sorted(schedule.keys())
+            native_runner, timestamps = prepare_native_schedule(
+                sorted_times, ('rust' if native_event_engine() is not None
+                               else event_schedule_backend)
+            )
 
-            if show_progress:
-                for current_time in tqdm(
-                    sorted_times,
-                    total=len(sorted_times),
-                    colour="GREEN",
-                    desc="Running event backtest"
-                ):
-                    self._configuration_service.add_value(
-                        INDEX_DATETIME, current_time
-                    )
-                    strategy_ids = schedule[current_time]["strategy_ids"]
-                    strategies = self._get_strategies(strategy_ids)
-                    self._run_iteration(
-                        strategies=strategies
-                    )
+            def run_tick(index, timestamp=None):
+                current_time = sorted_times[index]
+                if resource_check is not None:
+                    resource_check()
+                self._configuration_service.add_value(
+                    INDEX_DATETIME, current_time
+                )
+                strategy_ids = schedule[current_time]["strategy_ids"]
+                task_ids = schedule[current_time]["task_ids"]
+                sf_calls = schedule[current_time].get(
+                    "scheduled_function_calls", []
+                )
+                self._run_iteration(
+                    strategies=self._get_strategies(strategy_ids),
+                    tasks=self._get_tasks_by_ids(task_ids),
+                    scheduled_function_calls=sf_calls,
+                )
+                if snapshot_batch_size is not None \
+                        and len(self._snapshots) >= snapshot_batch_size:
+                    self._portfolio_snapshot_service.save_all(self._snapshots)
+                    self._snapshots = []
+                if resource_check is not None:
+                    resource_check()
+                progress.update(1)
 
-            else:
-                for current_time in sorted_times:
-                    self._configuration_service.add_value(
-                        INDEX_DATETIME, current_time
-                    )
-                    strategy_ids = schedule[current_time]["strategy_ids"]
-                    # task_ids = schedule[current_time]["task_ids"]
-                    strategies = self._get_strategies(strategy_ids)
-                    self._run_iteration(
-                        strategies=strategies
-                    )
+            with tqdm(
+                total=len(sorted_times), colour="GREEN",
+                desc="Running event backtest", disable=not show_progress,
+            ) as progress:
+                if native_runner is None:
+                    for index in range(len(sorted_times)):
+                        run_tick(index)
+                else:
+                    native_runner(timestamps, run_tick)
         else:
             if number_of_iterations is None:
-                try:
-                    config = self._configuration_service.config
-                    current_time = config[INDEX_DATETIME]
-                    strategies = self._get_due_strategies(current_time)
-                    self._run_iteration(
-                        strategies=strategies, tasks=self.tasks
-                    )
-                    current_time = datetime.now(timezone.utc)
-                    self._configuration_service.add_value(
-                        INDEX_DATETIME, current_time
-                    )
-                    sleep(1)
-                except KeyboardInterrupt:
-                    exit(0)
+                # Unbounded live loop: keeps iterating until a stop is
+                # requested (e.g. via ``request_stop()`` from the web
+                # API) or the process receives a KeyboardInterrupt.
+                while not self._stop_event.is_set():
+                    try:
+                        config = self._configuration_service.config
+                        current_time = config[INDEX_DATETIME]
+                        strategies = self._get_due_strategies(current_time)
+                        for strategy in self._pop_immediate_strategies(
+                            current_time
+                        ):
+                            if strategy not in strategies:
+                                strategies.append(strategy)
+                        tasks = self._get_due_tasks(current_time)
+                        sf_calls = \
+                            self._get_due_scheduled_functions(current_time)
+                        self._run_iteration(
+                            strategies=strategies,
+                            tasks=tasks,
+                            scheduled_function_calls=sf_calls,
+                        )
+                        current_time = datetime.now(timezone.utc)
+                        self._configuration_service.add_value(
+                            INDEX_DATETIME, current_time
+                        )
+                    except KeyboardInterrupt:
+                        raise
+                    # Wakes up immediately if a stop is requested
+                    # instead of always waiting out the full second.
+                    if self._stop_event.wait(1):
+                        break
             else:
 
                 if show_progress:
@@ -452,8 +845,13 @@ class EventLoopService:
                             config = self._configuration_service.config
                             current_time = config[INDEX_DATETIME]
                             strategies = self._get_due_strategies(current_time)
+                            tasks = self._get_due_tasks(current_time)
+                            sf_calls = \
+                                self._get_due_scheduled_functions(current_time)
                             self._run_iteration(
-                                strategies=strategies, tasks=self.tasks
+                                strategies=strategies,
+                                tasks=tasks,
+                                scheduled_function_calls=sf_calls,
                             )
                             current_time = datetime.now(timezone.utc)
                             self._configuration_service.add_value(
@@ -461,15 +859,20 @@ class EventLoopService:
                             )
                             sleep(1)
                         except KeyboardInterrupt:
-                            exit(0)
+                            raise
 
                 for _ in range(number_of_iterations):
                     try:
                         config = self._configuration_service.config
                         current_time = config[INDEX_DATETIME]
                         strategies = self._get_due_strategies(current_time)
+                        tasks = self._get_due_tasks(current_time)
+                        sf_calls = \
+                            self._get_due_scheduled_functions(current_time)
                         self._run_iteration(
-                            strategies=strategies, tasks=self.tasks
+                            strategies=strategies,
+                            tasks=tasks,
+                            scheduled_function_calls=sf_calls,
                         )
                         current_time = datetime.now(timezone.utc)
                         self._configuration_service.add_value(
@@ -477,7 +880,7 @@ class EventLoopService:
                         )
                         sleep(1)
                     except KeyboardInterrupt:
-                        exit(0)
+                        raise
 
         self.cleanup()
 
@@ -578,9 +981,17 @@ class EventLoopService:
         from investing_algorithm_framework.domain import (
             PortfolioOutOfSyncError,
         )
-        for market in tracker.markets():
-            if not tracker.is_auto_sync(market):
-                continue
+        auto_sync_markets = [
+            market for market in tracker.markets()
+            if tracker.is_auto_sync(market)
+        ]
+
+        if not auto_sync_markets:
+            return
+
+        logger.info(f"Syncing portfolios: {auto_sync_markets}")
+
+        for market in auto_sync_markets:
             mode = tracker.get_auto_sync_error_mode(market)
             try:
                 self.context.sync_portfolio(market=market)
@@ -610,164 +1021,93 @@ class EventLoopService:
                     tracker.set_auto_sync(market, False)
                     continue
 
-    def _filter_symbols_for_universe_cache(
-        self,
-        strategy_id: str,
-        pipeline_cls: Type,
-        symbol_to_identifier: Dict[str, str],
-        as_of: datetime,
-    ) -> Optional[Dict[str, str]]:
-        """If ``pipeline_cls`` declares ``refresh_universe_every`` and
-        we have a cached surviving-symbol set still inside the cadence,
-        return a restricted ``symbol_to_identifier`` mapping. Returning
-        ``None`` means "no cache hit — run a full universe evaluation".
-        """
-        cadence: Optional[timedelta] = getattr(
-            pipeline_cls, "refresh_universe_every", None
-        )
-        if cadence is None or cadence <= timedelta(0):
-            return None
-
-        cache_key = (strategy_id, pipeline_cls)
-        cached = self._pipeline_universe_cache.get(cache_key)
-        if cached is None:
-            return None
-
-        last_refresh, symbols = cached
-        # Normalise tz so naive backtest datetimes and aware live
-        # datetimes compare cleanly.
-        if last_refresh.tzinfo is None and as_of.tzinfo is not None:
-            cmp_as_of = as_of.replace(tzinfo=None)
-        elif last_refresh.tzinfo is not None and as_of.tzinfo is None:
-            cmp_as_of = as_of.replace(tzinfo=last_refresh.tzinfo)
-        else:
-            cmp_as_of = as_of
-        if cmp_as_of - last_refresh >= cadence:
-            return None  # cadence elapsed → refresh
-
-        # Cache hit: restrict the symbol set, skipping the universe
-        # filter entirely on this iteration.
-        return {
-            sym: ident
-            for sym, ident in symbol_to_identifier.items()
-            if sym in symbols
-        }
-
-    def _run_pipelines(
-        self,
-        strategy: TradingStrategy,
-        data: Dict,
-        data_object: Dict,
-        as_of: datetime,
-    ) -> None:
-        """Compute cross-sectional pipelines attached to ``strategy``
-        and inject their outputs into ``data`` keyed by pipeline
-        class name.
-
-        Strategies without ``pipelines`` skip this entirely (zero cost).
-
-        Live-mode hardening (#503):
-
-        * The v1 envelope (max 50 symbols, daily-or-coarser timeframes)
-          is validated once per run.
-        * Pipelines that declare ``refresh_universe_every`` reuse the
-          last surviving symbol set within the cadence — saving the
-          cost of evaluating the universe filter every bar.
-        * In non-backtest environments, a single failing pipeline is
-          logged and skipped (the iteration continues with an empty
-          output) instead of killing the whole event loop. Backtests
-          keep raising so failures stay deterministic.
-        """
-        pipelines = getattr(strategy, "pipelines", None)
-        if not pipelines:
-            return
-
-        config = self._configuration_service.get_config()
-        environment = config[ENVIRONMENT]
-        is_backtest = Environment.BACKTEST.equals(environment)
-
-        # Map symbol -> data-source identifier from the strategy's
-        # OHLCV data sources. If a symbol appears on multiple data
-        # sources (e.g. multiple timeframes) the first OHLCV match wins.
-        symbol_to_identifier: Dict[str, str] = {}
-        for ds in strategy.data_sources or []:
-            if not DataType.OHLCV.equals(ds.data_type):
-                continue
-            if ds.symbol is None or ds.symbol in symbol_to_identifier:
-                continue
-            symbol_to_identifier[ds.symbol] = ds.get_identifier()
-
-        if not symbol_to_identifier:
-            logger.warning(
-                "Strategy %s declares pipelines but has no OHLCV data "
-                "sources to feed them; pipelines will be skipped.",
-                strategy.strategy_id,
-            )
-            return
-
-        for pipeline_cls in pipelines:
-            # 3c: universe-refresh cache. If the pipeline declares a
-            # refresh cadence and we're inside it, restrict the panel
-            # input to the cached symbols.
-            cached_mapping = self._filter_symbols_for_universe_cache(
-                strategy_id=strategy.strategy_id,
-                pipeline_cls=pipeline_cls,
-                symbol_to_identifier=symbol_to_identifier,
-                as_of=as_of,
-            )
-            mapping = (
-                cached_mapping
-                if cached_mapping is not None
-                else symbol_to_identifier
-            )
-
-            try:
-                output = self._pipeline_engine.evaluate(
-                    pipeline_cls=pipeline_cls,
-                    data_object=data_object,
-                    symbol_to_identifier=mapping,
-                    as_of=as_of,
-                )
-            except Exception:
-                # 3d: live-mode resilience. In live trading a single
-                # pipeline failure must not kill the iteration —
-                # surface an empty frame and log so the rest of the
-                # strategies can still run. Backtests re-raise so
-                # failures stay deterministic.
-                logger.exception(
-                    "Pipeline %s failed during evaluation at %s",
-                    pipeline_cls.__name__,
-                    as_of,
-                )
-                if is_backtest:
-                    raise
-                output = self._pipeline_engine._empty_output(
-                    pipeline_cls
-                )
-
-            # 3c: refresh the universe cache when we just ran a full
-            # evaluation (cached_mapping was None) and the pipeline
-            # declares a cadence.
-            cadence = getattr(
-                pipeline_cls, "refresh_universe_every", None
-            )
-            if (
-                cadence is not None
-                and cadence > timedelta(0)
-                and cached_mapping is None
-                and "symbol" in output.columns
-            ):
-                surviving = frozenset(output["symbol"].to_list())
-                self._pipeline_universe_cache[
-                    (strategy.strategy_id, pipeline_cls)
-                ] = (as_of, surviving)
-
-            data[pipeline_cls.__name__] = output
-
     def _run_iteration(
         self,
         strategies: List[TradingStrategy] = None,
-        tasks: List = None
+        tasks: List = None,
+        scheduled_function_calls=None,
+    ):
+        if self.on_historical_iteration_report is not None:
+            self._iteration_signal_log = []
+            self.indicator_log = []
+            self.confluence_score_log = []
+            self.data_source_log = []
+            timestamp = (
+                self._configuration_service.get_config()[INDEX_DATETIME]
+            )
+            try:
+                self._execute_iteration(
+                    strategies, tasks, scheduled_function_calls,
+                )
+            except (Exception, KeyboardInterrupt) as error:
+                self.on_historical_iteration_report(
+                    timestamp, self._iteration_signal_log,
+                    indicators=self.indicator_log,
+                    confluence_scores=self.confluence_score_log,
+                    data_sources=self.data_source_log,
+                    status="interrupted" if isinstance(
+                        error, KeyboardInterrupt) else "execution_error",
+                    error=str(error) or "Interrupted",
+                )
+                raise
+            else:
+                return self.on_historical_iteration_report(
+                    timestamp, self._iteration_signal_log,
+                    indicators=self.indicator_log,
+                    confluence_scores=self.confluence_score_log,
+                    data_sources=self.data_source_log,
+                    status="completed" if strategies else "no_strategy_due",
+                )
+            finally:
+                self._iteration_signal_log = None
+        if self.on_iteration_report is None \
+                and not self._active_immediate_requests:
+            return self._execute_iteration(
+                strategies, tasks, scheduled_function_calls)
+        requests = self._active_immediate_requests
+        self._active_immediate_requests = []
+        self.signal_log = []
+        self.indicator_log = []
+        self.confluence_score_log = []
+        self.data_source_log = []
+        started_at = datetime.now(timezone.utc)
+        try:
+            self._execute_iteration(
+                strategies, tasks, scheduled_function_calls)
+        except (Exception, KeyboardInterrupt) as error:
+            try:
+                if self.on_iteration_report is not None:
+                    report = self.on_iteration_report(
+                        started_at, status="interrupted" if isinstance(
+                            error, KeyboardInterrupt) else "execution_error",
+                        error=str(error) or "Interrupted",
+                    )
+                    self._complete_immediate_requests(requests, report)
+                else:
+                    self._complete_immediate_requests(requests, error=error)
+            except Exception as report_error:
+                self._complete_immediate_requests(requests, error=report_error)
+                logger.exception("Could not persist iteration failure report")
+            raise
+        try:
+            report = None
+            if self.on_iteration_report is not None \
+                    and (strategies or requests):
+                report = self.on_iteration_report(
+                    started_at,
+                    status="completed" if strategies else "no_strategy_due",
+                )
+            self._complete_immediate_requests(requests, report)
+            return report
+        except Exception as error:
+            self._complete_immediate_requests(requests, error=error)
+            raise
+
+    def _execute_iteration(
+        self,
+        strategies: List[TradingStrategy] = None,
+        tasks: List = None,
+        scheduled_function_calls=None,
     ):
         """
         Runs a single iteration of the event loop. This method collects all
@@ -787,6 +1127,28 @@ class EventLoopService:
         Returns:
             None
         """
+        from investing_algorithm_framework.domain.native_event import \
+            native_event_engine
+
+        native = native_event_engine()
+        due_tasks = self.tasks if tasks is None else tasks
+        if native is not None:
+            return native.run_event_iteration(
+                self, strategies, due_tasks, scheduled_function_calls or [])
+        state = self._prepare_iteration(strategies)
+        self._evaluate_iteration(state)
+        for task in due_tasks:
+            self._run_iteration_task(task)
+        if not strategies:
+            return
+        for strategy in strategies:
+            self._run_iteration_strategy(strategy, state)
+        self._log_next_algorithm_run(state['date'])
+        for entry in scheduled_function_calls or []:
+            self._run_iteration_scheduled(entry, state)
+        self._finish_iteration(strategies, state)
+
+    def _prepare_iteration(self, strategies):
         config = self._configuration_service.get_config()
         environment = config[ENVIRONMENT]
         current_datetime = config[INDEX_DATETIME]
@@ -841,80 +1203,160 @@ class EventLoopService:
                 date=current_datetime,
             )
 
+        if data_sources:
+            logger.info(f"Retrieving data ({len(data_sources)} source(s))")
+
         if Environment.BACKTEST.equals(environment):
 
             for data_source in data_sources:
                 # For backtesting, we use the start date and end date
                 # from the data source to fetch the data
-                data_object[data_source.get_identifier()] = \
+                data_object[data_source.get_identifier()] = (
                     self._data_provider_service.get_backtest_data(
                         data_source=data_source,
                         backtest_index_date=current_datetime,
                         start_date=data_source.start_date,
                         end_date=data_source.end_date,
                     )
+                )
         else:
             for data_source in data_sources:
-                data_object[data_source.get_identifier()] = \
+                data_object[data_source.get_identifier()] = (
                     self._data_provider_service.get_data(
                         data_source=data_source,
                         date=current_datetime,
                         start_date=data_source.start_date,
                         end_date=data_source.end_date,
                     )
-
-        # Step 3: Check pending orders, stop losses, take profits
-        self._trade_order_evaluator.evaluate(
-            open_trades=open_trades,
-            open_orders=open_orders,
-            ohlcv_data=orders_trades_update_ohlcv_data
-        )
-
-        # Step 4: Run all tasks
-        for task in self.tasks:
-            task.run(data_object)
-
-        # Step 5: Run all strategies
-        if not strategies:
-            return
-
-        for task in self.tasks:
-            logger.info(f"Running task {task.__class__.__name__}")
-
-        for strategy in strategies:
-
-            if strategy.data_sources is not None:
-                data = {
-                    data_source.get_identifier(): data_object[
-                        data_source.get_identifier()]
-                    for data_source in strategy.data_sources
-                }
-            else:
-                data = {}
-
-            # Step 5b: Run any cross-sectional pipelines attached to
-            # the strategy (Phase 1 of the Pipeline API, see
-            # docs/design/pipeline-api.md). Strategies without
-            # ``pipelines`` skip this entirely.
-            self._run_pipelines(
-                strategy=strategy,
-                data=data,
-                data_object=data_object,
-                as_of=current_datetime,
-            )
-
-            for on_strategy_run_hook in \
-                    self._algorithm.on_strategy_run_hooks:
-                on_strategy_run_hook.execute(
-                    strategy=strategy,
-                    context=self.context,
-                    data=data
                 )
 
-            logger.info(f"Running strategy {strategy.strategy_id}")
-            strategy.run_strategy(context=self.context, data=data)
+        return {
+            'date': current_datetime, 'environment': environment,
+            'data': data_object, 'orders': open_orders, 'trades': open_trades,
+            'ohlcv': orders_trades_update_ohlcv_data,
+        }
 
-        # Step 7: Snapshot the portfolios if needed and update history
+    def _evaluate_iteration(self, state):
+        self._trade_order_evaluator.evaluate(
+            open_trades=state['trades'],
+            open_orders=state['orders'],
+            ohlcv_data=state['ohlcv']
+        )
+
+    def _run_iteration_task(self, task):
+        logger.debug(f"Running task {task.worker_id}")
+        task.run(self.context)
+
+    def _run_iteration_strategy(self, strategy, state):
+        data = {
+            source.get_identifier(): state['data'][source.get_identifier()]
+            for source in strategy.data_sources or []
+        }
+        capture_report = (
+            self.on_historical_iteration_report is not None
+            or not Environment.BACKTEST.equals(state["environment"])
+        )
+        if capture_report:
+            self.data_source_log.extend(data_source_snapshots(
+                strategy_id=strategy.strategy_id,
+                timestamp=state["date"], sources=strategy.data_sources,
+                data=data,
+            ))
+        positions_before = (
+            confluence_position_snapshots(strategy, self.context)
+            if capture_report
+            and (strategy.confluence_cards or strategy.signal_cards)
+            else None
+        )
+        self.context._current_strategy_id = strategy.strategy_id
+        try:
+            for hook in self._algorithm.on_strategy_run_hooks:
+                hook.execute(
+                    strategy=strategy, context=self.context, data=data)
+            logger.debug(f"Running strategy {strategy.strategy_id}")
+            signal_report = None
+            try:
+                strategy.run_strategy(context=self.context, data=data)
+                signal_report = _build_signal_report(strategy, state["date"])
+                self.signal_log.append(signal_report)
+                if self._iteration_signal_log is not None:
+                    self._iteration_signal_log.append(signal_report)
+            finally:
+                if capture_report:
+                    engine = getattr(strategy, "_indicator_engine", None)
+                    evaluation = data.get("indicators")
+                    score_snapshot = getattr(
+                        engine, "confluence_snapshot", None
+                    )
+                    scores = (
+                        score_snapshot(evaluation)
+                        if score_snapshot is not None
+                        and evaluation is not None
+                        else []
+                    )
+                    self.confluence_score_log.extend({
+                        **record, "strategy_id": strategy.strategy_id,
+                        "timestamp": state["date"],
+                    } for record in confluence_score_snapshots(
+                        evaluated=[
+                            *scores, *strategy._pending_confluence_scores,
+                        ],
+                        signals=(
+                            signal_report["signals"] if signal_report else None
+                        ),
+                        positions_before=positions_before,
+                    ))
+                    self.indicator_log.extend(indicator_snapshots(
+                        strategy_id=strategy.strategy_id,
+                        timestamp=state["date"],
+                        evaluated=(
+                            engine.snapshot(evaluation)
+                            if engine is not None and evaluation is not None
+                            else []
+                        ),
+                        decision_traces=strategy._pending_decision_traces,
+                        signals=(
+                            signal_report["signals"] if signal_report else []
+                        ),
+                    ))
+        finally:
+            self.context._current_strategy_id = None
+
+    def _run_iteration_scheduled(self, entry, state):
+        if not isinstance(entry, tuple) or len(entry) != 2:
+            return
+        first, second = entry
+        if isinstance(first, str):
+            strategy = self._strategies_lookup.get(first)
+            func_name = second
+        else:
+            strategy = first
+            func_name = second.func if hasattr(second, 'func') else second
+        if strategy is None:
+            return
+        function = getattr(strategy, func_name, None)
+        if function is None:
+            logger.warning(
+                f"ScheduledFunction '{func_name}' not found "
+                f"on strategy '{strategy.strategy_id}'."
+            )
+            return
+        data = {
+            source.get_identifier(): state['data'][source.get_identifier()]
+            for source in strategy.data_sources or []
+            if source.get_identifier() in state['data']
+        }
+        logger.debug(
+            f"Running scheduled function {strategy.strategy_id}.{func_name}"
+        )
+        self.context._current_strategy_id = strategy.strategy_id
+        try:
+            function(context=self.context, data=data)
+        finally:
+            self.context._current_strategy_id = None
+
+    def _finish_iteration(self, strategies, state):
+        current_datetime = state['date']
         created_orders = self._order_service.get_all(
             {
                 "status": OrderStatus.CREATED,
@@ -935,6 +1377,18 @@ class EventLoopService:
             strategies=strategies,
             hooks=[]
         )
+
+        # Build/persist a RunReport for this tick — continuous (web or
+        # non-web) runs never naturally "finish", so without this a
+        # long-lived live run would never produce a report until
+        # stopped. No-op for backtests (RunReport is a live/paper
+        # trading concept) and when this tick had nothing due.
+        if (
+            strategies
+            and self.on_iteration_complete is not None
+            and not Environment.BACKTEST.equals(state['environment'])
+        ):
+            self.on_iteration_complete(strategies)
 
     def _update_history(self, current_datetime, strategies, hooks):
         """

@@ -14,7 +14,7 @@ from investing_algorithm_framework import PositionSize
 
 ```python
 PositionSize(
-    symbol: str,
+    symbol: str | None = None,
     percentage_of_portfolio: float | None = None,
     fixed_amount: float | None = None,
 )
@@ -22,7 +22,7 @@ PositionSize(
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `symbol` | `str` | — | Target symbol (e.g. `"BTC"`). |
+| `symbol` | `str \| None` | `None` | Target symbol (e.g. `"BTC"`). When `None`, this entry is a **default** used for any symbol that doesn't have its own symbol-specific `PositionSize` — a symbol-specific entry always takes precedence. |
 | `percentage_of_portfolio` | `float \| None` | `None` | Percent (0–100) of *total portfolio value* (`unallocated + allocated`) to spend per entry. |
 | `fixed_amount` | `float \| None` | `None` | Fixed amount in the trading currency to spend per entry. Overrides `percentage_of_portfolio` if both are given. |
 
@@ -48,6 +48,21 @@ class EqualWeightStrategy(TradingStrategy):
     position_sizes = [
         PositionSize(symbol=s, percentage_of_portfolio=20.0)
         for s in symbols
+    ]
+```
+
+### Default for all symbols, with a per-symbol override
+
+```python
+class DefaultWithOverrideStrategy(TradingStrategy):
+    symbols = ["BTC", "ETH", "SOL"]
+
+    position_sizes = [
+        # Applies to every symbol above that doesn't have its own
+        # entry below.
+        PositionSize(percentage_of_portfolio=20.0),
+        # BTC gets its own size instead of the 20% default.
+        PositionSize(symbol="BTC", percentage_of_portfolio=50.0),
     ]
 ```
 

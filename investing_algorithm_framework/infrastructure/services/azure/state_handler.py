@@ -1,7 +1,6 @@
 import os
 import logging
 
-from azure.storage.blob import ContainerClient
 from investing_algorithm_framework.domain import OperationalException, \
     StateHandler
 
@@ -141,6 +140,10 @@ class AzureBlobStorageStateHandler(StateHandler):
 
         # Ensure the container exists
         try:
+            # Imported lazily so azure-storage-blob (an optional `azure`
+            # extra) is only required when this state handler is used.
+            from azure.storage.blob import ContainerClient
+
             container_client = ContainerClient.from_connection_string(
                 conn_str=self.connection_string,
                 container_name=self.container_name

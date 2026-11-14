@@ -5,6 +5,7 @@ Covers:
   * Universe-refresh cadence cache
   * Per-pipeline error resilience in non-backtest environments
 """
+import logging
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest import TestCase
@@ -52,7 +53,7 @@ def _strategy(strategy_id, data_sources, pipelines):
     )
 
 
-def _eventloop(env=Environment.DEV):
+def _eventloop(env=Environment.PROD):
     """Construct an :class:`EventLoopService` with stub services. The
     helper methods under test only need ``configuration_service`` to
     return ``{"environment": env}``, the rest can stay ``None``."""
@@ -140,7 +141,7 @@ class TestLiveEnvelopeValidation(TestCase):
         sources = [_ds("BTC/EUR", time_frame=TimeFrame.ONE_DAY)]
         strat = _strategy("s1", sources, [_DailyPipeline])
         loop._maybe_validate_live_envelope(
-            [strat], Environment.DEV.value,
+            [strat], Environment.PROD.value,
         )
         self.assertTrue(loop._pipelines_live_validated)
         # Even if we mutate the strategy to violate the envelope,
@@ -149,18 +150,24 @@ class TestLiveEnvelopeValidation(TestCase):
             _ds("BTC/EUR", time_frame=TimeFrame.ONE_HOUR),
         ]
         loop._maybe_validate_live_envelope(
-            [strat], Environment.DEV.value,
+            [strat], Environment.PROD.value,
         )  # no raise
 
 
 # ----------------------------------------------------------------- #
-# 3c: refresh_universe_every cache
+# 3c: refresh_universe_every cache (moved to EvaluatePipelinesPhase
+# in v9.0; the eventloop no longer owns the cache).
 # ----------------------------------------------------------------- #
 class TestUniverseRefreshCache(TestCase):
+    def _phase(self):
+        from investing_algorithm_framework.services.strategy_phases \
+            .evaluate_pipelines import EvaluatePipelinesPhase
+        return EvaluatePipelinesPhase
+
     def test_no_attribute_returns_none(self):
-        loop = _eventloop()
-        result = loop._filter_symbols_for_universe_cache(
-            strategy_id="s1",
+        phase = self._phase()
+        result = phase._filter_for_universe_cache(
+            strategy=SimpleNamespace(_pipeline_universe_cache={}),
             pipeline_cls=_DailyPipeline,  # no refresh_universe_every
             symbol_to_identifier={"A": "id_a"},
             as_of=datetime(2024, 1, 1),
@@ -168,9 +175,9 @@ class TestUniverseRefreshCache(TestCase):
         self.assertIsNone(result)
 
     def test_no_cache_entry_returns_none(self):
-        loop = _eventloop()
-        result = loop._filter_symbols_for_universe_cache(
-            strategy_id="s1",
+        phase = self._phase()
+        result = phase._filter_for_universe_cache(
+            strategy=SimpleNamespace(_pipeline_universe_cache={}),
             pipeline_cls=_CadencePipeline,
             symbol_to_identifier={"A": "id_a"},
             as_of=datetime(2024, 1, 1),
@@ -178,13 +185,17 @@ class TestUniverseRefreshCache(TestCase):
         self.assertIsNone(result)
 
     def test_cache_hit_within_cadence_restricts_symbols(self):
-        loop = _eventloop()
-        loop._pipeline_universe_cache[("s1", _CadencePipeline)] = (
-            datetime(2024, 1, 1),
-            frozenset({"A", "B"}),
+        phase = self._phase()
+        strat = SimpleNamespace(
+            _pipeline_universe_cache={
+                _CadencePipeline: (
+                    datetime(2024, 1, 1),
+                    frozenset({"A", "B"}),
+                ),
+            },
         )
-        result = loop._filter_symbols_for_universe_cache(
-            strategy_id="s1",
+        result = phase._filter_for_universe_cache(
+            strategy=strat,
             pipeline_cls=_CadencePipeline,
             symbol_to_identifier={"A": "id_a", "B": "id_b", "C": "id_c"},
             as_of=datetime(2024, 1, 1, 12),  # 12h later, < 1d cadence
@@ -192,13 +203,17 @@ class TestUniverseRefreshCache(TestCase):
         self.assertEqual(result, {"A": "id_a", "B": "id_b"})
 
     def test_cache_miss_after_cadence_returns_none(self):
-        loop = _eventloop()
-        loop._pipeline_universe_cache[("s1", _CadencePipeline)] = (
-            datetime(2024, 1, 1),
-            frozenset({"A"}),
+        phase = self._phase()
+        strat = SimpleNamespace(
+            _pipeline_universe_cache={
+                _CadencePipeline: (
+                    datetime(2024, 1, 1),
+                    frozenset({"A"}),
+                ),
+            },
         )
-        result = loop._filter_symbols_for_universe_cache(
-            strategy_id="s1",
+        result = phase._filter_for_universe_cache(
+            strategy=strat,
             pipeline_cls=_CadencePipeline,
             symbol_to_identifier={"A": "id_a"},
             as_of=datetime(2024, 1, 2, 1),  # > 1d after cache
@@ -207,7 +222,7 @@ class TestUniverseRefreshCache(TestCase):
 
 
 # ----------------------------------------------------------------- #
-# 3d: per-pipeline resilience
+# 3d: per-pipeline resilience (now driven through EvaluatePipelinesPhase).
 # ----------------------------------------------------------------- #
 class _BoomEngine:
     """Stand-in pipeline engine that always raises."""
@@ -223,36 +238,65 @@ class _BoomEngine:
         )
 
 
-class TestRunPipelinesResilience(TestCase):
+class _PhaseStateStub:
+    """Minimal PhaseState surface the phase reads from."""
+
+    def __init__(self, strategy, data, as_of, is_backtest):
+        self.strategy = strategy
+        self.data = data
+        self.current_datetime = as_of
+        # context.config[ENVIRONMENT] is what the phase actually reads
+        env = (
+            Environment.BACKTEST.value
+            if is_backtest else Environment.PROD.value
+        )
+        self.context = SimpleNamespace(config={"ENVIRONMENT": env})
+        self.traces = []
+
+    def trace(self, tag, payload):
+        self.traces.append((tag, payload))
+
+
+class TestEvaluatePipelinesPhaseResilience(TestCase):
     def _setup(self, env):
-        loop = _eventloop(env=env)
-        loop._pipeline_engine = _BoomEngine()
+        from investing_algorithm_framework.services.strategy_phases \
+            .evaluate_pipelines import EvaluatePipelinesPhase
+        phase = EvaluatePipelinesPhase(engine=_BoomEngine())
         strat = _strategy(
             "s1",
             [_ds("BTC/EUR", time_frame=TimeFrame.ONE_DAY)],
             [_DailyPipeline],
         )
-        return loop, strat
+        strat._pipeline_universe_cache = {}
+        state = _PhaseStateStub(
+            strategy=strat,
+            data={ds.get_identifier(): None for ds in strat.data_sources},
+            as_of=datetime(2024, 1, 1),
+            is_backtest=Environment.BACKTEST.equals(env),
+        )
+        return phase, state
 
     def test_live_mode_swallows_pipeline_error(self):
-        loop, strat = self._setup(Environment.DEV)
-        data = {}
-        loop._run_pipelines(
-            strategy=strat,
-            data=data,
-            data_object={},
-            as_of=datetime(2024, 1, 1),
+        phase, state = self._setup(Environment.PROD)
+        logger_name = (
+            "investing_algorithm_framework.services.strategy_phases"
+            ".evaluate_pipelines"
         )
-        self.assertIn("_DailyPipeline", data)
+        # Failure is expected here — assertLogs both captures the
+        # traceback (keeping it out of the test console) and confirms
+        # it was actually logged.
+        with self.assertLogs(logger_name, level=logging.ERROR):
+            phase.run(state)
+        self.assertIn("_DailyPipeline", state.data)
         # Empty output — schema preserved, no rows.
-        self.assertEqual(data["_DailyPipeline"].height, 0)
+        self.assertEqual(state.data["_DailyPipeline"].height, 0)
 
     def test_backtest_mode_reraises_pipeline_error(self):
-        loop, strat = self._setup(Environment.BACKTEST)
-        with self.assertRaises(RuntimeError):
-            loop._run_pipelines(
-                strategy=strat,
-                data={},
-                data_object={},
-                as_of=datetime(2024, 1, 1),
-            )
+        phase, state = self._setup(Environment.BACKTEST)
+        logger_name = (
+            "investing_algorithm_framework.services.strategy_phases"
+            ".evaluate_pipelines"
+        )
+        with self.assertLogs(logger_name, level=logging.ERROR):
+            with self.assertRaises(RuntimeError):
+                phase.run(state)

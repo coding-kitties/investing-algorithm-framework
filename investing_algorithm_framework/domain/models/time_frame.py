@@ -1,4 +1,5 @@
 from enum import Enum
+from functools import lru_cache
 
 
 class TimeFrame(Enum):
@@ -25,41 +26,31 @@ class TimeFrame(Enum):
     ONE_YEAR = "1Y"
 
     @staticmethod
+    @lru_cache(maxsize=None)
+    def _spellings():
+        # Map every accepted spelling to its member: hour frames also
+        # accept "H" and day frames also accept "D".
+        spellings = {}
+
+        for entry in TimeFrame:
+            spellings[entry.value] = entry
+
+            if "h" in entry.value:
+                spellings.setdefault(entry.value.replace("h", "H"), entry)
+
+            if "d" in entry.value:
+                spellings.setdefault(entry.value.replace("d", "D"), entry)
+
+        return spellings
+
+    @staticmethod
     def from_string(value: str):
 
         if isinstance(value, str):
+            entry = TimeFrame._spellings().get(value)
 
-            for entry in TimeFrame:
-
-                # For hour timeframes compare with and without H
-                if "H" in entry.value:
-
-                    if value == entry.value:
-                        return entry
-
-                    if value == entry.value.replace("H", "h"):
-                        return entry
-
-                # For hour timeframes compare with and without h
-                if "h" in entry.value:
-
-                    if value == entry.value:
-                        return entry
-
-                    if value == entry.value.replace("h", "H"):
-                        return entry
-
-                # For day timeframes compare with and without D
-                if "d" in entry.value:
-
-                    if value == entry.value:
-                        return entry
-
-                    if value == entry.value.replace("d", "D"):
-                        return entry
-
-                if value == entry.value:
-                    return entry
+            if entry is not None:
+                return entry
 
             raise ValueError(
                 f"Could not convert {value} to TimeFrame"
@@ -89,68 +80,38 @@ class TimeFrame(Enum):
         else:
             return TimeFrame.from_string(other) == self
 
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _minutes():
+        return {
+            TimeFrame.ONE_MINUTE: 1,
+            TimeFrame.TWO_MINUTE: 2,
+            TimeFrame.THREE_MINUTE: 3,
+            TimeFrame.FOUR_MINUTE: 4,
+            TimeFrame.FIVE_MINUTE: 5,
+            TimeFrame.TEN_MINUTE: 10,
+            TimeFrame.FIFTEEN_MINUTE: 15,
+            TimeFrame.TWENTY_MINUTE: 20,
+            TimeFrame.THIRTY_MINUTE: 30,
+            TimeFrame.ONE_HOUR: 60,
+            TimeFrame.TWO_HOUR: 120,
+            TimeFrame.FOUR_HOUR: 240,
+            TimeFrame.SIX_HOUR: 360,
+            TimeFrame.EIGHT_HOUR: 480,
+            TimeFrame.TWELVE_HOUR: 720,
+            TimeFrame.ONE_DAY: 1440,
+            TimeFrame.THREE_DAY: 4320,
+            TimeFrame.ONE_WEEK: 10080,
+            TimeFrame.ONE_MONTH: 40320,
+            TimeFrame.ONE_YEAR: 525600,
+        }
+
     @property
     def amount_of_minutes(self):
+        minutes = TimeFrame._minutes().get(self)
 
-        if self.equals(TimeFrame.ONE_MINUTE):
-            return 1
-
-        if self.equals(TimeFrame.TWO_MINUTE):
-            return 2
-
-        if self.equals(TimeFrame.THREE_MINUTE):
-            return 3
-
-        if self.equals(TimeFrame.FOUR_MINUTE):
-            return 4
-
-        if self.equals(TimeFrame.FIVE_MINUTE):
-            return 5
-
-        if self.equals(TimeFrame.TEN_MINUTE):
-            return 10
-
-        if self.equals(TimeFrame.FIFTEEN_MINUTE):
-            return 15
-
-        if self.equals(TimeFrame.TWENTY_MINUTE):
-            return 20
-
-        if self.equals(TimeFrame.THIRTY_MINUTE):
-            return 30
-
-        if self.equals(TimeFrame.ONE_HOUR):
-            return 60
-
-        if self.equals(TimeFrame.TWO_HOUR):
-            return 120
-
-        if self.equals(TimeFrame.FOUR_HOUR):
-            return 240
-
-        if self.equals(TimeFrame.SIX_HOUR):
-            return 360
-
-        if self.equals(TimeFrame.EIGHT_HOUR):
-            return 480
-
-        if self.equals(TimeFrame.TWELVE_HOUR):
-            return 720
-
-        if self.equals(TimeFrame.ONE_DAY):
-            return 1440
-
-        if self.equals(TimeFrame.THREE_DAY):
-            return 4320
-
-        if self.equals(TimeFrame.ONE_WEEK):
-            return 10080
-
-        if self.equals(TimeFrame.ONE_MONTH):
-            return 40320
-
-        if self.equals(TimeFrame.ONE_YEAR):
-            return 525600
+        if minutes is not None:
+            return minutes
 
         raise ValueError(
             f"Could not determine amount of minutes for {self.value}"

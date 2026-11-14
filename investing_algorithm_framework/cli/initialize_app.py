@@ -22,7 +22,7 @@ RECOMMENDED_NOTEBOOKS = [
      "candidates on the held-out out-of-sample window."),
     ("05_overfitting_analysis.ipynb",
      "# 05 — Overfitting Analysis\n\nCompare in-sample vs out-of-sample "
-     "performance, walk-forward / permutation checks."),
+     "performance, walk-forward / Monte-Carlo checks."),
     ("06_event_backtests.ipynb",
      "# 06 — Event-Driven Backtests\n\nValidate the final picks with the "
      "event-driven engine (fees, slippage, fills)."),

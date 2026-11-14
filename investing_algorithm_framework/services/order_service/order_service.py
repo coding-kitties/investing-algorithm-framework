@@ -1,11 +1,25 @@
 import logging
 
+from investing_algorithm_framework.domain.native_event import native_order
+from investing_algorithm_framework.domain.utils.amounts import (
+    amount_roundoff_tolerance,
+)
+from investing_algorithm_framework.domain.utils.cash import (
+    cash_tolerance as _cash_tolerance,
+)
+import math
+from datetime import datetime
+
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, Order, random_number, INDEX_DATETIME
+    OperationalException, OrderStatus, Order, PositionMode, random_number, \
+    INDEX_DATETIME, Environment, ENVIRONMENT, TradeStatus
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
 logger = logging.getLogger("investing_algorithm_framework")
+_PROTECTIVE_EXIT_REASONS = (
+    "stop_loss", "take_profit", "stop_loss_mirror", "take_profit_mirror",
+)
 
 
 class OrderService(RepositoryService):
@@ -44,7 +58,9 @@ class OrderService(RepositoryService):
         trade_service,
         portfolio_provider_lookup=None,
         order_executor_lookup=None,
-        market_credential_service=None
+        market_credential_service=None,
+        trade_stop_loss_service=None,
+        trade_take_profit_service=None,
     ):
         super(OrderService, self).__init__(order_repository)
         self.configuration_service = configuration_service
@@ -55,10 +71,15 @@ class OrderService(RepositoryService):
         self.portfolio_snapshot_service = portfolio_snapshot_service
         self.market_credential_service = market_credential_service
         self.trade_service = trade_service
+        self.trade_stop_loss_service = trade_stop_loss_service
+        self.trade_take_profit_service = trade_take_profit_service
         self._order_executor_lookup = order_executor_lookup
         self._portfolio_provider_lookup = portfolio_provider_lookup
 
-    def create(self, data, execute=True, validate=True, sync=True) -> Order:
+    def create(
+        self, data, execute=True, validate=True, sync=True,
+        create_allocations=True,
+    ) -> Order:
         """
         Function to create an order. The function will create the order and
         execute it if execute is set to True. The function will also validate
@@ -126,6 +147,14 @@ class OrderService(RepositoryService):
             execute: bool - if True the order will be executed
             validate: bool - if True the order will be validated
             sync: bool - if True the portfolio will be synced with the order
+            create_allocations: bool - if True (default) a SELL order
+                without explicit ``trades``/``stop_losses``/
+                ``take_profits`` falls back to FIFO trade matching at
+                creation time, same as before. Set False to place a
+                resting SELL order (e.g. a broker-native mirror stop)
+                that must NOT be matched against any trade, or reserve
+                the position, yet -- both are deferred until the
+                order is observed to actually fill.
 
         Returns:
             Order: Order object
@@ -135,6 +164,25 @@ class OrderService(RepositoryService):
         trades = data.get("trades", [])
         stop_losses = data.get("stop_losses", [])
         take_profits = data.get("take_profits", [])
+        # v9.0 (#431) — BUY-side: user-supplied rules that should be
+        # attached to each trade materialized at fill time.
+        pending_stop_losses = data.get("pending_stop_losses", [])
+        pending_take_profits = data.get("pending_take_profits", [])
+
+        # v9.0 (#431) — capture any user-supplied filled/remaining/status
+        # so we can re-apply them after the executor runs. This supports
+        # call sites that pre-simulate a filled order (commonly tests, but
+        # also live setups where the executor returns synchronously
+        # filled and the caller passes the resulting state in). The
+        # default ``CREATED`` status is filtered out because it is always
+        # injected by ``context.create_limit_order`` even when the caller
+        # has no opinion on the final status — preserving it would
+        # silently overwrite whatever the executor returns.
+        explicit_filled = data.get("filled")
+        explicit_remaining = data.get("remaining")
+        explicit_status = data.get("status") if "status" in data else None
+        if explicit_status == OrderStatus.CREATED.value:
+            explicit_status = None
 
         if "filled" in data:
             del data["filled"]
@@ -151,13 +199,23 @@ class OrderService(RepositoryService):
         if "take_profits" in data:
             del data["take_profits"]
 
-        # For plain STOP orders the user only provides a stop_price.
-        # Default the order price to the stop_price so downstream
-        # accounting / trade allocation has a numeric reference. The
-        # actual fill price is set at trigger time by the evaluator.
-        if OrderType.STOP.equals(data.get("order_type")) \
-                and data.get("price") is None:
-            data["price"] = data.get("stop_price")
+        if "pending_stop_losses" in data:
+            del data["pending_stop_losses"]
+
+        if "pending_take_profits" in data:
+            del data["pending_take_profits"]
+
+        if pending_stop_losses or pending_take_profits:
+            order_metadata = data.setdefault("metadata", {}) or {}
+            data["metadata"] = order_metadata
+            if pending_stop_losses:
+                order_metadata.setdefault(
+                    "pending_stop_losses", []
+                ).extend(pending_stop_losses)
+            if pending_take_profits:
+                order_metadata.setdefault(
+                    "pending_take_profits", []
+                ).extend(pending_take_profits)
 
         if validate:
             self.validate_order(data, portfolio)
@@ -168,12 +226,61 @@ class OrderService(RepositoryService):
         data["id"] = self._create_order_id()
 
         order = self.repository.create(data, save=False)
+        self._validate_order_fee(
+            order.order_fee, order.order_fee_currency, order.trading_symbol
+        )
+
+        # v9.0 (#431) — snapshot the price used to reserve cash so that
+        # slippage between reservation and fill can be settled later
+        # even after order.price is overwritten by the executor.
+        if any(side.equals(order.order_side) for side in (
+            OrderSide.BUY, OrderSide.SHORT, OrderSide.COVER,
+        )):
+            reservation_price = order.reservation_price
+            if reservation_price is not None:
+                order.metadata["_reservation_price"] = reservation_price
+                # Keep the persisted JSON column in sync with the
+                # in-memory metadata dict so the reservation price
+                # survives the eventual ``order_repository.save``.
+                if hasattr(order, "metadata_json"):
+                    import json as _json
+                    order.metadata_json = _json.dumps(order.metadata)
 
         if validate:
             self.validate_order(data, portfolio)
 
         if execute:
             order = self.execute_order(order, portfolio)
+        self._validate_order_fee(
+            order.order_fee, order.order_fee_currency, order.trading_symbol
+        )
+
+        # v9.0 (#431) — if the caller supplied filled / remaining / status
+        # explicitly, prefer them over whatever the executor returned. This
+        # supports callers that pre-simulate fills (tests and live setups
+        # where the executor responds synchronously). When execute is False
+        # we still need to honour the explicit values since execute_order
+        # never ran.
+        if explicit_filled is not None:
+            order.set_filled(explicit_filled)
+            if explicit_remaining is not None:
+                order.set_remaining(explicit_remaining)
+            else:
+                order.set_remaining(
+                    max(order.get_amount() - explicit_filled, 0)
+                )
+        if explicit_status is not None:
+            order.set_status(explicit_status)
+
+        self._append_protective_fill(
+            order.metadata, 0, order.get_filled(), order.get_price(),
+            order.updated_at, order.status,
+        )
+        if hasattr(order, "metadata_json") and order.metadata.get(
+            "protective_fills"
+        ):
+            import json
+            order.metadata_json = json.dumps(order.metadata)
 
         position = self._create_position_if_not_exists(symbol, portfolio)
         order.position_id = position.id
@@ -184,24 +291,114 @@ class OrderService(RepositoryService):
         if OrderSide.SELL.equals(order_side):
             # Create order metadata if there is a key in the data
             # for trades, stop_losses or take_profits
-            self.trade_service.create_trade_allocations(
-                sell_order=order,
-                trades=trades,
-                stop_losses=stop_losses,
-                take_profits=take_profits
-            )
-        else:
-            self.trade_service.create_trade_from_buy_order(order)
+            if create_allocations:
+                self.trade_service.create_trade_allocations(
+                    sell_order=order,
+                    trades=trades,
+                    stop_losses=stop_losses,
+                    take_profits=take_profits,
+                    position_mode=self._position_mode(portfolio),
+                )
+        elif OrderSide.COVER.equals(order_side) and trades:
+            # #434 phase 3 — stash the SL/TP-triggered trade
+            # allocation hint on the COVER order so the fill handler
+            # can close the right SHORT trade(s) instead of falling
+            # back to pure FIFO.
+            order.metadata["_cover_trade_allocations"] = trades
+            if hasattr(order, "metadata_json"):
+                import json as _json
+                order.metadata_json = _json.dumps(order.metadata)
+            # v9.0 — re-assert ``updated_at`` so the SQL model's
+            # ``onupdate=utcnow`` hook does not silently overwrite the
+            # executor-supplied timestamp on this second UPDATE.
+            # Without this, backtest sim-time gets clobbered by wall
+            # clock, which breaks the per-bar fill scan that uses
+            # ``Datetime >= updated_at`` to skip past candles.
+            preserved_updated_at = order.updated_at
+            order = self.order_repository.save(order)
+            if preserved_updated_at is not None \
+                    and order.updated_at != preserved_updated_at:
+                order = self.order_repository.update(
+                    order.id,
+                    {"updated_at": preserved_updated_at},
+                )
+        # v9.0 (#431) — BUY orders no longer eagerly create a trade.
+        # The trade is created from the actual fill event in
+        # ``_sync_with_buy_order_filled``.
+        # #434 phase 2 — SHORT trades are created from the fill event
+        # in ``_sync_with_short_order_filled``; COVER closes the open
+        # SHORT trade(s) in ``_sync_with_cover_order_filled``.
 
         if sync:
             order = self.get(order_id)
+            self._settle_order_fee(order)
             if OrderSide.BUY.equals(order_side):
                 self._sync_portfolio_with_created_buy_order(order)
+                # v9.0 (#431) — if the executor reported the order
+                # already filled at create time, route the filled
+                # portion through the regular fill-handling path so a
+                # Trade is created and any slippage settled.
+                if order.get_filled() and order.get_filled() > 0:
+                    synthetic_previous = Order.from_dict(order.to_dict())
+                    synthetic_previous.set_filled(0)
+                    self._sync_with_buy_order_filled(
+                        synthetic_previous, order
+                    )
+            elif OrderSide.SHORT.equals(order_side):
+                self._sync_portfolio_with_created_short_order(order)
+                if order.get_filled() and order.get_filled() > 0:
+                    synthetic_previous = Order.from_dict(order.to_dict())
+                    synthetic_previous.set_filled(0)
+                    self._sync_with_short_order_filled(
+                        synthetic_previous, order
+                    )
+            elif OrderSide.COVER.equals(order_side):
+                self._sync_portfolio_with_created_cover_order(order)
+                if order.get_filled() and order.get_filled() > 0:
+                    synthetic_previous = Order.from_dict(order.to_dict())
+                    synthetic_previous.set_filled(0)
+                    self._sync_with_cover_order_filled(
+                        synthetic_previous, order
+                    )
             else:
-                self._sync_portfolio_with_created_sell_order(order)
+                # A resting order with deferred allocation (e.g. a
+                # broker-native mirror order) must not reserve the
+                # position either -- that happens once it actually
+                # fills, exactly like the deferred trade allocation.
+                if create_allocations:
+                    self._sync_portfolio_with_created_sell_order(order)
+
+            if (
+                (OrderSide.SELL.equals(order_side) and create_allocations)
+                or (
+                    not OrderSide.SELL.equals(order_side)
+                    and (order.filled or 0) > 0
+                )
+            ):
+                self._reconcile_position_balances(order)
 
         order = self.get(order_id)
         return order
+
+    @staticmethod
+    def _append_protective_fill(
+        metadata, previous_filled, filled, price, timestamp, status,
+    ):
+        if metadata.get("order_reason") not in _PROTECTIVE_EXIT_REASONS \
+                or filled <= previous_filled:
+            return
+        if timestamp is None:
+            raise OperationalException("Protective fills require a timestamp")
+        metadata["protective_fills"] = [
+            *metadata.get("protective_fills", []),
+            {
+                "timestamp": timestamp.isoformat()
+                if isinstance(timestamp, datetime) else timestamp,
+                "amount": filled - previous_filled,
+                "filled_amount": filled, "price": price,
+                "order_status": status,
+            },
+        ]
 
     def update(self, object_id, data):
         """
@@ -227,39 +424,171 @@ class OrderService(RepositoryService):
             Order: Order object that has been updated
         """
         previous_order = self.order_repository.get(object_id)
+        if data.get("filled", previous_order.get_filled()) \
+                > previous_order.get_filled():
+            metadata = dict(
+                data.get("metadata", previous_order.metadata) or {}
+            )
+            if metadata.get("order_reason") in _PROTECTIVE_EXIT_REASONS:
+                self._append_protective_fill(
+                    metadata, previous_order.get_filled(), data["filled"],
+                    data.get("price", previous_order.price),
+                    data.get("updated_at")
+                    or self.configuration_service.config[INDEX_DATETIME],
+                    data.get("status", previous_order.status),
+                )
+                data["metadata"] = metadata
+        self._validate_order_fee(
+            data.get('order_fee', previous_order.order_fee),
+            data.get('order_fee_currency', previous_order.order_fee_currency),
+            previous_order.trading_symbol,
+        )
         new_order = self.order_repository.update(object_id, data)
+        self._settle_order_fee(new_order, previous_order.order_fee or 0)
+        self.trade_service.reconcile_order_fees(
+            new_order, previous_order.order_fee or 0
+        )
         filled_difference = new_order.get_filled() \
             - previous_order.get_filled()
 
+        new_side = new_order.get_order_side()
+
         if filled_difference > 0:
-            if OrderSide.BUY.equals(new_order.get_order_side()):
+            if OrderSide.BUY.equals(new_side):
                 self._sync_with_buy_order_filled(previous_order, new_order)
+            elif OrderSide.SHORT.equals(new_side):
+                self._sync_with_short_order_filled(
+                    previous_order, new_order
+                )
+            elif OrderSide.COVER.equals(new_side):
+                self._sync_with_cover_order_filled(
+                    previous_order, new_order
+                )
             else:
                 self._sync_with_sell_order_filled(previous_order, new_order)
 
-        if "status" in data:
+        if "status" in data and previous_order.status not in (
+            OrderStatus.CANCELED.value, OrderStatus.EXPIRED.value,
+            OrderStatus.REJECTED.value,
+        ):
 
             if OrderStatus.CANCELED.equals(new_order.get_status()):
-                if OrderSide.BUY.equals(new_order.get_order_side()):
+                if OrderSide.BUY.equals(new_side):
                     self._sync_with_buy_order_cancelled(new_order)
+                elif OrderSide.SHORT.equals(new_side):
+                    self._sync_with_short_order_cancelled(new_order)
+                elif OrderSide.COVER.equals(new_side):
+                    self._sync_with_cover_order_cancelled(new_order)
                 else:
                     self._sync_with_sell_order_cancelled(new_order)
 
             if OrderStatus.EXPIRED.equals(new_order.get_status()):
 
-                if OrderSide.BUY.equals(new_order.get_order_side()):
+                if OrderSide.BUY.equals(new_side):
                     self._sync_with_buy_order_expired(new_order)
+                elif OrderSide.SHORT.equals(new_side):
+                    self._sync_with_short_order_expired(new_order)
+                elif OrderSide.COVER.equals(new_side):
+                    self._sync_with_cover_order_expired(new_order)
                 else:
                     self._sync_with_sell_order_expired(new_order)
 
             if OrderStatus.REJECTED.equals(new_order.get_status()):
 
-                if OrderSide.BUY.equals(new_order.get_order_side()):
+                if OrderSide.BUY.equals(new_side):
                     self._sync_with_buy_order_rejected(new_order)
+                elif OrderSide.SHORT.equals(new_side):
+                    self._sync_with_short_order_rejected(new_order)
+                elif OrderSide.COVER.equals(new_side):
+                    self._sync_with_cover_order_rejected(new_order)
                 else:
                     self._sync_with_sell_order_expired(new_order)
 
+        if filled_difference > 0 or "status" in data:
+            self._reconcile_position_balances(new_order)
         return new_order
+
+    def _reconcile_position_balances(self, order):
+        """Repair cancellation roundoff using the remaining trade ledger."""
+        short = any(side.equals(order.order_side) for side in (
+            OrderSide.SHORT, OrderSide.COVER,
+        ))
+        position = self.position_service.get(order.position_id)
+        trades = self.trade_service.get_all({
+            "portfolio_id": position.portfolio_id,
+            "target_symbol": order.target_symbol,
+            "trading_symbol": order.trading_symbol,
+            "status": TradeStatus.OPEN.value,
+        })
+        trades = [
+            trade for trade in trades
+            if bool(trade.is_short) == short
+        ]
+        if not trades:
+            return
+        remaining = math.fsum(trade.available_amount for trade in trades)
+        costs = []
+        for trade in trades:
+            costs.append(trade.available_amount * trade.open_price)
+            costs.extend(
+                allocation.amount_pending * allocation.open_price
+                for allocation in (
+                    self.trade_service.trade_allocation_repository.get_all({
+                        "trade_id": trade.id,
+                    })
+                )
+            )
+        leg = "short" if short else "long"
+        price = order.price or order.reservation_price or 0
+        updates = {}
+        for field, expected, reference in (
+            (f"{leg}_amount", remaining, order.amount),
+            (f"{leg}_cost", math.fsum(costs), order.amount * price),
+        ):
+            current = getattr(position, field)
+            tolerance = amount_roundoff_tolerance(
+                current, expected, reference,
+            )
+            if current != expected and abs(current - expected) <= tolerance:
+                logger.debug(
+                    "Reconciling position %s %s roundoff from %r to %r",
+                    position.id, field, current, expected,
+                )
+                updates[field] = expected
+        if updates:
+            self.position_service.update(position.id, updates)
+
+    @staticmethod
+    def _validate_order_fee(fee, currency, trading_symbol):
+        if fee is None:
+            return
+        if not math.isfinite(fee) or fee < 0:
+            raise OperationalException(
+                'Order fee must be finite and nonnegative'
+            )
+        if fee and currency and currency.upper() != trading_symbol.upper():
+            raise OperationalException(
+                'Order fee settlement requires a quote-currency fee; '
+                'convert the fee before reporting it'
+            )
+
+    @native_order('fee')
+    def _settle_order_fee(self, order, previous_fee=0):
+        """Settle only the newly reported cumulative quote-currency fee."""
+        difference = (order.order_fee or 0) - previous_fee
+        if difference == 0:
+            return
+        position = self.position_service.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        quote_position = self.position_service.find({
+            'portfolio': portfolio.id, 'symbol': portfolio.trading_symbol,
+        })
+        self.portfolio_repository.update(portfolio.id, {
+            'unallocated': portfolio.unallocated - difference,
+        })
+        self.position_service.update(quote_position.id, {
+            'amount': quote_position.amount - difference,
+        })
 
     def execute_order(self, order, portfolio) -> Order:
         """
@@ -305,10 +634,22 @@ class OrderService(RepositoryService):
 
     def validate_order(self, order_data, portfolio):
 
-        if OrderSide.BUY.equals(order_data["order_side"]):
+        order_side = order_data["order_side"]
+        if OrderSide.BUY.equals(order_side):
             self.validate_buy_order(order_data, portfolio)
-        else:
+        elif OrderSide.SELL.equals(order_side):
             self.validate_sell_order(order_data, portfolio)
+        elif OrderSide.SHORT.equals(order_side):
+            # #434 phase 1 — plumbing only. The validator runs but the
+            # event-engine sync that actually opens the short position
+            # arrives in phase 2.
+            self.validate_short_order(order_data, portfolio)
+        elif OrderSide.COVER.equals(order_side):
+            self.validate_cover_order(order_data, portfolio)
+        else:
+            raise OperationalException(
+                f"Order side {order_side} is not supported"
+            )
 
         if OrderType.LIMIT.equals(order_data["order_type"]):
             self.validate_limit_order(order_data, portfolio)
@@ -322,6 +663,41 @@ class OrderService(RepositoryService):
             raise OperationalException(
                 f"Order type {order_data['order_type']} is not supported"
             )
+
+    def _position_mode(self, portfolio):
+        configuration = (
+            self.portfolio_configuration_service.resolve_for_portfolio(
+                portfolio
+            )
+        )
+        if configuration is None:
+            return PositionMode.NETTING
+        return PositionMode(configuration.position_mode)
+
+    def _closing_position_amount(self, position, order_side, portfolio):
+        if self._position_mode(portfolio) == PositionMode.HEDGE:
+            if OrderSide.SELL.equals(order_side):
+                return position.long_amount
+            if OrderSide.COVER.equals(order_side):
+                return position.short_amount
+        if OrderSide.COVER.equals(order_side):
+            return abs(min(position.get_amount() or 0, 0))
+        amount = position.get_amount()
+        return max(amount if amount is not None else 0, 0)
+
+    @staticmethod
+    def _cap_close_amount_roundoff(order_data, position_amount):
+        requested = order_data["amount"]
+        tolerance = amount_roundoff_tolerance(requested, position_amount)
+        if (
+            0 < position_amount < requested
+            and requested - position_amount <= tolerance
+        ):
+            logger.debug(
+                "Capping close-order roundoff from %r to %r",
+                requested, position_amount,
+            )
+            order_data["amount"] = position_amount
 
     def validate_sell_order(self, order_data, portfolio):
 
@@ -343,10 +719,17 @@ class OrderService(RepositoryService):
                 }
             )
 
-        if position.get_amount() < order_data["amount"]:
+        position_amount = self._closing_position_amount(
+            position, OrderSide.SELL, portfolio
+        )
+        self._cap_close_amount_roundoff(order_data, position_amount)
+        if position_amount < order_data["amount"]:
+            position_label = "open long position" \
+                if self._position_mode(portfolio) == PositionMode.HEDGE \
+                else "open position"
             raise OperationalException(
                 f"Order amount {order_data['amount']} is larger " +
-                f"then amount of open position {position.get_amount()}"
+                f"then amount of {position_label} {position_amount}"
             )
 
         if not order_data["trading_symbol"] == portfolio.trading_symbol:
@@ -366,122 +749,304 @@ class OrderService(RepositoryService):
                 f"portfolio with trading symbol {portfolio.trading_symbol}"
             )
 
+    def validate_short_order(self, order_data, portfolio):
+        """
+        Validate a SHORT (short-entry) order.
+
+        Phase 1 of #434 — high-level invariants only. Cash-collateral
+        reservation is enforced by the type-level validator
+        (``_validate_short_collateral`` via the LIMIT/MARKET/STOP
+        validators).
+
+        Invariants:
+          * trading_symbol matches portfolio.trading_symbol
+          * amount > 0
+          * no existing **long** position (positive amount) in the
+            same symbol — you must close the long before opening a
+            short (per #434: one direction per symbol).
+        """
+        if not order_data["trading_symbol"] == portfolio.trading_symbol:
+            raise OperationalException(
+                f"Can't add short order with trading "
+                f"symbol {order_data['trading_symbol']} to "
+                f"portfolio with trading symbol {portfolio.trading_symbol}"
+            )
+
+        if order_data.get("amount", 0) <= 0:
+            raise OperationalException(
+                "Short order amount must be greater than zero"
+            )
+
+        if self.position_service.exists(
+            {
+                "symbol": order_data["target_symbol"],
+                "portfolio": portfolio.id,
+            }
+        ):
+            position = self.position_service.find(
+                {
+                    "symbol": order_data["target_symbol"],
+                    "portfolio": portfolio.id,
+                }
+            )
+            if self._position_mode(portfolio) == PositionMode.NETTING \
+                    and position.get_amount() and position.get_amount() > 0:
+                raise OperationalException(
+                    f"Can't open short on {order_data['target_symbol']}: "
+                    f"existing long position of "
+                    f"{position.get_amount()} must be closed first"
+                )
+
+    def validate_cover_order(self, order_data, portfolio):
+        """
+        Validate a COVER (short-close) order.
+
+        Invariants:
+          * trading_symbol matches portfolio.trading_symbol
+          * amount > 0
+          * an open short position must exist in the same symbol
+            (phase-2 sync model: short positions carry a negative
+            ``amount``; until phase 2 lands no short positions exist
+            in event mode and this check always fails — by design).
+          * cover amount must not exceed the absolute size of the
+            open short.
+        """
+        if not order_data["trading_symbol"] == portfolio.trading_symbol:
+            raise OperationalException(
+                f"Can't add cover order with trading "
+                f"symbol {order_data['trading_symbol']} to "
+                f"portfolio with trading symbol {portfolio.trading_symbol}"
+            )
+
+        if order_data.get("amount", 0) <= 0:
+            raise OperationalException(
+                "Cover order amount must be greater than zero"
+            )
+
+        if not self.position_service.exists(
+            {
+                "symbol": order_data["target_symbol"],
+                "portfolio": portfolio.id,
+            }
+        ):
+            raise OperationalException(
+                f"Can't cover {order_data['target_symbol']}: no "
+                f"open short position exists"
+            )
+
+        position = self.position_service.find(
+            {
+                "symbol": order_data["target_symbol"],
+                "portfolio": portfolio.id,
+            }
+        )
+        position_amount = self._closing_position_amount(
+            position, OrderSide.COVER, portfolio
+        )
+        self._cap_close_amount_roundoff(order_data, position_amount)
+
+        if position_amount <= 0:
+            raise OperationalException(
+                f"Can't cover {order_data['target_symbol']}: "
+                f"position has no open short leg"
+            )
+
+        if order_data["amount"] > position_amount:
+            raise OperationalException(
+                f"Cover amount {order_data['amount']} exceeds open "
+                f"short size {position_amount} on "
+                f"{order_data['target_symbol']}"
+            )
+
+    # ------------------------------------------------------------------
+    # Shared validation primitives — every order-type validator
+    # composes these two helpers rather than calling each other. The
+    # only thing that varies per type is which field holds the
+    # reservation reference price.
+    # ------------------------------------------------------------------
+
+    def _validate_sell_amount(self, order_data, portfolio):
+        """SELL: amount > 0 and amount <= current position size."""
+        amount = order_data["amount"]
+        position = self.position_service.find(
+            {
+                "portfolio": portfolio.id,
+                "symbol": order_data["target_symbol"],
+            }
+        )
+
+        if amount <= 0:
+            raise OperationalException(
+                f"Order amount: {amount} {position.symbol}, is "
+                f"less or equal to 0"
+            )
+
+        position_amount = self._closing_position_amount(
+            position, OrderSide.SELL, portfolio
+        )
+        self._cap_close_amount_roundoff(order_data, position_amount)
+        amount = order_data["amount"]
+        if amount > position_amount:
+            raise OperationalException(
+                f"Order amount: {amount} {position.symbol}, is "
+                f"larger then position size: {position_amount} "
+                f"{position.symbol} of the portfolio"
+            )
+
+    def _validate_buy_cash(self, order_data, portfolio, reference_price):
+        """BUY: amount * reference_price <= portfolio unallocated cash.
+
+        The reference price is supplied by the caller and represents
+        the worst-case cash to reserve for the order:
+
+        - LIMIT      → ``order_data["price"]``
+        - MARKET     → ``order_data["price"]`` (caller-supplied estimate)
+        - STOP       → ``stop_price`` (no limit price exists)
+        - STOP_LIMIT → ``price`` (limit price; trigger is not a fill)
+        """
+        if reference_price is None or reference_price <= 0:
+            raise OperationalException(
+                "Cannot validate buy order: reference price is "
+                "missing or non-positive"
+            )
+
+        total_price = order_data["amount"] * reference_price
+        unallocated_position = self.position_service.find(
+            {
+                "portfolio": portfolio.id,
+                "symbol": portfolio.trading_symbol,
+            }
+        )
+        unallocated_amount = unallocated_position.get_amount()
+
+        if unallocated_amount is None:
+            raise OperationalException(
+                "Unallocated amount of the portfolio is None. "
+                "Please check if the portfolio configuration is correct."
+            )
+
+        tolerance = _cash_tolerance(unallocated_amount, total_price)
+        if unallocated_amount < total_price - tolerance:
+            raise OperationalException(
+                f"Order total: {total_price} "
+                f"{portfolio.trading_symbol}, is "
+                f"larger then unallocated size: {portfolio.unallocated} "
+                f"{portfolio.trading_symbol} of the portfolio"
+            )
+
+    def _validate_short_collateral(
+        self, order_data, portfolio, reference_price
+    ):
+        """SHORT: amount * reference_price <= unallocated cash (full
+        collateral, no leverage). Mirrors ``_validate_buy_cash``
+        for the short side; kept separate so the error message and
+        future leverage hook stay distinct.
+        """
+        if reference_price is None or reference_price <= 0:
+            raise OperationalException(
+                "Cannot validate short order: reference price is "
+                "missing or non-positive"
+            )
+
+        required_collateral = order_data["amount"] * reference_price
+        unallocated_position = self.position_service.find(
+            {
+                "portfolio": portfolio.id,
+                "symbol": portfolio.trading_symbol,
+            }
+        )
+        unallocated_amount = unallocated_position.get_amount()
+
+        if unallocated_amount is None:
+            raise OperationalException(
+                "Unallocated amount of the portfolio is None. "
+                "Please check if the portfolio configuration is correct."
+            )
+
+        tolerance = _cash_tolerance(unallocated_amount, required_collateral)
+        if unallocated_amount < required_collateral - tolerance:
+            raise OperationalException(
+                f"Short collateral required: {required_collateral} "
+                f"{portfolio.trading_symbol}, exceeds unallocated "
+                f"balance: {portfolio.unallocated} "
+                f"{portfolio.trading_symbol}"
+            )
+
+    def _validate_cover_amount(self, order_data, portfolio):
+        """COVER: amount > 0 and amount <= abs(open short size)."""
+        amount = order_data["amount"]
+        position = self.position_service.find(
+            {
+                "portfolio": portfolio.id,
+                "symbol": order_data["target_symbol"],
+            }
+        )
+        position_amount = self._closing_position_amount(
+            position, OrderSide.COVER, portfolio
+        )
+
+        if amount <= 0:
+            raise OperationalException(
+                f"Cover amount: {amount} {position.symbol}, is "
+                f"less or equal to 0"
+            )
+
+        if position_amount <= 0:
+            raise OperationalException(
+                f"Position {position.symbol} has no open short leg; "
+                f"cannot cover"
+            )
+
+        if amount > position_amount:
+            raise OperationalException(
+                f"Cover amount: {amount} {position.symbol}, exceeds "
+                f"open short size: {position_amount} "
+                f"{position.symbol}"
+            )
+
     def validate_limit_order(self, order_data, portfolio):
-
-        if OrderSide.SELL.equals(order_data["order_side"]):
-            amount = order_data["amount"]
-            position = self.position_service\
-                .find(
-                    {
-                        "portfolio": portfolio.id,
-                        "symbol": order_data["target_symbol"]
-                    }
-                )
-
-            if amount <= 0:
-                raise OperationalException(
-                    f"Order amount: {amount} {position.symbol}, is "
-                    f"less or equal to 0"
-                )
-
-            if amount > position.get_amount():
-                raise OperationalException(
-                    f"Order amount: {amount} {position.symbol}, is "
-                    f"larger then position size: {position.get_amount()} "
-                    f"{position.symbol} of the portfolio"
-                )
+        side = order_data["order_side"]
+        if OrderSide.SELL.equals(side):
+            self._validate_sell_amount(order_data, portfolio)
+        elif OrderSide.COVER.equals(side):
+            self._validate_cover_amount(order_data, portfolio)
+        elif OrderSide.SHORT.equals(side):
+            self._validate_short_collateral(
+                order_data, portfolio, order_data.get("price")
+            )
         else:
-            total_price = order_data["amount"] * order_data["price"]
-            unallocated_position = self.position_service\
-                .find(
-                    {
-                        "portfolio": portfolio.id,
-                        "symbol": portfolio.trading_symbol
-                    }
-                )
-            unallocated_amount = unallocated_position.get_amount()
-
-            if unallocated_amount is None:
-                raise OperationalException(
-                    "Unallocated amount of the portfolio is None" +
-                    "can't validate limit order. Please check if " +
-                    "the portfolio configuration is correct"
-                )
-
-            if unallocated_amount < total_price:
-                raise OperationalException(
-                    f"Order total: {total_price} "
-                    f"{portfolio.trading_symbol}, is "
-                    f"larger then unallocated size: {portfolio.unallocated} "
-                    f"{portfolio.trading_symbol} of the portfolio"
-                )
+            self._validate_buy_cash(
+                order_data, portfolio, order_data.get("price")
+            )
 
     def validate_market_order(self, order_data, portfolio):
         """
         Validate a market order. For sell orders, validates position
         size. For buy orders, validates using the estimated price
-        (stored in the order price field at creation time) against
-        the portfolio's unallocated balance.
+        supplied at creation time against the portfolio's unallocated
+        balance. SHORT mirrors BUY (collateral); COVER mirrors SELL
+        (amount vs open short).
         """
-
-        if OrderSide.SELL.equals(order_data["order_side"]):
-            amount = order_data["amount"]
-            position = self.position_service\
-                .find(
-                    {
-                        "portfolio": portfolio.id,
-                        "symbol": order_data["target_symbol"]
-                    }
-                )
-
-            if amount <= 0:
-                raise OperationalException(
-                    f"Order amount: {amount} {position.symbol}, is "
-                    f"less or equal to 0"
-                )
-
-            if amount > position.get_amount():
-                raise OperationalException(
-                    f"Order amount: {amount} {position.symbol}, is "
-                    f"larger then position size: {position.get_amount()} "
-                    f"{position.symbol} of the portfolio"
-                )
+        side = order_data["order_side"]
+        if OrderSide.SELL.equals(side):
+            self._validate_sell_amount(order_data, portfolio)
+        elif OrderSide.COVER.equals(side):
+            self._validate_cover_amount(order_data, portfolio)
+        elif OrderSide.SHORT.equals(side):
+            self._validate_short_collateral(
+                order_data, portfolio, order_data.get("price", 0)
+            )
         else:
-            # Use the estimated price for validation
-            estimated_price = order_data.get("price", 0)
-            total_price = order_data["amount"] * estimated_price
-            unallocated_position = self.position_service\
-                .find(
-                    {
-                        "portfolio": portfolio.id,
-                        "symbol": portfolio.trading_symbol
-                    }
-                )
-            unallocated_amount = unallocated_position.get_amount()
-
-            if unallocated_amount is None:
-                raise OperationalException(
-                    "Unallocated amount of the portfolio is None. "
-                    "Can't validate market order. Please check if "
-                    "the portfolio configuration is correct."
-                )
-
-            if unallocated_amount < total_price:
-                raise OperationalException(
-                    f"Order total (estimated): {total_price} "
-                    f"{portfolio.trading_symbol}, is "
-                    f"larger then unallocated size: {portfolio.unallocated} "
-                    f"{portfolio.trading_symbol} of the portfolio"
-                )
+            self._validate_buy_cash(
+                order_data, portfolio, order_data.get("price", 0)
+            )
 
     def validate_stop_order(self, order_data, portfolio):
         """
-        Validate a stop order. A stop order requires a stop_price and,
-        once triggered, executes as a market order.
-
-        Cash / position validation reuses the market-order rules: the
-        stop_price is used as the price reference for buy-side cash
-        reservation since no limit price exists.
+        Validate a STOP order. Requires a positive ``stop_price`` and,
+        for BUY/SHORT, reserves cash against ``stop_price`` (no limit
+        price exists). The actual fill price is discovered at trigger
+        time.
         """
         stop_price = order_data.get("stop_price")
 
@@ -490,16 +1055,24 @@ class OrderService(RepositoryService):
                 "Stop orders require a positive stop_price"
             )
 
-        # Reuse market-order validation for amount / cash checks,
-        # using the stop_price as the price reference.
-        validation_data = dict(order_data)
-        validation_data["price"] = stop_price
-        self.validate_market_order(validation_data, portfolio)
+        side = order_data["order_side"]
+        if OrderSide.SELL.equals(side):
+            self._validate_sell_amount(order_data, portfolio)
+        elif OrderSide.COVER.equals(side):
+            self._validate_cover_amount(order_data, portfolio)
+        elif OrderSide.SHORT.equals(side):
+            self._validate_short_collateral(
+                order_data, portfolio, stop_price
+            )
+        else:
+            self._validate_buy_cash(order_data, portfolio, stop_price)
 
     def validate_stop_limit_order(self, order_data, portfolio):
         """
-        Validate a stop-limit order. Requires both a stop_price (trigger)
-        and a price (limit price after trigger).
+        Validate a STOP_LIMIT order. Requires both ``stop_price``
+        (trigger) and ``price`` (limit). For BUY, reserves cash
+        against the limit price — once triggered, the order behaves
+        like a LIMIT.
         """
         stop_price = order_data.get("stop_price")
         limit_price = order_data.get("price")
@@ -514,22 +1087,39 @@ class OrderService(RepositoryService):
                 "Stop-limit orders require a positive limit price"
             )
 
-        # Validate stop / limit price consistency relative to side
         if OrderSide.BUY.equals(order_data["order_side"]):
             if limit_price < stop_price:
                 raise OperationalException(
                     "For BUY stop-limit orders, the limit price must be "
                     "greater than or equal to the stop price"
                 )
+            self._validate_buy_cash(order_data, portfolio, limit_price)
+        elif OrderSide.SHORT.equals(order_data["order_side"]):
+            # SHORT stop-limit: stop above limit (sells into a drop).
+            if limit_price > stop_price:
+                raise OperationalException(
+                    "For SHORT stop-limit orders, the limit price must "
+                    "be less than or equal to the stop price"
+                )
+            self._validate_short_collateral(
+                order_data, portfolio, limit_price
+            )
+        elif OrderSide.COVER.equals(order_data["order_side"]):
+            # COVER stop-limit: behaves like BUY stop-limit (limit
+            # >= stop) because it buys to close a short.
+            if limit_price < stop_price:
+                raise OperationalException(
+                    "For COVER stop-limit orders, the limit price must "
+                    "be greater than or equal to the stop price"
+                )
+            self._validate_cover_amount(order_data, portfolio)
         else:
             if limit_price > stop_price:
                 raise OperationalException(
                     "For SELL stop-limit orders, the limit price must be "
                     "less than or equal to the stop price"
                 )
-
-        # Reuse limit-order amount / cash validation
-        self.validate_limit_order(order_data, portfolio)
+            self._validate_sell_amount(order_data, portfolio)
 
     def check_pending_orders(self, portfolio=None):
         """
@@ -544,6 +1134,18 @@ class OrderService(RepositoryService):
             )
         else:
             pending_orders = self.get_all({"status": OrderStatus.OPEN.value})
+
+        # v9.0 (#431) — process pending orders in creation order so
+        # that the trades materialized at fill time preserve the
+        # original BUY placement order. Downstream FIFO sell-allocation
+        # depends on this ordering.
+        pending_orders = sorted(
+            pending_orders,
+            key=lambda o: (
+                o.get_created_at() or datetime.min,
+                o.get_id() or 0,
+            ),
+        )
 
         for order in pending_orders:
             position = self.position_service.get(order.position_id)
@@ -587,6 +1189,7 @@ class OrderService(RepositoryService):
 
         return position
 
+    @native_order('create')
     def _sync_portfolio_with_created_buy_order(self, order):
         """
         Function to sync the portfolio and positions with a created buy order.
@@ -607,6 +1210,7 @@ class OrderService(RepositoryService):
             portfolio.id, {"unallocated": portfolio.get_unallocated() - size}
         )
 
+    @native_order('create')
     def _sync_portfolio_with_created_sell_order(self, order):
         """
         Function to sync the portfolio with a created sell order. The
@@ -624,8 +1228,10 @@ class OrderService(RepositoryService):
         Returns:
             None
         """
+        position = self.position_service.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
         self.position_service.update_positions_with_created_sell_order(
-            order
+            order, self._position_mode(portfolio)
         )
 
         filled = order.get_filled()
@@ -637,69 +1243,151 @@ class OrderService(RepositoryService):
             self.portfolio_repository.update(
                 portfolio.id,
                 {
-                    "unallocated": portfolio.get_unallocated() + size
+                    "unallocated": portfolio.get_unallocated() + size,
+                    "total_trade_volume": portfolio.total_trade_volume + size,
                 }
             )
+            self.trade_service.update_trade_with_filled_sell_order(
+                filled, order
+            )
 
-    def cancel_order(self, order):
-        self.check_pending_orders()
-        order = self.order_repository.get(order.id)
+    # ------------------------------------------------------------------
+    # #434 phase 2 — SHORT / COVER portfolio sync.
+    #
+    # Cash model (mirrors the vector engine, #433):
+    #
+    #   SHORT
+    #     create  -> reserve collateral (amount * reservation_price)
+    #                from unallocated and trading-symbol position.
+    #     fill    -> release reservation, credit proceeds, decrement
+    #                target position (going negative). Net cash
+    #                change from create->fill is +proceeds.
+    #     cancel/ -> refund unfilled reservation.
+    #     expire/
+    #     reject
+    #
+    #   COVER
+    #     create  -> reserve cover cash (amount * reservation_price)
+    #                — same cash-side semantics as a BUY reservation.
+    #     fill    -> release reservation, debit actual cover cost,
+    #                move target position toward zero, realize P&L
+    #                on the open short trade.
+    #     cancel/ -> refund unfilled reservation.
+    #     expire/
+    #     reject
+    # ------------------------------------------------------------------
 
-        if order is not None:
-
-            if OrderStatus.OPEN.equals(order.status):
-                portfolio = self.portfolio_repository\
-                    .find({"position": order.position_id})
-                market_credential = self.market_credential_service.get(
-                    portfolio.market
-                )
-                order_executor = self._order_executor_lookup\
-                    .get_order_executor(portfolio.market)
-                order = order_executor\
-                    .cancel_order(portfolio, order, market_credential)
-                self.update(order.id, order.to_dict())
-
-    def _sync_with_buy_order_filled(self, previous_order, current_order):
+    @native_order('create')
+    def _sync_portfolio_with_created_short_order(self, order):
+        """Reserve cash collateral for a freshly-created SHORT order.
+        Cash-side semantics are identical to a BUY reservation; the
+        target position is left untouched until the fill arrives.
         """
-        Function to sync the portfolio, position and trades with the
-        filled buy order.
+        self.position_service.update_positions_with_created_short_order(
+            order
+        )
+        position = self.position_service.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        size = order.get_size()
+        self.portfolio_repository.update(
+            portfolio.id,
+            {"unallocated": portfolio.get_unallocated() - size}
+        )
 
-        Args:
-            previous_order: the previous order object
-            current_order:  the current order object
-
-        Returns:
-            None
+    @native_order('create')
+    def _sync_portfolio_with_created_cover_order(self, order):
+        """Reserve cash to buy back the short for a freshly-created
+        COVER order. Cash-side semantics are identical to a BUY
+        reservation.
         """
-        logger.info("Syncing portfolio with filled buy order")
+        self.position_service.update_positions_with_created_cover_order(
+            order
+        )
+        position = self.position_service.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        size = order.get_size()
+        self.portfolio_repository.update(
+            portfolio.id,
+            {"unallocated": portfolio.get_unallocated() - size}
+        )
+
+    @native_order('fill')
+    def _sync_with_short_order_filled(self, previous_order, current_order):
+        """SHORT fill: release the per-fill reservation, credit
+        proceeds, drive the target position further negative, create
+        a SHORT trade row.
+        """
         filled_difference = current_order.get_filled() - \
             previous_order.get_filled()
-        filled_size = filled_difference * current_order.get_price()
 
         if filled_difference <= 0:
             return
 
-        self.position_service.update_positions_with_buy_order_filled(
-            current_order, filled_difference
+        logger.info(
+            f"Syncing portfolio with filled short "
+            f"order {current_order.get_id()} with filled amount "
+            f"{filled_difference}"
         )
-        position = self.position_service.get(current_order.position_id)
 
-        # Update portfolio
+        fill_price = current_order.get_price()
+        if fill_price is None or fill_price == 0:
+            fill_price = current_order.reservation_price or 0
+
+        reservation_price = current_order.metadata.get(
+            "_reservation_price"
+        )
+        if reservation_price is None:
+            reservation_price = (
+                current_order.reservation_price or fill_price
+            )
+
+        filled_size = filled_difference * fill_price
+        reserved_for_fill = filled_difference * reservation_price
+
+        # Drive the target position further negative; accrue proceeds
+        # as the position's ``cost`` so net_gain math stays symmetric
+        # with the long path.
+        position = self.position_service.get(current_order.position_id)
         portfolio = self.portfolio_repository.get(position.portfolio_id)
+        self.position_service.update_positions_with_short_order_filled(
+            current_order, filled_difference, self._position_mode(portfolio)
+        )
+
+        position = self.position_service.get(current_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+
+        # Cash flow at fill: refund the per-fill reservation and
+        # credit the realized proceeds.
+        cash_credit = reserved_for_fill + filled_size
         self.portfolio_repository.update(
             portfolio.id,
             {
-                "total_cost": portfolio.get_total_cost() + filled_size,
+                "unallocated": portfolio.get_unallocated() + cash_credit,
                 "total_trade_volume": portfolio.get_total_trade_volume()
                 + filled_size,
             }
         )
+        trading_symbol_position = self.position_service.find(
+            {
+                "symbol": portfolio.trading_symbol,
+                "portfolio": portfolio.id
+            }
+        )
+        self.position_service.update(
+            trading_symbol_position.id,
+            {
+                "amount":
+                    trading_symbol_position.get_amount() + cash_credit
+            }
+        )
 
-        # If the exchange modified the order amount (e.g. partial
-        # fill rounding), reconcile the reserved balance.
+        # If the exchange modified the order amount (partial-fill
+        # rounding), reconcile the still-reserved balance for the
+        # outstanding remainder.
         if current_order.amount != previous_order.amount:
+            portfolio = self.portfolio_repository.get(position.portfolio_id)
             difference = current_order.amount - previous_order.amount
-            cost_adjustment = difference * current_order.get_price()
+            cost_adjustment = difference * reservation_price
             self.portfolio_repository.update(
                 portfolio.id,
                 {
@@ -722,10 +1410,549 @@ class OrderService(RepositoryService):
                 }
             )
 
-        self.trade_service.update_trade_with_buy_order(
+        # Record the SHORT trade for this fill event.
+        self.trade_service.create_short_trade_at_fill(
+            current_order,
+            filled_difference,
+            fill_price,
+            current_order.updated_at or current_order.created_at,
+        )
+
+    @native_order('fill')
+    def _sync_with_cover_order_filled(self, previous_order, current_order):
+        """COVER fill: release the per-fill reservation, debit the
+        actual cover cost, move the target position toward zero, and
+        realize P&L on the matched open SHORT trade(s).
+        """
+        filled_difference = current_order.get_filled() - \
+            previous_order.get_filled()
+
+        if filled_difference <= 0:
+            return
+
+        logger.info(
+            f"Syncing portfolio with filled cover "
+            f"order {current_order.get_id()} with filled amount "
+            f"{filled_difference}"
+        )
+
+        fill_price = current_order.get_price()
+        if fill_price is None or fill_price == 0:
+            fill_price = current_order.reservation_price or 0
+
+        reservation_price = current_order.metadata.get(
+            "_reservation_price"
+        )
+        if reservation_price is None:
+            reservation_price = (
+                current_order.reservation_price or fill_price
+            )
+
+        filled_size = filled_difference * fill_price
+        reserved_for_fill = filled_difference * reservation_price
+
+        # Move target position toward zero; reduce the position's
+        # short-side ``cost`` proportionally.
+        position = self.position_service.get(current_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        self.position_service.update_positions_with_cover_order_filled(
+            current_order, filled_difference, self._position_mode(portfolio)
+        )
+
+        position = self.position_service.get(current_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+
+        # Cash flow at fill: refund the per-fill reservation, debit
+        # the actual cover cost.
+        cash_delta = reserved_for_fill - filled_size
+        self.portfolio_repository.update(
+            portfolio.id,
+            {
+                "unallocated": portfolio.get_unallocated() + cash_delta,
+                "total_trade_volume": portfolio.get_total_trade_volume()
+                + filled_size,
+            }
+        )
+        trading_symbol_position = self.position_service.find(
+            {
+                "symbol": portfolio.trading_symbol,
+                "portfolio": portfolio.id
+            }
+        )
+        self.position_service.update(
+            trading_symbol_position.id,
+            {
+                "amount":
+                    trading_symbol_position.get_amount() + cash_delta
+            }
+        )
+
+        # Reconcile if the exchange modified the order amount.
+        if current_order.amount != previous_order.amount:
+            portfolio = self.portfolio_repository.get(position.portfolio_id)
+            difference = current_order.amount - previous_order.amount
+            cost_adjustment = difference * reservation_price
+            self.portfolio_repository.update(
+                portfolio.id,
+                {
+                    "unallocated":
+                        portfolio.get_unallocated() - cost_adjustment
+                }
+            )
+            trading_symbol_position = self.position_service.find(
+                {
+                    "symbol": portfolio.trading_symbol,
+                    "portfolio": portfolio.id
+                }
+            )
+            self.position_service.update(
+                trading_symbol_position.id,
+                {
+                    "amount":
+                        trading_symbol_position.get_amount()
+                        - cost_adjustment
+                }
+            )
+
+        # Realize P&L on the matched open SHORT trade(s) (FIFO).
+        self.trade_service.close_short_trade_with_filled_cover_order(
             filled_difference, current_order
         )
 
+    def _sync_with_short_order_cancelled(self, order):
+        """Cancellation reversal for a SHORT order. Cash-side
+        semantics are identical to BUY (refund unfilled reservation).
+        """
+        self._restore_buy_order_balance(order)
+
+    def _sync_with_short_order_expired(self, order):
+        self._restore_buy_order_balance(order)
+
+    def _sync_with_short_order_rejected(self, order):
+        self._restore_buy_order_balance(order)
+
+    def _sync_with_short_order_failed(self, order):
+        self._restore_buy_order_balance(order)
+
+    def _sync_with_cover_order_cancelled(self, order):
+        """Cancellation reversal for a COVER order. Cash-side
+        semantics are identical to BUY (refund unfilled reservation).
+        """
+        self._restore_buy_order_balance(order)
+
+    def _sync_with_cover_order_expired(self, order):
+        self._restore_buy_order_balance(order)
+
+    def _sync_with_cover_order_rejected(self, order):
+        self._restore_buy_order_balance(order)
+
+    def _sync_with_cover_order_failed(self, order):
+        self._restore_buy_order_balance(order)
+
+    def cancel_order(self, order):
+        self.check_pending_orders()
+        order = self.order_repository.get(order.id)
+
+        if order is not None:
+
+            if OrderStatus.OPEN.equals(order.status):
+                portfolio = self.portfolio_repository\
+                    .find({"position": order.position_id})
+                market_credential = self.market_credential_service.get(
+                    portfolio.market
+                )
+                order_executor = self._order_executor_lookup\
+                    .get_order_executor(portfolio.market)
+                order = order_executor\
+                    .cancel_order(portfolio, order, market_credential)
+                self.update(order.id, order.to_dict())
+
+    def cancel_mirror_orders_for_trade(self, trade_id):
+        """
+        Cancel any resting broker-native mirror order still attached
+        to this trade's stop-loss/take-profit rules.
+
+        Must be called right before a client-side close (a triggered
+        SL/TP or a manual ``close_trade``) creates its own close order
+        for the trade, so the resting mirror order and the client-side
+        close can never both end up executing for the same trade.
+        Best-effort -- a cancellation failure is logged, not raised,
+        since the client-side close must not be blocked by it.
+        """
+        if self.trade_stop_loss_service is None \
+                or self.trade_take_profit_service is None:
+            return
+
+        trade = self.trade_service.get(trade_id)
+
+        for stop_loss in trade.stop_losses:
+            self._cancel_mirror_order_for_rule(stop_loss)
+
+        for take_profit in trade.take_profits:
+            self._cancel_mirror_order_for_rule(take_profit)
+
+    def _cancel_mirror_order_for_rule(self, rule):
+        if rule.mirror_order_id is None or rule.mirror_triggered:
+            return
+
+        try:
+            order = self.order_repository.get(rule.mirror_order_id)
+            if order is None or not OrderStatus.OPEN.equals(order.status):
+                return
+
+            # Deliberately does NOT go through ``cancel_order`` -- that
+            # calls ``check_pending_orders`` first, re-syncing every
+            # OPEN order in the portfolio, which is unrelated overhead
+            # (and a needless race window) for cancelling one specific
+            # resting order we already know is open.
+            portfolio = self.portfolio_repository.find(
+                {"position": order.position_id}
+            )
+            market_credential = self.market_credential_service.get(
+                portfolio.market
+            )
+            order_executor = self._order_executor_lookup\
+                .get_order_executor(portfolio.market)
+            order = order_executor\
+                .cancel_order(portfolio, order, market_credential)
+            self.update(order.id, order.to_dict())
+        except Exception as exc:
+            logger.warning(
+                f"Failed to cancel mirror order {rule.mirror_order_id} "
+                f"for rule {rule.id}: {exc}"
+            )
+
+    @native_order('fill')
+    def _sync_with_buy_order_filled(self, previous_order, current_order):
+        """
+        Function to sync the portfolio, position and trades with the
+        filled buy order.
+
+        v9.0 (#431) — a fresh Trade is created for every fill event
+        (one trade per fill), and the slippage between the price used
+        to reserve cash at order-creation time and the actual fill
+        price is settled here in a unified way for LIMIT, MARKET and
+        STOP / STOP_LIMIT orders.
+
+        Args:
+            previous_order: the previous order object
+            current_order:  the current order object
+
+        Returns:
+            None
+        """
+        logger.info("Syncing portfolio with filled buy order")
+        filled_difference = current_order.get_filled() - \
+            previous_order.get_filled()
+
+        if filled_difference <= 0:
+            return
+
+        fill_price = current_order.get_price()
+        # Fall back through the reservation chain if the executor has
+        # not yet written a price (defensive — shouldn't happen for a
+        # fill event).
+        if fill_price is None or fill_price == 0:
+            fill_price = current_order.reservation_price or 0
+
+        # Snapshot of the reservation price stashed by ``create``.
+        reservation_price = current_order.metadata.get(
+            "_reservation_price"
+        )
+        if reservation_price is None:
+            reservation_price = (
+                current_order.reservation_price or fill_price
+            )
+
+        filled_size = filled_difference * fill_price
+        reserved_for_fill = filled_difference * reservation_price
+        slippage_delta = reserved_for_fill - filled_size
+
+        position = self.position_service.get(current_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        self.position_service.update_positions_with_buy_order_filled(
+            current_order, filled_difference, self._position_mode(portfolio)
+        )
+        position = self.position_service.get(current_order.position_id)
+
+        # Update portfolio: book the actual cost / volume, and refund
+        # (or charge) the slippage delta against the original
+        # reservation so unallocated stays consistent.
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        portfolio_updates = {
+            "total_cost": portfolio.get_total_cost() + filled_size,
+            "total_trade_volume": portfolio.get_total_trade_volume()
+            + filled_size,
+        }
+        if slippage_delta != 0:
+            portfolio_updates["unallocated"] = (
+                portfolio.get_unallocated() + slippage_delta
+            )
+        self.portfolio_repository.update(portfolio.id, portfolio_updates)
+
+        if slippage_delta != 0:
+            trading_symbol_position = self.position_service.find(
+                {
+                    "symbol": portfolio.trading_symbol,
+                    "portfolio": portfolio.id
+                }
+            )
+            self.position_service.update(
+                trading_symbol_position.id,
+                {
+                    "amount":
+                        trading_symbol_position.get_amount()
+                        + slippage_delta
+                }
+            )
+            # Refresh portfolio reference for the amount-change branch
+            portfolio = self.portfolio_repository.get(position.portfolio_id)
+
+        # If the exchange modified the order amount (e.g. partial
+        # fill rounding), reconcile the reserved balance using the
+        # original reservation price.
+        if current_order.amount != previous_order.amount:
+            difference = current_order.amount - previous_order.amount
+            cost_adjustment = difference * reservation_price
+            self.portfolio_repository.update(
+                portfolio.id,
+                {
+                    "unallocated":
+                        portfolio.get_unallocated() - cost_adjustment
+                }
+            )
+            trading_symbol_position = self.position_service.find(
+                {
+                    "symbol": portfolio.trading_symbol,
+                    "portfolio": portfolio.id
+                }
+            )
+            self.position_service.update(
+                trading_symbol_position.id,
+                {
+                    "amount":
+                        trading_symbol_position.get_amount()
+                        - cost_adjustment
+                }
+            )
+
+        # v9.0 (#431) — create the Trade row for this fill event.
+        trade = self.trade_service.create_trade_at_fill(
+            current_order,
+            filled_difference,
+            fill_price,
+            current_order.updated_at or current_order.created_at,
+        )
+        self._place_mirror_orders_for_trade(trade)
+
+    def _place_mirror_orders_for_trade(self, trade):
+        """
+        Best-effort broker-native mirror order placement (safety net)
+        for any ``mirror_on_exchange`` rule on a freshly opened LONG
+        trade. Never raises — a placement failure must not block
+        trade creation. Short-trade mirroring is not yet supported
+        (COVER close accounting differs from the SELL/TradeAllocation
+        path this relies on).
+        """
+        if trade is None or getattr(trade, "is_short", False):
+            return
+
+        if self.trade_stop_loss_service is None \
+                or self.trade_take_profit_service is None:
+            return
+
+        config = self.configuration_service.config
+        if Environment.BACKTEST.equals(config.get(ENVIRONMENT)):
+            return
+
+        trade = self.trade_service.get(trade.id)
+        position = self.position_service.find(
+            {"order_id": trade.orders[0].id}
+        )
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        order_executor = None
+        if self._order_executor_lookup is not None:
+            order_executor = self._order_executor_lookup\
+                .get_order_executor(portfolio.market)
+
+        if order_executor is None \
+                or not order_executor.supports_mirror_orders:
+            return
+
+        # Mirror orders don't reserve the position at placement time
+        # (see ``_place_single_mirror_order``), so nothing else stops
+        # a mirrored stop-loss and a mirrored take-profit on the same
+        # trade from each resting for the *same* shares. Track what's
+        # already committed to a still-live mirror order so the two
+        # can never jointly promise more than the trade actually has.
+        committed = sum(
+            rule.get_sell_amount()
+            for rule in list(trade.stop_losses) + list(trade.take_profits)
+            if rule.mirror_order_id is not None and not rule.mirror_triggered
+        )
+
+        for stop_loss in trade.stop_losses:
+            if not stop_loss.mirror_on_exchange \
+                    or stop_loss.mirror_order_id is not None \
+                    or not stop_loss.active:
+                continue
+            amount = stop_loss.get_sell_amount()
+            if committed + amount > trade.available_amount:
+                logger.warning(
+                    f"Skipping broker-native mirror order for "
+                    f"stop_loss on trade {trade.id}: would commit "
+                    f"more than the trade's available amount "
+                    f"alongside an existing mirror order."
+                )
+                continue
+            self._place_single_mirror_order(
+                trade, portfolio, rule=stop_loss, rule_kind="stop_loss",
+                trigger_price=stop_loss.stop_loss_price,
+            )
+            committed += amount
+
+        for take_profit in trade.take_profits:
+            if not take_profit.mirror_on_exchange \
+                    or take_profit.mirror_order_id is not None \
+                    or not take_profit.active:
+                continue
+            amount = take_profit.get_sell_amount()
+            if committed + amount > trade.available_amount:
+                logger.warning(
+                    f"Skipping broker-native mirror order for "
+                    f"take_profit on trade {trade.id}: would commit "
+                    f"more than the trade's available amount "
+                    f"alongside an existing mirror order."
+                )
+                continue
+            self._place_single_mirror_order(
+                trade, portfolio, rule=take_profit, rule_kind="take_profit",
+                trigger_price=take_profit.take_profit_price,
+            )
+            committed += amount
+
+    def _place_single_mirror_order(
+        self, trade, portfolio, rule, rule_kind, trigger_price
+    ):
+        """
+        Place one resting STOP order on the exchange backing a single
+        ``mirror_on_exchange`` rule. Deliberately does NOT pass
+        ``trades``/``stop_losses``/``take_profits`` to ``create`` — the
+        order is not yet a decided close, so it must not touch trade
+        ``available_amount``/net_gain or trip the trade to CLOSED.
+        That accounting only happens once the mirror order is observed
+        to have actually filled (see ``_sync_with_sell_order_filled``).
+        """
+        if trigger_price is None:
+            return
+
+        try:
+            order = self.create(
+                {
+                    "target_symbol": trade.target_symbol,
+                    "trading_symbol": trade.trading_symbol,
+                    "amount": rule.get_sell_amount(),
+                    "order_type": OrderType.STOP.value,
+                    "stop_price": trigger_price,
+                    "order_side": OrderSide.SELL.value,
+                    "portfolio_id": portfolio.id,
+                    "metadata": {
+                        "order_reason": f"{rule_kind}_mirror",
+                        "_mirror_trade_id": trade.id,
+                        "_mirror_rule_id": rule.id,
+                        "_mirror_rule_kind": rule_kind,
+                        "strategy_id": trade.strategy_id,
+                        "protective_rules": [{
+                            "rule_id": rule.id,
+                            "amount": rule.get_sell_amount(),
+                            "threshold_price": trigger_price,
+                            "trailing": bool(getattr(rule, "trailing", False)),
+                        }],
+                    },
+                },
+                create_allocations=False,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"Failed to place broker-native mirror order for "
+                f"{rule_kind} on trade {trade.id}: {exc}"
+            )
+            return
+
+        service = (
+            self.trade_stop_loss_service if rule_kind == "stop_loss"
+            else self.trade_take_profit_service
+        )
+        service.update(rule.id, {"mirror_order_id": order.id})
+
+    def _materialize_mirror_fill_if_needed(self, current_order):
+        """
+        A mirror order carries no ``TradeAllocation`` at placement
+        time (see ``_place_single_mirror_order``) since it isn't yet
+        a decided close. Once it actually fills, build that allocation
+        now -- exactly like an already-decided client-side close would
+        have -- and mark the originating rule triggered (mirror=True).
+        Idempotent via the ``_mirror_allocated`` metadata flag.
+        """
+        metadata = current_order.metadata or {}
+        order_reason = metadata.get("order_reason")
+        if order_reason not in ("stop_loss_mirror", "take_profit_mirror"):
+            return
+        if metadata.get("_mirror_allocated"):
+            return
+
+        trade_id = metadata.get("_mirror_trade_id")
+        rule_id = metadata.get("_mirror_rule_id")
+        if trade_id is None or rule_id is None:
+            return
+
+        amount = current_order.amount
+        is_stop_loss = order_reason == "stop_loss_mirror"
+        service = (
+            self.trade_stop_loss_service if is_stop_loss
+            else self.trade_take_profit_service
+        )
+        rule = service.get(rule_id)
+
+        position = self.position_service.get(current_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+
+        self.trade_service.create_trade_allocations(
+            sell_order=current_order,
+            trades=[{"trade_id": trade_id, "amount": amount}],
+            stop_losses=[{"stop_loss_id": rule_id, "amount": amount}]
+            if is_stop_loss else None,
+            take_profits=[{"take_profit_id": rule_id, "amount": amount}]
+            if not is_stop_loss else None,
+            position_mode=self._position_mode(portfolio),
+        )
+        service.update(
+            rule_id,
+            {
+                "active": False,
+                "sold_amount": (rule.sold_amount or 0) + amount,
+            },
+        )
+        service.mark_triggered(
+            [rule_id], current_order.updated_at, mirror=True
+        )
+
+        # This mirror fill just closed (or partially closed) the
+        # trade -- any OTHER still-resting mirror order on the same
+        # trade (e.g. a mirrored take-profit sitting alongside the
+        # stop-loss that just fired) is now stale and must not be
+        # left resting on the exchange.
+        self.cancel_mirror_orders_for_trade(trade_id)
+
+        current_order.metadata["_mirror_allocated"] = True
+        if hasattr(current_order, "metadata_json"):
+            import json as _json
+            current_order.metadata_json = _json.dumps(
+                current_order.metadata
+            )
+        self.order_repository.save(current_order)
+
+    @native_order('fill')
     def _sync_with_sell_order_filled(self, previous_order, current_order):
         """
         Function to sync the portfolio, position and trades with the
@@ -746,6 +1973,8 @@ class OrderService(RepositoryService):
 
         if filled_difference <= 0:
             return
+
+        self._materialize_mirror_fill_if_needed(current_order)
 
         logger.info(
             f"Syncing portfolio with filled sell "
@@ -785,24 +2014,41 @@ class OrderService(RepositoryService):
         # Update the position if the amount has changed
         if current_order.amount != previous_order.amount:
             difference = current_order.amount - previous_order.amount
-            cost = difference * current_order.get_price()
-            self.position_service.update(
-                position.id,
-                {
-                    "amount": position.get_amount() - difference,
-                    "cost": position.get_cost() - cost
-                }
-            )
+            if self._position_mode(portfolio) == PositionMode.HEDGE:
+                self.position_service.update(
+                    position.id,
+                    {
+                        "long_amount": position.long_amount - difference,
+                    }
+                )
+            else:
+                self.position_service.update(
+                    position.id,
+                    {
+                        "amount": position.get_amount() - difference,
+                    }
+                )
 
         self.trade_service.update_trade_with_filled_sell_order(
             filled_difference, current_order
         )
 
+    @native_order('cancel')
     def _restore_buy_order_balance(self, order):
         """Shared logic: restore reserved balance when a BUY order is
-        cancelled, expired, rejected, or failed."""
+        cancelled, expired, rejected, or failed.
+
+        v9.0 (#431) — uses the reservation-price snapshot stashed on
+        ``order.metadata['_reservation_price']`` so that STOP orders
+        (whose ``price`` is None until trigger) and MARKET orders
+        (whose ``price`` may have been overwritten by an early fill)
+        still refund the originally-reserved amount.
+        """
         remaining = order.get_amount() - order.get_filled()
-        size = remaining * order.get_price()
+        reservation_price = order.metadata.get("_reservation_price")
+        if reservation_price is None:
+            reservation_price = order.reservation_price or order.get_price()
+        size = remaining * reservation_price
 
         portfolio = self.portfolio_repository.find(
             {"position": order.position_id}
@@ -823,17 +2069,36 @@ class OrderService(RepositoryService):
             {"amount": trading_symbol_position.get_amount() + size}
         )
 
+    @native_order('cancel')
     def _restore_sell_order_position(self, order):
         """Shared logic: restore locked position when a SELL order is
         cancelled, expired, rejected, or failed."""
+        metadata = order.metadata or {}
+        if metadata.get("order_reason") in (
+            "stop_loss_mirror", "take_profit_mirror"
+        ) and not metadata.get("_mirror_allocated"):
+            # Never reserved the position or a trade allocation (see
+            # ``_place_single_mirror_order``) -- nothing to restore.
+            return
+
         remaining = order.get_amount() - order.get_filled()
 
         position = self.position_service.get(order.position_id)
-        self.position_service.update(
-            position.id,
-            {"amount": position.get_amount() + remaining}
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        position_mode = self._position_mode(portfolio)
+        if position_mode == PositionMode.HEDGE:
+            self.position_service.update(
+                position.id,
+                {"long_amount": position.long_amount + remaining}
+            )
+        else:
+            self.position_service.update(
+                position.id,
+                {"amount": position.get_amount() + remaining}
+            )
+        self.trade_service.update_trade_with_removed_sell_order(
+            order, position_mode=position_mode
         )
-        self.trade_service.update_trade_with_removed_sell_order(order)
 
     def _sync_with_buy_order_cancelled(self, order):
         self._restore_buy_order_balance(order)

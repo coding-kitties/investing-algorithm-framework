@@ -1,10 +1,19 @@
-from typing import Dict, Any
+from typing import Any, Dict, Iterable
 
-import pandas as pd
-from pyindicators import ema, crossunder, crossover
+from pyindicators import crossover, crossunder, ema
 
-from investing_algorithm_framework import TradingStrategy, TimeUnit, \
-    DataSource, PositionSize
+from investing_algorithm_framework import (
+    DataSource,
+    PositionSize,
+    Schedule,
+    Signal,
+    SignalSeries,
+    SignalSide,
+    TimeUnit,
+    TradingStrategy,
+    signal_series_from_column,
+    signals_from_column,
+)
 
 
 class CrossOverStrategyV1(TradingStrategy):
@@ -23,8 +32,7 @@ class CrossOverStrategyV1(TradingStrategy):
     take profit are both trailing, meaning that they will move up
     with the price when the price goes up.
     """
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     fast = 50
     slow = 100
     trend = 200
@@ -41,7 +49,7 @@ class CrossOverStrategyV1(TradingStrategy):
     def __init__(
         self,
         algorithm_id: str = "crossover_strategy_v1",
-        symbols = ["BTC"],
+        symbols=["BTC"],
         ema_time_frame="2h",
         ema_crossover_result_column="ema_crossover",
         ema_crossunder_result_column="ema_crossunder",
@@ -92,44 +100,58 @@ class CrossOverStrategyV1(TradingStrategy):
             second_column=f"ema_{self.slow}",
             result_column=self.ema_crossover_result_column
         )
+        # Rolling-max within lookback window so a fresh crossover stays
+        # active for ``ema_cross_lookback_window`` bars.
+        ema_data["entry"] = (
+            ema_data[self.ema_crossover_result_column]
+            .rolling(window=self.ema_cross_lookback_window)
+            .max().fillna(False).astype(bool)
+        )
+        ema_data["exit"] = (
+            ema_data[self.ema_crossunder_result_column]
+            .rolling(window=self.ema_cross_lookback_window)
+            .max().fillna(False).astype(bool)
+        )
         return ema_data
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        signals = {}
-
+    # ---- v9 event-mode API ---------------------------------------- #
+    def generate_signals(
+        self, context, data: Dict[str, Any]
+    ) -> Iterable[Signal]:
         for symbol in self.symbols:
             symbol_pair = f"{symbol}/EUR"
-            ema_data = data[f"{symbol_pair}-ohlcv-2h"]
-            ema_data = self._prepare_indicators(ema_data)
+            frame = self._prepare_indicators(data[f"{symbol_pair}-ohlcv-2h"])
+            yield from signals_from_column(
+                frame, "entry",
+                side=SignalSide.OPEN_LONG,
+                symbol=symbol,
+                source="ema_cross",
+            )
+            yield from signals_from_column(
+                frame, "exit",
+                side=SignalSide.CLOSE_LONG,
+                symbol=symbol,
+                source="ema_cross",
+            )
 
-            # crossover confirmed
-            ema_crossover_lookback = ema_data[
-                self.ema_crossover_result_column
-            ].rolling(
-                window=self.ema_cross_lookback_window
-            ).max().astype(bool)
-
-            buy_signal = ema_crossover_lookback
-            buy_signals = buy_signal.fillna(False).astype(bool)
-            signals[symbol] = buy_signals
-        return signals
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        signals = {}
-
+    # ---- v9 vector-mode API --------------------------------------- #
+    def generate_signal_series(
+        self, data: Dict[str, Any]
+    ) -> Iterable[SignalSeries]:
         for symbol in self.symbols:
             symbol_pair = f"{symbol}/EUR"
-            ema_data = data[f"{symbol_pair}-ohlcv-2h"].copy()
-            ema_data = self._prepare_indicators(ema_data)
-
-            # crossover confirmed
-            ema_crossunder_lookback = ema_data[
-                self.ema_crossunder_result_column
-            ].rolling(
-                window=self.ema_cross_lookback_window
-            ).max().astype(bool)
-
-            sell_signal = ema_crossunder_lookback
-            sell_signal = sell_signal.fillna(False).astype(bool)
-            signals[symbol] = sell_signal
-        return signals
+            frame = self._prepare_indicators(
+                data[f"{symbol_pair}-ohlcv-2h"].copy()
+            )
+            yield signal_series_from_column(
+                frame, "entry",
+                side=SignalSide.OPEN_LONG,
+                symbol=symbol,
+                source="ema_cross",
+            )
+            yield signal_series_from_column(
+                frame, "exit",
+                side=SignalSide.CLOSE_LONG,
+                symbol=symbol,
+                source="ema_cross",
+            )

@@ -10,7 +10,7 @@ What it does on each iteration (once per day):
    symbols.
 2. ``MomentumScreener`` ranks every symbol by 30-day return within the
    top-3 most liquid names (by 30-day average dollar volume).
-3. ``CrossSectionalMomentumBot.run_strategy`` reads the resulting
+3. ``CrossSectionalMomentumBot.generate_signals`` reads the resulting
    ``polars.DataFrame`` from ``data["MomentumScreener"]``, picks the
    top-2 ranked symbols, and rebalances the portfolio:
      * closes any open position that is no longer in the target set,
@@ -41,6 +41,7 @@ from dotenv import load_dotenv
 from investing_algorithm_framework import (
     AverageDollarVolume,
     BacktestDateRange,
+    BacktestWindow,
     Context,
     DataSource,
     DEFAULT_LOGGING_CONFIG,
@@ -48,9 +49,12 @@ from investing_algorithm_framework import (
     OrderType,
     Pipeline,
     Returns,
+    Study,
     TimeUnit,
     TradingStrategy,
+    Universe,
     create_app,
+    Schedule,
 )
 
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
@@ -97,10 +101,8 @@ class MomentumScreener(Pipeline):
 # Strategy: rebalance into the top-N pipeline picks
 class CrossSectionalMomentumBot(TradingStrategy):
     algorithm_id = "pipeline-momentum-bot"
-    time_unit = TimeUnit.DAY
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
-    trading_symbol = TRADING_SYMBOL
     symbols = SYMBOLS
 
     # OHLCV data sources, one per symbol. ``warmup_window`` covers the
@@ -124,13 +126,13 @@ class CrossSectionalMomentumBot(TradingStrategy):
     # iteration and place the result under ``data["MomentumScreener"]``.
     pipelines = [MomentumScreener]
 
-    # Strategy entry point
-    def run_strategy(self, context: Context, data: Dict[str, Any]) -> None:
+    # Signal-generation entry point. The pipeline phase has populated data.
+    def generate_signals(self, context: Context, data: Dict[str, Any]):
         screen = data["MomentumScreener"]
 
         # Skip iterations where the universe / warmup is not satisfied.
         if screen.is_empty():
-            return
+            return ()
 
         # Rank is ascending — highest rank = highest momentum.
         targets_df = screen.sort("alpha", descending=True).head(TOP_N)
@@ -170,7 +172,7 @@ class CrossSectionalMomentumBot(TradingStrategy):
             if not context.has_position(_base(sym), market=self.market)
         ]
         if not new_targets:
-            return
+            return ()
 
         per_target_budget = unallocated / len(new_targets)
         for symbol in new_targets:
@@ -187,12 +189,15 @@ class CrossSectionalMomentumBot(TradingStrategy):
                 price=price,
                 amount=amount,
             )
+        return ()
 
 
 # App wiring
 app = create_app()
 app.add_strategy(CrossSectionalMomentumBot)
-app.add_market(market=MARKET, trading_symbol=TRADING_SYMBOL, initial_balance=1000)
+app.add_market(
+    market=MARKET, trading_symbol=TRADING_SYMBOL, initial_balance=1000
+)
 
 
 if __name__ == "__main__":
@@ -200,11 +205,30 @@ if __name__ == "__main__":
     # live (requires bitvavo credentials in your .env file).
     end = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     start = end - timedelta(days=365)
-    backtest_date_range = BacktestDateRange(start_date=start, end_date=end)
-    backtest = app.run_backtest(
-        backtest_date_range=backtest_date_range,
+
+    study = Study(
+        name="cross-sectional-momentum",
+        universe=Universe(
+            symbols=SYMBOLS,
+            market=MARKET,
+            trading_symbol=TRADING_SYMBOL,
+            initial_capital=1000,
+        ),
+        backtest_windows=[
+            BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=start,
+                    end_date=end,
+                )
+            )
+        ],
     )
+    backtests = app.run_backtest(
+        study=study,
+    )
+    backtest = next(backtests.iter_backtests())
     # Inspect the result interactively with the BacktestReport dashboard:
     #     from investing_algorithm_framework import BacktestReport
     #     BacktestReport(backtest).show()
-    print(backtest)
+    metrics = backtest.get_backtest_metrics(study_name=study.name)
+    print(metrics)

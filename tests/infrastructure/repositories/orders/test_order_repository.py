@@ -1,7 +1,7 @@
 from investing_algorithm_framework.domain import OrderSide, OrderType, OrderStatus
 from investing_algorithm_framework.domain import PortfolioConfiguration, MarketCredential
 from tests.resources import TestBase
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 
 
 class TestSQLOrderRepositoryIntegration(TestBase):
@@ -82,6 +82,22 @@ class TestSQLOrderRepositoryIntegration(TestBase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].id, order.id)
 
+    def test_created_after_is_exclusive(self):
+        watermark = datetime(2026, 1, 2, tzinfo=timezone.utc)
+        for identity, date in enumerate((
+            watermark - timedelta(days=1), watermark,
+            watermark + timedelta(microseconds=1),
+        ), 1):
+            self.repository.create({
+                'id': identity, 'target_symbol': 'BTC',
+                'trading_symbol': 'EUR', 'amount': 1., 'price': 10.,
+                'order_side': OrderSide.BUY, 'order_type': OrderType.LIMIT,
+                'created_at': date,
+            })
+        self.assertEqual([row.id for row in self.repository.get_all({
+            'created_at_gt': watermark,
+        })], [3])
+
     def test_filter_by_external_id(self):
         self._create_order(external_id="custom_ext_id_123")
         result = self.repository.get_all({"external_id": "custom_ext_id_123"})
@@ -122,6 +138,26 @@ class TestSQLOrderRepositoryIntegration(TestBase):
             "order_by_created_at_asc": True
         })
         self.assertLessEqual(results[0].created_at, results[1].created_at)
+
+    def test_simultaneous_orders_have_stable_business_order(self):
+        created_at = datetime(2023, 11, 27, 10, tzinfo=timezone.utc)
+        for identifier, symbol, price in (
+            (100, "DOT", 10), (300, "BTC", 11), (200, "BTC", 10),
+        ):
+            self._create_order(
+                id=identifier, target_symbol=symbol,
+                price=price, created_at=created_at,
+            )
+        for ascending in (False, True):
+            with self.subTest(ascending=ascending):
+                results = self.repository.get_all({
+                    "order_by_created_at_asc": ascending,
+                    "status": OrderStatus.OPEN.value,
+                })
+                self.assertEqual(
+                    [("BTC", 10), ("BTC", 11), ("DOT", 10)],
+                    [(order.target_symbol, order.price) for order in results],
+                )
 
     def test_order_by_created_at_desc(self):
         self._create_order()

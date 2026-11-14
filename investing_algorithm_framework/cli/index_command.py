@@ -1,9 +1,9 @@
 """``iaf index`` CLI \u2014 build a SQLite Tier-1 index over a folder of
-``.iafbt`` bundles (epic #540 phase 2).
+``.obtf`` bundles (epic #540 phase 2).
 
 Walks the directory, opens each bundle with ``summary_only=True`` (no
 Parquet metric-blob decode), derives a :class:`BacktestIndexRow` via
-:meth:`Backtest.index_row`, and upserts into a
+:meth:`Backtest.index_rows`, and upserts into a
 :class:`SqliteBacktestIndex`.
 """
 
@@ -33,9 +33,26 @@ logger = logging.getLogger(__name__)
 DEFAULT_INDEX_NAME = "index.sqlite"
 
 
-def _iter_bundle_paths(directory: Path) -> Iterable[Path]:
-    """Yield every ``*.iafbt`` file under *directory* (sorted)."""
-    return sorted(directory.rglob(f"*{BUNDLE_EXT}"))
+def _iter_bundle_paths(
+    directory: Path,
+    exclude_dirs: Optional[List[str]] = None,
+) -> Iterable[Path]:
+    """Yield every ``*.obtf`` file under *directory* (sorted).
+
+    Args:
+        directory: Root folder to scan.
+        exclude_dirs: Subdirectory names (not full paths) to skip.
+            E.g. ``["top_selection"]`` prevents promoted-bundle folders
+            from being included in the sweep index.
+    """
+    excluded = set(exclude_dirs) if exclude_dirs else set()
+    results = []
+    for path in directory.rglob(f"*{BUNDLE_EXT}"):
+        relative_parts = path.relative_to(directory).parts[:-1]
+        if excluded and any(part in excluded for part in relative_parts):
+            continue
+        results.append(path)
+    return sorted(results)
 
 
 def build_index(
@@ -44,11 +61,12 @@ def build_index(
     relative_paths: bool = True,
     show_progress: bool = False,
     incremental: bool = True,
+    exclude_dirs: Optional[List[str]] = None,
 ) -> str:
     """Build (or refresh) a SQLite Tier-1 index over *directory*.
 
     Args:
-        directory: Folder to scan for ``.iafbt`` bundles.
+        directory: Folder to scan for ``.obtf`` bundles.
         output: Path to the SQLite file. Defaults to
             ``<directory>/index.sqlite``.
         relative_paths: if True, store ``bundle_path`` relative to
@@ -59,6 +77,11 @@ def build_index(
             any) and skip bundles whose ``(mtime, size)`` already
             match the on-disk file. Pass ``False`` to force a full
             rebuild.
+        exclude_dirs: Subdirectory names to skip when scanning.
+            E.g. ``["top_selection"]`` prevents promoted-bundle
+            folders from polluting the sweep index. Matched against
+            each path component, so nested directories are also
+            excluded.
 
     Returns:
         Absolute path of the SQLite file that was written.
@@ -68,7 +91,9 @@ def build_index(
         raise NotADirectoryError(f"Not a directory: {src}")
 
     out = Path(output).resolve() if output else src / DEFAULT_INDEX_NAME
-    paths: List[Path] = list(_iter_bundle_paths(src))
+    paths: List[Path] = list(
+        _iter_bundle_paths(src, exclude_dirs=exclude_dirs)
+    )
 
     pbar = None
     if show_progress:
@@ -100,12 +125,19 @@ def build_index(
                     continue
 
                 bt = Backtest.open(str(path), summary_only=True)
-                row = bt.index_row(bundle_path=bundle_path)
-                index.upsert(
-                    row,
-                    bundle_mtime_ns=stat.st_mtime_ns,
-                    bundle_size=stat.st_size,
-                )
+                # v9.0: ``index_rows`` returns one row per populated
+                # engine (vector and/or event). A dual-engine bundle
+                # produces two upserts under the same bundle_path with
+                # different ``engine_type`` values; the SQLite index's
+                # composite primary key ``(bundle_path, engine_type)``
+                # keeps them distinct.
+                rows = bt.index_rows(bundle_path=bundle_path)
+                for row in rows:
+                    index.upsert(
+                        row,
+                        bundle_mtime_ns=stat.st_mtime_ns,
+                        bundle_size=stat.st_size,
+                    )
                 n_ok += 1
             except Exception as exc:  # noqa: BLE001 — best-effort scan
                 logger.warning("failed to index %s: %s", path, exc)
@@ -207,6 +239,10 @@ def list_index(
     limit: Optional[int] = None,
     where: Optional[str] = None,
     columns: Optional[Sequence[str]] = None,
+    engine: Optional[str] = None,
+    universe_key: Optional[str] = "",
+    study: Optional[str] = None,
+    anchor_algorithm_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Query an index file and return matching rows as plain dicts.
 
@@ -222,14 +258,65 @@ def list_index(
             bind parameters.
         columns: Columns to project; defaults to
             :data:`DEFAULT_LIST_COLUMNS`.
+        engine: Optional engine filter, ``"vector"`` or ``"event"``.
+            When set, only rows whose ``engine_type`` column matches
+            are returned. Combined with ``where`` via ``AND``.
+        universe_key: Filter on the ``universe_key`` column. The
+            default ``""`` selects only the pooled cross-universe
+            rows — the legacy single-row-per-engine shape — so
+            existing reports keep their pre-multi-universe semantics.
+            Pass an explicit universe key (e.g. ``"majors"``) to
+            select only that universe's rows, or ``None`` to disable
+            the filter and include every row (pooled + per-universe).
+        study: Filter on the ``study_name`` column (Phase 3d). The
+            default ``None`` includes every study side-by-side —
+            unchanged from pre-Phase-3d behaviour for legacy
+            single-study bundles. Pass an explicit study name (e.g.
+            ``"in_sample"`` or ``"default"``) to restrict the
+            report to that study slot.
 
     Returns:
         A list of column-name → value dicts, ready for tabulation.
     """
+    if engine is not None and engine not in ("vector", "event"):
+        raise ValueError(
+            f"list_index: engine must be 'vector' or 'event', "
+            f"got {engine!r}"
+        )
+
     cols = list(columns) if columns else list(DEFAULT_LIST_COLUMNS)
     resolved = _resolve_index_path(index_path)
 
-    base_where = f"({where})" if where else "1=1"
+    clauses = []
+    if where:
+        clauses.append(f"({where})")
+    if engine is not None:
+        clauses.append(f"engine_type = '{engine}'")
+    if universe_key is not None:
+        # Quote-double to neutralise embedded single quotes; universe
+        # keys are arbitrary user strings (e.g. "us-large-cap").
+        safe = str(universe_key).replace("'", "''")
+        clauses.append(f"universe_key = '{safe}'")
+    if study is not None:
+        # Accept either a Study object or a bare name string.
+        study_name_str = (
+            study.name if hasattr(study, "name") else str(study)
+        )
+        safe_study = study_name_str.replace("'", "''")
+        clauses.append(f"study_name = '{safe_study}'")
+    if anchor_algorithm_id is not None:
+        # Lineage filter (v5+). Pass an explicit anchor's
+        # ``algorithm_id`` to pull only its sibling-bundle
+        # neighbourhood (param-robustness perturbations,
+        # cooldown-stress runs, etc.). Pass the literal string
+        # ``"<none>"`` to match anchor bundles only
+        # (``anchor_algorithm_id IS NULL``).
+        if anchor_algorithm_id == "<none>":
+            clauses.append("anchor_algorithm_id IS NULL")
+        else:
+            safe_anchor = str(anchor_algorithm_id).replace("'", "''")
+            clauses.append(f"anchor_algorithm_id = '{safe_anchor}'")
+    base_where = " AND ".join(clauses) if clauses else "1=1"
     fragment = base_where
     if sort_by:
         sort_col = _resolve_metric_column(sort_by)
@@ -250,12 +337,16 @@ def list_index(
 def rank_index(
     index_path: str,
     by: Optional[str] = None,
-    limit: int = 10,
+    limit: Optional[int] = None,
     where: Optional[str] = None,
     columns: Optional[Sequence[str]] = None,
     ascending: bool = False,
     focus: Optional["BacktestEvaluationFocus | str"] = None,
     weights: Optional[Dict[str, float]] = None,
+    engine: Optional[str] = None,
+    universe_key: Optional[str] = "",
+    study: Optional[str] = None,
+    anchor_algorithm_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Rank bundles by a single metric or a weighted combination.
 
@@ -284,6 +375,22 @@ def rank_index(
         weights: Custom ``{metric: weight}`` dict.  Metric names
             without a ``summary_`` prefix are accepted (they are
             mapped automatically).
+        engine: Optional engine filter, ``"vector"`` or ``"event"``.
+            When set, only rows for that engine slot participate in
+            the ranking. To produce separate vector- and event-only
+            rankings, call this function twice.
+        universe_key: Filter on the ``universe_key`` column. The
+            default ``""`` ranks only the pooled cross-universe rows
+            so existing reports keep their pre-multi-universe
+            semantics. Pass an explicit universe key to rank only
+            that universe's rows, or ``None`` to rank across every
+            row (pooled + per-universe — usually not what you want).
+        study: Filter on the ``study_name`` column (Phase 3d). The
+            default ``None`` ranks across every study side-by-side.
+            Pass an explicit study name (e.g. ``"in_sample"``) to
+            rank only that study's rows — the recommended setup
+            when comparing backtests of the same algorithm across
+            multiple studies (e.g. in-sample vs out-of-sample).
     """
     cols = list(columns) if columns else list(DEFAULT_RANK_COLUMNS)
 
@@ -296,6 +403,10 @@ def rank_index(
             where=where,
             columns=cols,
             ascending=ascending,
+            engine=engine,
+            universe_key=universe_key,
+            study=study,
+            anchor_algorithm_id=anchor_algorithm_id,
         )
 
     if by is None:
@@ -311,6 +422,10 @@ def rank_index(
         limit=limit,
         where=where,
         columns=cols,
+        engine=engine,
+        universe_key=universe_key,
+        study=study,
+        anchor_algorithm_id=anchor_algorithm_id,
     )
 
 
@@ -319,10 +434,14 @@ def _rank_index_weighted(
     *,
     focus=None,
     weights: Optional[Dict[str, float]] = None,
-    limit: int = 10,
+    limit: Optional[int] = None,
     where: Optional[str] = None,
     columns: Sequence[str] = (),
     ascending: bool = False,
+    engine: Optional[str] = None,
+    universe_key: Optional[str] = "",
+    study: Optional[str] = None,
+    anchor_algorithm_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Score every row in the index using normalised weighted metrics.
 
@@ -356,6 +475,10 @@ def _rank_index_weighted(
         limit=None,
         where=where,
         columns=all_cols,
+        engine=engine,
+        universe_key=universe_key,
+        study=study,
+        anchor_algorithm_id=anchor_algorithm_id,
     )
 
     if not rows:
@@ -448,7 +571,7 @@ def prune_backtests(
     """Move or delete bundles that are **not** in *keep*.
 
     Args:
-        directory: Folder containing the ``.iafbt`` bundles (same
+        directory: Folder containing the ``.obtf`` bundles (same
             path you passed to :func:`build_index`).
         keep: List of row dicts (as returned by :func:`rank_index`)
             whose ``"bundle_path"`` values identify bundles to keep.
@@ -527,4 +650,150 @@ def prune_backtests(
         "kept": n_kept,
         "pruned": n_pruned,
         "archive_dir": str(archive) if archive else None,
+    }
+
+
+def promote_backtests(
+    directory: str,
+    keep: List[Dict[str, Any]],
+    dest_dir: str,
+    *,
+    mode: str = "copy",
+    clear_dest: bool = True,
+    flatten: bool = True,
+    dry_run: bool = False,
+    show_progress: bool = False,
+    refresh_index: bool = True,
+) -> Dict[str, Any]:
+    """Promote the bundles in ``keep`` into a separate folder.
+
+    This is the dual of :func:`prune_backtests`. Where ``prune``
+    removes (or archives) the bundles *not* in ``keep``,
+    ``promote_backtests`` collects the bundles *that are* in
+    ``keep`` into a dedicated destination folder — useful for
+    tutorial workflows that want a clean "top-N" directory to feed
+    into a downstream notebook (e.g. an out-of-sample run) without
+    touching the original sweep results.
+
+    Args:
+        directory: Folder containing the source ``.obtf`` bundles
+            (the directory passed to :func:`build_index`).
+        keep: List of row dicts (as returned by :func:`rank_index`)
+            whose ``"bundle_path"`` values identify bundles to
+            promote.
+        dest_dir: Destination folder for the promoted bundles.
+            Created if it does not exist.
+        mode: ``"copy"`` (default) duplicates each bundle into
+            ``dest_dir`` so the source remains intact. ``"move"``
+            relocates them, leaving ``directory`` with only the
+            non-promoted bundles (the inverse of ``prune``).
+        clear_dest: When True (default), wipe ``dest_dir`` before
+            promoting so the folder reflects exactly the current
+            ``keep`` selection — no leakage from earlier runs.
+        flatten: When True (default), all promoted bundles land
+            directly in ``dest_dir``. When False, the source's
+            sub-directory structure is preserved relative to
+            ``directory``.
+        dry_run: When True, report what would happen without
+            touching the file system.
+        show_progress: Show a tqdm progress bar.
+        refresh_index: When True (default) and not dry-run, rebuild
+            the Tier-1 SQLite index inside ``dest_dir`` after the
+            promotion completes. Disable when callers prefer to
+            control index refresh themselves.
+
+    Returns:
+        ``{"promoted": int, "missing": int, "dest_dir": str,
+        "mode": str}`` where ``missing`` counts ``keep`` rows whose
+        bundle was not found on disk under ``directory``.
+    """
+    import shutil
+
+    if mode not in ("copy", "move"):
+        raise ValueError(
+            f"mode must be 'copy' or 'move', got {mode!r}"
+        )
+
+    src = Path(directory).resolve()
+    if not src.is_dir():
+        raise NotADirectoryError(f"Not a directory: {src}")
+
+    dest = Path(dest_dir).resolve()
+
+    # Deduplicate by bundle_path so a dual-engine row pair (same
+    # bundle indexed for both engines) doesn't trigger two copies
+    # of the same file.
+    seen: set = set()
+    bundle_rels: List[str] = []
+    for row in keep:
+        rel = row.get("bundle_path")
+        if not rel or rel in seen:
+            continue
+        seen.add(rel)
+        bundle_rels.append(rel)
+
+    if not dry_run:
+        if clear_dest and dest.exists():
+            shutil.rmtree(dest)
+        dest.mkdir(parents=True, exist_ok=True)
+
+    pbar = None
+    if show_progress:
+        try:
+            from tqdm import tqdm
+            pbar = tqdm(total=len(bundle_rels), desc="Promoting bundles")
+        except ImportError:
+            pbar = None
+
+    n_promoted = 0
+    n_missing = 0
+
+    try:
+        for rel in bundle_rels:
+            source_path = src / rel
+            if not source_path.exists():
+                n_missing += 1
+                if pbar is not None:
+                    pbar.update(1)
+                continue
+
+            if flatten:
+                target = dest / source_path.name
+            else:
+                target = dest / rel
+                if not dry_run:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+
+            if not dry_run:
+                if mode == "copy":
+                    shutil.copy2(str(source_path), str(target))
+                else:  # move
+                    shutil.move(str(source_path), str(target))
+
+            n_promoted += 1
+            if pbar is not None:
+                pbar.update(1)
+    finally:
+        if pbar is not None:
+            pbar.close()
+
+    if not dry_run and refresh_index and n_promoted > 0:
+        build_index(
+            str(dest),
+            show_progress=False,
+            incremental=False,
+        )
+        if mode == "move":
+            # Source lost the promoted bundles; refresh its index too.
+            build_index(
+                str(src),
+                show_progress=False,
+                incremental=False,
+            )
+
+    return {
+        "promoted": n_promoted,
+        "missing": n_missing,
+        "dest_dir": str(dest),
+        "mode": mode,
     }

@@ -4,10 +4,27 @@ Tests for Order.metadata on the domain model.
 from unittest import TestCase
 
 from investing_algorithm_framework.domain import Order, OrderType, \
-    OrderSide, OrderStatus
+    OrderSide
 
 
 class TestOrderMetadata(TestCase):
+
+    def test_legacy_trace_metadata_round_trip(self):
+        metadata = {"score_card": {
+            "score_card_version": 2, "summary": "Legacy", "entries": [],
+        }}
+        order = Order(
+            order_type=OrderType.LIMIT, order_side=OrderSide.BUY,
+            amount=1, target_symbol="BTC", trading_symbol="EUR",
+            metadata=metadata,
+        )
+        restored = Order.from_dict(order.to_dict())
+        self.assertEqual(restored.metadata["decision_trace"],
+                         restored.metadata["score_card"])
+        self.assertEqual(2, restored.metadata["decision_trace"][
+            "decision_trace_version"
+        ])
+        self.assertNotIn("decision_trace", metadata)
 
     def test_metadata_default_is_empty_dict(self):
         order = Order(

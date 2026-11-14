@@ -157,7 +157,7 @@ class TestLocalTieredStoreOhlcv(TestCase):
 
     # ------------------------------------------------------------------
     # iter_ohlcv_hashes / ohlcv_referenced_hashes — input for the
-    # dedup-upload negotiate step (docs/design/ohlcv-dedup-protocol.md).
+    # dedup-upload negotiate step (docs/architecture/backtest/ohlcv-dedup-protocol.md).
     # ------------------------------------------------------------------
     def test_iter_ohlcv_hashes_lists_referenced_chunks(self):
         self.store.write(

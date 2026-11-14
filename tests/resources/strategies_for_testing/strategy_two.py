@@ -1,10 +1,8 @@
-from investing_algorithm_framework import TradingStrategy, TimeUnit
+from investing_algorithm_framework import TradingStrategy, TimeUnit, Schedule
 
 
 class StrategyTwo(TradingStrategy):
     strategy_id = "strategy_two"
-    time_unit = TimeUnit.MINUTE
-    interval = 1
-
+    schedule = Schedule.every(1, TimeUnit.MINUTE)
     def run_strategy(self, context, market_data):
         pass

@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, reconstructor
 
 from investing_algorithm_framework.domain import PortfolioSnapshot
 from investing_algorithm_framework.infrastructure.database import (
@@ -34,6 +34,10 @@ class SQLPortfolioSnapshot(
     position_snapshots = relationship(
         "SQLPositionSnapshot",
         back_populates="portfolio_snapshot",
-        lazy="dynamic",
+        lazy="selectin",
         cascade="all,delete",
     )
+
+    @reconstructor
+    def _initialize_transient_metadata(self):
+        self.metadata = {}

@@ -63,6 +63,27 @@ class OrderBacktestService(OrderService):
         ]
         return order
 
+    def update(self, object_id, data):
+        """
+        Override update so backtests always advance ``updated_at`` using
+        the simulated clock instead of wall-clock time.
+
+        The SQL model declares ``updated_at`` with
+        ``onupdate=utcnow``. SQLAlchemy fires that hook on any UPDATE
+        statement where ``updated_at`` is not in the SET clause —
+        which silently overwrites the simulated timestamp set by
+        ``execute_order`` and breaks the per-bar fill scan in
+        ``BacktestTradeOrderEvaluator._check_has_executed`` (which
+        filters candles via ``Datetime >= updated_at``). Callers that
+        already supply ``updated_at`` retain control.
+        """
+        data = dict(data) if data else {}
+        data.setdefault(
+            "updated_at",
+            self.configuration_service.config[INDEX_DATETIME],
+        )
+        return super().update(object_id, data)
+
     def check_pending_orders(self, market_data):
         """
         Function to check if any pending orders have executed. It querys the
@@ -190,12 +211,14 @@ class OrderBacktestService(OrderService):
             # against the configured limit price.
 
         # Check if the order execution conditions are met
-        if OrderSide.BUY.equals(order_side):
-            # Check if the low price drops below or equals the order price
+        if OrderSide.BUY.equals(order_side) \
+                or OrderSide.COVER.equals(order_side):
+            # BUY / COVER: a willing seller appears at <= our price.
             if (ohlcv_data_after_order['Low'] <= order_price).any():
                 return True
-        elif OrderSide.SELL.equals(order_side):
-            # Check if the high price goes above or equals the order price
+        elif OrderSide.SELL.equals(order_side) \
+                or OrderSide.SHORT.equals(order_side):
+            # SELL / SHORT: a willing buyer appears at >= our price.
             if (ohlcv_data_after_order['High'] >= order_price).any():
                 return True
 

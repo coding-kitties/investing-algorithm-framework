@@ -1,11 +1,19 @@
 import unittest
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 from investing_algorithm_framework.analysis.ranking import create_weights, \
     combine_backtest_metrics, rank_results, normalize, compute_score
 from investing_algorithm_framework.domain import BacktestEvaluationFocus, \
     Trade, BacktestMetrics, Backtest, \
-    BacktestSummaryMetrics, OperationalException
+    BacktestSummaryMetrics, OperationalException, BacktestWindow, \
+    BacktestDateRange
+
+
+def _backtest_window(start_date, end_date):
+    return BacktestWindow(train_range=BacktestDateRange(
+        start_date=start_date,
+        end_date=end_date,
+    ))
 
 
 class TestCreateWeights(unittest.TestCase):
@@ -131,8 +139,7 @@ class TestCombineMetrics(unittest.TestCase):
 
         # Variation 1
         backtest_metrics_1 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (1.0, datetime(2020, 1, 1)),
                 (1.5, datetime(2020, 6, 30)),
@@ -200,8 +207,7 @@ class TestCombineMetrics(unittest.TestCase):
 
         # Variation 2
         backtest_metrics_2 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             equity_curve=[
                 (1.0, datetime(2020, 1, 1)),
                 (1.2, datetime(2020, 6, 30)),
@@ -280,8 +286,7 @@ class TestCombineMetrics(unittest.TestCase):
     def test_combine_single_metrics(self):
         """Combining a single metrics object should return it unchanged."""
         metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             total_net_gain=500.0,
             total_net_gain_percentage=50.0,
             win_rate=0.6,
@@ -298,13 +303,11 @@ class TestCombineMetrics(unittest.TestCase):
     def test_combine_max_drawdown_takes_worst(self):
         """Max drawdown should be the worst (maximum) across all metrics."""
         m1 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             max_drawdown=0.10,
         )
         m2 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             max_drawdown=0.30,
         )
         combined = combine_backtest_metrics([m1, m2])
@@ -313,13 +316,11 @@ class TestCombineMetrics(unittest.TestCase):
     def test_combine_number_of_trades_summed(self):
         """Number of trades should be summed, not averaged."""
         m1 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             number_of_trades=20,
         )
         m2 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             number_of_trades=30,
         )
         combined = combine_backtest_metrics([m1, m2])
@@ -328,16 +329,20 @@ class TestCombineMetrics(unittest.TestCase):
     def test_combine_date_range_spans_all(self):
         """Combined date range should span all input date ranges."""
         m1 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 3, 1),
-            backtest_end_date=datetime(2020, 9, 30),
+            backtest_window=_backtest_window(datetime(2020, 3, 1), datetime(2020, 9, 30)),
         )
         m2 = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
         )
         combined = combine_backtest_metrics([m1, m2])
-        self.assertEqual(datetime(2020, 1, 1), combined.backtest_start_date)
-        self.assertEqual(datetime(2020, 12, 31), combined.backtest_end_date)
+        self.assertEqual(
+            datetime(2020, 1, 1, tzinfo=timezone.utc),
+            combined.backtest_start_date,
+        )
+        self.assertEqual(
+            datetime(2020, 12, 31, tzinfo=timezone.utc),
+            combined.backtest_end_date,
+        )
 
 
 class TestNormalize(unittest.TestCase):
@@ -374,8 +379,7 @@ class TestComputeScore(unittest.TestCase):
     def test_basic_score(self):
         """Score should be weighted sum of normalized values."""
         metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             sharpe_ratio=1.5,
             win_rate=0.6,
         )
@@ -389,8 +393,7 @@ class TestComputeScore(unittest.TestCase):
     def test_missing_attribute_is_skipped(self):
         """Attributes not on the metrics object should be skipped."""
         metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             sharpe_ratio=1.0,
         )
         weights = {"sharpe_ratio": 1.0, "nonexistent_metric": 5.0}
@@ -400,8 +403,7 @@ class TestComputeScore(unittest.TestCase):
 
     def test_empty_weights_returns_zero(self):
         metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_window=_backtest_window(datetime(2020, 1, 1), datetime(2020, 12, 31)),
             sharpe_ratio=1.5,
         )
         score = compute_score(metrics, {}, {})

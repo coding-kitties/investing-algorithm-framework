@@ -1,7 +1,43 @@
+from datetime import datetime, timezone
+import json
 from unittest import TestCase
-from investing_algorithm_framework.domain import TradeStopLoss
+from investing_algorithm_framework.domain import RunReport, TradeStopLoss
+
 
 class TestTradeStopLoss(TestCase):
+
+    def test_watermark_date_is_json_safe_in_captured_trade_reports(self):
+        opened = datetime(2020, 3, 7, 22, tzinfo=timezone.utc)
+        updated = datetime(2020, 3, 8, 2, tzinfo=timezone.utc)
+        stop_loss = TradeStopLoss(
+            trade_id=1, percentage=7, open_price=100, total_amount_trade=1,
+            trailing=True, created_at=opened,
+        )
+        self.assertEqual(stop_loss.to_dict()["high_water_mark_date"], opened.isoformat())
+        stop_loss.update_with_last_reported_price(110, updated)
+        output = stop_loss.to_dict()
+        self.assertEqual(output["high_water_mark_date"], updated.isoformat())
+        report = RunReport(trades=[{"id": 1, "stop_losses": [output]}]).to_dict()
+        encoded = json.dumps(report, allow_nan=False)
+        self.assertEqual(
+            json.loads(encoded)["trades"][0]["stop_losses"][0]["high_water_mark_date"],
+            updated.isoformat(),
+        )
+        restored = TradeStopLoss.from_dict(output)
+        self.assertEqual(restored.high_water_mark_date, updated)
+        self.assertEqual(stop_loss.high_water_mark_date, updated)
+
+    def test_round_trip_preserves_fixed_trigger_and_filled_amount(self):
+        stop_loss = TradeStopLoss(
+            trade_id=1, percentage=5, open_price=120,
+            total_amount_trade=10, is_short=True,
+        )
+        stop_loss.high_water_mark = 90
+        stop_loss.sold_amount = 3
+        restored = TradeStopLoss.from_dict(stop_loss.to_dict())
+        self.assertEqual(restored.stop_loss_price, 126)
+        self.assertEqual(restored.high_water_mark, 90)
+        self.assertEqual(restored.sold_amount, 3)
 
     def test_model_creation(self):
         stop_loss = TradeStopLoss(
@@ -55,3 +91,34 @@ class TestTradeStopLoss(TestCase):
         self.assertFalse(stop_loss.has_triggered(24))
         self.assertFalse(stop_loss.has_triggered(23))
         self.assertTrue(stop_loss.has_triggered(22))
+
+    def test_mirror_fields_default(self):
+        stop_loss = TradeStopLoss(
+            trade_id=1,
+            percentage=10,
+            open_price=20,
+            sell_percentage=50,
+            total_amount_trade=100
+        )
+        self.assertFalse(stop_loss.mirror_on_exchange)
+        self.assertIsNone(stop_loss.mirror_order_id)
+        self.assertFalse(stop_loss.mirror_triggered)
+        self.assertIsNone(stop_loss.mirror_triggered_at)
+
+    def test_mirror_fields_round_trip_via_dict(self):
+        stop_loss = TradeStopLoss(
+            trade_id=1,
+            percentage=10,
+            open_price=20,
+            sell_percentage=50,
+            total_amount_trade=100,
+            mirror_on_exchange=True,
+            mirror_order_id="ext-123",
+            mirror_triggered=True,
+            mirror_triggered_at="2024-01-01T00:00:00+00:00",
+        )
+        restored = TradeStopLoss.from_dict(stop_loss.to_dict())
+        self.assertTrue(restored.mirror_on_exchange)
+        self.assertEqual("ext-123", restored.mirror_order_id)
+        self.assertTrue(restored.mirror_triggered)
+        self.assertIsNotNone(restored.mirror_triggered_at)

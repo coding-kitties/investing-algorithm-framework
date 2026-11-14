@@ -42,9 +42,10 @@ class MomentumScreener(Pipeline):
 class MyStrategy(TradingStrategy):
     pipelines = [MomentumScreener]
 
-    def run_strategy(self, context, data):
+    def generate_signals(self, context, data):
         screen = data["MomentumScreener"]    # Polars DataFrame
         top = screen.sort("alpha", descending=True).head(10)
+        # Yield Signal objects for the selected symbols.
         ...
 ```
 
@@ -62,7 +63,7 @@ The framework:
 
 ### `Factor`
 
-A per-symbol time-series computation. Phase 1 ships these built-ins:
+A per-symbol time-series computation. The framework includes these built-ins:
 
 | Factor | Inputs | Description |
 | --- | --- | --- |
@@ -162,9 +163,9 @@ each bar (per-bar OLS):
 class FactorNeutralAlpha(Pipeline):
     r = Returns(window=1)
     size = StaticPerSymbol(MARKET_CAPS)          # cross-sectional size
-    val = BookToPrice()
+    value = StaticPerSymbol(BOOK_TO_PRICE)       # cross-sectional value
     mom = Returns(window=252)
-    residual = Neutralize(r, exposures=[size, val, mom])
+    residual = Neutralize(r, exposures=[size, value, mom])
 ```
 
 Bars where the system is rank-deficient (more exposures than
@@ -200,20 +201,21 @@ Division by zero leaves `inf` in place (downstream filters can drop
 it) — for safe normalisation prefer `zscore`, which guards against
 zero dispersion.
 
-## Phased rollout
+## Execution modes
 
-Pipelines run today in the **event-driven backtest** path and in
-**live** trading by way of the same event loop. Vector-mode pipelines
-and cached/lazy execution are tracked separately.
+The same pipeline declarations work in event-driven backtests, vector
+backtests, paper trading, and live trading. Live execution currently uses a
+conservative envelope of at most 50 OHLCV symbols per strategy and daily-or-
+coarser timeframes while further streaming and partial-bar hardening continues.
 
 | Mode | Status | Page |
 | --- | --- | --- |
-| Event-driven backtest | ✅ Phase 1 | [Pipelines: Event-driven backtest](pipelines-event-backtest.md) |
-| Vector backtest | ✅ Phase 2 ([#502](https://github.com/coding-kitties/investing-algorithm-framework/issues/502)) | [Pipelines: Vector backtest](pipelines-vector-backtest.md) |
-| Live trading | 🚧 Phase 3 ([#503](https://github.com/coding-kitties/investing-algorithm-framework/issues/503)) | [Pipelines: Live trading](pipelines-live.md) |
+| Event-driven backtest | Available | [Pipelines: Event-driven backtest](pipelines-event-backtest.md) |
+| Vector backtest | Available | [Pipelines: Vector backtest](pipelines-vector-backtest.md) |
+| Paper and live trading | Available with live envelope | [Pipelines: Live trading](pipelines-live.md) |
 
-Start with the event-driven backtest page — it covers the full Phase 1
-surface area you can use today.
+Start with the event-driven page for per-bar evaluation or the vector page for
+whole-window execution. Review the live page before deploying a pipeline.
 
 ## Why opt-in?
 
@@ -225,7 +227,7 @@ touching the rest of your codebase.
 ## See also
 
 - [Pipelines: Event-driven backtest](pipelines-event-backtest.md) — full Phase 1 reference.
-- Design doc: [`docs/design/pipeline-api.md`](https://github.com/coding-kitties/investing-algorithm-framework/blob/dev/docs/design/pipeline-api.md).
+- Design doc: [`docs/architecture/strategy/pipeline-api.md`](https://github.com/coding-kitties/investing-algorithm-framework/blob/dev/docs/architecture/strategy/pipeline-api.md).
 - Tracking issues: [#501 (Phase 1)](https://github.com/coding-kitties/investing-algorithm-framework/issues/501),
   [#502 (Phase 2)](https://github.com/coding-kitties/investing-algorithm-framework/issues/502),
   [#503 (Phase 3)](https://github.com/coding-kitties/investing-algorithm-framework/issues/503).

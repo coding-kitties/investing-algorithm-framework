@@ -4,7 +4,7 @@ sidebar_position: 7
 
 # TradingCost
 
-`TradingCost` describes the **fees and slippage** that apply when an order fills. It can be attached per symbol on a `TradingStrategy`, or set as a market-level default on the `PortfolioConfiguration`. Both backtest engines apply it to fill prices and trade values; in live mode, the broker reports actual costs.
+`TradingCost` describes the **fees and slippage** that apply when an order fills. Per-symbol overrides are configured on `PortfolioConfiguration.trading_costs` (live/paper trading, via `app.add_market(trading_costs=[...])`) or on `Study.execution_config` (backtests, via `ExecutionConfig(trading_costs=[...])`). Market-wide defaults (one flat fee/slippage pair for every symbol) are set directly on `PortfolioConfiguration` via `fee_percentage`/`slippage_percentage`. Both backtest engines apply costs to fill prices and trade values; in live mode, the broker reports actual costs (paper trading falls back to the exchange's real, publicly advertised taker fee when no cost is configured).
 
 ```python
 from investing_algorithm_framework import TradingCost
@@ -24,7 +24,7 @@ TradingCost(
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `symbol` | `str \| None` | `None` | Target symbol (e.g. `"BTC"`). `None` means "market default" when used at the portfolio level. Symbol matching is case-insensitive. |
+| `symbol` | `str \| None` | `None` | Target symbol (e.g. `"BTC"`). `None` means "applies to any symbol without its own entry" when placed in `PortfolioConfiguration.trading_costs`/`ExecutionConfig.trading_costs`. Symbol matching is case-insensitive. |
 | `fee_percentage` | `float` | `0.0` | Variable fee in **percent of trade value** (e.g. `0.1` = 0.1 %). |
 | `slippage_percentage` | `float` | `0.0` | Slippage in **percent of price**. Buys fill higher, sells fill lower. Ignored when `slippage_model` is set. |
 | `fee_fixed` | `float` | `0.0` | Flat fee per trade in the trading currency, added on top of `fee_percentage`. |
@@ -49,20 +49,22 @@ When a `slippage_model` is set, the model's `calculate_slippage()` method replac
 
 When the engine needs a `TradingCost` for a symbol it walks this fallback chain:
 
-1. **Strategy-level** — first matching `TradingCost` in `TradingStrategy.trading_costs` whose `symbol` matches.
-2. **Portfolio defaults** — `fee_percentage` / `slippage_percentage` on `PortfolioConfiguration` (or `app.add_market(...)`), used when the strategy doesn't override the symbol.
-3. **Zero cost** — singleton fallback so every code path always gets a `TradingCost`.
+1. **Symbol-specific override** — first matching `TradingCost` in `PortfolioConfiguration.trading_costs` (live/paper) or `Study.execution_config.trading_costs` (backtests) whose `symbol` matches.
+2. **Configured default** — a `TradingCost(symbol=None, ...)` entry in that same list, if any.
+3. **Portfolio defaults** — `fee_percentage` / `slippage_percentage` on `PortfolioConfiguration` (or `app.add_market(...)`).
+4. **Zero cost** — singleton fallback so every code path always gets a `TradingCost`. In paper trading, this step instead resolves the exchange's real, publicly advertised taker fee via ccxt before falling back to zero.
 
-This means market-level defaults set on the portfolio quietly apply to every symbol unless a strategy explicitly overrides them.
+This means market-level defaults set on the portfolio quietly apply to every symbol unless a more specific `TradingCost` entry overrides them.
 
 ## Examples
 
-### Per-symbol fees and slippage
+### Per-symbol fees and slippage (live / paper trading)
 
 ```python
-class MyStrategy(TradingStrategy):
-    symbols = ["BTC", "ETH"]
-    trading_costs = [
+app.add_market(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    trading_costs=[
         TradingCost(
             symbol="BTC",
             fee_percentage=0.10,
@@ -73,7 +75,31 @@ class MyStrategy(TradingStrategy):
             fee_percentage=0.10,
             slippage_percentage=0.10,   # ETH less liquid here
         ),
-    ]
+    ],
+)
+```
+
+### Per-symbol fees and slippage (backtests)
+
+```python
+from investing_algorithm_framework import ExecutionConfig, Study
+
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    backtest_windows=[...],
+    execution_config=ExecutionConfig(
+        trading_costs=[
+            TradingCost(
+                symbol="BTC", fee_percentage=0.10,
+                slippage_percentage=0.05,
+            ),
+            TradingCost(
+                symbol="ETH", fee_percentage=0.10,
+                slippage_percentage=0.10,
+            ),
+        ],
+    ),
+)
 ```
 
 ### Realistic broker model
@@ -91,7 +117,7 @@ trading_costs = [
 
 ### Stress-testing a strategy
 
-Bump fees to see how robust your edge is:
+Bump fees to see how robust your edge is — pass a higher-fee list via `ExecutionConfig(trading_costs=[...])` on a second `Study` and compare:
 
 ```python
 trading_costs = [
@@ -104,7 +130,7 @@ If your strategy still has positive expectancy at 50 bps round-trip, real-world 
 
 ### Market-level defaults
 
-Set defaults once on the portfolio, override per symbol on the strategy:
+Set defaults once on the portfolio, override per symbol via `trading_costs=`:
 
 ```python
 PortfolioConfiguration(

@@ -15,6 +15,7 @@ from investing_algorithm_framework.domain import (
 from investing_algorithm_framework.domain.models.data.data_source import (
     DataSource,
 )
+from investing_algorithm_framework import Schedule
 
 
 class _ConcreteStrategy(TradingStrategy):
@@ -33,8 +34,7 @@ class TestStrategyIntervalValidation(TestCase):
         """1 minute interval < 60 minute (1h) OHLCV → must raise."""
         with self.assertRaises(OperationalException):
             _ConcreteStrategy(
-                time_unit=TimeUnit.MINUTE,
-                interval=1,
+                schedule=Schedule.every(1, TimeUnit.MINUTE),
                 data_sources=[
                     DataSource(
                         symbol="BTC/EUR",
@@ -52,8 +52,7 @@ class TestStrategyIntervalValidation(TestCase):
     def test_no_error_when_interval_matches_ohlcv_timeframe(self):
         """1 hour interval == 60 min == 1h OHLCV → should NOT raise."""
         strategy = _ConcreteStrategy(
-            time_unit=TimeUnit.HOUR,
-            interval=1,
+            schedule=Schedule.every(1, TimeUnit.HOUR),
             data_sources=[
                 DataSource(
                     symbol="BTC/EUR",
@@ -72,8 +71,7 @@ class TestStrategyIntervalValidation(TestCase):
     def test_no_error_when_interval_slower_than_ohlcv_timeframe(self):
         """1 day interval (1440 min) > 60 min (1h) OHLCV → should NOT raise."""
         strategy = _ConcreteStrategy(
-            time_unit=TimeUnit.DAY,
-            interval=1,
+            schedule=Schedule.every(1, TimeUnit.DAY),
             data_sources=[
                 DataSource(
                     symbol="BTC/EUR",
@@ -93,8 +91,7 @@ class TestStrategyIntervalValidation(TestCase):
         """5 min interval < 15 min (smallest OHLCV) → must raise."""
         with self.assertRaises(OperationalException):
             _ConcreteStrategy(
-                time_unit=TimeUnit.MINUTE,
-                interval=5,
+                schedule=Schedule.every(5, TimeUnit.MINUTE),
                 data_sources=[
                     DataSource(
                         symbol="BTC/EUR",
@@ -119,8 +116,7 @@ class TestStrategyIntervalValidation(TestCase):
     def test_no_validation_when_no_ohlcv_data_sources(self):
         """No OHLCV sources → nothing to compare → should NOT raise."""
         strategy = _ConcreteStrategy(
-            time_unit=TimeUnit.MINUTE,
-            interval=1,
+            schedule=Schedule.every(1, TimeUnit.MINUTE),
             data_sources=[],
         )
         self.assertIsNotNone(strategy)
@@ -131,8 +127,7 @@ class TestStrategyIntervalValidation(TestCase):
     def test_skips_data_sources_without_timeframe(self):
         """Ticker source has no time_frame → should NOT raise."""
         strategy = _ConcreteStrategy(
-            time_unit=TimeUnit.MINUTE,
-            interval=1,
+            schedule=Schedule.every(1, TimeUnit.MINUTE),
             data_sources=[
                 DataSource(
                     symbol="BTC/EUR",
@@ -150,8 +145,7 @@ class TestStrategyIntervalValidation(TestCase):
         """Exception message should contain interval info AND timeframe info."""
         with self.assertRaises(OperationalException) as cm:
             _ConcreteStrategy(
-                time_unit=TimeUnit.MINUTE,
-                interval=1,
+                schedule=Schedule.every(1, TimeUnit.MINUTE),
                 data_sources=[
                     DataSource(
                         symbol="BTC/EUR",

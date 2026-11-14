@@ -1,7 +1,9 @@
+from investing_algorithm_framework import BacktestRunConfiguration
 import os
 import sys
 import unittest
 from io import StringIO
+from tempfile import TemporaryDirectory
 from itertools import product
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -12,21 +14,20 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, rank_results, \
-    BacktestEvaluationFocus, generate_algorithm_id
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, BacktestIndex, \
+    generate_algorithm_id, Schedule, Study, \
+    Universe, BacktestWindow, BacktestEngine, SignalSide, \
+    signal_series_from_column
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id,
         symbols,
         position_sizes,
-        time_unit: TimeUnit,
-        interval: int,
+        schedule: Schedule,
         market: str,
         rsi_time_frame: str,
         rsi_period: int,
@@ -81,8 +82,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval,
+            schedule=schedule,
             symbols=symbols,
             position_sizes=position_sizes
         )
@@ -127,19 +127,10 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
         return ema_data, rsi_data
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+    def generate_signal_series(self, data: Dict[str, Any]):
         """
-        Generate buy signals based on the moving average crossover.
-
-        data (Dict[str, Any]): Dictionary containing all the data for
-            the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating buy signals (True/False).
+        Generate buy/sell signal series based on the RSI + EMA crossover.
         """
-
-        signals = {}
         for symbol in self.symbols:
             ema_data_identifier = f"{symbol}_ema_data"
             rsi_data_identifier = f"{symbol}_rsi_data"
@@ -160,31 +151,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
             # Combine both conditions
             buy_signal = rsi_oversold & ema_crossover_lookback
-            buy_signals = buy_signal.fillna(False).astype(bool)
-            signals[symbol] = buy_signals
-        return signals
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        """
-        Generate sell signals based on the moving average crossover.
-
-        Args:
-            data (Dict[str, Any]): Dictionary containing all the data for
-                the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating sell signals (True/False).
-        """
-
-        signals = {}
-        for symbol in self.symbols:
-            ema_data_identifier = f"{symbol}_ema_data"
-            rsi_data_identifier = f"{symbol}_rsi_data"
-            ema_data, rsi_data = self.prepare_indicators(
-                data[ema_data_identifier].copy(),
-                data[rsi_data_identifier].copy()
-            )
+            buy_signal = buy_signal.fillna(False).astype(bool)
 
             # Confirmed by crossover between short-term EMA and long-term EMA
             # within a given lookback window
@@ -200,8 +167,19 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             # Combine both conditions
             sell_signal = rsi_overbought & ema_crossunder_lookback
             sell_signal = sell_signal.fillna(False).astype(bool)
-            signals[symbol] = sell_signal
-        return signals
+
+            buy_df = pd.DataFrame({"_buy_signal": buy_signal})
+            sell_df = pd.DataFrame({"_sell_signal": sell_signal})
+            yield signal_series_from_column(
+                buy_df, "_buy_signal",
+                side=SignalSide.OPEN_LONG, symbol=symbol,
+                source="test_fixture",
+            )
+            yield signal_series_from_column(
+                sell_df, "_sell_signal",
+                side=SignalSide.CLOSE_LONG, symbol=symbol,
+                source="test_fixture",
+            )
 
 class Test(TestCase):
 
@@ -212,16 +190,9 @@ class Test(TestCase):
         """
         Filter function that only keeps backtests with at least one closed trade.
         """
-        filtered = []
-
-        for backtest in backtests:
-            backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
-
-            if backtest_metrics is not None \
-                    and backtest_metrics.number_of_trades_closed > 0:
-                filtered.append(backtest)
-
-        return filtered
+        return backtests.filter(
+            lambda row: row["window_number_of_trades_closed"] > 0,
+        )
 
     @staticmethod
     def filter_function_with_ranking(
@@ -230,13 +201,20 @@ class Test(TestCase):
         """
         Filter function that only keeps backtests with at least one closed trade.
         """
-        return rank_results(backtests, focus=BacktestEvaluationFocus.BALANCED)
+        if backtests.df.empty:
+            return backtests
+        return BacktestIndex(
+            backtests.directory,
+            backtests.df.sort_values("summary.total_net_gain", ascending=False),
+        )
 
     def test_run_with_show_output(self):
         """
         Test run_vector_backtests with a filter_function that filters
         strategies based on whether they have closed trades.
         """
+        storage = TemporaryDirectory()
+        self.addCleanup(storage.cleanup)
         param_grid = {
             "rsi_time_frame": ["2h"],
             "rsi_period": [14],
@@ -278,8 +256,7 @@ class Test(TestCase):
             strategies.append(
                 RSIEMACrossoverStrategy(
                     algorithm_id=generate_algorithm_id(params=param_set),
-                    time_unit=TimeUnit.HOUR,
-                    interval=2,
+                    schedule=Schedule.every(2, TimeUnit.HOUR),
                     market="BITVAVO",
                     rsi_time_frame=param_set["rsi_time_frame"],
                     rsi_period=param_set["rsi_period"],
@@ -309,25 +286,32 @@ class Test(TestCase):
         old_stdout = sys.stdout
         sys.stdout = captured_output
 
+        study = Study(
+            universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+            initial_capital=1000,
+            risk_free_rate=0.027,
+            backtest_windows=[
+                BacktestWindow(train_range=date_range_1),
+                BacktestWindow(train_range=date_range_2),
+            ],
+            engines=[BacktestEngine.VECTOR],
+        )
+
         try:
-            backtests = app.run_vector_backtests(
-                initial_amount=1000,
-                backtest_date_ranges=[date_range_1, date_range_2],
+            backtests = app.run_backtests(
                 strategies=strategies,
-                snapshot_interval=SnapshotInterval.DAILY,
-                risk_free_rate=0.027,
-                trading_symbol="EUR",
-                market="BITVAVO",
-                use_checkpoints=True,
-                backtest_storage_directory=os.path.join(
-                    resource_directory, "backtest_reports_for_testing"
+                study=study,
+                window_metrics_filter_function=(
+                    self.filter_function_with_closed_trades
                 ),
-                window_filter_function=self.filter_function_with_closed_trades,
-                final_filter_function=self.filter_function_with_ranking,
-                show_progress=True,
-                n_workers=os.cpu_count() - 1,
-                batch_size=100,  # Process 100 strategies at a time
-                checkpoint_batch_size=50,  # Save checkpoint every 50 backtests
+                final_metrics_filter_function=self.filter_function_with_ranking,
+                run_configuration=BacktestRunConfiguration(
+                    snapshot_interval=SnapshotInterval.DAILY,
+                    use_checkpoints=True,
+                    backtest_storage_directory=storage.name,
+                    show_progress=True,
+                    n_workers=2,
+                ),
             )
         finally:
             # Restore stdout
@@ -354,9 +338,9 @@ class Test(TestCase):
         )
 
         self.assertTrue(
-            "Applying window filter function" in output
+            "Applying window metrics filter function" in output
         )
 
         self.assertTrue(
-            "Combining backtests across date ranges" in output
+            (backtests.directory / "backtest_session_index.parquet").is_file()
         )

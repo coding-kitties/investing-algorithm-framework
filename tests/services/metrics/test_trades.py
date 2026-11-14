@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 from investing_algorithm_framework.services.metrics.trades import (
+    get_directional_trade_statistics,
     get_positive_trades,
     get_negative_trades,
     get_number_of_trades,
@@ -110,7 +111,38 @@ def create_trade(
     trade.open_price = open_price
     trade.opened_at = opened_at or datetime(2024, 1, 1, tzinfo=timezone.utc)
     trade.closed_at = closed_at or datetime(2024, 1, 2, tzinfo=timezone.utc)
+    trade.is_short = False
     return trade
+
+
+class TestGetDirectionalTradeStatistics(unittest.TestCase):
+    def test_splits_long_and_short_counts_and_win_rates(self):
+        winning_long = create_trade(net_gain=10)
+        losing_long = create_trade(net_gain=-5)
+        open_long = create_trade(status="OPEN", net_gain=0)
+        winning_short = create_trade(net_gain=8)
+        winning_short.is_short = True
+        losing_short = create_trade(net_gain=-3)
+        losing_short.is_short = True
+
+        result = get_directional_trade_statistics([
+            winning_long,
+            losing_long,
+            open_long,
+            winning_short,
+            losing_short,
+        ])
+
+        self.assertEqual(result["number_of_long_trades"], 3)
+        self.assertEqual(result["number_of_long_trades_closed"], 2)
+        self.assertEqual(result["number_of_winning_long_trades"], 1)
+        self.assertEqual(result["number_of_losing_long_trades"], 1)
+        self.assertEqual(result["long_win_rate"], 0.5)
+        self.assertEqual(result["number_of_short_trades"], 2)
+        self.assertEqual(result["number_of_short_trades_closed"], 2)
+        self.assertEqual(result["number_of_winning_short_trades"], 1)
+        self.assertEqual(result["number_of_losing_short_trades"], 1)
+        self.assertEqual(result["short_win_rate"], 0.5)
 
 
 class TestGetPositiveTrades(unittest.TestCase):
@@ -894,4 +926,3 @@ class TestTradesIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

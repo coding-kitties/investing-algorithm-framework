@@ -1,17 +1,15 @@
 import os
-from typing import Dict, Any
 from datetime import datetime, timezone
-import pandas as pd
 from unittest.mock import patch
 
 from investing_algorithm_framework import PortfolioConfiguration, \
-    MarketCredential, TradingStrategy, DataSource, BacktestDateRange
+    MarketCredential, TradingStrategy, DataSource, BacktestDateRange, \
+    Schedule, TimeUnit
 from investing_algorithm_framework.domain.exceptions import DataError
 from tests.resources import TestBase
 
 class TestStrategy(TradingStrategy):
-    time_unit = "DAY"
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     data_sources = [
         DataSource(
             data_type="OHLCV",
@@ -23,20 +21,9 @@ class TestStrategy(TradingStrategy):
         )
     ]
 
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        return {}
-
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        return {}
-
 
 class TestStrategyIncompleteData(TradingStrategy):
-    time_unit = "DAY"
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     data_sources = [
         DataSource(
             data_type="OHLCV",
@@ -48,16 +35,6 @@ class TestStrategyIncompleteData(TradingStrategy):
             data_provider_identifier="BITVAVO"
         )
     ]
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        return {}
-
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        return {}
 
 
 class TestConfig(TestBase):

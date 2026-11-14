@@ -1,4 +1,5 @@
 from datetime import timezone, datetime
+from investing_algorithm_framework.domain.native_event import native_risk
 
 from investing_algorithm_framework.domain.datetime_parsing import (
     parse_datetime as _parse_dt,
@@ -75,6 +76,11 @@ class TradeTakeProfit(BaseModel):
         sell_amount: float = None,
         high_water_mark: float = None,
         high_water_mark_date: str = None,
+        is_short: bool = False,
+        mirror_on_exchange: bool = False,
+        mirror_order_id: str = None,
+        mirror_triggered: bool = False,
+        mirror_triggered_at: datetime = None,
         created_at: datetime = None,
         updated_at: datetime = None
     ):
@@ -87,12 +93,25 @@ class TradeTakeProfit(BaseModel):
         self.high_water_mark = high_water_mark
         self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
+        self.is_short = is_short
+        # Broker-native mirror order safety net (opt-in). See
+        # ``TakeProfitRule.mirror_on_exchange``. ``mirror_order_id`` is
+        # the exchange order id of the currently-live mirror order, if
+        # any. ``mirror_triggered`` records that the mirror order
+        # (not the client-side check) closed the position.
+        self.mirror_on_exchange = mirror_on_exchange
+        self.mirror_order_id = mirror_order_id
+        self.mirror_triggered = mirror_triggered
+        self.mirror_triggered_at = mirror_triggered_at
         self.created_at = created_at
         self.updated_at = updated_at
 
+        # #434 phase 3 — for short trades the take profit triggers on
+        # price *drop*, so the trigger price sits BELOW entry.
+        direction = -1 if self.is_short else 1
         if high_water_mark is None and not self.trailing:
             self.take_profit_price = self.open_price * \
-                (1 + (self.percentage / 100))
+                (1 + direction * (self.percentage / 100))
         else:
             self.take_profit_price = None
 
@@ -106,6 +125,7 @@ class TradeTakeProfit(BaseModel):
         self.sell_prices = sell_prices
         self.sell_dates = sell_dates
 
+    @native_risk(stop=False, check=False)
     def update_with_last_reported_price(self, current_price: float, date):
         """
         Function to update the take profit price based on
@@ -119,6 +139,10 @@ class TradeTakeProfit(BaseModel):
             current_price: float - the last reported price of the trade
             date: the date of the price update
         """
+
+        if self.is_short:
+            self._update_short(current_price, date)
+            return
 
         if not self.trailing:
             # Fixed take profit: track high watermark
@@ -156,10 +180,14 @@ class TradeTakeProfit(BaseModel):
                 if new_take_profit_price > self.take_profit_price:
                     self.take_profit_price = new_take_profit_price
 
+    @native_risk(stop=False, check=True)
     def has_triggered(self, current_price: float = None) -> bool:
 
         if current_price is None:
             return False
+
+        if self.is_short:
+            return self._has_triggered_short(current_price)
 
         if not self.trailing:
             # Fixed take profit: trigger when price reaches take_profit_price
@@ -205,6 +233,62 @@ class TradeTakeProfit(BaseModel):
                         self.take_profit_price = new_take_profit_price
 
                 return False
+
+    # ------------------------------------------------------------------
+    # #434 phase 3 \u2014 SHORT take-profit logic. The favorable
+    # direction is DOWN, so we track the LOW water mark in
+    # ``high_water_mark`` (reused as \"extreme favorable price\") and
+    # the trigger price sits ABOVE that mark for trailing rebounds.
+    # ------------------------------------------------------------------
+
+    def _update_short(self, current_price: float, date) -> None:
+        if not self.trailing:
+            if current_price <= self.take_profit_price:
+                if (self.high_water_mark is None
+                        or current_price < self.high_water_mark):
+                    self.high_water_mark = current_price
+                    self.high_water_mark_date = date
+            return
+
+        if self.high_water_mark is None:
+            initial_threshold = self.open_price * (1 - (self.percentage / 100))
+            if current_price <= initial_threshold:
+                self.high_water_mark = current_price
+                self.high_water_mark_date = date
+                self.take_profit_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
+        else:
+            if current_price < self.high_water_mark:
+                self.high_water_mark = current_price
+                self.high_water_mark_date = date
+                new_take_profit_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
+                if new_take_profit_price < self.take_profit_price:
+                    self.take_profit_price = new_take_profit_price
+
+    def _has_triggered_short(self, current_price: float) -> bool:
+        if not self.trailing:
+            return current_price <= self.take_profit_price
+
+        if self.high_water_mark is None:
+            initial_threshold = self.open_price * (1 - (self.percentage / 100))
+            if current_price <= initial_threshold:
+                self.high_water_mark = current_price
+                self.take_profit_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
+            return False
+
+        # Trailing short TP: trigger when price rebounds upward
+        # above the take_profit_price.
+        if current_price > self.take_profit_price:
+            return True
+        if current_price < self.high_water_mark:
+            self.high_water_mark = current_price
+            new_take_profit_price = self.high_water_mark * \
+                (1 + (self.percentage / 100))
+            if new_take_profit_price < self.take_profit_price:
+                self.take_profit_price = new_take_profit_price
+        return False
 
     def get_sell_amount(self) -> float:
         """
@@ -300,6 +384,15 @@ class TradeTakeProfit(BaseModel):
             "sell_amount": self.sell_amount,
             "sold_amount": self.sold_amount,
             "active": self.active,
+            "is_short": getattr(self, "is_short", False),
+            "mirror_on_exchange": getattr(
+                self, "mirror_on_exchange", False
+            ),
+            "mirror_order_id": getattr(self, "mirror_order_id", None),
+            "mirror_triggered": getattr(self, "mirror_triggered", False),
+            "mirror_triggered_at": ensure_iso(
+                getattr(self, "mirror_triggered_at", None)
+            ),
             "triggered": self.triggered,
             "triggered_at": ensure_iso(self.triggered_at),
             "high_water_mark_date": self.high_water_mark_date,
@@ -318,6 +411,8 @@ class TradeTakeProfit(BaseModel):
             if data.get("triggered_at") is not None else None
         high_water_mark_date = _parse_dt(data.get("high_water_mark_date")) \
             if data.get("high_water_mark_date") is not None else None
+        mirror_triggered_at = _parse_dt(data["mirror_triggered_at"]) \
+            if data.get("mirror_triggered_at") is not None else None
 
         # Make sure all the dates are timezone utc aware
         if created_at and created_at.tzinfo is None:
@@ -330,8 +425,12 @@ class TradeTakeProfit(BaseModel):
             high_water_mark_date = high_water_mark_date.replace(
                 tzinfo=timezone.utc
             )
+        if mirror_triggered_at and mirror_triggered_at.tzinfo is None:
+            mirror_triggered_at = mirror_triggered_at.replace(
+                tzinfo=timezone.utc
+            )
 
-        return TradeTakeProfit(
+        take_profit = TradeTakeProfit(
             trade_id=data.get("trade_id"),
             trailing=data.get("trailing"),
             percentage=data.get("percentage"),
@@ -346,9 +445,18 @@ class TradeTakeProfit(BaseModel):
             sell_amount=data.get("sell_amount"),
             high_water_mark=data.get("high_water_mark"),
             high_water_mark_date=high_water_mark_date,
+            is_short=data.get("is_short", False),
+            mirror_on_exchange=data.get("mirror_on_exchange", False),
+            mirror_order_id=data.get("mirror_order_id"),
+            mirror_triggered=data.get("mirror_triggered", False),
+            mirror_triggered_at=mirror_triggered_at,
             created_at=created_at,
             updated_at=updated_at
         )
+        if data.get("take_profit_price") is not None:
+            take_profit.take_profit_price = data["take_profit_price"]
+        take_profit.sold_amount = data.get("sold_amount", 0)
+        return take_profit
 
     def __repr__(self):
         return self.repr(

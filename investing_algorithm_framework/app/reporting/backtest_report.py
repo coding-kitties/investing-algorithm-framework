@@ -14,6 +14,9 @@ from jinja2 import Environment, FileSystemLoader
 from investing_algorithm_framework.domain import (
     Backtest, OperationalException, tqdm, BUNDLE_EXT
 )
+from investing_algorithm_framework.domain.backtesting.backtest import (
+    ENGINE_VECTOR,
+)
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -77,6 +80,12 @@ def _fmt_date(dt):
     if isinstance(dt, str):
         return dt
     return dt.strftime('%Y-%m-%d')
+
+
+def _fmt_datetime(dt):
+    if isinstance(dt, str):
+        return dt
+    return dt.isoformat()
 
 
 def _is_na(val):
@@ -162,6 +171,10 @@ class BacktestReport:
     directory_path: str = None
     # Backward compat with old API (backtest: Backtest)
     backtest: object = None
+    # Optional study name (or Study instance) to scope multi-study
+    # bundles to a single study. When None, every study on each
+    # backtest is rendered as its own strategy (see ``_engine_views``).
+    study: object = None
     _source_tags: List[str] = field(
         default_factory=list, repr=False
     )
@@ -178,10 +191,6 @@ class BacktestReport:
             else:
                 self.backtests = [self.backtest]
             self.backtest = None
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def show(self, backtest_date_range=None, browser=False):
         if not self.html_report:
@@ -215,11 +224,41 @@ class BacktestReport:
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.html_report)
 
+    def pretty_print(self):
+        """Print a summary of rejected signals across all report runs."""
+        rejection_summary = {}
+        for view in self._engine_views():
+            backtest = view["backtest"]
+            runs = backtest.get_runs(
+                view["engine"], study=view["study"]
+            )
+            for run in runs:
+                for reason, count in run.get_rejection_summary().items():
+                    rejection_summary[reason] = (
+                        rejection_summary.get(reason, 0) + count
+                    )
+
+        total_rejected = sum(rejection_summary.values())
+        if total_rejected == 0:
+            return
+
+        label_width = max(
+            len("Total rejected"),
+            *(len(reason) for reason in rejection_summary),
+        )
+        print("Signal rejections:")
+        for reason in sorted(rejection_summary):
+            print(
+                f"  {reason:<{label_width}} : "
+                f"{rejection_summary[reason]}"
+            )
+        print(f"  {'Total rejected':<{label_width}} : {total_rejected}")
+
     @staticmethod
     def _is_backtest(backtest_path):
         if not os.path.exists(backtest_path):
             return False
-        # Bundle file (.iafbt)
+        # Bundle file (.obtf)
         if os.path.isfile(backtest_path) and \
                 backtest_path.endswith(BUNDLE_EXT):
             return True
@@ -349,6 +388,101 @@ backtest_utils import (
         return report
 
     # ------------------------------------------------------------------
+    # Engine-view expansion (design doc §7 / Stage 6)
+    # ------------------------------------------------------------------
+
+    def _engine_views(self):
+        """Expand ``self.backtests`` to one entry per populated
+        (study, engine) combination.
+
+        Each entry is a dict ``{'backtest', 'study', 'engine', 'dual',
+        'multi_study'}`` where ``dual`` is True when the study carries
+        runs for both engines and ``multi_study`` is True when the
+        source backtest has more than one study. Builders treat each
+        entry as an independent "strategy" so vector/event results —
+        and separate studies (e.g. in-sample vs. out-of-sample) —
+        render as separate pages in the dashboard, and always pass an
+        explicit ``study=`` down to ``Backtest.get_runs()``/
+        ``get_summary()`` so multi-study bundles never hit the
+        default-study disambiguation error.
+
+        Backtests with no studies at all fall back to a single vector
+        view (``study=None``) for backward compatibility with empty /
+        legacy fixtures.
+
+        When ``self.study`` is set (a study name or a ``Study``
+        instance), each backtest is narrowed to that single study —
+        backtests that don't carry a matching study contribute no
+        views at all.
+        """
+        study_filter = self.study
+        if study_filter is not None and hasattr(study_filter, "name"):
+            study_filter = study_filter.name
+
+        views = []
+        for bt_idx, bt in enumerate(self.backtests):
+            study_names = bt.list_studies()
+            if not study_names:
+                views.append({
+                    "backtest": bt,
+                    "backtest_index": bt_idx,
+                    "study": None,
+                    "engine": ENGINE_VECTOR,
+                    "dual": False,
+                    "multi_study": False,
+                })
+                continue
+
+            if study_filter is not None:
+                study_names = [
+                    name for name in study_names if name == study_filter
+                ]
+                if not study_names:
+                    continue
+
+            multi_study = len(study_names) > 1
+            for study_name in study_names:
+                study = bt.get_study(study_name)
+                engines = list(study.populated_engines()) or [ENGINE_VECTOR]
+                dual = len(engines) > 1
+                for engine in engines:
+                    views.append({
+                        "backtest": bt,
+                        "backtest_index": bt_idx,
+                        "study": study_name,
+                        "engine": engine,
+                        "dual": dual,
+                        "multi_study": multi_study,
+                    })
+        comparison_engines = {}
+        for view in views:
+            key = (
+                view["backtest"].algorithm_id or view["backtest_index"],
+                view["study"],
+            )
+            comparison_engines.setdefault(key, set()).add(view["engine"])
+        for view in views:
+            key = (
+                view["backtest"].algorithm_id or view["backtest_index"],
+                view["study"],
+            )
+            view["dual"] = len(comparison_engines[key]) > 1
+        return views
+
+    @staticmethod
+    def _engine_label(view) -> str:
+        """Suffix appended to algorithm_id for dual-engine and/or
+        multi-study views."""
+        parts = []
+        if view.get("multi_study") and view.get("study"):
+            parts.append(view["study"])
+        if view["dual"]:
+            parts.append(view["engine"])
+        if not parts:
+            return ""
+        return f" ({', '.join(parts)})"
+
+    # ------------------------------------------------------------------
     # Full HTML assembly
     # ------------------------------------------------------------------
 
@@ -361,7 +495,18 @@ backtest_utils import (
         logo_dark_b64 = _read_logo_base64('finterion-dark.png')
         logo_light_b64 = _read_logo_base64('finterion-light.png')
 
-        is_single = len(self.backtests) == 1
+        # ``is_single`` drives the dashboard's single- vs comparison-
+        # view layout. A backtest exposing both engines now counts as
+        # a comparison (vector vs event) even when it is the only
+        # backtest loaded.
+        engine_views = self._engine_views()
+        if not engine_views:
+            study_name = getattr(self.study, "name", self.study)
+            raise OperationalException(
+                f"No backtest has study {study_name!r}. Available "
+                f"studies: {sorted({s for bt in self.backtests for s in bt.list_studies()})!r}."
+            )
+        is_single = len(engine_views) == 1
         strategies = self._build_strategies_data()
         run_data = self._build_run_data()
         windows_meta = self._build_windows_meta()
@@ -447,14 +592,18 @@ backtest_utils import (
     def _build_strategies_data(self):
         strategies = []
 
-        for i, bt in enumerate(self.backtests):
+        for i, view in enumerate(self._engine_views()):
+            bt = view["backtest"]
+            engine = view["engine"]
             color = STRATEGY_COLORS[i % len(STRATEGY_COLORS)]
-            runs = bt.get_all_backtest_runs()
+            runs = bt.get_runs(engine, study=view["study"])
 
-            # Summary metrics
+            # Summary metrics: each engine view binds to its own
+            # per-engine summary (design doc section 7 / Stage 6).
             summary_dict = {}
-            if bt.backtest_summary is not None:
-                summary_dict = bt.backtest_summary.to_dict()
+            primary_summary = bt.get_summary(engine, study=view["study"])
+            if primary_summary is not None:
+                summary_dict = primary_summary.to_dict()
 
             # Representative equity curve (first run, as % growth)
             rep_eq = []
@@ -487,11 +636,23 @@ backtest_utils import (
             algo_name = bt.algorithm_id or f"strategy_{i}"
             if len(algo_name) > 8:
                 algo_name = algo_name[:8]
+            algo_name += self._engine_label(view)
 
-            # Prefer persisted bt.tag, fall back to directory tag
+            # Prefer persisted bt.tag, fall back to directory tag.
+            # Source tags are indexed by the original backtest index
+            # so both engine views of a dual-engine bundle share the
+            # same source tag.
             tag = getattr(bt, 'tag', None) or ''
-            if not tag and i < len(self._source_tags):
-                tag = self._source_tags[i]
+            bt_idx = view["backtest_index"]
+            if not tag and bt_idx < len(self._source_tags):
+                tag = self._source_tags[bt_idx]
+
+            # Surfaces window_filter_function's progressive-pruning
+            # marker (set by BacktestService) so partial window
+            # coverage can be explained as "pruned", not a data gap.
+            meta = bt.metadata or {}
+            filtered_out = bool(meta.get('filtered_out'))
+            filtered_out_at = meta.get('filtered_out_at_date_range')
 
             strategies.append({
                 'id': f'strat-{i}',
@@ -504,6 +665,8 @@ backtest_utils import (
                 'runNameMap': run_name_map,
                 'runLabels': run_labels_list,
                 'parameters': bt.parameters or {},
+                'filteredOut': filtered_out,
+                'filteredOutAt': filtered_out_at,
             })
 
         return strategies
@@ -511,8 +674,9 @@ backtest_utils import (
     def _build_run_data(self):
         run_data = {}
 
-        for i, bt in enumerate(self.backtests):
-            runs = bt.get_all_backtest_runs()
+        for i, view in enumerate(self._engine_views()):
+            bt = view["backtest"]
+            runs = bt.get_runs(view["engine"], study=view["study"])
 
             for j, run in enumerate(runs):
                 rid = f"run-{i}-{j}"
@@ -577,7 +741,8 @@ backtest_utils import (
                 yr = []
                 if m and m.yearly_returns:
                     yr = [
-                        [v, str(d.year) if hasattr(d, 'year') else str(d)]
+                        [v * 100 if abs(v) < 1 else v,
+                         str(d.year) if hasattr(d, 'year') else str(d)]
                         for v, d in m.yearly_returns
                     ]
 
@@ -635,8 +800,12 @@ backtest_utils import (
                         trades_list.append({
                             'id': idx_t,
                             'sym': sym,
-                            'opened': _fmt_date(op_dt) if op_dt else '',
-                            'closed': _fmt_date(cl_dt) if cl_dt else '',
+                            'side': (
+                                'SHORT' if getattr(t, 'is_short', False)
+                                else 'LONG'
+                            ),
+                            'opened': _fmt_datetime(op_dt) if op_dt else '',
+                            'closed': _fmt_datetime(cl_dt) if cl_dt else '',
                             'open_price': round(
                                 getattr(t, 'open_price', 0) or 0, 2
                             ),
@@ -752,6 +921,10 @@ backtest_utils import (
                         'total_cost': round(
                             getattr(last, 'total_cost', 0) or 0, 2
                         ),
+                        'long_exposure': round(last.long_exposure, 2),
+                        'short_exposure': round(last.short_exposure, 2),
+                        'net_exposure': round(last.net_exposure, 2),
+                        'gross_exposure': round(last.gross_exposure, 2),
                     }
 
                 # Orders
@@ -805,9 +978,9 @@ backtest_utils import (
                                 float(o_slippage), 4
                             ),
                             'reason': o_reason,
-                            'created': _fmt_date(o_dt)
+                            'created': _fmt_datetime(o_dt)
                             if o_dt else '',
-                            'updated': _fmt_date(u_dt)
+                            'updated': _fmt_datetime(u_dt)
                             if u_dt else '',
                         })
 
@@ -820,10 +993,42 @@ backtest_utils import (
                             'amount': round(
                                 getattr(p, 'amount', 0) or 0, 6
                             ),
+                            'gross_amount': round(
+                                getattr(p, 'gross_amount', 0) or 0, 6
+                            ),
+                            'long_amount': round(
+                                getattr(p, 'long_amount', 0) or 0, 6
+                            ),
+                            'short_amount': round(
+                                getattr(p, 'short_amount', 0) or 0, 6
+                            ),
                             'cost': round(
                                 getattr(p, 'cost', 0) or 0, 2
                             ),
+                            'net_cost': round(
+                                getattr(p, 'net_cost', 0) or 0, 2
+                            ),
+                            'gross_cost': round(
+                                getattr(p, 'gross_cost', 0) or 0, 2
+                            ),
+                            'long_cost': round(
+                                getattr(p, 'long_cost', 0) or 0, 2
+                            ),
+                            'short_cost': round(
+                                getattr(p, 'short_cost', 0) or 0, 2
+                            ),
                         })
+
+                signal_rejections = [
+                    {
+                        'date': _fmt_datetime(event['date']),
+                        'sym': event['symbol'],
+                        'signal': event['signal'],
+                        'reason': event['reason'],
+                    }
+                    for event in run.signal_events
+                    if not event['executed']
+                ]
 
                 # Downsample heavy time series for browser perf
                 eq = _downsample(eq)
@@ -845,6 +1050,7 @@ backtest_utils import (
                     'MONTHLY_HEATMAP': heatmap,
                     'TRADES': trades_list,
                     'ORDERS': orders_list,
+                    'SIGNAL_REJECTIONS': signal_rejections,
                     'POSITIONS': positions_list,
                     'SYM_STATS': sym_stats,
                     'metrics': metrics_dict,
@@ -855,8 +1061,9 @@ backtest_utils import (
 
     def _build_windows_meta(self):
         windows = {}
-        for bt in self.backtests:
-            for run in bt.get_all_backtest_runs():
+        for view in self._engine_views():
+            bt = view["backtest"]
+            for run in bt.get_runs(view["engine"], study=view["study"]):
                 name = run.backtest_date_range_name or ''
                 if name not in windows:
                     ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
@@ -877,8 +1084,9 @@ backtest_utils import (
 
     def _build_run_labels(self):
         labels, seen = [], set()
-        for bt in self.backtests:
-            for run in bt.get_all_backtest_runs():
+        for view in self._engine_views():
+            bt = view["backtest"]
+            for run in bt.get_runs(view["engine"], study=view["study"]):
                 name = run.backtest_date_range_name or ''
                 if name not in seen:
                     ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
@@ -953,8 +1161,9 @@ backtest_utils import (
 
         # Collect all window date ranges
         windows = {}
-        for bt in self.backtests:
-            for run in bt.get_all_backtest_runs():
+        for view in self._engine_views():
+            bt = view["backtest"]
+            for run in bt.get_runs(view["engine"], study=view["study"]):
                 name = run.backtest_date_range_name or ''
                 if name not in windows:
                     windows[name] = {

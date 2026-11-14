@@ -14,14 +14,13 @@ class RoundingService:
             return value
 
         with decimal.localcontext() as ctx:
-            d = decimal.Decimal(value)
+            d = decimal.Decimal(str(value))
             ctx.rounding = decimal.ROUND_DOWN
             return float(round(d, amount_of_decimals))
 
     @staticmethod
     def count_decimals(number):
-        decimal_str = str(number)
-        if '.' in decimal_str:
-            return len(decimal_str.split('.')[1])
-        else:
+        value = decimal.Decimal(str(number))
+        if not value.is_finite():
             return 0
+        return max(0, -value.as_tuple().exponent)

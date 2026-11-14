@@ -90,9 +90,13 @@ def validate_and_create_checkpoints(
                 invalid_dirs += 1
                 continue
 
-            # Process each backtest run to extract date ranges
-            if backtest.backtest_runs:
-                for run in backtest.get_all_backtest_runs():
+            # Process each backtest run to extract date ranges. In
+            # v9.0 a Backtest has independent vector and event run
+            # lists; ``get_all_backtest_runs()`` returns them
+            # concatenated (vector first).
+            all_runs = backtest.get_all_backtest_runs()
+            if all_runs:
+                for run in all_runs:
                     # Create date range key in the format used by the framework
                     start_date = run.backtest_start_date.isoformat()
                     end_date = run.backtest_end_date.isoformat()

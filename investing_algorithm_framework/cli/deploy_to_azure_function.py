@@ -6,10 +6,16 @@ import string
 import asyncio
 import time
 
-from azure.identity import DefaultAzureCredential
-from azure.mgmt.resource import ResourceManagementClient
-from azure.mgmt.storage import StorageManagementClient
-from azure.mgmt.web import WebSiteManagementClient
+try:
+    from azure.identity import DefaultAzureCredential
+    from azure.mgmt.resource import ResourceManagementClient
+    from azure.mgmt.storage import StorageManagementClient
+    from azure.mgmt.web import WebSiteManagementClient
+except ImportError:  # pragma: no cover - exercised via command() guard
+    DefaultAzureCredential = None
+    ResourceManagementClient = None
+    StorageManagementClient = None
+    WebSiteManagementClient = None
 
 STORAGE_ACCOUNT_NAME_PREFIX = "iafstorageaccount"
 
@@ -759,6 +765,12 @@ def command(
     Returns:
         None
     """
+    if DefaultAzureCredential is None:
+        raise ImportError(
+            "The azure SDK is required to deploy to Azure Functions. "
+            "Install it with `pip install investing-algorithm-framework"
+            "[azure]`."
+        )
 
     print("logging in to Azure...")
     # Ensure the user is logged in

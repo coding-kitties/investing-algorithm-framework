@@ -2,12 +2,12 @@ from .database import setup_sqlalchemy, Session, \
     create_all_tables, clear_db, teardown_sqlalchemy
 from .models import SQLPortfolio, SQLOrder, SQLPosition, \
     SQLPortfolioSnapshot, SQLPositionSnapshot, SQLTrade, \
-    SQLTradeTakeProfit, SQLTradeStopLoss
+    SQLTradeTakeProfit, SQLTradeStopLoss, SQLRunReport
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioRepository, SQLTradeRepository, \
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository, \
     SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
-    SQLTradeAllocationRepository
+    SQLTradeAllocationRepository, SQLRunReportRepository
 from .services import AzureBlobStorageStateHandler, AWSS3StorageStateHandler, \
     BacktestService
 from .data_providers import CSVOHLCVDataProvider, \
@@ -18,8 +18,9 @@ from .data_providers import CSVOHLCVDataProvider, \
     OHLCVDataProviderBase, \
     YahooOHLCVDataProvider, AlphaVantageOHLCVDataProvider, \
     PolygonOHLCVDataProvider
-from .order_executors import CCXTOrderExecutor
-from .portfolio_providers import CCXTPortfolioProvider
+from .order_executors import CCXTOrderExecutor, PaperTradingOrderExecutor
+from .portfolio_providers import CCXTPortfolioProvider, \
+    PaperTradingPortfolioProvider
 
 __all__ = [
     "clear_db",
@@ -45,6 +46,10 @@ __all__ = [
     "SQLTradeTakeProfitRepository",
     "SQLTradeStopLossRepository",
     "SQLTradeAllocationRepository",
+    "SQLRunReport",
+    "SQLRunReportRepository",
+    "PaperTradingOrderExecutor",
+    "PaperTradingPortfolioProvider",
     "CSVOHLCVDataProvider",
     "CSVTickerDataProvider",
     "CCXTOrderExecutor",

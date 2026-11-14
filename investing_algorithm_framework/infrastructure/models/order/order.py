@@ -7,6 +7,8 @@ from sqlalchemy.orm import relationship, reconstructor
 
 from investing_algorithm_framework.domain import OrderType, \
     OrderSide, Order, OrderStatus
+from investing_algorithm_framework.domain.models.decision_trace import \
+    normalize_trace_metadata
 from investing_algorithm_framework.infrastructure.database import (
     SQLBaseModel, SqliteDecimal
 )
@@ -56,6 +58,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     triggered_at = Column(DateTime(timezone=True), default=None)
     sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
     metadata_json = Column(Text, default=None)
+    strategy_id = Column(String, default=None)
     trade_allocations = relationship(
         'SQLTradeAllocation', back_populates='order'
     )
@@ -70,7 +73,9 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     def init_on_load(self):
         """Deserialize metadata from JSON when loaded from DB."""
         if self.metadata_json:
-            self.metadata = json.loads(self.metadata_json)
+            self.metadata = normalize_trace_metadata(
+                json.loads(self.metadata_json)
+            )
         else:
             self.metadata = {}
 
@@ -78,7 +83,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
 
         if "metadata" in data:
             metadata_val = data.pop("metadata")
-            self.metadata = metadata_val if metadata_val else {}
+            self.metadata = normalize_trace_metadata(metadata_val or {})
             self.metadata_json = json.dumps(self.metadata) \
                 if self.metadata else None
 
@@ -105,6 +110,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             metadata=order.metadata,
             stop_price=order.get_stop_price(),
             triggered_at=order.get_triggered_at(),
+            strategy_id=getattr(order, "strategy_id", None),
         )
         return sql_order
 

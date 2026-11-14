@@ -11,7 +11,7 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     APP_MODE, DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
     APPLICATION_DIRECTORY, SNAPSHOT_INTERVAL, AWS_S3_STATE_BUCKET_NAME, \
     LAST_SNAPSHOT_DATETIME, DATA_DIRECTORY, INDEX_DATETIME, \
-    DATETIME_FORMAT_FILE_NAME, DEFAULT_DATETIME_FORMAT
+    DATETIME_FORMAT_FILE_NAME, DEFAULT_DATETIME_FORMAT, TIMEZONE
 from .data_provider import DataProvider
 from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
@@ -19,13 +19,48 @@ from .exceptions import OperationalException, ApiException, DataError, \
     PermissionDeniedApiException, ImproperlyConfigured, NetworkError, \
     PortfolioOutOfSyncError
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
-    TimeUnit, TimeFrame, PortfolioConfiguration, Portfolio, Position, \
+    TimeUnit, TimeFrame, PortfolioConfiguration, PositionMode, \
+    PaperTradingMode, Portfolio, Position, \
     Order, TradeStatus, StrategyProfile, Trade, MarketCredential, \
     AppMode, DataType, DataSource, PortfolioSnapshot, PositionSnapshot, \
     TradeTakeProfit, TradeStopLoss, Event, SnapshotInterval, \
     TakeProfitRule, StopLossRule, PositionSize, ScalingRule, TradingCost, \
-    CooldownRule, CooldownTrigger, CooldownBlocks, CooldownTracker, \
-    SyncResult, ScheduledDeposit
+    ExposureRule, CooldownRule, CooldownTrigger, CooldownBlocks, \
+    CooldownTracker, \
+    SyncResult, ScheduledDeposit, DateRule, TimeRule, Schedule, \
+    ScheduledFunction, Signal, SignalSide, SignalSeries, \
+    signals_from_column, signal_series_from_column, \
+    signals_from_panel, ConflictPolicy, ConflictResolution, RunReport, \
+    DecisionTrace, DecisionTraceEntry, DECISION_TRACE_METADATA_KEY, \
+    DECISION_TRACE_VERSION, ScoreCard, ScoreCardEntry, \
+    SCORE_CARD_METADATA_KEY, SCORE_CARD_VERSION
+from .models import (
+    AllOf,
+    AnyOf,
+    AtLeast,
+    Condition,
+    ConditionExpression,
+    condition,
+    ConfluenceCard,
+    ConfluenceResult,
+    EvaluationContext,
+    Expression,
+    Not,
+    Operator,
+    PrimaryGroup,
+    EvidenceGroup,
+    GroupEvaluation,
+    Requirement,
+    RuleEvaluation,
+    ScoreRule,
+    ConfluenceScoreCard,
+    ConfluenceScoreRule,
+    Rule,
+    Threshold,
+    ScoreType,
+    Veto,
+    CONFLUENCE_CARD_VERSION,
+)
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
@@ -42,20 +77,40 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     add_column_headers_to_csv, get_total_amount_of_rows, \
     convert_polars_to_pandas, random_number, is_jupyter_notebook, \
     csv_to_list, StoppableThread, load_csv_into_dict, tqdm, \
-    is_timezone_aware, sync_timezones, get_timezone
-from .backtesting import BacktestRun, BacktestSummaryMetrics, \
+    is_timezone_aware, sync_timezones, get_timezone, format_datetime_utc
+from .backtesting import BacktestRun, BacktestHistory, \
+    BacktestSummaryMetrics, \
     BacktestDateRange, Backtest, BacktestMetrics, combine_backtests, \
-    BacktestPermutationTest, BacktestEvaluationFocus, \
-    BacktestIndexRow, \
+    combine_multi_universe_backtest, BacktestEngine, \
+    BacktestMonteCarloTest, BacktestEvaluationFocus, \
+    BacktestIndexRow, Universe, BacktestWindow, \
     generate_backtest_summary_metrics, load_backtests_from_directory, \
+    load_backtests, \
     save_backtests_to_directory, retag_backtests, migrate_backtests, \
-    resolve_backtest_path, BUNDLE_EXT, BUNDLE_FORMAT_VERSION, BacktestIndex
+    resolve_backtest_path, get_backtest, get_backtests, \
+    BUNDLE_EXT, BUNDLE_FORMAT_VERSION, \
+    BacktestIndex, build_strategy_universe_map, stamp_backtest, \
+    stamp_backtests, Study, EngineSlot, ExecutionConfig, StudySampleType, \
+    WindowPart, BacktestRunConfiguration
 from .pipeline import Pipeline, AverageDollarVolume, AverageTradedValue, \
     CrossSectionalMean, Neutralize, Returns, RollingBeta, RSI, SMA, \
     StaticPerSymbol, Volatility, Factor, CustomFactor, Filter
 from .algorithm_id import generate_algorithm_id
+from .optimization import (
+    CandidateProposal, EvaluationEvidence, FloatParameter, IntegerParameter,
+    OptimizationConfiguration, OptimizationSearchSpace,
+    StrategyOptimizer, TrialObservation,
+)
 
 __all__ = [
+    "CandidateProposal",
+    "EvaluationEvidence",
+    "FloatParameter",
+    "IntegerParameter",
+    "OptimizationConfiguration",
+    "OptimizationSearchSpace",
+    "StrategyOptimizer",
+    "TrialObservation",
     "OrderStatus",
     "OrderSide",
     "OrderType",
@@ -81,6 +136,42 @@ __all__ = [
     "DATABASE_DIRECTORY_PATH",
     "DATABASE_NAME",
     "PortfolioConfiguration",
+    "PositionMode",
+    "PaperTradingMode",
+    "RunReport",
+    "ScoreCard",
+    "ScoreCardEntry",
+    "SCORE_CARD_METADATA_KEY",
+    "SCORE_CARD_VERSION",
+    "DecisionTrace",
+    "DecisionTraceEntry",
+    "DECISION_TRACE_METADATA_KEY",
+    "DECISION_TRACE_VERSION",
+    "AllOf",
+    "AnyOf",
+    "AtLeast",
+    "Condition",
+    "ConditionExpression",
+    "condition",
+    "ConfluenceCard",
+    "ConfluenceScoreCard",
+    "ConfluenceScoreRule",
+    "Rule",
+    "Threshold",
+    "ConfluenceResult",
+    "EvaluationContext",
+    "Expression",
+    "Not",
+    "Operator",
+    "PrimaryGroup",
+    "EvidenceGroup",
+    "GroupEvaluation",
+    "Requirement",
+    "RuleEvaluation",
+    "ScoreRule",
+    "ScoreType",
+    "Veto",
+    "CONFLUENCE_CARD_VERSION",
     "RESOURCE_DIRECTORY",
     'ENVIRONMENT',
     'Environment',
@@ -90,15 +181,29 @@ __all__ = [
     "Order",
     "Strategy",
     "DATETIME_FORMAT",
+    "TIMEZONE",
     "StatelessActions",
     "parse_decimal_to_string",
     "parse_string_to_decimal",
     "BacktestRun",
+    "BacktestHistory",
     "DATETIME_FORMAT_BACKTESTING",
     "BACKTESTING_FLAG",
     "PortfolioSnapshot",
     "BACKTESTING_START_DATE",
     "StrategyProfile",
+    "DateRule",
+    "TimeRule",
+    "Schedule",
+    "ScheduledFunction",
+    "Signal",
+    "SignalSide",
+    "SignalSeries",
+    "signals_from_column",
+    "signals_from_panel",
+    "signal_series_from_column",
+    "ConflictPolicy",
+    "ConflictResolution",
     "CCXT_DATETIME_FORMAT",
     "BACKTEST_DATA_DIRECTORY_NAME",
     "Trade",
@@ -118,6 +223,7 @@ __all__ = [
     "AppMode",
     "RoundingService",
     "BacktestDateRange",
+    "BacktestWindow",
     "convert_polars_to_pandas",
     "DEFAULT_LOGGING_CONFIG",
     "DATABASE_DIRECTORY_NAME",
@@ -135,6 +241,7 @@ __all__ = [
     "is_timezone_aware",
     "sync_timezones",
     "get_timezone",
+    "format_datetime_utc",
     "Event",
     "SNAPSHOT_INTERVAL",
     "SnapshotInterval",
@@ -143,9 +250,11 @@ __all__ = [
     "DataType",
     "DataSource",
     "Backtest",
+    "BacktestRunConfiguration",
+    "Universe",
     "BacktestMetrics",
     "BacktestSummaryMetrics",
-    "BacktestPermutationTest",
+    "BacktestMonteCarloTest",
     "LAST_SNAPSHOT_DATETIME",
     "DATA_DIRECTORY",
     "INDEX_DATETIME",
@@ -155,6 +264,7 @@ __all__ = [
     "DEFAULT_DATETIME_FORMAT",
     "BacktestEvaluationFocus",
     'combine_backtests',
+    'combine_multi_universe_backtest',
     'PositionSize',
     'generate_backtest_summary_metrics',
     'DataError',
@@ -162,7 +272,9 @@ __all__ = [
     'StopLossRule',
     'ScalingRule',
     'TradingCost',
+    'ExposureRule',
     "load_backtests_from_directory",
+    "load_backtests",
     "save_backtests_to_directory",
     "retag_backtests",
     "migrate_backtests",
@@ -191,10 +303,20 @@ __all__ = [
     "ScheduledDeposit",
     "PortfolioOutOfSyncError",
     "resolve_backtest_path",
+    "get_backtest",
+    "get_backtests",
     "BUNDLE_EXT",
     "BUNDLE_FORMAT_VERSION",
     "BacktestIndexRow",
     "BacktestIndex",
+    "build_strategy_universe_map",
+    "stamp_backtest",
+    "stamp_backtests",
+    "Study",
+    "EngineSlot",
+    "ExecutionConfig",
+    "StudySampleType",
+    "WindowPart",
     "Pipeline",
     "Factor",
     "CustomFactor",
@@ -213,4 +335,5 @@ __all__ = [
     "CooldownTrigger",
     "CooldownBlocks",
     "CooldownTracker",
+    "BacktestEngine"
 ]

@@ -24,7 +24,7 @@ class TestCreateApp(TestCase):
     def test_create_app(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.assertIsNotNone(app)
-        self.assertIsNone(app._flask_app)
+        self.assertIsNone(app._web_app)
         self.assertIsNotNone(app.container)
         self.assertIsNotNone(app.get_algorithm())
 
@@ -32,7 +32,7 @@ class TestCreateApp(TestCase):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.assertIsNotNone(app)
         self.assertIsNotNone(app.config)
-        self.assertIsNone(app._flask_app)
+        self.assertIsNone(app._web_app)
         self.assertIsNotNone(app.container)
         self.assertIsNotNone(app.get_algorithm())
 
@@ -67,7 +67,7 @@ class TestCreateApp(TestCase):
         app.initialize_storage()
         app.initialize_services()
         self.assertIsNotNone(app)
-        self.assertIsNotNone(app._flask_app)
+        self.assertIsNotNone(app._web_app)
         self.assertIsNotNone(app.container)
         self.assertIsNotNone(app.config)
         self.assertIsNotNone(app.get_algorithm())

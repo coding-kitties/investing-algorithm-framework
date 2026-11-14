@@ -311,22 +311,22 @@ import pandas as pd
 
 def validate_ohlcv_data(data, symbol):
     """Validate downloaded OHLCV data quality"""
-    
+
     if data is None or len(data) == 0:
         raise ValueError(f"No data downloaded for {symbol}")
-    
+
     # Check for required columns
     required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
     missing_cols = [col for col in required_cols if col not in data.columns]
-    
+
     if missing_cols:
         raise ValueError(f"Missing columns: {missing_cols}")
-    
+
     # Check for null values
     null_counts = data[required_cols].isnull().sum()
     if null_counts.sum() > 0:
         print(f"Warning: {symbol} has null values: {null_counts.to_dict()}")
-    
+
     # Validate price relationships (High >= Low, etc.)
     invalid_rows = (
         (data['High'] < data['Low']) |
@@ -335,10 +335,10 @@ def validate_ohlcv_data(data, symbol):
         (data['Low'] > data['Open']) |
         (data['Low'] > data['Close'])
     )
-    
+
     if invalid_rows.any():
         print(f"Warning: {symbol} has {invalid_rows.sum()} invalid OHLC rows")
-    
+
     print(f"✓ {symbol} data validation passed")
     return True
 
@@ -363,7 +363,9 @@ Downloaded data can be used with `PandasOHLCVDataProvider` for backtesting:
 ```python
 from investing_algorithm_framework import (
     create_app, download, TradingStrategy, DataSource,
-    BacktestDateRange, PortfolioConfiguration, TimeUnit
+    BacktestDateRange, PortfolioConfiguration, TimeUnit,
+    Study, Universe, BacktestWindow, SignalSide,
+    signal_series_from_column
 )
 from investing_algorithm_framework.infrastructure import PandasOHLCVDataProvider
 from datetime import datetime, timezone
@@ -390,7 +392,7 @@ data_provider = PandasOHLCVDataProvider(
 class MyStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 4
-    
+
     data_sources = [
         DataSource(
             identifier="btc_data",
@@ -400,16 +402,20 @@ class MyStrategy(TradingStrategy):
             market="BITVAVO"
         )
     ]
-    
-    def generate_buy_signals(self, data):
+
+    def generate_signal_series(self, data):
         df = data["btc_data"]
         ma20 = df["Close"].rolling(20).mean()
-        return {"BTC": df["Close"] > ma20}
-    
-    def generate_sell_signals(self, data):
-        df = data["btc_data"]
-        ma20 = df["Close"].rolling(20).mean()
-        return {"BTC": df["Close"] < ma20}
+        df["_buy_signal"] = df["Close"] > ma20
+        df["_sell_signal"] = df["Close"] < ma20
+        yield signal_series_from_column(
+            df, "_buy_signal", side=SignalSide.OPEN_LONG,
+            symbol="BTC", source="ma20_cross"
+        )
+        yield signal_series_from_column(
+            df, "_sell_signal", side=SignalSide.CLOSE_LONG,
+            symbol="BTC", source="ma20_cross"
+        )
 
 # Setup app with custom data provider
 app = create_app()
@@ -423,14 +429,23 @@ app.add_portfolio_configuration(
 )
 
 # Run backtest
-backtest = app.run_vector_backtest(
-    strategy=MyStrategy(),
-    backtest_date_range=BacktestDateRange(
-        start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        end_date=datetime(2024, 6, 1, tzinfo=timezone.utc)
-    ),
-    initial_amount=10000
+study = Study(
+    universe=Universe(market="BITVAVO", trading_symbol="EUR"),
+    initial_capital=10000,
+    backtest_windows=[
+        BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                end_date=datetime(2024, 6, 1, tzinfo=timezone.utc)
+            )
+        )
+    ],
 )
+backtests = app.run_backtest(
+    strategy=MyStrategy(),
+    study=study,
+)
+backtest = backtests[0]
 ```
 
 ## Best Practices
@@ -485,7 +500,7 @@ import pandas as pd
 
 def get_or_download_data(symbol, market, time_frame, start_date, end_date, storage_path="./data/"):
     """Get data from cache or download if not available"""
-    
+
     # Create expected file path
     file_path = create_data_storage_path(
         symbol=symbol,
@@ -495,12 +510,12 @@ def get_or_download_data(symbol, market, time_frame, start_date, end_date, stora
         end_date=end_date,
         storage_path=storage_path
     )
-    
+
     # Check if file exists
     if os.path.exists(file_path):
         print(f"Loading cached data from {file_path}")
         return pd.read_csv(file_path, index_col=0, parse_dates=True)
-    
+
     # Download and save
     print(f"Downloading data for {symbol}...")
     data = download(
@@ -512,7 +527,7 @@ def get_or_download_data(symbol, market, time_frame, start_date, end_date, stora
         save=True,
         storage_path=storage_path
     )
-    
+
     return data
 ```
 

@@ -1,4 +1,5 @@
 from datetime import timezone, datetime
+from investing_algorithm_framework.domain.native_event import native_risk
 
 from investing_algorithm_framework.domain.datetime_parsing import (
     parse_datetime as _parse_dt,
@@ -68,6 +69,11 @@ class TradeStopLoss(BaseModel):
         sell_amount: float = None,
         high_water_mark: float = None,
         high_water_mark_date: str = None,
+        is_short: bool = False,
+        mirror_on_exchange: bool = False,
+        mirror_order_id: str = None,
+        mirror_triggered: bool = False,
+        mirror_triggered_at: datetime = None,
         created_at: datetime = None,
         updated_at: datetime = None
     ):
@@ -80,17 +86,33 @@ class TradeStopLoss(BaseModel):
         self.high_water_mark = high_water_mark
         self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
+        self.is_short = is_short
+        # Broker-native mirror order safety net (opt-in). See
+        # ``StopLossRule.mirror_on_exchange``. ``mirror_order_id`` is
+        # the exchange order id of the currently-live mirror STOP
+        # order, if any. ``mirror_triggered`` records that the mirror
+        # order (not the client-side check) closed the position.
+        self.mirror_on_exchange = mirror_on_exchange
+        self.mirror_order_id = mirror_order_id
+        self.mirror_triggered = mirror_triggered
+        self.mirror_triggered_at = mirror_triggered_at
         self.created_at = created_at
         self.updated_at = updated_at
 
+        # #434 phase 3 — for short trades the stop loss triggers on
+        # price *rise*, so the trigger price sits ABOVE the
+        # most-favorable (lowest) price seen so far. ``high_water_mark``
+        # is reused as the "extreme favorable price" regardless of
+        # direction: maximum for longs, minimum for shorts.
+        direction = 1 if self.is_short else -1
         if high_water_mark is None:
             self.high_water_mark = open_price
             self.stop_loss_price = self.open_price * \
-                (1 - (self.percentage / 100))
+                (1 + direction * (self.percentage / 100))
             self.high_water_mark_date = created_at
         else:
             self.stop_loss_price = high_water_mark * \
-                (1 - (self.percentage / 100))
+                (1 + direction * (self.percentage / 100))
 
         if sell_amount is not None:
             self.sell_amount = sell_amount
@@ -103,6 +125,7 @@ class TradeStopLoss(BaseModel):
         self.sell_prices = sell_prices
         self.sell_dates = sell_dates
 
+    @native_risk(stop=True, check=False)
     def update_with_last_reported_price(self, current_price: float, date):
         """
         Function to update the take profit price based on the last
@@ -123,6 +146,23 @@ class TradeStopLoss(BaseModel):
         if not self.active or self.sold_amount == self.sell_amount:
             return
 
+        if self.is_short:
+            # SHORT: favorable direction is DOWN. Track the lowest
+            # price; trigger price sits ABOVE the low water mark.
+            if not self.trailing:
+                if current_price < self.high_water_mark:
+                    self.high_water_mark = current_price
+                return
+            # trailing short SL
+            if current_price >= self.stop_loss_price:
+                return
+            if current_price < self.high_water_mark:
+                self.high_water_mark = current_price
+                self.high_water_mark_date = date
+                self.stop_loss_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
+            return
+
         if not self.trailing:
             # Check if the current price is less than the high water mark
             if current_price > self.high_water_mark:
@@ -138,6 +178,7 @@ class TradeStopLoss(BaseModel):
                 self.stop_loss_price = self.high_water_mark * \
                     (1 - (self.percentage / 100))
 
+    @native_risk(stop=True, check=True)
     def has_triggered(self, current_price: float) -> bool:
         """
         Function to check if the stop loss has triggered.
@@ -154,6 +195,18 @@ class TradeStopLoss(BaseModel):
             return False
 
         if not self.active or self.sold_amount == self.sell_amount:
+            return False
+
+        if self.is_short:
+            # SHORT: trigger when price rises above the stop level.
+            if not self.trailing:
+                return current_price >= self.stop_loss_price
+            if current_price >= self.stop_loss_price:
+                return True
+            if current_price < self.high_water_mark:
+                self.high_water_mark = current_price
+                self.stop_loss_price = self.high_water_mark * \
+                    (1 + (self.percentage / 100))
             return False
 
         if not self.trailing:
@@ -261,13 +314,22 @@ class TradeStopLoss(BaseModel):
             "open_price": self.open_price,
             "sell_percentage": self.sell_percentage,
             "high_water_mark": self.high_water_mark,
-            "high_water_mark_date": self.high_water_mark_date,
+            "high_water_mark_date": ensure_iso(self.high_water_mark_date),
             "triggered": self.triggered,
             "triggered_at": ensure_iso(getattr(self, "triggered_at", None)),
             "stop_loss_price": self.stop_loss_price,
             "sell_amount": self.sell_amount,
             "sold_amount": self.sold_amount,
             "active": self.active,
+            "is_short": getattr(self, "is_short", False),
+            "mirror_on_exchange": getattr(
+                self, "mirror_on_exchange", False
+            ),
+            "mirror_order_id": getattr(self, "mirror_order_id", None),
+            "mirror_triggered": getattr(self, "mirror_triggered", False),
+            "mirror_triggered_at": ensure_iso(
+                getattr(self, "mirror_triggered_at", None)
+            ),
             "sell_prices": self.sell_prices,
             "created_at": ensure_iso(self.created_at),
             "updated_at": ensure_iso(self.updated_at)
@@ -283,6 +345,8 @@ class TradeStopLoss(BaseModel):
             if data.get("triggered_at") is not None else None
         high_water_mark_date = _parse_dt(data.get("high_water_mark_date")) \
             if data.get("high_water_mark_date") is not None else None
+        mirror_triggered_at = _parse_dt(data["mirror_triggered_at"]) \
+            if data.get("mirror_triggered_at") is not None else None
 
         # Make sure all the dates are timezone utc aware
         if created_at and created_at.tzinfo is None:
@@ -295,8 +359,12 @@ class TradeStopLoss(BaseModel):
             high_water_mark_date = high_water_mark_date.replace(
                 tzinfo=timezone.utc
             )
+        if mirror_triggered_at and mirror_triggered_at.tzinfo is None:
+            mirror_triggered_at = mirror_triggered_at.replace(
+                tzinfo=timezone.utc
+            )
 
-        return TradeStopLoss(
+        stop_loss = TradeStopLoss(
             trade_id=data.get("trade_id"),
             trailing=data.get("trailing"),
             percentage=data.get("percentage"),
@@ -312,9 +380,19 @@ class TradeStopLoss(BaseModel):
             high_water_mark_date=high_water_mark_date,
             triggered=data.get("triggered", False),
             triggered_at=triggered_at,
+            is_short=data.get("is_short", False),
+            mirror_on_exchange=data.get("mirror_on_exchange", False),
+            mirror_order_id=data.get("mirror_order_id"),
+            mirror_triggered=data.get("mirror_triggered", False),
+            mirror_triggered_at=mirror_triggered_at,
             created_at=created_at,
             updated_at=updated_at
         )
+        # Restore recorded execution state, not a newly calculated trigger.
+        if data.get("stop_loss_price") is not None:
+            stop_loss.stop_loss_price = data["stop_loss_price"]
+        stop_loss.sold_amount = data.get("sold_amount", 0)
+        return stop_loss
 
     def __repr__(self):
         return self.repr(

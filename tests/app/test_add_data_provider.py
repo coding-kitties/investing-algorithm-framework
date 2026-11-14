@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import Union, List
 
 from investing_algorithm_framework import DataProvider, DataSource, DataType, \
-    PortfolioConfiguration, MarketCredential, TradingStrategy
+    PortfolioConfiguration, MarketCredential, TradingStrategy, Schedule, \
+    TimeUnit
 from tests.resources import TestBase
 
 
@@ -60,8 +61,7 @@ class DataProviderTest(DataProvider):
 
 
 class TestCustomDataProviderStrategy(TradingStrategy):
-    time_unit = "SECOND"
-    interval = 10
+    schedule = Schedule.every(10, TimeUnit.SECOND)
     data_sources = [DataSource(data_type=DataType.CUSTOM, identifier="custom_data")]
 
     def run_strategy(self, context, data):

@@ -9,7 +9,7 @@ Python framework path.
 
 | Side | What it does | What it represents |
 |------|--------------|--------------------|
-| **`python_bench.py`** | Runs `app.run_vector_backtests(...)` with a real `TradingStrategy`, real `CSVOHLCVDataProvider` data sources, real bundle write, real metric aggregation. | The end-user code path today. |
+| **`python_bench.py`** | Runs `app.run_backtests(..., study=Study(engines=[BacktestEngine.VECTOR]))` with a real `TradingStrategy`, real `CSVOHLCVDataProvider` data sources, real bundle write, real metric aggregation. | The end-user code path today. |
 | **`rust_bench/`** | A standalone Cargo binary that loads the same parquet OHLCV, computes the same EMA + RSI signals, runs the same long-only execution loop with fees + slippage, **persists every order and per-bar portfolio snapshot to a per-backtest SQLite database** (mirroring the framework's native behavior), and prints throughput. **No PyO3, no framework abstractions.** | The **best-case ceiling** for what a future `iaf-core` Rust kernel could achieve. |
 
 Both sides:
@@ -124,7 +124,7 @@ These are intentional and acceptable for a baseline benchmark:
   The *distribution* of params is matched, the exact ordering is not.
   This does not affect throughput numbers.
 - **Metrics:** both sides compute the standard metric pack (total return,\n  CAGR, annual volatility, Sharpe, Sortino, max drawdown + duration,\n  Calmar) over the equity curve. The Python side runs the **full**\n  framework `BacktestMetrics` + `BacktestSummaryMetrics` pipeline\n  (which has a longer tail of metrics: rolling Sharpe, exposure ratio,\n  trades per day, win/loss ratio, ...). Issue #523 will port the\n  metric kernel; the Rust pack here is the subset that drives 95% of\n  user decisions and is enough to make the timing comparison honest.
-- **Bundle I/O:** the Python side writes `.iafbt` bundles for every
+- **Bundle I/O:** the Python side writes `.obtf` bundles for every
   backtest (issue #524 will port the writer). The Rust side does not
   write bundles. This is a deliberate inclusion of framework overhead
   on the Python side — it's part of what users actually pay today.

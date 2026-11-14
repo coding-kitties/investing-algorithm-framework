@@ -5,7 +5,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed, \
 from logging import getLogger
 from pathlib import Path
 from random import Random
-from typing import List, Union, Callable, Optional
+from typing import Any, Dict, Iterator, List, Union, Callable, Optional
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
@@ -39,7 +39,7 @@ def resolve_backtest_path(
 ) -> Optional[str]:
     """Return the on-disk path for a stored backtest, or ``None``.
 
-    Prefers ``<storage>/<algorithm_id>.iafbt`` (issue #487 bundle
+    Prefers ``<storage>/<algorithm_id>.obtf`` (issue #487 bundle
     format) and falls back to the legacy directory at
     ``<storage>/<algorithm_id>``.
     """
@@ -52,6 +52,59 @@ def resolve_backtest_path(
     if os.path.isdir(legacy):
         return legacy
     return None
+
+
+def get_backtest(
+    storage_directory: Union[str, Path], algorithm_id: str,
+) -> Optional[Backtest]:
+    """Load a single previously-saved :class:`Backtest` by its
+    ``algorithm_id`` from *storage_directory*.
+
+    Companion to :func:`resolve_backtest_path`: resolves the on-disk
+    path (``.obtf`` bundle or legacy directory) and opens it. Returns
+    ``None`` (rather than raising) when no backtest exists for
+    ``algorithm_id`` in *storage_directory*, matching the
+    ``get_``-prefixed lookup convention used elsewhere (e.g.
+    ``Backtest.get_study``).
+    """
+    path = resolve_backtest_path(storage_directory, algorithm_id)
+    if path is None:
+        return None
+    return Backtest.open(path)
+
+
+def get_backtests(
+    storage_directory: Union[str, Path], algorithm_ids: List[str],
+) -> List[Backtest]:
+    """Load multiple previously-saved backtests by ``algorithm_id``
+    from *storage_directory*, e.g. the top-N winners of a prior
+    parameter sweep.
+
+    Args:
+        storage_directory: Directory the backtests were saved to
+            (the same ``backtest_storage_directory`` passed to
+            ``App.run_backtest``).
+        algorithm_ids: ``algorithm_id``s to load.
+
+    Returns:
+        List[Backtest]: One entry per ``algorithm_id`` that resolved
+            to an on-disk backtest, in the same order as
+            ``algorithm_ids``. Ids with no matching backtest are
+            skipped (with a warning) rather than raising, since a
+            partial storage directory shouldn't abort the whole
+            batch load.
+    """
+    backtests: List[Backtest] = []
+    for algorithm_id in algorithm_ids:
+        bt = get_backtest(storage_directory, algorithm_id)
+        if bt is None:
+            logger.warning(
+                "No backtest found for algorithm_id %r in %s; skipping.",
+                algorithm_id, storage_directory,
+            )
+            continue
+        backtests.append(bt)
+    return backtests
 
 
 # --- worker entry points (must be top-level so they pickle) -------------
@@ -117,7 +170,7 @@ def save_backtests_to_directory(
         show_progress (bool, optional): Whether to display a progress bar
             while saving backtests. Defaults to False.
         format: Persistence layout. ``"bundle"`` (default, issue #487)
-            writes one ``.iafbt`` file per backtest. ``"directory"``
+            writes one ``.obtf`` file per backtest. ``"directory"``
             keeps the legacy human-readable per-file JSON layout.
         workers: Process pool size for parallel saves. Only used in
             ``bundle`` mode. Defaults to ``min(8, os.cpu_count())``.
@@ -334,62 +387,77 @@ def _retag_single(
     return True
 
 
-def load_backtests_from_directory(
-    directory_path: Union[str, Path],
-    filter_function: Callable[[Backtest], bool] = None,
-    number_of_backtests_to_load: int = None,
+def _discover_backtest_sources(
+    directory_path: Union[str, Path], recursive: bool = False
+) -> List[tuple]:
+    """Find ``.obtf`` bundle files and legacy backtest directories
+    under *directory_path*, returned as ``(path, kind)`` tuples.
+
+    When *recursive* is False, only entries directly inside
+    *directory_path* are considered (historical behaviour of
+    :func:`load_backtests_from_directory`). When True, the tree is
+    walked in a single ``os.walk`` pass, pruning recursion as soon as
+    a legacy backtest directory is matched — its internals (e.g. an
+    ``ohlcv/`` cache folder) are never additional backtests — so
+    large nested layouts (e.g. one subfolder per study/window) are
+    discovered without repeated ``os.listdir`` calls per subfolder.
+    """
+    sources: List[tuple] = []
+
+    if not recursive:
+        for entry in sorted(os.listdir(directory_path)):
+            if entry == "checkpoints.json" or entry.endswith(".py"):
+                continue
+            if entry == "index.parquet" or entry == "ohlcv":
+                continue
+            full = os.path.join(directory_path, entry)
+            if os.path.isfile(full):
+                if entry.endswith(BUNDLE_EXT) or is_bundle_file(full):
+                    sources.append((full, "bundle"))
+            elif os.path.isdir(full):
+                sources.append((full, "directory"))
+        return sources
+
+    for root, dirs, files in os.walk(directory_path):
+        dirs.sort()
+        if "ohlcv" in dirs:
+            dirs.remove("ohlcv")
+        for fname in sorted(files):
+            if fname == "checkpoints.json" or fname.endswith(".py"):
+                continue
+            if fname == "index.parquet":
+                continue
+            full = os.path.join(root, fname)
+            if fname.endswith(BUNDLE_EXT) or is_bundle_file(full):
+                sources.append((full, "bundle"))
+        # A legacy backtest directory is identified by algorithm_id.json
+        # plus at least one runs slot (v9.0: vector_runs/event_runs;
+        # legacy v8: a single runs/ dir).
+        for dname in list(dirs):
+            d = os.path.join(root, dname)
+            has_id = os.path.isfile(os.path.join(d, "algorithm_id.json"))
+            has_runs = (
+                os.path.isdir(os.path.join(d, "runs"))
+                or os.path.isdir(os.path.join(d, "vector_runs"))
+                or os.path.isdir(os.path.join(d, "event_runs"))
+            )
+            if has_id and has_runs:
+                sources.append((d, "directory"))
+                dirs.remove(dname)  # don't descend into a matched backtest
+
+    return sources
+
+
+def _load_backtests_from_sources(
+    sources: List[tuple],
     show_progress: bool = False,
     workers: Optional[int] = None,
 ) -> List[Backtest]:
-    """
-    Loads Backtest objects from the specified directory.
-
-    Auto-detects each entry: ``.iafbt`` bundle files (issue #487) and
-    legacy backtest directories are both supported and may coexist in
-    the same parent directory.
-
-    Args:
-        directory_path (str): Path to the directory from which backtests
-            will be loaded.
-        filter_function (Callable[[Backtest], bool], optional): A function
-            that takes a Backtest object as input and returns True if the
-            backtest should be included in the result. Defaults to None.
-        number_of_backtests_to_load (int, optional): Maximum number of
-            backtests to load. If None, all backtests will be loaded.
-        show_progress (bool, optional): Whether to display a progress bar
-            while loading backtests. Defaults to False.
-        workers: Process pool size for parallel loads. Defaults to
-            ``min(8, os.cpu_count())``. Pass ``1`` to disable.
-
-    Returns:
-        List[Backtest]: List of loaded Backtest objects.
+    """Load every ``(path, kind)`` source, in parallel via a process
+    pool when there is more than one and *workers* != 1. Shared by
+    :func:`load_backtests_from_directory` and :func:`load_backtests`.
     """
     backtests: List[Backtest] = []
-
-    if not os.path.exists(directory_path):
-        logger.warning(
-            f"Directory {directory_path} does not exist. "
-            "No backtests loaded."
-        )
-        return backtests
-
-    # Build the load list: a list of (path, kind) tuples.
-    sources: List[tuple] = []
-    for entry in sorted(os.listdir(directory_path)):
-        if entry == "checkpoints.json" or entry.endswith(".py"):
-            continue
-        if entry == "index.parquet" or entry == "ohlcv":
-            continue
-        full = os.path.join(directory_path, entry)
-        if os.path.isfile(full):
-            if entry.endswith(BUNDLE_EXT) or is_bundle_file(full):
-                sources.append((full, "bundle"))
-        elif os.path.isdir(full):
-            sources.append((full, "directory"))
-
-    if number_of_backtests_to_load is not None:
-        sources = sources[: max(0, int(number_of_backtests_to_load))]
-
     n_workers = _resolve_workers(workers)
 
     pbar = None
@@ -455,6 +523,62 @@ def load_backtests_from_directory(
     if pbar is not None:
         pbar.close()
 
+    return backtests
+
+
+def load_backtests_from_directory(
+    directory_path: Union[str, Path],
+    filter_function: Callable[[Backtest], bool] = None,
+    number_of_backtests_to_load: int = None,
+    show_progress: bool = False,
+    workers: Optional[int] = None,
+    recursive: bool = False,
+) -> List[Backtest]:
+    """
+    Loads Backtest objects from the specified directory.
+
+    Auto-detects each entry: ``.obtf`` bundle files (issue #487) and
+    legacy backtest directories are both supported and may coexist in
+    the same parent directory.
+
+    Args:
+        directory_path (str): Path to the directory from which backtests
+            will be loaded.
+        filter_function (Callable[[Backtest], bool], optional): A function
+            that takes a Backtest object as input and returns True if the
+            backtest should be included in the result. Defaults to None.
+        number_of_backtests_to_load (int, optional): Maximum number of
+            backtests to load. If None, all backtests will be loaded.
+        show_progress (bool, optional): Whether to display a progress bar
+            while loading backtests. Defaults to False.
+        workers: Process pool size for parallel loads. Defaults to
+            ``min(8, os.cpu_count())``. Pass ``1`` to disable.
+        recursive (bool, optional): When True, also search
+            subdirectories (single ``os.walk`` pass, pruned as soon as
+            a backtest is matched) instead of only the top level of
+            *directory_path*. Defaults to False. See also
+            :func:`load_backtests`, a convenience wrapper with
+            ``recursive=True``.
+
+    Returns:
+        List[Backtest]: List of loaded Backtest objects.
+    """
+    if not os.path.exists(directory_path):
+        logger.warning(
+            f"Directory {directory_path} does not exist. "
+            "No backtests loaded."
+        )
+        return []
+
+    sources = _discover_backtest_sources(directory_path, recursive=recursive)
+
+    if number_of_backtests_to_load is not None:
+        sources = sources[: max(0, int(number_of_backtests_to_load))]
+
+    backtests = _load_backtests_from_sources(
+        sources, show_progress=show_progress, workers=workers
+    )
+
     if filter_function is not None:
         try:
             backtests = [bt for bt in backtests if filter_function(bt)]
@@ -462,6 +586,47 @@ def load_backtests_from_directory(
             logger.error(f"Error in filter_function: {fe}")
 
     return backtests
+
+
+def load_backtests(
+    directory_path: Union[str, Path],
+    filter_function: Callable[[Backtest], bool] = None,
+    number_of_backtests_to_load: int = None,
+    show_progress: bool = False,
+    workers: Optional[int] = None,
+) -> List[Backtest]:
+    """Recursively load every backtest found anywhere under
+    *directory_path*.
+
+    Convenience wrapper around
+    :func:`load_backtests_from_directory(..., recursive=True)
+    <load_backtests_from_directory>` — useful for storage layouts that
+    group ``.obtf`` bundles and/or legacy backtest directories into
+    nested subfolders (e.g. one per study or per backtest window).
+
+    Args:
+        directory_path: Root directory to scan recursively.
+        filter_function (Callable[[Backtest], bool], optional): A function
+            that takes a Backtest object as input and returns True if the
+            backtest should be included in the result. Defaults to None.
+        number_of_backtests_to_load (int, optional): Maximum number of
+            backtests to load (applied after discovery, before loading).
+        show_progress (bool, optional): Whether to display a progress bar
+            while loading backtests. Defaults to False.
+        workers: Process pool size for parallel loads. Defaults to
+            ``min(8, os.cpu_count())``. Pass ``1`` to disable.
+
+    Returns:
+        List[Backtest]: List of loaded Backtest objects.
+    """
+    return load_backtests_from_directory(
+        directory_path,
+        filter_function=filter_function,
+        number_of_backtests_to_load=number_of_backtests_to_load,
+        show_progress=show_progress,
+        workers=workers,
+        recursive=True,
+    )
 
 
 def iter_backtests_from_directory(
@@ -500,18 +665,9 @@ def iter_backtests_from_directory(
         )
         return
 
-    sources: List[tuple] = []
-    for entry in sorted(os.listdir(directory_path)):
-        if entry == "checkpoints.json" or entry.endswith(".py"):
-            continue
-        if entry == "index.parquet" or entry == "ohlcv":
-            continue
-        full = os.path.join(directory_path, entry)
-        if os.path.isfile(full):
-            if entry.endswith(BUNDLE_EXT) or is_bundle_file(full):
-                sources.append((full, "bundle"))
-        elif os.path.isdir(full):
-            sources.append((full, "directory"))
+    sources: List[tuple] = _discover_backtest_sources(
+        directory_path, recursive=False
+    )
 
     if number_of_backtests_to_load is not None:
         sources = sources[: max(0, int(number_of_backtests_to_load))]
@@ -550,19 +706,27 @@ def iter_backtests_from_directory(
 # ---------------------------------------------------------------------------
 
 
-def _backtest_to_index_row(bt: Backtest, bundle_path: Optional[str] = None):
-    """Flatten a backtest's summary + identity into a single row.
+def _backtest_to_index_rows(
+    bt: Backtest, bundle_path: Optional[str] = None,
+):
+    """Flatten a backtest's per-engine summary + identity into rows.
 
-    Thin wrapper around :meth:`Backtest.index_row` for callers that
-    want the legacy flat dict shape (Parquet / SQL columns). The
-    typed :class:`BacktestIndexRow` is the authoritative contract \u2014
-    see ``docs/design/tiered-backtest-storage.md`` \u00a73.1.
+    Thin wrapper around :meth:`Backtest.index_rows` for callers that
+    want the legacy flat dict shape (Parquet / SQL columns). Returns
+    one row per populated engine — vector first, then event. The
+    typed :class:`BacktestIndexRow` is the authoritative contract —
+    see ``docs/architecture/backtest/tiered-backtest-storage.md`` §3.1
+    and the v9.0 dual-engine design doc §6.
     """
-    return bt.index_row(bundle_path=bundle_path).to_flat_dict()
+    return [
+        row.to_flat_dict()
+        for row in bt.index_rows(bundle_path=bundle_path)
+    ]
 
 
 def _write_index(directory_path: Union[str, Path], backtests: List[Backtest]):
-    """Write ``<directory_path>/index.parquet`` with one row per backtest.
+    """Write ``<directory_path>/index.parquet`` with one row per
+    (backtest, engine) pair.
 
     Uses pandas + pyarrow. Failures are non-fatal — the caller logs them.
     """
@@ -572,7 +736,7 @@ def _write_index(directory_path: Union[str, Path], backtests: List[Backtest]):
     for bt in backtests:
         base = getattr(bt, "algorithm_id", None) or "backtest"
         rel = f"{base}{BUNDLE_EXT}"
-        rows.append(_backtest_to_index_row(bt, bundle_path=rel))
+        rows.extend(_backtest_to_index_rows(bt, bundle_path=rel))
 
     df = pd.DataFrame(rows)
     target = Path(directory_path) / "index.parquet"
@@ -586,33 +750,221 @@ class BacktestIndex:
     Lets analysis code filter on summary metrics / parameters
     *without opening any bundle*. Bundles for surviving rows can then
     be loaded explicitly via :py:meth:`load_backtests`.
+
+    ``run_reports`` is None by default, or a list of transient event-tick
+    report dictionaries when capture is requested. It includes evaluated
+    algorithms/windows, even if later metric filters prune their results.
+    Calling ``filter`` keeps reports for the surviving algorithm ids.
+    Reopening an index does not automatically restore reports. When
+    persistence was requested, load_run_reports explicitly reads the
+    compressed sidecars referenced by the current rows.
     """
 
-    def __init__(self, directory: Union[str, Path], dataframe):
+    def __init__(
+        self, directory: Union[str, Path], dataframe,
+        run_reports: Optional[List[Dict[str, Any]]] = None,
+    ):
         self.directory = Path(directory)
         self.df = dataframe
+        self.run_reports = run_reports
 
     @classmethod
-    def open(cls, directory: Union[str, Path]) -> "BacktestIndex":
+    def open(
+        cls,
+        directory: Union[str, Path],
+        *,
+        filename: str = "index.parquet",
+    ) -> "BacktestIndex":
+        """Open a global index or a named sweep-session index sidecar."""
         import pandas as pd
 
-        path = Path(directory) / "index.parquet"
+        path = Path(directory) / filename
         if not path.exists():
             raise FileNotFoundError(
-                f"No index.parquet at {directory}; pass write_index=True "
-                "to save_backtests_to_directory to generate one."
+                f"No backtest index at {path}; save an index before "
+                "opening it."
             )
         return cls(directory, pd.read_parquet(path))
 
     def __len__(self) -> int:
         return len(self.df)
 
+    def _distinct_identifiers(self, column: str) -> List[str]:
+        if self.df.empty:
+            return []
+        if column not in self.df.columns:
+            raise OperationalException(
+                f"Backtest index must contain a {column} column."
+            )
+        values = self.df[column].dropna().drop_duplicates().tolist()
+        if any(not isinstance(value, str) for value in values):
+            raise OperationalException(
+                f"Backtest index {column} values must be strings or null."
+            )
+        return sorted(values)
+
+    def get_algorithm_ids(self) -> List[str]:
+        """Return sorted, distinct non-null algorithm ids in this index."""
+        return self._distinct_identifiers("algorithm_id")
+
+    def get_study_names(self) -> List[str]:
+        """Return sorted, distinct non-null study names in this index."""
+        return self._distinct_identifiers("study_name")
+
+    def get_engine_types(self) -> List[str]:
+        """Return sorted, distinct engine types, e.g. event and vector."""
+        return self._distinct_identifiers("engine_type")
+
+    def get_universe_keys(self) -> List[str]:
+        """Return distinct universe keys, excluding null pooled rows."""
+        return self._distinct_identifiers("universe_key")
+
+    def get_number_of_algorithms(self) -> int:
+        """Count distinct algorithm ids, not study/engine/universe rows."""
+        return len(self.get_algorithm_ids())
+
+    def get_number_of_studies(self) -> int:
+        """Count distinct study names across all algorithms."""
+        return len(self.get_study_names())
+
+    def get_number_of_engines(self) -> int:
+        """Count distinct engine types across all algorithms and studies."""
+        return len(self.get_engine_types())
+
+    def get_number_of_universes(self) -> int:
+        """Count distinct recorded universe keys, excluding pooled rows."""
+        return len(self.get_universe_keys())
+
+    def get_summary(self) -> Dict[str, int]:
+        """Describe the current index without loading backtest bundles."""
+        return {
+            "number_of_rows": len(self),
+            "number_of_algorithms": self.get_number_of_algorithms(),
+            "number_of_studies": self.get_number_of_studies(),
+            "number_of_engines": self.get_number_of_engines(),
+            "number_of_universes": self.get_number_of_universes(),
+        }
+
     def filter(self, predicate: Callable) -> "BacktestIndex":
         """Return a new index restricted to rows where *predicate(row)*
         is True.  ``predicate`` receives a pandas Series.
         """
+        if self.df.empty:
+            return BacktestIndex(
+                self.directory, self.df.copy(),
+                run_reports=[] if self.run_reports is not None else None,
+            )
         mask = self.df.apply(predicate, axis=1).astype(bool)
-        return BacktestIndex(self.directory, self.df.loc[mask].copy())
+        dataframe = self.df.loc[mask].copy()
+        reports = None
+        if self.run_reports is not None:
+            algorithm_ids = set(dataframe["algorithm_id"])
+            reports = [
+                report for report in self.run_reports
+                if report["algorithm_id"] in algorithm_ids
+            ]
+        return BacktestIndex(self.directory, dataframe, run_reports=reports)
+
+    def load_run_reports(
+        self, algorithm_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Load persisted reports for the current algorithm/study/engine rows.
+
+        Does not populate run_reports or load backtest bundles. Universe
+        rows share algorithm-wide snapshots; they do not trim report contents.
+        Missing references/files and corrupt sidecars raise explicitly.
+        """
+        from .run_report_storage import (
+            REPORT_SCOPE_COLUMNS, RUN_REPORTS_PATH_COLUMN,
+            iter_run_reports, report_scope,
+        )
+
+        if algorithm_id is not None and (
+            not isinstance(algorithm_id, str) or not algorithm_id
+        ):
+            raise ValueError("algorithm_id must be a non-empty string")
+        frame = self.df
+        if algorithm_id is not None:
+            if algorithm_id not in self.get_algorithm_ids():
+                raise OperationalException(
+                    f"Algorithm {algorithm_id!r} is not present in this index."
+                )
+            frame = frame.loc[frame["algorithm_id"].eq(algorithm_id)]
+        if frame.empty:
+            return []
+        required = (*REPORT_SCOPE_COLUMNS, RUN_REPORTS_PATH_COLUMN)
+        if any(column not in frame for column in required):
+            raise OperationalException(
+                "Index has no complete persisted run report references. "
+                "Rerun with capture_run_reports=True and "
+                "persist_run_reports=True."
+            )
+        scopes_by_path = {}
+        for row in frame[list(required)].itertuples(index=False, name=None):
+            *scope, reference = row
+            if any(not isinstance(value, str) or not value for value in row):
+                raise OperationalException(
+                    "Index contains an invalid run report scope or "
+                    "run_reports_path. Reports must be persisted for "
+                    "every selected row."
+                )
+            scopes_by_path.setdefault(reference, set()).add(tuple(scope))
+        reports = []
+        for reference, scopes in scopes_by_path.items():
+            for report in iter_run_reports(self.directory, reference):
+                if report_scope(report) in scopes:
+                    reports.append(report)
+        return reports
+
+    def get_backtest(self, algorithm_id: str) -> Optional[Backtest]:
+        """Load the bundle indexed for an algorithm, or return None.
+
+        Respects the current rows, including filters. Repeated rows for
+        one bundle load it once; multiple distinct bundles are ambiguous.
+        Invalid index data and bundle loading errors propagate.
+        """
+        if self.df.empty:
+            return None
+        if "algorithm_id" not in self.df.columns:
+            raise OperationalException(
+                "Backtest index must contain an algorithm_id column."
+            )
+        matches = self.df.loc[self.df["algorithm_id"].eq(algorithm_id)]
+        if matches.empty:
+            return None
+        if "bundle_path" not in matches.columns:
+            raise OperationalException(
+                "Backtest index must contain a bundle_path column."
+            )
+        if len(matches["bundle_path"].drop_duplicates()) > 1:
+            raise OperationalException(
+                f"Backtest index contains multiple bundles for "
+                f"algorithm_id {algorithm_id!r}; filter the index first."
+            )
+        return next(BacktestIndex(self.directory, matches).iter_backtests())
+
+    def iter_backtests(self) -> Iterator[Backtest]:
+        """Load one full backtest at a time, without retaining prior ones.
+
+        Multiple study/engine rows referencing the same bundle yield it
+        once. Loading errors propagate; callers decide whether to retry.
+        Collecting this iterator into a list defeats the memory benefit.
+        """
+        if "bundle_path" not in self.df.columns:
+            raise OperationalException(
+                "Backtest index must contain a bundle_path column."
+            )
+        seen = set()
+        for path in self.df["bundle_path"]:
+            if not isinstance(path, str) or not path:
+                raise OperationalException(
+                    "Backtest index contains an invalid bundle_path."
+                )
+            resolved = self.directory / path
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            yield Backtest.open(resolved)
 
     def load_backtests(
         self,
@@ -622,7 +974,8 @@ class BacktestIndex:
         """Load all backtest bundles referenced by the current rows."""
         n_workers = _resolve_workers(workers)
         paths = [
-            str(self.directory / p) for p in self.df["bundle_path"].tolist()
+            str(self.directory / p)
+            for p in self.df["bundle_path"].drop_duplicates().tolist()
             if isinstance(p, str)
         ]
         out: List[Backtest] = []
@@ -680,7 +1033,7 @@ def _migrate_one(args):
         ohlcv_store=ohlcv_store,
     ))
     rel = os.path.basename(out)
-    row = _backtest_to_index_row(bt, bundle_path=rel)
+    rows = _backtest_to_index_rows(bt, bundle_path=rel)
     # Drop the heavy backtest before returning so the worker process's
     # RSS can be reclaimed before it picks up the next task.
     del bt
@@ -693,7 +1046,7 @@ def _migrate_one(args):
                 os.remove(src)
             except OSError:
                 pass
-    return out, row
+    return out, rows
 
 
 def migrate_backtests(
@@ -708,7 +1061,7 @@ def migrate_backtests(
     delete_source: bool = False,
 ) -> int:
     """Rewrite a directory of legacy backtest folders (or existing
-    ``.iafbt`` bundles) as ``.iafbt`` bundles in *dst_dir*.
+    ``.obtf`` bundles) as ``.obtf`` bundles in *dst_dir*.
 
     The migration is streamed: each backtest is loaded and re-saved
     inside a single worker process, so memory usage stays roughly
@@ -716,7 +1069,7 @@ def migrate_backtests(
 
     Args:
         src_dir: Source directory containing legacy backtest folders
-            and/or ``.iafbt`` bundles. Walked recursively.
+            and/or ``.obtf`` bundles. Walked recursively.
         dst_dir: Destination directory. Created if it does not exist.
         workers: Number of parallel workers. ``None`` picks
             ``min(8, cpu_count)``. Pass ``1`` to force serial.
@@ -739,7 +1092,7 @@ def migrate_backtests(
     dst_dir = Path(dst_dir)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
-    # Discover sources: any *.iafbt file or any directory shaped like
+    # Discover sources: any *.obtf file or any directory shaped like
     # a legacy backtest (algorithm_id.json + runs/).
     sources: List[str] = []
     for root, dirs, files in os.walk(src_dir):
@@ -748,10 +1101,19 @@ def migrate_backtests(
                 sources.append(os.path.join(root, fname))
         for dname in list(dirs):
             d = os.path.join(root, dname)
-            if (
-                os.path.isfile(os.path.join(d, "algorithm_id.json"))
-                and os.path.isdir(os.path.join(d, "runs"))
-            ):
+            # A backtest directory is identified by algorithm_id.json
+            # plus at least one runs slot. v9.0 writes per-engine
+            # slots (``vector_runs/`` / ``event_runs/``); legacy v8
+            # layout used a single ``runs/`` directory.
+            has_id = os.path.isfile(
+                os.path.join(d, "algorithm_id.json")
+            )
+            has_runs = (
+                os.path.isdir(os.path.join(d, "runs"))
+                or os.path.isdir(os.path.join(d, "vector_runs"))
+                or os.path.isdir(os.path.join(d, "event_runs"))
+            )
+            if has_id and has_runs:
                 sources.append(d)
                 # Don't descend into a recognised backtest dir.
                 dirs.remove(dname)
@@ -814,9 +1176,9 @@ def migrate_backtests(
                     for fut in done_set:
                         args = inflight.pop(fut)
                         try:
-                            _out, row = fut.result()
+                            _out, new_rows = fut.result()
                             if write_index:
-                                rows.append(row)
+                                rows.extend(new_rows)
                         except Exception as e:
                             logger.error(
                                 f"Failed to migrate {args[0]}: {e}"
@@ -831,9 +1193,9 @@ def migrate_backtests(
         else:
             for args in plan:
                 try:
-                    _out, row = _migrate_one(args)
+                    _out, new_rows = _migrate_one(args)
                     if write_index:
-                        rows.append(row)
+                        rows.extend(new_rows)
                 except Exception as e:
                     logger.error(f"Failed to migrate {args[0]}: {e}")
                 finally:

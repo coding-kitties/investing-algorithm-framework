@@ -89,35 +89,28 @@ class DataSource:
                                TimeFrame.from_string(self.time_frame))
 
         start_date = self.start_date
-        end_date = self.end_date
 
         # Parse the start_date if it is a string and
         # make sure its set to timezone utc
-        if start_date is None:
+        if isinstance(start_date, str):
+            start_date = parser.parse(start_date)
 
-            if isinstance(self.start_date, str):
-                start_date = parser.parse(start_date)
+        if start_date is not None and start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
 
-            if start_date is not None:
-                object.__setattr__(
-                    self,
-                    'start_date',
-                    start_date.replace(tzinfo=timezone.utc)
-                )
+        object.__setattr__(self, 'start_date', start_date)
+
+        end_date = self.end_date
 
         # Parse the end_date if it is a string and
         # make sure its set to timezone utc
-        if end_date is None:
+        if isinstance(end_date, str):
+            end_date = parser.parse(end_date)
 
-            if isinstance(self.end_date, str):
-                end_date = parser.parse(end_date)
+        if end_date is not None and end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
 
-            if end_date is not None:
-                object.__setattr__(
-                    self,
-                    'end_date',
-                    end_date.replace(tzinfo=timezone.utc)
-                )
+        object.__setattr__(self, 'end_date', end_date)
 
         if self.market is not None:
             object.__setattr__(self, 'market', self.market.upper())

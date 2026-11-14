@@ -1,9 +1,44 @@
+import inspect
 import math
 from typing import List
 from statistics import mean
 
 from investing_algorithm_framework.domain import BacktestEvaluationFocus, \
-    BacktestDateRange, Backtest, BacktestMetrics, OperationalException
+    BacktestDateRange, Backtest, BacktestMetrics, OperationalException, \
+    BacktestWindow
+
+
+def _filter_accepts_backtest(filter_fn) -> bool:
+    """Return True if ``filter_fn`` accepts a ``backtest`` argument.
+
+    Supports both the legacy 1-arg signature ``filter_fn(metrics)`` and
+    the v9.0+ 2-arg signature ``filter_fn(metrics, backtest)``. Callables
+    that explicitly declare a ``backtest`` parameter (positional or
+    keyword) receive the owning ``Backtest`` as a second argument.
+    """
+    try:
+        sig = inspect.signature(filter_fn)
+    except (TypeError, ValueError):
+        return False
+
+    params = list(sig.parameters.values())
+
+    # Explicit ``backtest`` keyword wins regardless of position.
+    if any(p.name == "backtest" for p in params):
+        return True
+
+    # Otherwise rely on positional arity: 2+ positional params means
+    # the second slot is intended for the backtest.
+    positional = [
+        p for p in params
+        if p.kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    ]
+    if any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in params):
+        return True
+    return len(positional) >= 2
 
 
 def normalize(value, min_val, max_val):
@@ -87,10 +122,21 @@ def rank_results(
     focus=None,
     weights=None,
     filter_fn=None,
-    backtest_date_range: BacktestDateRange = None
+    backtest_date_range: BacktestDateRange = None,
+    engine: str = "vector",
+    study: str = None,
 ) -> List[Backtest]:
     """
     Rank backtest results based on specified focus, weights, and filters.
+
+    v9.0 dual-engine note:
+        Ranking is always scoped to a single engine. A dual-engine
+        bundle exposes a ``vector`` slot and an ``event`` slot whose
+        summaries are not directly comparable (different execution
+        models, different fee assumptions). To rank both engines, call
+        this function twice — once with ``engine="vector"`` and once
+        with ``engine="event"``. Backtests that have no run in the
+        requested engine slot are silently skipped.
 
     Args:
         backtests (List[Backtest]): List of backtest results to rank.
@@ -101,26 +147,52 @@ def rank_results(
             If None, uses default weights based on focus.
         filter_fn (callable | dict, optional): A filter to apply to
             backtests before ranking.
-            - If callable: receives metrics and should return True/False.
+            - If callable: receives ``(metrics, backtest)`` and should
+              return True/False. Legacy 1-arg callables of the form
+              ``filter_fn(metrics)`` are still supported — the second
+              argument is only passed when the signature declares a
+              ``backtest`` parameter (or has 2+ positional params).
             - If dict: mapping {metric_name: condition_fn},
               all conditions must pass.
         backtest_date_range (BacktestDateRange, optional): If provided,
             only backtests matching this date range are considered.
+        engine (str): Which engine slot to rank by. One of
+            ``"vector"`` (default) or ``"event"``.
+        study (str, optional): Study name to scope metrics to.
+            When omitted, the default-study rule applies (works for
+            single-study bundles; multi-study bundles require an
+            explicit study name).
 
     Returns:
-        List[Backtest]: Sorted list of backtests based on computed scores.
+        List[Backtest]: Sorted list of backtests (descending score).
+            Only backtests with a populated ``engine`` slot appear.
     """
+
+    if engine not in ("vector", "event"):
+        raise OperationalException(
+            f"rank_results: engine must be 'vector' or 'event', "
+            f"got {engine!r}"
+        )
 
     if weights is None:
         weights = create_weights(focus=focus)
 
-    # Pair backtests with their metrics
+    # Pair backtests with their metrics for the requested engine.
+    # Backtests lacking a populated slot for `engine` are skipped.
     paired = []
     for backtest in backtests:
+        if engine not in backtest.engines():
+            continue
+
         if backtest_date_range is not None:
-            metrics = backtest.get_backtest_metrics(backtest_date_range)
+            # Engine-scoped per-run lookup — avoids accidentally
+            # picking up the other engine's run when both slots are
+            # populated for the same window.
+            metrics = backtest.get_backtest_metrics(
+                backtest_date_range, engine=engine, study=study
+            )
         else:
-            metrics = backtest.backtest_summary
+            metrics = backtest.get_summary(engine, study=study)
 
         if metrics is not None:
             paired.append((backtest, metrics))
@@ -128,9 +200,15 @@ def rank_results(
     # Apply filtering on metrics
     if filter_fn is not None:
         if callable(filter_fn):
-            paired = [
-                (bt, m) for bt, m in paired if filter_fn(m)
-            ]
+            pass_backtest = _filter_accepts_backtest(filter_fn)
+            if pass_backtest:
+                paired = [
+                    (bt, m) for bt, m in paired if filter_fn(m, bt)
+                ]
+            else:
+                paired = [
+                    (bt, m) for bt, m in paired if filter_fn(m)
+                ]
         elif isinstance(filter_fn, dict):
             paired = [
                 (bt, m) for bt, m in paired
@@ -193,8 +271,10 @@ def combine_backtest_metrics(
 
     # Aggregate
     return BacktestMetrics(
-        backtest_start_date=start_date,
-        backtest_end_date=end_date,
+        backtest_window=BacktestWindow(train_range=BacktestDateRange(
+            start_date=start_date,
+            end_date=end_date,
+        )),
         equity_curve=[],  # leave empty to avoid misleading curves
         total_growth=safe_mean([m.total_growth for m in backtest_metrics]),
         total_growth_percentage=safe_mean(

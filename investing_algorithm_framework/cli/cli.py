@@ -1,8 +1,5 @@
 import click
 
-from .deploy_to_aws_lambda import command as deploy_to_aws_lambda_command
-from .deploy_to_azure_function import command as \
-    deploy_to_azure_function_command
 from .initialize_app import command as initialize_app_command
 from .validate_backtest_checkpoints import command as \
     validate_backtest_checkpoints_command
@@ -137,6 +134,11 @@ def deploy_azure_function(
     Returns:
         None
     """
+    # Imported lazily: deploy_to_azure_function.py needs the `azure`
+    # extra installed, which most users of the CLI don't need.
+    from .deploy_to_azure_function import command as \
+        deploy_to_azure_function_command
+
     crg = create_resource_group_if_not_exists
     deploy_to_azure_function_command(
         resource_group=resource_group,
@@ -208,6 +210,10 @@ def deploy_aws_lambda(
     Returns:
         None
     """
+    # Imported lazily: deploy_to_aws_lambda.py needs the `aws` extra
+    # installed, which most users of the CLI don't need.
+    from .deploy_to_aws_lambda import command as deploy_to_aws_lambda_command
+
     # Convert env tuples to dictionary
     env_vars = {}
     if env:
@@ -263,7 +269,7 @@ cli.add_command(mcp)
     "--dst", "-d",
     required=True,
     type=click.Path(file_okay=False, dir_okay=True),
-    help="Destination directory for the new ``.iafbt`` bundle files.",
+    help="Destination directory for the new ``.obtf`` bundle files.",
 )
 @click.option(
     "--workers", "-w", type=int, default=None,
@@ -295,7 +301,7 @@ def migrate_backtests_cmd(
     """Convert a directory of legacy backtest folders into the bundled
     binary format introduced in issue #487.
 
-    The new ``.iafbt`` format is a single zstd-compressed MessagePack
+    The new ``.obtf`` format is a single zstd-compressed MessagePack
     file per backtest. Loading bundled directories is dramatically
     faster than the legacy multi-file layout for large batches.
 
@@ -422,7 +428,7 @@ cli.add_command(migrate_store_cmd)
          "row).",
 )
 def index_cmd(directory, output, absolute_paths, no_progress, rebuild):
-    """Build a SQLite Tier-1 index over a folder of ``.iafbt`` bundles.
+    """Build a SQLite Tier-1 index over a folder of ``.obtf`` bundles.
 
     The resulting ``index.sqlite`` file holds one row per bundle with
     identity / provenance / config columns and every scalar
@@ -483,8 +489,17 @@ cli.add_command(index_cmd)
     "--json", "as_json", is_flag=True, default=False,
     help="Emit JSON instead of a text table.",
 )
+@click.option(
+    "--engine",
+    type=click.Choice(["vector", "event"]),
+    default=None,
+    help="Restrict to a single engine slot. v9.0 dual-engine "
+         "bundles index one row per engine; pass \"vector\" or "
+         "\"event\" to scope the listing.",
+)
 def list_cmd(
     index_path, sort_by, ascending, limit, where, columns, as_json,
+    engine,
 ):
     """List rows from a SQLite Tier-1 index built by ``iaf index``.
 
@@ -509,6 +524,7 @@ def list_cmd(
         limit=limit,
         where=where,
         columns=cols,
+        engine=engine,
     )
     if as_json:
         import json as _json
@@ -570,8 +586,18 @@ cli.add_command(list_cmd)
     "--dry-run", is_flag=True, default=False,
     help="Show what --prune would do without touching files.",
 )
+@click.option(
+    "--engine",
+    type=click.Choice(["vector", "event"]),
+    default=None,
+    help="Restrict ranking to a single engine slot. v9.0 dual-"
+         "engine bundles produce one index row per engine; pass "
+         "\"vector\" or \"event\" to produce engine-specific "
+         "rankings. Call twice (once per engine) for parallel "
+         "vector/event leaderboards.",
+)
 def rank_cmd(index_path, by, limit, ascending, where, columns, as_json,
-             prune, archive_dir, dry_run):
+             prune, archive_dir, dry_run, engine):
     """Rank backtests in a Tier-1 index by a single metric.
 
     Sugar over ``iaf list --sort <by> --limit <n>`` with a column set
@@ -596,6 +622,7 @@ def rank_cmd(index_path, by, limit, ascending, where, columns, as_json,
         where=where,
         columns=cols,
         ascending=ascending,
+        engine=engine,
     )
     if as_json:
         import json as _json

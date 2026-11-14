@@ -5,7 +5,7 @@ End-to-end demo of the new tiered backtest storage layer
 
 It shows how to:
 
-1. Save a directory of `.iafbt` backtest bundles.
+1. Save a directory of `.obtf` backtest bundles.
 2. Build a SQLite Tier-1 index over them with `iaf index` (or
    `build_index` from Python).
 3. Query / sort / filter the index with `iaf list` and `iaf rank`
@@ -16,7 +16,7 @@ It shows how to:
 ## Why this matters
 
 Previously, comparing 50 walk-forward backtest variants meant
-opening every `.iafbt` bundle (each with multi-MB Parquet metric
+opening every `.obtf` bundle (each with multi-MB Parquet metric
 blobs) just to read scalar headline metrics like `sharpe_ratio` or
 `max_drawdown`.
 
@@ -25,7 +25,7 @@ with one row per bundle and every scalar from
 `BacktestSummaryMetrics` promoted to its own column. Filtering and
 ranking 12,500 bundles becomes a sub-100 ms SQL query.
 
-The `.iafbt` bundles themselves remain the source of truth — the
+The `.obtf` bundles themselves remain the source of truth — the
 index can always be rebuilt from them with `iaf index`.
 
 ## Run it
@@ -39,7 +39,7 @@ python examples/storage_layer_demo/demo.py
 
 The script will:
 
-1. Create a temp directory and write 6 `.iafbt` bundles with
+1. Create a temp directory and write 6 `.obtf` bundles with
    varying synthetic Sharpe / Sortino / drawdown values.
 2. Build `index.sqlite` over them.
 3. Print the equivalent `iaf` CLI commands you could run by hand.

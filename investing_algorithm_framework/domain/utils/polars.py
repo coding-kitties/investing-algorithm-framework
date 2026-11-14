@@ -1,4 +1,5 @@
 import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype
 from polars import DataFrame as PolarsDataFrame
 
 
@@ -36,15 +37,19 @@ def convert_polars_to_pandas(
     if not isinstance(data, PolarsDataFrame):
         raise ValueError("Data must be a Polars DataFrame")
 
-    df = data.to_pandas().copy()
+    small_frame = data.height <= 10_000
+    df = data.to_pandas(use_threads=not small_frame)
 
     if add_datetime_column and datetime_column_name not in df.columns:
         df[datetime_column_name] = pd.to_datetime(df.index)
 
-    # Ensure datetime column is datetime type
-    df[datetime_column_name] = pd.to_datetime(df[datetime_column_name])
+    if not is_datetime64_any_dtype(df[datetime_column_name].dtype):
+        df[datetime_column_name] = pd.to_datetime(df[datetime_column_name])
 
-    if remove_duplicates:
+    if remove_duplicates and (
+        not small_frame or not add_index
+        or not df[datetime_column_name].is_unique
+    ):
         df = df.drop_duplicates(subset=datetime_column_name, keep="first")
 
     if add_index:

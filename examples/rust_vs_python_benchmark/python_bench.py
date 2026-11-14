@@ -1,7 +1,7 @@
 """
 Python benchmark — runs a parameter sweep through the
 investing-algorithm-framework's vectorized backtest engine
-(`app.run_vector_backtests`).
+(`app.run_backtests(..., study=Study(engines=[BacktestEngine.VECTOR]))`).
 
 This represents the *current* end-user code path: framework data
 providers, the `TradingStrategy` lifecycle, signal generation in
@@ -15,6 +15,7 @@ Usage::
 """
 from __future__ import annotations
 
+from investing_algorithm_framework import BacktestRunConfiguration
 import argparse
 import json
 import time
@@ -27,12 +28,20 @@ import pandas as pd
 
 from investing_algorithm_framework import (
     BacktestDateRange,
+    BacktestEngine,
+    BacktestWindow,
     DataSource,
     DataType,
+    ExecutionConfig,
     PositionSize,
+    Schedule,
+    SignalSeries,
+    SignalSide,
+    Study,
     TimeUnit,
     TradingCost,
     TradingStrategy,
+    Universe,
     create_app,
 )
 from investing_algorithm_framework.infrastructure import (
@@ -66,22 +75,17 @@ def _rsi(series: pd.Series, period: int) -> pd.Series:
 class EmaRsiSweepStrategy(TradingStrategy):
     """Long-only EMA crossover with RSI oversold confirmation."""
 
-    time_unit = TimeUnit.HOUR
-    interval = 1
-
+    schedule = Schedule.every(1, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id: str,
         symbols: list[str],
-        trading_symbol: str,
         ema_short: int,
         ema_long: int,
         rsi_period: int,
         rsi_oversold: float,
         rsi_overbought: float,
         market: str = "BITVAVO",
-        fee_pct: float = 0.1,
-        slippage_pct: float = 0.05,
     ) -> None:
         warmup = max(ema_short, ema_long, rsi_period) + 10
         data_sources = [
@@ -100,24 +104,12 @@ class EmaRsiSweepStrategy(TradingStrategy):
             PositionSize(symbol=s, percentage_of_portfolio=1 / len(symbols))
             for s in symbols
         ]
-        trading_costs = [
-            TradingCost(
-                symbol=s,
-                fee_percentage=fee_pct,
-                slippage_percentage=slippage_pct,
-            )
-            for s in symbols
-        ]
 
         super().__init__(
             algorithm_id=algorithm_id,
             symbols=symbols,
-            trading_symbol=trading_symbol,
             data_sources=data_sources,
             position_sizes=position_sizes,
-            trading_costs=trading_costs,
-            time_unit=self.time_unit,
-            interval=self.interval,
         )
         self.ema_short = ema_short
         self.ema_long = ema_long
@@ -134,10 +126,8 @@ class EmaRsiSweepStrategy(TradingStrategy):
             }
         )
 
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals: Dict[str, pd.Series] = {}
+    def generate_signal_series(self, data: Dict[str, Any]):
+        """v9.0 vector-backtest entry point."""
         for symbol in self.symbols:
             df = data[f"ohlcv_{symbol}"]
             close = df["Close"]
@@ -145,24 +135,23 @@ class EmaRsiSweepStrategy(TradingStrategy):
             ema_l = _ema(close, self.ema_long)
             rsi_v = _rsi(close, self.rsi_period)
             crossover = (ema_s > ema_l) & (ema_s.shift(1) <= ema_l.shift(1))
-            sig = crossover & (rsi_v < self.rsi_oversold)
-            signals[symbol] = sig.fillna(False).astype(bool)
-        return signals
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals: Dict[str, pd.Series] = {}
-        for symbol in self.symbols:
-            df = data[f"ohlcv_{symbol}"]
-            close = df["Close"]
-            ema_s = _ema(close, self.ema_short)
-            ema_l = _ema(close, self.ema_long)
-            rsi_v = _rsi(close, self.rsi_period)
             crossunder = (ema_s < ema_l) & (ema_s.shift(1) >= ema_l.shift(1))
-            sig = crossunder & (rsi_v > self.rsi_overbought)
-            signals[symbol] = sig.fillna(False).astype(bool)
-        return signals
+            entry = (crossover & (rsi_v < self.rsi_oversold)) \
+                .fillna(False).astype(bool)
+            exit_ = (crossunder & (rsi_v > self.rsi_overbought)) \
+                .fillna(False).astype(bool)
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.OPEN_LONG,
+                series=entry,
+                source="ema_rsi",
+            )
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.CLOSE_LONG,
+                series=exit_,
+                source="ema_rsi",
+            )
 
 
 def _build_param_grid(n_combos: int) -> list[dict]:
@@ -288,12 +277,24 @@ def main() -> None:
         shutil.rmtree(BACKTEST_DIR)
 
     t0 = time.perf_counter()
-    backtests = app.run_vector_backtests(
+    trading_costs = [
+        TradingCost(symbol=s, fee_percentage=0.1, slippage_percentage=0.05)
+        for s in SYMBOLS
+    ]
+    study = Study(
+        universe=Universe(market=market, trading_symbol="USD"),
+        backtest_windows=[BacktestWindow(train_range=date_range)],
+        engines=[BacktestEngine.VECTOR],
+        execution_config=ExecutionConfig(trading_costs=trading_costs),
+    )
+    backtests = app.run_backtests(
         strategies=strategies,
-        backtest_date_ranges=[date_range],
-        n_workers=args.workers,
-        backtest_storage_directory=str(BACKTEST_DIR),
-        show_progress=True,
+        study=study,
+        run_configuration=BacktestRunConfiguration(
+            n_workers=args.workers,
+            backtest_storage_directory=str(BACKTEST_DIR),
+            show_progress=True,
+        ),
     )
     elapsed = time.perf_counter() - t0
 
