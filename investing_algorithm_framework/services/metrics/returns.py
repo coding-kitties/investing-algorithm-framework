@@ -21,7 +21,11 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
 
         r_month = (V_end - cash_flow_in_month) / V_prev_end - 1
 
-    With no cash flows this is identical to ``pct_change()``.
+    The first month is measured from the initial snapshot when that month
+    contains at least two snapshots. A mid-month start therefore produces
+    a partial-month return, labelled with that month's end date.
+
+    With no cash flows, subsequent months are identical to ``pct_change()``.
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.

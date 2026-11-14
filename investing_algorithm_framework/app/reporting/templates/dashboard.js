@@ -417,7 +417,7 @@ function rebuildOverviewTradingActivity() {
       const v = m[key];
       const isBest = bestVals[key]===i;
       const cls = (isBest && indices.length>1) ? ' class="best-cell"' : '';
-      if (key==='average_trade_duration' && v!=null) html += '<td'+cls+'>'+v.toFixed(1)+'d</td>';
+      if (key==='average_trade_duration' && v!=null) html += '<td'+cls+'>'+fmtDuration(v)+'</td>';
       else html += '<td'+cls+'>' + fmtVal(v,ftype) + '</td>';
     });
     html += '</tr>';
@@ -944,6 +944,10 @@ function drawPnlBar(id, symStats) {
 }
 
 // ===== HEATMAP =====
+function compoundMonthlyReturns(months) {
+  return (Object.values(months).reduce((growth, value) => growth * (1 + value / 100), 1) - 1) * 100;
+}
+
 function buildHeatmap(containerId, heatmapData) {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const years = Object.keys(heatmapData).sort();
@@ -953,11 +957,10 @@ function buildHeatmap(containerId, heatmapData) {
   html += '<th>Year</th></tr></thead><tbody>';
   years.forEach(y => {
     html += '<tr><th>'+y+'</th>';
-    let yTotal = 0;
+    const yTotal = compoundMonthlyReturns(heatmapData[y]);
     months.forEach((_, mi) => {
       const v = heatmapData[y]?.[mi+1];
       if (v !== undefined) {
-        yTotal += v;
         let cls = 'hm-zero';
         if (v > 10) cls = 'hm-strong-pos';
         else if (v > 0) cls = 'hm-pos';
@@ -1946,7 +1949,7 @@ function rebuildRankingTable() {
       var star = isBest ? ' ★' : '';
       var txt;
       if (key==='max_drawdown' && v!=null) txt = (Math.abs(v)*100).toFixed(1)+'%';
-      else if (key==='average_trade_duration' && v!=null) txt = v.toFixed(1)+'d';
+      else if (key==='average_trade_duration' && v!=null) txt = fmtDuration(v);
       else txt = fmtVal(v,ftype);
       if (colorStyle) {
         html += '<td onclick="showPage(\'strat-'+i+'\')"><span style="'+colorStyle+';font-weight:600">'+txt+star+'</span></td>';
@@ -2260,9 +2263,8 @@ function buildStratMonthlyReturns(stratIdx) {
         html += '<tr style="background:var(--surface2);font-weight:600"><td class="sticky-col" style="background:var(--surface2)">' + y + ' End</td>';
         html += '<td style="font-weight:600"><span style="color:'+color+'">' + peekCum.toFixed(1) + '</span></td></tr>';
       } else {
-        var yearTotal = 0;
         var hmY = hm[y] || {};
-        for (var mi = 1; mi <= 12; mi++) yearTotal += hmY[String(mi)] || 0;
+        var yearTotal = compoundMonthlyReturns(hmY);
         var color = yearTotal >= 0 ? 'var(--green)' : 'var(--red)';
         html += '<tr style="background:var(--surface2);font-weight:600"><td class="sticky-col" style="background:var(--surface2)">' + y + ' Total</td>';
         html += '<td style="font-weight:600"><span style="color:'+color+'">' + (yearTotal >= 0 ? '+' : '') + yearTotal.toFixed(1) + '%</span></td></tr>';
@@ -2307,11 +2309,10 @@ function buildStratMonthlyReturns(stratIdx) {
         var ycls = yearGain > 0 ? 'hm-pos' : yearGain < 0 ? 'hm-neg' : 'hm-zero';
         html += '<td class="'+ycls+'" style="font-weight:600">' + stratCum.toFixed(0) + '</td></tr>';
       } else {
-        var yTotal = 0;
+        var yTotal = compoundMonthlyReturns(hm[y] || {});
         for (var mi = 1; mi <= 12; mi++) {
           var v = (hm[y] && hm[y][String(mi)] != null) ? hm[y][String(mi)] : undefined;
           if (v !== undefined) {
-            yTotal += v;
             var cls = 'hm-zero';
             if (v > 10) cls = 'hm-strong-pos';
             else if (v > 0) cls = 'hm-pos';
@@ -3390,7 +3391,7 @@ function buildCompareTradingActivityRanking(indices) {
       var v = m[key];
       var isBest = bestVals[key] === i;
       var cls = isBest && indices.length > 1 ? ' class="best-cell"' : '';
-      if (key === 'average_trade_duration' && v != null) html += '<td'+cls+'>'+v.toFixed(1)+'d</td>';
+      if (key === 'average_trade_duration' && v != null) html += '<td'+cls+'>'+fmtDuration(v)+'</td>';
       else html += '<td'+cls+'>' + fmtVal(v, ftype) + '</td>';
     });
     html += '</tr>';
@@ -3592,9 +3593,8 @@ function buildCompareMonthlyReturns(indices) {
         });
       } else {
         stratData.forEach(function(sd) {
-          var yearTotal = 0;
           var hm = sd.hm[y] || {};
-          for (var mi = 1; mi <= 12; mi++) { yearTotal += hm[String(mi)] || 0; }
+          var yearTotal = compoundMonthlyReturns(hm);
           var color = yearTotal >= 0 ? 'var(--green)' : 'var(--red)';
           html += '<td style="font-weight:600"><span style="color:'+color+'">' + (yearTotal >= 0 ? '+' : '') + yearTotal.toFixed(1) + '%</span></td>';
         });
@@ -3681,11 +3681,10 @@ function buildCompareMonthlyReturns(indices) {
           var ycls = yearGain > 0 ? 'hm-pos' : yearGain < 0 ? 'hm-neg' : 'hm-zero';
           html += '<td class="'+ycls+'" style="font-weight:600">' + stratCum.toFixed(0) + '</td></tr>';
         } else {
-          var yTotal = 0;
+          var yTotal = compoundMonthlyReturns(hm[y] || {});
           for (var mi = 1; mi <= 12; mi++) {
             var v = (hm[y] && hm[y][mi] != null) ? hm[y][mi] : undefined;
             if (v !== undefined) {
-              yTotal += v;
               var cls = 'hm-zero';
               if (v > 10) cls = 'hm-strong-pos';
               else if (v > 0) cls = 'hm-pos';
@@ -3927,8 +3926,24 @@ function drawCompareReturnDist(indices) {
     });
 
     ctx.fillStyle = COL.dim; ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(sr.name.slice(0,8), cx2, h-8);
+    ctx.fillText(sr.name, cx2, h-8);
   });
+}
+
+function equityCorrelation(a, b) {
+  const aByDate = new Map(a.map(([value, date]) => [date, value]));
+  const bByDate = new Map(b.map(([value, date]) => [date, value]));
+  const dates = Array.from(aByDate.keys()).filter(date => bByDate.has(date));
+  const n = dates.length;
+  if (n < 3) return null;
+  let sumA = 0, sumB = 0, sumAB = 0, sumA2 = 0, sumB2 = 0;
+  dates.forEach(date => {
+    const av = aByDate.get(date), bv = bByDate.get(date);
+    sumA += av; sumB += bv; sumAB += av * bv;
+    sumA2 += av * av; sumB2 += bv * bv;
+  });
+  const denom = Math.sqrt((n * sumA2 - sumA * sumA) * (n * sumB2 - sumB * sumB));
+  return denom > 0 ? (n * sumAB - sumA * sumB) / denom : null;
 }
 
 function buildCompareCorrelation(indices) {
@@ -3945,26 +3960,13 @@ function buildCompareCorrelation(indices) {
     const s = STRATEGIES[si];
     const rd = getViewRunData(si);
     if (rd && rd.EQ && rd.EQ.length > 1) {
-      equities.push({ name: s.name, color: s.color, eq: rd.EQ.map(d => d[0]) });
+      equities.push({ name: s.name, color: s.color, eq: rd.EQ });
     }
   });
 
   if (equities.length < 2) {
     container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--dim);font-size:13px;">Need at least 2 strategies</div>';
     return;
-  }
-
-  function correlation(a, b) {
-    const n = Math.min(a.length, b.length);
-    if (n < 3) return 0;
-    let sumA = 0, sumB = 0, sumAB = 0, sumA2 = 0, sumB2 = 0;
-    for (let i = 0; i < n; i++) {
-      sumA += a[i]; sumB += b[i]; sumAB += a[i]*b[i];
-      sumA2 += a[i]*a[i]; sumB2 += b[i]*b[i];
-    }
-    const denom = Math.sqrt((n*sumA2-sumA*sumA)*(n*sumB2-sumB*sumB));
-    if (denom === 0) return 0;
-    return (n*sumAB - sumA*sumB) / denom;
   }
 
   function corrColor(v) {
@@ -3977,13 +3979,16 @@ function buildCompareCorrelation(indices) {
   }
 
   let html = '<table class="corr-table"><thead><tr><th></th>';
-  equities.forEach(e => { html += '<th title="'+e.name+'">'+e.name.slice(0,8)+'</th>'; });
+  equities.forEach(e => { html += '<th title="'+e.name+'">'+e.name+'</th>'; });
   html += '</tr></thead><tbody>';
   equities.forEach((ei, i) => {
-    html += '<tr><th style="text-align:right">'+ei.name.slice(0,8)+'</th>';
+    html += '<tr><th style="text-align:right">'+ei.name+'</th>';
     equities.forEach((ej, j) => {
       if (i === j) html += '<td class="corr-self">1.00</td>';
-      else { const corr = correlation(ei.eq, ej.eq); html += '<td style="'+corrColor(corr)+'">'+corr.toFixed(2)+'</td>'; }
+      else {
+        const corr = equityCorrelation(ei.eq, ej.eq);
+        html += corr == null ? '<td>\u2014</td>' : '<td style="'+corrColor(corr)+'">'+corr.toFixed(2)+'</td>';
+      }
     });
     html += '</tr>';
   });
@@ -4351,7 +4356,7 @@ function drawReturnDistribution() {
 
     // Label
     ctx.fillStyle = COL.dim; ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(sr.name.slice(0,8), cx, h-8);
+    ctx.fillText(sr.name, cx, h-8);
   });
 }
 
@@ -4373,26 +4378,12 @@ function buildCorrelationMatrix() {
   const equities = [];
   vis.forEach(si => {
     const eq = getViewEquity(si);
-    equities.push({ name: STRATEGIES[si].name, color: STRATEGIES[si].color, eq: eq.map(d => d[0]) });
+    equities.push({ name: STRATEGIES[si].name, color: STRATEGIES[si].color, eq: eq });
   });
 
   if (equities.length < 2) {
     container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--dim);font-size:13px;">Need at least 2 strategies</div>';
     return;
-  }
-
-  // Pearson correlation
-  function correlation(a, b) {
-    const n = Math.min(a.length, b.length);
-    if (n < 3) return 0;
-    let sumA = 0, sumB = 0, sumAB = 0, sumA2 = 0, sumB2 = 0;
-    for (let i = 0; i < n; i++) {
-      sumA += a[i]; sumB += b[i]; sumAB += a[i]*b[i];
-      sumA2 += a[i]*a[i]; sumB2 += b[i]*b[i];
-    }
-    const denom = Math.sqrt((n*sumA2-sumA*sumA)*(n*sumB2-sumB*sumB));
-    if (denom === 0) return 0;
-    return (n*sumAB - sumA*sumB) / denom;
   }
 
   function corrColor(v) {
@@ -4405,17 +4396,17 @@ function buildCorrelationMatrix() {
   }
 
   let html = '<table class="corr-table"><thead><tr><th></th>';
-  equities.forEach(e => { html += '<th title="'+e.name+'">'+e.name.slice(0,8)+'</th>'; });
+  equities.forEach(e => { html += '<th title="'+e.name+'">'+e.name+'</th>'; });
   html += '</tr></thead><tbody>';
 
   equities.forEach((ei, i) => {
-    html += '<tr><th style="text-align:right">'+ei.name.slice(0,8)+'</th>';
+    html += '<tr><th style="text-align:right">'+ei.name+'</th>';
     equities.forEach((ej, j) => {
       if (i === j) {
         html += '<td class="corr-self">1.00</td>';
       } else {
-        const corr = correlation(ei.eq, ej.eq);
-        html += '<td style="'+corrColor(corr)+'">'+corr.toFixed(2)+'</td>';
+        const corr = equityCorrelation(ei.eq, ej.eq);
+        html += corr == null ? '<td>\u2014</td>' : '<td style="'+corrColor(corr)+'">'+corr.toFixed(2)+'</td>';
       }
     });
     html += '</tr>';
@@ -6410,6 +6401,8 @@ function buildTimelineScatter(stratIdx) {
   if (!el) return;
   var rd = getStratRunData(stratIdx);
   if (!rd) { el.innerHTML = ''; return; }
+  var previousSelect = document.getElementById('sel-' + sid + '-timeline-sym');
+  var selectedSymbol = previousSelect ? previousSelect.value : '';
 
   var trades = rd.TRADES || [];
   var orders = rd.ORDERS || [];
@@ -6453,9 +6446,11 @@ function buildTimelineScatter(stratIdx) {
   allPoints.forEach(function(p) { if (p.sym) symSet[p.sym] = true; });
   var symbols = Object.keys(symSet).sort();
 
-  // Build dropdown HTML — default is empty prompt
-  var optionsHtml = '<option value="" selected>Select asset\u2026</option>';
-  symbols.forEach(function(s) { optionsHtml += '<option value="' + s + '">' + s + '</option>'; });
+  if (!symbols.includes(selectedSymbol)) selectedSymbol = '';
+  var optionsHtml = '<option value=""' + (selectedSymbol ? '' : ' selected') + '>Select asset\u2026</option>';
+  symbols.forEach(function(s) {
+    optionsHtml += '<option value="' + s + '"' + (s === selectedSymbol ? ' selected' : '') + '>' + s + '</option>';
+  });
 
   el.innerHTML = '<div class="chart-card">'
     + '<div class="chart-title" style="display:flex;align-items:center;gap:12px;">'
@@ -6473,8 +6468,7 @@ function buildTimelineScatter(stratIdx) {
   el._allPoints = allPoints;
   el._stratIdx = stratIdx;
 
-  // Draw initial prompt message (no symbol selected)
-  _drawTimelineCanvas(sid, allPoints, '');
+  _drawTimelineCanvas(sid, allPoints, selectedSymbol);
 
   // Dropdown change handler
   var sel = document.getElementById('sel-' + sid + '-timeline-sym');

@@ -1438,19 +1438,19 @@ devel = ["colorama", "json-spec", "jsonschema", "pylint", "pytest", "pytest-benc
 
 [[package]]
 name = "finterion-charts"
-version = "1.4.0"
+version = "1.5.0"
 description = "Python binding for Finterion Charts — declarative ChartSpec builder, validator, and codec."
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "finterion_charts-1.4.0-py3-none-any.whl", hash = "sha256:173d8f47d7f4db7ef1395b5d57b73356ec5e3d9c5e2770c33557e75f31bc09cf"},
-    {file = "finterion_charts-1.4.0.tar.gz", hash = "sha256:552838710077160a794146893a20e50b3157c5195714493c0b0887a435601478"},
+    {file = "finterion_charts-1.5.0-py3-none-any.whl", hash = "sha256:a28e69f80ebcd0449f814e039b8134c8167ed01f972c04e899c131f70fd27545"},
+    {file = "finterion_charts-1.5.0.tar.gz", hash = "sha256:90efcbe1cbb55b0162c216cf5bfc1cebf7190589ca52c8f5912e462292ea403c"},
 ]
 
 [package.extras]
 all = ["ipython (>=8.0)", "jsonschema (>=4.17)", "numpy (>=1.24)", "pandas (>=2.0)"]
-dev = ["jsonschema (>=4.17)", "numpy (>=1.24)", "pandas (>=2.0)", "pytest (>=7.4)"]
+dev = ["ipython (>=8.0)", "jsonschema (>=4.17)", "numpy (>=1.24)", "pandas (>=2.0)", "pytest (>=7.4)"]
 jupyter = ["ipython (>=8.0)"]
 pandas = ["numpy (>=1.24)", "pandas (>=2.0)"]
 schema = ["jsonschema (>=4.17)"]
@@ -5921,4 +5921,4 @@ yahoo = ["yfinance"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "b25cd46e6fa77212adecd0260d723e59d3cb281f81625a3d4866d571398cb478"
+content-hash = "a308949f77098beb613af5f5a87dd8cb6e574c02606ac04665c9e46ce4e385db"

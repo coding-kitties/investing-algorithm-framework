@@ -50,9 +50,12 @@ from investing_algorithm_framework.services.metrics.returns import (
 class MockSnapshot:
     """Mock PortfolioSnapshot class for testing."""
 
-    def __init__(self, total_value: float, created_at: datetime):
+    def __init__(
+        self, total_value: float, created_at: datetime, cash_flow: float = 0.0
+    ):
         self.total_value = total_value
         self.created_at = created_at
+        self.cash_flow = cash_flow
 
     def get_total_value(self):
         return self.total_value
@@ -112,6 +115,46 @@ class TestGetMonthlyReturns(TestCase):
         self.assertEqual(len(result), 2)
         self.assertAlmostEqual(result[0][0], 0.10)
         self.assertAlmostEqual(result[1][0], 0.10)
+        self.assertEqual(result[0][1], datetime(2023, 1, 31, tzinfo=timezone.utc))
+        self.assertEqual(result[1][1], datetime(2023, 2, 28, tzinfo=timezone.utc))
+
+    def test_monthly_returns_first_month_cash_flow(self):
+        for cash_flow in (500, -200):
+            with self.subTest(cash_flow=cash_flow):
+                snapshots = [
+                    MockSnapshot(
+                        1000, datetime(2023, 1, 1, tzinfo=timezone.utc)
+                    ),
+                    MockSnapshot(
+                        1000 + cash_flow,
+                        datetime(2023, 1, 15, tzinfo=timezone.utc),
+                        cash_flow=cash_flow,
+                    ),
+                    MockSnapshot(
+                        1100 + cash_flow,
+                        datetime(2023, 1, 31, tzinfo=timezone.utc),
+                    ),
+                ]
+
+                result = get_monthly_returns(snapshots)
+
+                self.assertEqual(len(result), 1)
+                self.assertAlmostEqual(result[0][0], 0.10)
+                self.assertEqual(
+                    result[0][1], datetime(2023, 1, 31, tzinfo=timezone.utc)
+                )
+
+    def test_monthly_returns_mid_month_start(self):
+        snapshots = [
+            MockSnapshot(1000, datetime(2023, 1, 15, tzinfo=timezone.utc)),
+            MockSnapshot(1100, datetime(2023, 1, 31, tzinfo=timezone.utc)),
+        ]
+
+        result = get_monthly_returns(snapshots)
+
+        self.assertEqual(len(result), 1)
+        self.assertAlmostEqual(result[0][0], 0.10)
+        self.assertEqual(result[0][1], datetime(2023, 1, 31, tzinfo=timezone.utc))
 
     def test_monthly_returns_positive_trend(self):
         """Test with consistently positive monthly returns."""

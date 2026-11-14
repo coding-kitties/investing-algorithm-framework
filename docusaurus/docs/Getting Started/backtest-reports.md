@@ -26,6 +26,29 @@ report.show()  # Opens a browser, or renders inline in Jupyter.
 
 ## Creating Reports
 
+### Dedicated dashboard demo
+
+The [dashboard demo](https://github.com/coding-kitties/investing-algorithm-framework/tree/main/examples/dashboard_demo)
+runs a declarative confluence strategy on deterministic local OHLCV data through
+both vector and event backtesting. It saves and reopens the results,
+then generates individual dashboards and a side-by-side comparison without
+exchange credentials or data downloads.
+
+From the repository root:
+
+```bash
+python -m examples.dashboard_demo.demo
+```
+
+The demo automatically opens `examples/dashboard_demo/output/comparison.html`
+in your default browser; use `--no-browser` for headless runs.
+To regenerate the HTML
+after reporting changes without rerunning backtests:
+
+```bash
+python -m examples.dashboard_demo.demo --reports-only
+```
+
 ### From a Backtest Object
 
 `run_backtest()` returns a `BacktestIndex`. Load the selected bundle before
@@ -81,6 +104,15 @@ This generates a multi-strategy comparison dashboard with:
 By default, the report expands every populated `(study, engine)` pair into a
 separate dashboard entry. This lets a single `.obtf` bundle compare in-sample
 and out-of-sample studies or vector and event evidence side by side.
+Vector and event results for the same algorithm are labelled by engine even
+when loaded from separate bundles.
+
+Trade, order, and rejected-signal timestamps retain their intraday times and
+timezone offsets in tables and timelines. Trade durations are displayed from
+their hour-based values, and the yearly totals in monthly-return views compound
+the available monthly returns rather than summing them.
+Equity correlations align the displayed curves by shared dates, not by sample
+index, so differently sampled vector and event results can be compared.
 
 Scope an in-memory report to one named study when needed:
 

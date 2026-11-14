@@ -48,10 +48,12 @@ dashboard, and run the same strategy in paper or live trading.
 > ```
 >
 > See the [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md)
-> and [changelog](CHANGELOG.md). The APIs below describe current v9 development.
+> and [changelog](CHANGELOG.md). This README targets **v9 and later**;
+> its APIs and examples may not work with earlier versions.
 
 ### Feature Highlights
 
+- 🧠 **[Advanced strategy definitions](#3-confluence-scoring-declare-indicators-and-decisions):** Combine declarative indicators and data streams, confluence-scored entry and exit decisions, and position sizing and risk rules.
 - 🔁 **[Long and short trading](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/orders):** Define entry and exit signals once and run the same strategy in vector backtests, event-driven backtests, paper trading, and live trading.
 - ⚡ **[Vector backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting):** Evaluate signals and sweep thousands of strategy variants quickly with Polars-powered execution.
 - 🏃 **[Event-driven backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting):** Validate candidates bar by bar with realistic orders, fills, costs, and portfolio management.
@@ -76,91 +78,223 @@ dashboard, and run the same strategy in paper or live trading.
 <summary><strong>Strategy Definition</strong></summary>
 <br>
 
-Strategies are `TradingStrategy` subclasses that declare their data, schedule,
-signal logic, and risk rules. The framework handles data loading, order execution,
-position management, persistence, and reporting around them.
+There are three ways to define a strategy: use `TradingStrategy` for direct
+orders or custom signals, or its `ConfluenceScoringStrategy` subclass for
+declarative indicator-driven decisions. All declare their data and schedule;
+choose how much of the trading logic you want to manage yourself:
+
+> **Recommended: start with `ConfluenceScoringStrategy`.** We recommend it over
+> the other two approaches because it:
+> - Provides both event and vector signal hooks, avoiding duplicated signal logic.
+> - Keeps indicator calculations, scoring rules, and thresholds declarative.
+> - Records explainable decision traces in event mode.
+> - Uses the shared sizing, risk, execution, and cooldown pipeline.
+>
+> Use custom signals or direct orders as escape hatches when your strategy needs
+> behavior that the declarative API cannot express.
+
+| Style | Define | Execution modes |
+| --- | --- | --- |
+| **Direct orders** | Override `run_strategy` and place orders through `Context`. | Event backtests, paper, and live trading |
+| **Custom signals** | Implement `generate_signals` and `generate_signal_series`; let the framework size and execute orders. | Both backtest engines, paper, and live trading |
+| **Confluence scoring (recommended)** | Subclass `ConfluenceScoringStrategy` and declare indicators and scored entry/exit cards. | Both backtest engines, paper, and live trading |
+
+### 1. Direct orders: control the event loop
+
+> **No vector backtesting:** this approach supports event-driven backtests,
+> paper trading, and live trading only. Use custom signals or confluence cards
+> below if you need vector backtesting.
+
+Use `run_strategy` when you need direct control over order conditions, sizing,
+and routing. This replaces the default signal-processing pipeline: declaring
+strategy risk rules alone does not apply that pipeline to your custom orders.
 
 ```python
-from pyindicators import crossover, crossunder, ema, rsi
-
-from investing_algorithm_framework import ConfluenceCard, CooldownRule, \
-    DataSource, DataType, EvidenceGroup, ExposureRule, Operator, \
-    PrimaryGroup, ScalingRule, Schedule, ScoreRule, SignalSide, \
-    StopLossRule, TakeProfitRule, TimeUnit, TradingStrategy, \
-    condition, PositionSize
+from investing_algorithm_framework import (
+    DataSource, OrderSide, Schedule, TimeUnit, TradingStrategy,
+)
 
 
-def create_confluence_card(name, rsi_operator, rsi_value, cross_column):
-  return ConfluenceCard(
-    name=name,
-    primary=PrimaryGroup(name="RSI reversal", rules=(ScoreRule(
-      name=f"RSI {rsi_operator.value} {rsi_value}",
-      expression=condition("rsi", rsi_operator, value=rsi_value), points=3,
-    ),), minimum_matches=1),
-    secondary=(EvidenceGroup(name="EMA confirmation", rules=(ScoreRule(
-      name="Recent EMA cross",
-      expression=condition(cross_column, Operator.GT, value=0), points=2,
-    ),), minimum_score=2),),
-    minimum_score=5,
-  )
-
-
-class RSIEMACrossoverStrategy(TradingStrategy):
+class DirectOrderStrategy(TradingStrategy):
   schedule = Schedule.every(2, TimeUnit.HOUR)
   symbols = ["BTC"]
   data_sources = [DataSource(
-    identifier="BTC_ohlcv", symbol="BTC/EUR", data_type=DataType.OHLCV,
-    time_frame="2h", market="BITVAVO", pandas=True, warmup_window=100,
+    identifier="BTC_ohlcv", symbol="BTC/EUR", data_type="OHLCV", time_frame="2h",
+    market="BITVAVO", pandas=True, warmup_window=30,
   )]
 
-  # Portfolio and position risk controls.
-  exposure_rule = ExposureRule(max_portfolio_percentage=80)
-  position_sizes = [PositionSize(symbol="BTC", percentage_of_portfolio=20)]
-  scaling_rules = [ScalingRule(
-    symbol="BTC", max_entries=3, scale_in_percentage=[50, 25],
-    cooldown_in_bars=5,
-  )]
-  stop_losses = [StopLossRule(
-    symbol="BTC", percentage_threshold=5, sell_percentage=100, trailing=True,
-  )]
-  take_profits = [TakeProfitRule(
-    symbol="BTC", percentage_threshold=10, sell_percentage=50,
-  )]
-  cooldowns = [
-    CooldownRule(symbol="BTC", trigger="sell", blocks="buy", bars=12),
-    CooldownRule(trigger="any", blocks="any", bars=2),
-  ]
+  def run_strategy(self, context, data):
+    frame = data["BTC_ohlcv"]
+    price = float(frame["Close"].iloc[-1])
+    average = float(frame["Close"].rolling(20).mean().iloc[-1])
 
-  # Weighted, explainable entry and exit decisions.
-  signal_cards = {
-    SignalSide.OPEN_LONG: create_confluence_card(
-      "Open long", Operator.LT, 30, "recent_crossover"),
-    SignalSide.CLOSE_LONG: create_confluence_card(
-      "Close long", Operator.GTE, 70, "recent_crossunder"),
-    SignalSide.OPEN_SHORT: create_confluence_card(
-      "Open short", Operator.GTE, 70, "recent_crossunder"),
-    SignalSide.CLOSE_SHORT: create_confluence_card(
-      "Close short", Operator.LT, 30, "recent_crossover"),
-  }
-
-  def prepare_signal_data(self, data):
-    """Prepare the same card inputs for every execution mode."""
-    frame = data["BTC_ohlcv"].copy()
-    frame = ema(frame, "Close", 12, "ema_short")
-    frame = ema(frame, "Close", 26, "ema_long")
-    frame = crossover(frame, "ema_short", "ema_long", "ema_crossover")
-    frame = crossunder(frame, "ema_short", "ema_long", "ema_crossunder")
-    frame = rsi(frame, "Close", 14, "rsi")
-    frame["recent_crossover"] = frame["ema_crossover"].rolling(10).max()
-    frame["recent_crossunder"] = frame["ema_crossunder"].rolling(10).max()
-    return {"BTC": frame}
+    if price > average and not context.has_position("BTC"):
+      context.create_limit_order(
+        target_symbol="BTC", price=price, order_side=OrderSide.BUY,
+        percentage_of_portfolio=20,
+      )
+    elif price < average and context.has_position("BTC"):
+      context.create_limit_order(
+        target_symbol="BTC", price=price, order_side=OrderSide.SELL,
+        percentage_of_position=100,
+      )
 ```
 
-The framework evaluates `signal_cards` against the prepared columns and creates
-signals and decision traces automatically. `prepare_signal_data` is shared by
-vector backtests, event-driven backtests, paper trading, and live trading, while
-the declarative rules govern sizing, exposure, scaling, exits, and cooldowns in
-each mode. The four cards cover long entry and exit plus short entry and cover.
+The vector engine does not call `run_strategy`. For vector backtesting, express
+the strategy as signal series instead.
+
+### 2. Custom signals: share logic across both engines
+
+Emit trading intent rather than orders. The framework applies its normal
+conflict resolution, sizing, risk, execution, and cooldown phases.
+
+```python
+from investing_algorithm_framework import (
+    DataSource, PositionSize, Schedule, SignalSide, TimeUnit, TradingStrategy,
+    signal_series_from_column, signals_from_column,
+)
+
+
+class MovingAverageSignalStrategy(TradingStrategy):
+  schedule = Schedule.every(2, TimeUnit.HOUR)
+  symbols = ["BTC"]
+  data_sources = [DataSource(
+    identifier="BTC_ohlcv", symbol="BTC/EUR", data_type="OHLCV", time_frame="2h",
+    market="BITVAVO", pandas=True, warmup_window=30,
+  )]
+  position_sizes = [PositionSize(symbol="BTC", percentage_of_portfolio=20)]
+
+  def _with_signals(self, data):
+    frame = data["BTC_ohlcv"].copy()
+    average = frame["Close"].rolling(20).mean()
+    frame["open_long"] = frame["Close"] > average
+    frame["close_long"] = frame["Close"] < average
+    return frame
+
+  def generate_signals(self, context, data):
+    frame = self._with_signals(data)
+    yield from signals_from_column(
+      frame, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+    )
+    yield from signals_from_column(
+      frame, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+    )
+
+  def generate_signal_series(self, data):
+    frame = self._with_signals(data)
+    yield signal_series_from_column(
+      frame, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+    )
+    yield signal_series_from_column(
+      frame, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+    )
+```
+
+`generate_signals` evaluates the latest bar for event backtests, paper trading,
+and live trading. `generate_signal_series` evaluates the full window for vector
+backtests. Implement both to support both engines, sharing indicator logic to
+keep their decisions consistent.
+
+### 3. Confluence scoring: declare indicators and decisions
+
+Inherit from `ConfluenceScoringStrategy` and declare `indicator_configs` plus
+`confluence_cards`. The base class calculates the indicators and supplies both
+signal hooks: no custom `prepare_signal_data`, `generate_signals`, or
+`generate_signal_series` is needed.
+
+This example uses `pyindicators` (`pip install pyindicators`). Pass its indicator
+function as `calculate`, and declare the parameters and output columns explicitly.
+Precomputation is appropriate here because RSI uses only present and past data.
+
+```python
+from pyindicators import rsi
+
+from investing_algorithm_framework import (
+    ConfluenceScoringStrategy, ConfluenceScoreConfig, CooldownRule,
+    DataSource, IndicatorConfig, IndicatorRule, PositionSize, Schedule,
+    SignalSide, StopLossRule, TakeProfitRule, TimeUnit,
+)
+
+
+class RSIConfluenceStrategy(ConfluenceScoringStrategy):
+  schedule = Schedule.every(2, TimeUnit.HOUR)
+  symbols = ["BTC"]
+  data_sources = [
+    DataSource(
+      identifier="BTC_ohlcv",
+      symbol="BTC/EUR",
+      data_type="OHLCV",
+      time_frame="2h",
+      market="BITVAVO",
+      pandas=True,
+      warmup_window=100,
+    )
+  ]
+
+  indicator_configs = [
+    IndicatorConfig(
+      id="rsi",
+      calculate=rsi,
+      timeframe="2h",
+      data_source="BTC_ohlcv",
+      parameters={
+        "source_column": "Close", "period": 14, "result_column": "rsi",
+      },
+      output_columns=["rsi"],
+      minimum_history=15,
+      history="continuous",
+      execution="precompute",
+    ),
+  ]
+  confluence_cards = [
+    ConfluenceScoreConfig(
+      id=name,
+      side=side,
+      symbols=["BTC"],
+      rules={"rsi_threshold": IndicatorRule(
+        indicator_id="rsi",
+        output_column="rsi",
+        threshold=threshold,
+        comparison=comparison,
+        group_weights={"primary": 1},
+        lookback_period=1,
+      )},
+      group_aggregation={"primary": "sum"},
+      group_thresholds={"primary": 1},
+    )
+    for name, side, threshold, comparison in (
+      ("long_entry", SignalSide.OPEN_LONG, 30, "le"),
+      ("long_exit", SignalSide.CLOSE_LONG, 70, "ge"),
+      ("short_entry", SignalSide.OPEN_SHORT, 70, "ge"),
+      ("short_exit", SignalSide.CLOSE_SHORT, 30, "le"),
+    )
+  ]
+
+  position_sizes = [PositionSize(symbol="BTC", percentage_of_portfolio=20)]
+  stop_losses = [
+    StopLossRule(
+      symbol="BTC",
+      percentage_threshold=5,
+      sell_percentage=100,
+    )
+  ]
+  take_profits = [
+    TakeProfitRule(
+      symbol="BTC",
+      percentage_threshold=10,
+      sell_percentage=100,
+    )
+  ]
+  cooldowns = [CooldownRule(trigger="any", blocks="any", bars=2)]
+```
+
+The framework evaluates each card's explicit `side` and score threshold, then
+routes qualifying signals through the same sizing, risk, execution, and cooldown
+pipeline as custom signals. Event mode also records decision traces. The four
+cards above cover long entry and exit plus short entry and cover.
+
+See the [declarative confluence strategy example](examples/framework_features/two_hour_confluence_strategy.py)
+for callable indicators, staged scale-ins, and execution-engine limitations.
 
 Fees and slippage belong to the portfolio or backtest study because they describe
 a venue or scenario rather than signal logic.

@@ -27,7 +27,7 @@ python-dotenv = "^1.0.1"
 yfinance = {version = "^0.2.61", optional = true}
 alpha_vantage = {version = "^3.0.0", optional = true}
 polygon-api-client = {version = "^1.14.0", optional = true}
-finterion-charts = "1.4.0"
+finterion-charts = "1.5.0"
 boto3 = {version = "^1.38.41", optional = true}
 azure-storage-blob = {version = "^12.24.0", optional = true}
 azure-identity = {version = "^1.19.0", optional = true}

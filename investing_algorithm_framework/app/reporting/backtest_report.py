@@ -82,6 +82,12 @@ def _fmt_date(dt):
     return dt.strftime('%Y-%m-%d')
 
 
+def _fmt_datetime(dt):
+    if isinstance(dt, str):
+        return dt
+    return dt.isoformat()
+
+
 def _is_na(val):
     """Check whether *val* is a pandas-like NA/NaN sentinel."""
     try:
@@ -448,6 +454,19 @@ backtest_utils import (
                         "dual": dual,
                         "multi_study": multi_study,
                     })
+        comparison_engines = {}
+        for view in views:
+            key = (
+                view["backtest"].algorithm_id or view["backtest_index"],
+                view["study"],
+            )
+            comparison_engines.setdefault(key, set()).add(view["engine"])
+        for view in views:
+            key = (
+                view["backtest"].algorithm_id or view["backtest_index"],
+                view["study"],
+            )
+            view["dual"] = len(comparison_engines[key]) > 1
         return views
 
     @staticmethod
@@ -785,8 +804,8 @@ backtest_utils import (
                                 'SHORT' if getattr(t, 'is_short', False)
                                 else 'LONG'
                             ),
-                            'opened': _fmt_date(op_dt) if op_dt else '',
-                            'closed': _fmt_date(cl_dt) if cl_dt else '',
+                            'opened': _fmt_datetime(op_dt) if op_dt else '',
+                            'closed': _fmt_datetime(cl_dt) if cl_dt else '',
                             'open_price': round(
                                 getattr(t, 'open_price', 0) or 0, 2
                             ),
@@ -959,9 +978,9 @@ backtest_utils import (
                                 float(o_slippage), 4
                             ),
                             'reason': o_reason,
-                            'created': _fmt_date(o_dt)
+                            'created': _fmt_datetime(o_dt)
                             if o_dt else '',
-                            'updated': _fmt_date(u_dt)
+                            'updated': _fmt_datetime(u_dt)
                             if u_dt else '',
                         })
 
@@ -1002,7 +1021,7 @@ backtest_utils import (
 
                 signal_rejections = [
                     {
-                        'date': _fmt_date(event['date']),
+                        'date': _fmt_datetime(event['date']),
                         'sym': event['symbol'],
                         'signal': event['signal'],
                         'reason': event['reason'],

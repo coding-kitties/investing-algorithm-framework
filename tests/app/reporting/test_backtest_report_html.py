@@ -1,16 +1,19 @@
 import os
 import tempfile
 import shutil
+import subprocess
 from contextlib import redirect_stdout
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import StringIO
-from unittest import TestCase
+from pathlib import Path
+from unittest import TestCase, skipUnless
 
 from investing_algorithm_framework.app.reporting import BacktestReport
 from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
 from investing_algorithm_framework.domain import (
     Backtest, BacktestRun, BacktestMetrics, PortfolioSnapshot,
     BacktestDateRange, OperationalException, PositionSnapshot,
+    Order, Trade,
 )
 
 
@@ -347,7 +350,7 @@ class TestBacktestReportDataTransform(TestCase):
         run = report.backtests[0].vector_runs[0]
         run.signal_events = [
             {
-                "date": datetime(2023, 1, 2, tzinfo=timezone.utc),
+                "date": datetime(2023, 1, 2, 8, 30, tzinfo=timezone.utc),
                 "symbol": "BTC",
                 "signal": "buy",
                 "executed": False,
@@ -367,7 +370,7 @@ class TestBacktestReportDataTransform(TestCase):
         ]["SIGNAL_REJECTIONS"]
 
         self.assertEqual(rejections, [{
-            "date": "2023-01-02",
+            "date": "2023-01-02T08:30:00+00:00",
             "sym": "BTC",
             "signal": "buy",
             "reason": "cooldown",
@@ -379,6 +382,32 @@ class TestBacktestReportDataTransform(TestCase):
         self.assertIn("p.series === 'rejected'", html)
         self.assertIn("color: '#9ca3af', shape: 'x'", html)
         self.assertIn("ctx.lineWidth = 1", html)
+
+    def test_run_data_preserves_intraday_trade_and_order_timestamps(self):
+        opened = datetime(2023, 1, 2, 8, 30, tzinfo=timezone.utc)
+        updated = opened + timedelta(hours=1)
+        closed = opened + timedelta(hours=2)
+        order = Order(
+            order_type="LIMIT", order_side="BUY", amount=1, price=100,
+            target_symbol="BTC", trading_symbol="EUR",
+            created_at=opened, updated_at=updated,
+        )
+        trade = Trade(
+            id=1, orders=[order], target_symbol="BTC", trading_symbol="EUR",
+            opened_at=opened, closed_at=closed, open_price=100,
+            amount=1, available_amount=0, cost=100, remaining=0,
+            filled_amount=1, status="CLOSED",
+        )
+        run = self.report.backtests[0].vector_runs[0]
+        run.orders = [order]
+        run.trades = [trade]
+
+        data = self.report._build_run_data()["run-0-0"]
+
+        self.assertEqual(data["TRADES"][0]["opened"], opened.isoformat())
+        self.assertEqual(data["TRADES"][0]["closed"], closed.isoformat())
+        self.assertEqual(data["ORDERS"][0]["created"], opened.isoformat())
+        self.assertEqual(data["ORDERS"][0]["updated"], updated.isoformat())
 
     def test_windows_meta(self):
         windows = self.report._build_windows_meta()
@@ -448,6 +477,146 @@ class TestBacktestReportDataTransform(TestCase):
         self.assertIn("const IS_SINGLE = false", html)
         self.assertIn("dual (vector)", html)
         self.assertIn("dual (event)", html)
+
+    def test_separate_engine_bundles_have_distinct_labels(self):
+        vector = _make_backtest("same_algo")
+        event = Backtest(
+            algorithm_id="same_algo", event_runs=list(vector.vector_runs),
+        )
+        report = BacktestReport(backtests=[vector, event])
+
+        strategies = report._build_strategies_data()
+
+        self.assertEqual(
+            [strategy["name"] for strategy in strategies],
+            ["same_alg (vector)", "same_alg (event)"],
+        )
+        self.assertEqual(
+            set(report._build_run_data()), {"run-0-0", "run-1-0"},
+        )
+
+
+@skipUnless(shutil.which("node"), "Dashboard behavior tests require Node.js")
+class TestDashboardJavascript(TestCase):
+    def run_javascript(self, code):
+        dashboard = Path(__file__).parents[3] / (
+            "investing_algorithm_framework/app/reporting/templates/dashboard.js"
+        )
+        harness = """
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+function load(name) {
+  const start = source.indexOf('function ' + name + '(');
+  assert.ok(start >= 0, name);
+  const end = source.indexOf('\\nfunction ', start + 1);
+  vm.runInThisContext(source.slice(start, end < 0 ? source.length : end));
+}
+global.initCollapseButtons = () => {};
+"""
+        result = subprocess.run(
+            ["node", "-e", harness + code, str(dashboard)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_monthly_returns_compound_in_rows_and_heatmap(self):
+        self.run_javascript("""
+load('compoundMonthlyReturns');
+load('buildStratMonthlyReturns');
+load('buildCompareMonthlyReturns');
+global.STRATEGIES = [
+  {name: 'vector', runIds: ['run'], runNameMap: {}},
+  {name: 'event', runIds: ['run'], runNameMap: {}},
+];
+global.stratSelectedRun = {};
+global.stratMonthlyData = {};
+global.stratMonthlyDisplay = {};
+global.stratMonthlyYear = {};
+global.compareMonthlyData = 'returns';
+global.compareMonthlyYear = 'all';
+global.challengerIdx = -1;
+global.getViewRunData = () => RUN_DATA.run;
+const container = {innerHTML: ''};
+global.document = {getElementById: () => container};
+for (const [months, expected] of [
+  [{1: 10, 2: -10}, '-1.0%'],
+  [{1: 10, 3: 10}, '+21.0%'],
+  [{1: -100, 2: 50}, '-100.0%'],
+]) {
+  global.RUN_DATA = {run: {MONTHLY_HEATMAP: {2024: months}}};
+  for (const display of ['rows', 'heatmap']) {
+    stratMonthlyDisplay[0] = display;
+    buildStratMonthlyReturns(0);
+    assert.ok(container.innerHTML.includes(expected), container.innerHTML);
+    global.compareMonthlyDisplay = display;
+    buildCompareMonthlyReturns([0, 1]);
+    assert.ok(container.innerHTML.includes(expected), container.innerHTML);
+  }
+}
+""")
+
+    def test_trading_ranking_displays_hour_based_duration(self):
+        self.run_javascript("""
+load('fmtDuration');
+load('rebuildOverviewTradingActivity');
+global.selectedForCompare = new Set();
+global.tradingSortCol = null;
+global.challengerIdx = -1;
+global.STRATEGIES = [{name: 'strategy', color: '#fff'}];
+global.TRADING_COLS = [['Avg Duration', 'average_trade_duration', 'ratio', 'neutral']];
+global.getViewMetrics = () => ({average_trade_duration: 16.128});
+const container = {innerHTML: ''};
+global.document = {getElementById: id => id === 'overview-trading-activity' ? container : null};
+rebuildOverviewTradingActivity();
+assert.ok(container.innerHTML.includes('16h'), container.innerHTML);
+assert.ok(!container.innerHTML.includes('16.1d'));
+""")
+
+    def test_equity_correlations_align_dates_and_keep_engine_labels(self):
+        self.run_javascript("""
+load('equityCorrelation');
+load('buildCorrelationMatrix');
+load('buildCompareCorrelation');
+const a = [[0, '2024-01-01'], [1, '2024-01-02'], [9, '2024-01-02'], [5, '2024-01-03']];
+const b = [[-100, '2023-12-31'], [0, '2024-01-01'], [18, '2024-01-02'], [10, '2024-01-03']];
+assert.equal(equityCorrelation(a, b), 1);
+assert.equal(equityCorrelation(a, b.slice(0, 2)), null);
+assert.equal(equityCorrelation(a, [[1, '2024-01-01'], [1, '2024-01-02'], [1, '2024-01-03']]), null);
+global.STRATEGIES = [{name: 'confluen (vector)'}, {name: 'confluen (event)'}];
+global.selectedRunView = 'window';
+global.selectedForCompare = new Set([0, 1]);
+global.getViewEquity = i => i === 0 ? a : b;
+global.getViewRunData = i => ({EQ: getViewEquity(i)});
+const container = {innerHTML: ''};
+global.document = {getElementById: () => container};
+for (const render of [buildCorrelationMatrix, () => buildCompareCorrelation([0, 1])]) {
+  render();
+  for (const strategy of STRATEGIES) {
+    assert.ok(container.innerHTML.includes('>' + strategy.name + '</th>'), container.innerHTML);
+  }
+}
+""")
+
+    def test_timeline_retains_asset_on_redraw_and_clears_missing_asset(self):
+        self.run_javascript("""
+load('buildTimelineScatter');
+global.getStratRunData = () => ({
+  ORDERS: [{created: '2024-01-01T08:00:00+00:00', price: 100, sym: 'BTC', side: 'BUY'}],
+});
+const container = {innerHTML: ''};
+const select = {value: 'BTC', addEventListener: () => {}};
+global.document = {getElementById: id => id === 'strat-0-timeline-scatter' ? container : select};
+let selected;
+global._drawTimelineCanvas = (sid, points, symbol) => {selected = symbol;};
+buildTimelineScatter(0);
+assert.equal(selected, 'BTC');
+assert.ok(container.innerHTML.includes('value="BTC" selected'));
+select.value = 'ETH';
+buildTimelineScatter(0);
+assert.equal(selected, '');
+""")
 
 
 class TestBacktestReportOpen(TestCase):
