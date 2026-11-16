@@ -50,8 +50,7 @@ def extract_main_example_from_readme(readme_path: str) -> str:
     """
     Extract the main trading strategy example from README.md.
 
-    This looks for the large code block that contains the
-    RSIEMACrossoverStrategy class and the main execution block.
+    This selects the recommended declarative RSIConfluenceStrategy example.
 
     Args:
         readme_path: Path to the README.md file
@@ -61,26 +60,12 @@ def extract_main_example_from_readme(readme_path: str) -> str:
     """
     code_blocks = extract_python_code_blocks_from_readme(readme_path)
 
-    # Find the code block that contains the RSIEMACrossoverStrategy
     for block in code_blocks:
-        if 'RSIEMACrossoverStrategy' in block and 'class' in block:
+        if 'class RSIConfluenceStrategy(' in block:
             return block
 
     raise ValueError(
-        "Could not find the RSIEMACrossoverStrategy example in README.md"
-    )
-
-
-def prepare_readme_example_for_test(main_example: str) -> str:
-    """Adapt the README strategy to the compact offline test fixture set."""
-    return (
-        main_example
-        .replace('symbols = ["BTC", "ETH"]', 'symbols = ["BTC", "DOT"]')
-        .replace(
-            'identifier="ETH_ohlcv", symbol="ETH/EUR"',
-            'identifier="DOT_ohlcv", symbol="DOT/EUR"',
-        )
-        .replace('symbol="ETH"', 'symbol="DOT"')
+        "Could not find the RSIConfluenceStrategy example in README.md"
     )
 
 
@@ -118,12 +103,12 @@ class TestReadmeExample(TestCase):
 
         # Verify the main strategy example exists
         main_example = extract_main_example_from_readme(self.readme_path)
-        self.assertIn('RSIEMACrossoverStrategy', main_example)
-        self.assertIn('signal_cards', main_example)
-        self.assertIn('prepare_signal_data', main_example)
+        self.assertIn('RSIConfluenceStrategy', main_example)
+        self.assertIn('confluence_cards', main_example)
+        self.assertIn('indicator_configs', main_example)
 
     def test_readme_strategy_class_is_valid_python(self):
-        """The RSIEMACrossoverStrategy code from README compiles."""
+        """The RSIConfluenceStrategy code from README compiles."""
         main_example = extract_main_example_from_readme(self.readme_path)
 
         try:
@@ -131,11 +116,11 @@ class TestReadmeExample(TestCase):
         except SyntaxError as e:
             self.fail(f"README example has syntax error: {e}")
 
-    def test_readme_strategy_uses_scaling_rules(self):
-        """The README example demonstrates ScalingRule usage."""
+    def test_readme_strategy_uses_take_profits(self):
+        """The README example demonstrates TakeProfitRule usage."""
         main_example = extract_main_example_from_readme(self.readme_path)
-        self.assertIn('ScalingRule', main_example)
-        self.assertIn('scaling_rules', main_example)
+        self.assertIn('TakeProfitRule', main_example)
+        self.assertIn('take_profits', main_example)
 
     def test_readme_strategy_uses_stop_losses(self):
         """The README example demonstrates StopLossRule usage."""
@@ -150,30 +135,31 @@ class TestReadmeExample(TestCase):
         namespace = {}
         exec(main_example, namespace)
 
-        self.assertIn('RSIEMACrossoverStrategy', namespace)
-        cls = namespace['RSIEMACrossoverStrategy']
+        self.assertIn('RSIConfluenceStrategy', namespace)
+        cls = namespace['RSIConfluenceStrategy']
 
         # Verify class attributes
         self.assertTrue(hasattr(cls, 'generate_signals'))
         self.assertTrue(hasattr(cls, 'generate_signal_series'))
-        self.assertTrue(hasattr(cls, 'scaling_rules'))
+        self.assertTrue(hasattr(cls, 'confluence_cards'))
+        self.assertTrue(hasattr(cls, 'indicator_configs'))
+        self.assertTrue(hasattr(cls, 'take_profits'))
         self.assertTrue(hasattr(cls, 'stop_losses'))
         self.assertTrue(hasattr(cls, 'position_sizes'))
         self.assertTrue(hasattr(cls, 'data_sources'))
 
-        # Verify scaling rules are defined
-        self.assertGreater(len(cls.scaling_rules), 0)
+        self.assertGreater(len(cls.confluence_cards), 0)
+        self.assertGreater(len(cls.indicator_configs), 0)
+        self.assertGreater(len(cls.take_profits), 0)
         # Verify stop losses are defined
         self.assertGreater(len(cls.stop_losses), 0)
 
     def test_readme_strategy_runs_fast_vector_backtest_with_offline_data(self):
         """The README strategy runs using only compact offline test data."""
         main_example = extract_main_example_from_readme(self.readme_path)
-        class_code = prepare_readme_example_for_test(main_example)
-
         namespace = {}
-        exec(class_code, namespace)
-        strategy_class = namespace['RSIEMACrossoverStrategy']
+        exec(main_example, namespace)
+        strategy_class = namespace['RSIConfluenceStrategy']
 
         app = create_app(
             name="ReadmeExampleTest",

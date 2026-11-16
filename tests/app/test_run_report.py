@@ -9,6 +9,7 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 import pandas as pd
+from ccxt.binance import binance
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
@@ -255,6 +256,11 @@ class TestRunReport(TestCase):
         super().setUp()
         self.resource_directory = TemporaryDirectory()
         self.resource_dir = self.resource_directory.name
+        market_discovery = patch.object(
+            binance, "load_markets", return_value={"BTC/EUR": {}},
+        )
+        market_discovery.start()
+        self.addCleanup(market_discovery.stop)
 
     def tearDown(self) -> None:
         super().tearDown()
