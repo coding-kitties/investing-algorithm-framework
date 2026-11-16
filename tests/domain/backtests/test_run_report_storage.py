@@ -1,6 +1,7 @@
 import gzip
 import json
-from pathlib import Path
+import os
+from pathlib import Path, PureWindowsPath
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
@@ -194,9 +195,39 @@ class TestRunReportStorage(TestCase):
                 save_run_reports(self.directory, self.reports)
         self.assertEqual(list((self.directory / "run_reports").iterdir()), [])
 
+    def test_sidecar_sync_uses_a_writable_descriptor(self):
+        fsync = os.fsync
+
+        def sync_writable(descriptor):
+            os.write(descriptor, b"")
+            fsync(descriptor)
+
+        with patch(
+            "investing_algorithm_framework.domain.backtesting."
+            "run_report_storage.os.fsync",
+            side_effect=sync_writable,
+        ):
+            reference = save_run_reports(self.directory, self.reports)
+        self.assertEqual(
+            list(iter_run_reports(self.directory, reference)), self.reports,
+        )
+
     def test_references_cannot_escape_the_index_directory(self):
         for reference in ("/outside.jsonl.gz", "../outside.jsonl.gz"):
             with self.subTest(reference=reference), self.assertRaisesRegex(
                 OperationalException, "relative",
             ):
                 self.make_index(reference).load_run_reports()
+
+    def test_windows_rooted_and_drive_relative_references_are_rejected(self):
+        for reference in (
+            "/outside.jsonl.gz", r"\outside.jsonl.gz",
+            r"C:\outside.jsonl.gz", "C:outside.jsonl.gz",
+            r"\\server\share\outside.jsonl.gz",
+        ):
+            with self.subTest(reference=reference), patch(
+                "investing_algorithm_framework.domain.backtesting."
+                "run_report_storage.Path",
+                return_value=PureWindowsPath(reference),
+            ), self.assertRaisesRegex(OperationalException, "relative"):
+                list(iter_run_reports(self.directory, reference))

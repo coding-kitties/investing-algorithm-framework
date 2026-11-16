@@ -40,7 +40,7 @@ class TestDashboardDemo(TestCase):
             browser.assert_not_called()
 
     def test_unavailable_browser_logs_manual_open_path(self):
-        report_path = Path("/tmp/dashboard demo/comparison.html")
+        report_path = Path("dashboard demo/comparison.html").resolve()
         with patch("sys.argv", [
             "demo", "--reports-only",
         ]), patch.object(

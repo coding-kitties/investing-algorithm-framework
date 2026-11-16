@@ -35,7 +35,7 @@ def report_scope(report: Dict[str, Any]) -> Tuple[str, str, str]:
 def save_run_reports(
     directory: Path, reports: List[Dict[str, Any]],
 ) -> str:
-    """Atomically write one immutable sidecar for this invocation."""
+    """Atomically publish a sidecar after syncing a writable descriptor."""
     relative = Path("run_reports") / f"{uuid4().hex}.jsonl.gz"
     destination = directory / relative
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -52,7 +52,7 @@ def save_run_reports(
                 handle.write(json.dumps(
                     report, allow_nan=False, separators=(",", ":"),
                 ) + "\n")
-        with staging.open("rb") as handle:
+        with staging.open("r+b") as handle:
             os.fsync(handle.fileno())
         os.replace(staging, destination)
     finally:
@@ -66,7 +66,7 @@ def iter_run_reports(
 ) -> Iterator[Dict[str, Any]]:
     """Read and validate a sidecar without retaining unmatched reports."""
     relative = Path(reference)
-    if relative.is_absolute() or ".." in relative.parts:
+    if relative.anchor or ".." in relative.parts:
         raise OperationalException(
             "run_reports_path must be relative to the index directory."
         )
