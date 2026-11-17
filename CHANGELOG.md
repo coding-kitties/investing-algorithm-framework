@@ -28,17 +28,94 @@ below.
 
 ### Highlights
 
-- Study-based vector and event backtesting with disk-backed result indexes,
-  checkpoint recovery, multi-window evaluation, and parameter optimization.
-- Declarative confluence strategies with callable indicators, explainable
-  decision traces, and persisted backtest run reports.
-- Expanded strategy documentation and comparison dashboards with corrected
-  timestamps, annual returns, correlation alignment, and window selection.
-- Buffered history and bundle writes, bounded handling of large MessagePack
-  values, and cached timeframe parsing.
+This is the cumulative stable release of the complete v9 alpha series, not
+only the changes since the last alpha.
+
+#### Research, backtesting, and optimization
+
+- Study-first research with reusable `Study`, `Universe`, and `BacktestWindow`
+  definitions, rolling/anchored/holdout/time-series k-fold windows, and
+  time/universe out-of-sample evaluation.
+- Dual vector/event engine results in the same algorithm bundle, with
+  engine-aware summaries, ranking, filtering, and reporting.
+- Combined multi-strategy event backtests sharing a portfolio, independent
+  algorithm sweeps, strategy attribution on orders/trades, and isolated state
+  between event windows.
+- Cross-sectional ranking, filtering, and scoring pipelines; Monte Carlo and
+  permutation tests; evaluation-focus ranking and benchmark comparisons.
+- Parameter optimization with optional baseline-first candidates, progressive
+  pruning, checkpoint recovery, reusable prepared market data, and versioned
+  evidence for completed, pruned, and partially failed trials.
+- Worker limits, worker-pool recycling, incremental persistence, and soft
+  process-tree memory/system-headroom guards for backtest sweeps.
+
+#### Strategies, execution, and portfolio management
+
+- Long/short signals and SHORT/COVER routing with collateral handling,
+  fill-time accounting, partial fills, FIFO/explicit allocation, and
+  short-aware fixed/trailing stop-loss and take-profit rules.
+- Declarative confluence cards, boolean/crossover conditions, scored rules,
+  hard requirements, vetoes, callable indicators, and canonical decision
+  traces shared by research and runtime reporting.
+- Shared signal conflict resolution, position sizing, scaling, exposure
+  budgets, and side-aware symbol/portfolio cooldowns.
+- Broker-native mirror stop-loss/take-profit safety orders for supported
+  executors, with sibling cancellation and fill-based accounting.
+- Reproducible execution assumptions with commission/slippage models, per-order
+  cost attribution, and venue/study-level trading-cost configuration.
+- Explicit local/broker/automatic paper-trading modes, opt-in hedge positions,
+  recurring/one-shot deposits, credential resolution, and deployment overrides.
+- Anchor-aligned scheduling shared by live and backtest execution, optional
+  immediate startup execution, and configurable display timezones.
+
+#### Storage, API, and reporting
+
+- Open Backtest Format (`.obtf`) bundles containing engine-scoped studies,
+  windows, results, metrics, and execution assumptions; merge-on-save preserves
+  other engines and windows, with legacy readers and migration tooling.
+- Disk-backed `BacktestIndex` and read-only `BacktestHistory` sequences,
+  lazy result selection, local/tiered stores, OHLCV deduplication, and CLI
+  migration/index/list/rank/prune/store workflows.
+- FastAPI replaces Flask, with automatic Swagger documentation, algorithm
+  status/start/stop/invoke/insights endpoints, trade endpoints, and order-cost
+  overview/specification endpoints.
+- Persisted live/paper run reports, per-tick signal outcomes and no-signal
+  explanations, correlated manual invocation with optional waiting, and
+  backtest report sidecars.
+- Multi-study and per-engine HTML reports, comparison dashboards, explainable
+  diagnostics, and expanded strategy/showcase documentation.
+- More explicit independent-window aggregation, capital-weighted and
+  median/best/worst returns, completeness metadata, and corrected risk metrics.
+
+#### Performance, packaging, and optional native backends
+
+- Buffered history and bundle writes, bounded large-MessagePack handling,
+  cached timeframe parsing, shared metric calculations, provider-frame reuse,
+  and reduced archive/conversion overhead.
+- Optional Rust kernels for eligible confluence/vector/risk operations and
+  explicitly selected event-state/archive operations, with platform wheels,
+  protocol compatibility checks, and installed-wheel parity validation.
 - Python remains the default reference implementation. Native backends remain
   optional and explicitly selected; this release does not promise Python-free
-  execution or a hard whole-process memory limit.
+  execution, a universal Rust speedup, or a hard whole-process memory limit.
+- Leaner core installation with optional cloud/notebook extras and updated
+  cross-platform release validation.
+
+### Additional upgrade considerations
+
+- Move strategy-level trading costs to `PortfolioConfiguration` or
+  `Study.execution_config`; trading currency belongs to the portfolio/universe.
+- Replace legacy full-object backtest filters with scalar
+  `window_metrics_filter_function` / `final_metrics_filter_function` callbacks.
+- Disk-backed histories return detached, read-only records. Materialize, edit,
+  and reassign a history when modifying saved results; writable scratch disk
+  space is required.
+- Metric corrections change historical Sortino/Calmar and drawdown comparisons.
+  Rerun old checkpoints when comparing results under the corrected accounting;
+  existing live SQL ledgers need explicit reconciliation where affected.
+- Flask integrations and removed `/api/backtest-results/*` endpoints require
+  migration to FastAPI and the current scoped portfolio/order/trade APIs.
+- Cloud deployment and notebook integrations now require their optional extras.
 
 ### Fixed
 
