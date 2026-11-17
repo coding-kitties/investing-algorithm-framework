@@ -41,10 +41,10 @@ trading workflow. Define a strategy once, explore it with vector backtests,
 validate it in an event-driven simulation, inspect the results in an interactive
 dashboard, and run the same strategy in paper or live trading.
 
-> **v9.0.0 alpha is available.** Install the prerelease explicitly:
+> **v9 is now available.**
 >
 > ```bash
-> pip install investing-algorithm-framework==9.0.0a22
+> pip install investing-algorithm-framework==9.0.0
 > ```
 >
 > See the [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md)
