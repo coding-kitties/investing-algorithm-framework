@@ -7,8 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.0.0] - 2026-11-17
+
+The first stable v9 release brings together the v9 prereleases documented
+below.
+
+### Upgrading from v8
+
+- Replace `run_vector_backtest` / `run_vector_backtests` with `run_backtest` /
+  `run_backtests`, passing a `Study` with a `Universe` and `BacktestWindow`
+  entries. Results are disk-backed `BacktestIndex` objects; use
+  `iter_backtests()` to load individual backtests.
+- Replace legacy `generate_buy_signals` / `generate_sell_signals` hooks with
+  `generate_signals` for event execution and `generate_signal_series` for
+  vector execution, or use `ConfluenceScoringStrategy`.
+- Review the [backtesting guide](docusaurus/docs/Getting%20Started/backtesting.md),
+  [strategy guide](docusaurus/docs/Getting%20Started/strategies.md), and
+  [storage guide](docusaurus/docs/Getting%20Started/backtest-storage.md)
+  before migrating existing strategies or saved results.
+
+### Highlights
+
+- Study-based vector and event backtesting with disk-backed result indexes,
+  checkpoint recovery, multi-window evaluation, and parameter optimization.
+- Declarative confluence strategies with callable indicators, explainable
+  decision traces, and persisted backtest run reports.
+- Expanded strategy documentation and comparison dashboards with corrected
+  timestamps, annual returns, correlation alignment, and window selection.
+- Buffered history and bundle writes, bounded handling of large MessagePack
+  values, and cached timeframe parsing.
+- Python remains the default reference implementation. Native backends remain
+  optional and explicitly selected; this release does not promise Python-free
+  execution or a hard whole-process memory limit.
+
 ### Fixed
 
+- Monthly returns include the first month and account for first-month cash
+  flows. A mid-month start produces a partial-month return.
+- Execution-price provider lookups refresh between backtest windows without
+  losing the preference for finer timeframes.
+- Windows run-report persistence uses writable file-sync handles and rejects
+  rooted or drive-relative sidecar references.
+- Python 3.10/3.11 validation passes on Linux, macOS, and Windows; native wheel
+  and installed-parity validation passes on all configured platforms.
 - Order-amount rounding now handles scientific notation (#634).
 - Optional amount precision is consistent across generic, short/cover and
   buy/sell convenience order APIs. Value-based sizing is rounded after
