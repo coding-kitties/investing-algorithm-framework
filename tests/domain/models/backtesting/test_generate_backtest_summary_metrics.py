@@ -37,8 +37,8 @@ def create_mock_backtest_metrics(
     max_drawdown=0.10,
     max_drawdown_duration=30,
     trades_per_year=50,
-    win_rate=60.0,
-    current_win_rate=55.0,
+    win_rate=0.6,
+    current_win_rate=0.55,
     win_loss_ratio=1.5,
     current_win_loss_ratio=1.4,
     number_of_trades=10,
@@ -79,6 +79,11 @@ def create_mock_backtest_metrics(
     metrics.current_win_loss_ratio = current_win_loss_ratio
     metrics.number_of_trades = number_of_trades
     metrics.number_of_trades_closed = number_of_trades_closed
+    # These fixtures have no breakeven trades.
+    metrics.number_of_positive_trades = number_of_trades_closed * win_rate
+    metrics.number_of_negative_trades = (
+        number_of_trades_closed - metrics.number_of_positive_trades
+    )
     metrics.cumulative_exposure = cumulative_exposure
     metrics.exposure_ratio = exposure_ratio
     metrics.average_trade_return = average_trade_return
@@ -500,15 +505,15 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         # Period 2: 30 trades, 60% win rate
         # Weighted: (80 * 10 + 60 * 30) / (10 + 30) = 2600 / 40 = 65%
         metrics1 = create_mock_backtest_metrics(
-            win_rate=80.0, number_of_trades_closed=10
+            win_rate=0.8, number_of_trades_closed=10
         )
         metrics2 = create_mock_backtest_metrics(
-            win_rate=60.0, number_of_trades_closed=30
+            win_rate=0.6, number_of_trades_closed=30
         )
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
-        self.assertAlmostEqual(result.win_rate, 65.0, places=5)
+        self.assertAlmostEqual(result.win_rate, 0.65, places=5)
 
     def test_win_loss_ratio_weighted_by_trade_count(self):
         """Test that win/loss ratio is weighted by trade count."""
@@ -590,7 +595,7 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
             max_drawdown=0.15,
             number_of_trades=20,
             number_of_trades_closed=18,
-            win_rate=60,
+            win_rate=0.6,
             total_number_of_days=365,
         )
         metrics2 = create_mock_backtest_metrics(
@@ -600,7 +605,7 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
             max_drawdown=0.10,
             number_of_trades=10,
             number_of_trades_closed=8,
-            win_rate=50,
+            win_rate=0.5,
             total_number_of_days=365,
         )
 
@@ -626,8 +631,8 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         self.assertEqual(result.worst_window_max_drawdown, 0.15)
 
         # Verify win rate weighted by trades
-        # (60 * 18 + 50 * 8) / 26 = 1480 / 26 ≈ 56.92%
-        expected_win_rate = (60 * 18 + 50 * 8) / 26
+        # (0.6 * 18 + 0.5 * 8) / 26 = 1480 / 26 ≈ 56.92%
+        expected_win_rate = (0.6 * 18 + 0.5 * 8) / 26
         self.assertAlmostEqual(result.win_rate, expected_win_rate, places=3)
 
     def test_three_periods_different_lengths(self):
@@ -830,16 +835,16 @@ class TestGenerateBacktestSummaryMetricsCalculationValidity(unittest.TestCase):
         NOT: (90 + 50) / 2 = 70% (simple average)
         """
         metrics1 = create_mock_backtest_metrics(
-            win_rate=90, number_of_trades_closed=10
+            win_rate=0.9, number_of_trades_closed=10
         )
         metrics2 = create_mock_backtest_metrics(
-            win_rate=50, number_of_trades_closed=90
+            win_rate=0.5, number_of_trades_closed=90
         )
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
         # Weighted: (90*10 + 50*90) / 100 = 5400 / 100 = 54%
-        self.assertAlmostEqual(result.win_rate, 54.0, places=3)
+        self.assertAlmostEqual(result.win_rate, 0.54, places=3)
 
     def test_profit_factor_from_totals_makes_sense(self):
         """
