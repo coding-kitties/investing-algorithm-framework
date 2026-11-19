@@ -63,7 +63,7 @@ class BacktestSummaryMetrics:
         average_trade_return (float): Average return per trade.
         average_trade_return_percentage (float): Average return percentage
             per trade.
-        average_trade_loss (float): Total gross loss from all trades.
+        average_trade_loss (float): Mean loss weighted by losing-trade counts.
         average_trade_loss_percentage (float): Average trade loss percentage.
         average_trade_gain (float): Average gain from winning trades.
         average_trade_gain_percentage (float): Average gain percentage
@@ -81,7 +81,7 @@ class BacktestSummaryMetrics:
             ``worst_window_max_drawdown`` as a nonnegative magnitude.
         max_drawdown_duration (int): Duration of the maximum drawdown.
         trades_per_year (float): Average trades executed per year.
-        win_rate (float): Percentage of winning trades.
+        win_rate (float): Winning/closed-trade fraction (0 to 1).
         current_win_rate (float): Win rate over recent trades.
         win_loss_ratio (float): Ratio of average win to average loss.
         current_win_loss_ratio (float): Win/loss ratio over recent trades.
