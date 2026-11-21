@@ -6,6 +6,8 @@ from investing_algorithm_framework.domain import PortfolioSnapshot, \
 
 import pandas as pd
 
+from .returns import get_monthly_returns
+
 
 def get_value_at_risk(
     snapshots: List[PortfolioSnapshot],
@@ -66,20 +68,7 @@ def _get_monthly_return_series(
     """Helper: build a monthly TWR return series from snapshots."""
     if not snapshots or len(snapshots) < 2:
         return None
-    data = [
-        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
-        for s in snapshots
-    ]
-    df = pd.DataFrame(data, columns=["created_at", "total_value", "cash_flow"])
-    df['created_at'] = pd.to_datetime(df['created_at'])
-    df = df.sort_values('created_at').drop_duplicates('created_at')\
-        .set_index('created_at')
-    monthly_value = df['total_value'].resample('ME').last().dropna()
-    monthly_cf = df['cash_flow'].resample('ME').sum()
-    monthly_cf = monthly_cf.reindex(monthly_value.index, fill_value=0)
-    prev_value = monthly_value.shift(1)
-    monthly_returns = (monthly_value - monthly_cf) / prev_value - 1
-    monthly_returns = monthly_returns.dropna()
-    if monthly_returns.empty:
+    monthly_returns = get_monthly_returns(snapshots)
+    if not monthly_returns:
         return None
-    return monthly_returns
+    return pd.Series([r for r, _ in monthly_returns])
