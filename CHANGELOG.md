@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `StrategyScenario` (`investing_algorithm_framework.testing`, also exported
+  at the top level) seeds a strategy test with cash, long/short trade lots,
+  pending orders, stop-loss/take-profit rules, trailing state and cooldown
+  history through the production order and trade services. Each seed is
+  validated (`ScenarioSetupError`) and followed by a cash/position/lot
+  consistency check (`ScenarioStateError`); every scenario keeps its state in
+  its own in-memory store, with no database, network or files. (#625)
+
 ## [9.0.0] - 2026-11-17
 
 The first stable v9 release brings together the v9 prereleases documented

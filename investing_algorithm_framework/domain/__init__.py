@@ -17,7 +17,7 @@ from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .exceptions import OperationalException, ApiException, DataError, \
     PermissionDeniedApiException, ImproperlyConfigured, NetworkError, \
-    PortfolioOutOfSyncError
+    PortfolioOutOfSyncError, ScenarioSetupError, ScenarioStateError
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, PortfolioConfiguration, PositionMode, \
     PaperTradingMode, Portfolio, Position, \
@@ -302,6 +302,8 @@ __all__ = [
     "SyncResult",
     "ScheduledDeposit",
     "PortfolioOutOfSyncError",
+    "ScenarioSetupError",
+    "ScenarioStateError",
     "resolve_backtest_path",
     "get_backtest",
     "get_backtests",

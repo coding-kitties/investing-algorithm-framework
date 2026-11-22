@@ -266,6 +266,8 @@ from .services import (
     TradeTakeProfitService,
     TradeStopLossService,
 )
+from .testing import StrategyScenario, ScenarioSetupError, \
+    ScenarioStateError
 try:
     from .notebook.magic import load_ipython_extension  # noqa: F401
 except ImportError:
@@ -594,5 +596,8 @@ __all__ = [
     "StudySampleType",
     "ScheduledDeposit",
     "SyncResult",
-    "PortfolioOutOfSyncError"
+    "PortfolioOutOfSyncError",
+    "StrategyScenario",
+    "ScenarioSetupError",
+    "ScenarioStateError",
 ]
