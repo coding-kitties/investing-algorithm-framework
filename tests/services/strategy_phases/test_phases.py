@@ -973,3 +973,25 @@ class TestRecordCooldownPhase(TestCase):
             [rule], signal_side="buy", symbol="BTC", bar_index=1,
         )
         self.assertTrue(blocked)
+
+    def test_record_emission_keys_state_per_side_in_hedge_mode(self):
+        from investing_algorithm_framework import PositionMode
+        from investing_algorithm_framework.services.strategy_phases \
+            .record_cooldown import record_emission
+
+        strategy = _StubStrategy(
+            symbols=["BTC"],
+            scaling_rules={"BTC": _StubScalingRule(cooldown_in_bars=2)},
+        )
+        record_emission(
+            strategy, "BTC", SignalSide.OPEN_SHORT, 4, PositionMode.HEDGE
+        )
+        self.assertEqual(
+            strategy._cooldown_remaining, {("BTC", "short"): 2}
+        )
+        rule = CooldownRule(symbol="BTC", bars=3, trigger="sell")
+        tracker = strategy._cooldown_tracker
+        self.assertEqual(tracker.remaining_bars(
+            rule, symbol="BTC", bar_index=5, position_side="short"), 2)
+        self.assertEqual(tracker.remaining_bars(
+            rule, symbol="BTC", bar_index=5, position_side="long"), 0)
