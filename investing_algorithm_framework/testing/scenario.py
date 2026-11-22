@@ -1,5 +1,6 @@
 """StrategyScenario: a seeded, isolated portfolio for strategy tests."""
 import math
+import weakref
 from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
@@ -112,11 +113,10 @@ class StrategyScenario:
             )
 
         if not isinstance(start, datetime) or start.tzinfo is None \
-                or (start.minute, start.second, start.microsecond) \
-                != (0, 0, 0):
+                or start.timestamp() % 3600:
             raise ScenarioSetupError(
                 f"{call}: start must be a timezone-aware datetime on the "
-                f"hour (got {start!r}). Pass e.g. "
+                f"UTC hour (got {start!r}). Pass e.g. "
                 f"datetime(2024, 1, 1, tzinfo=timezone.utc)."
             )
 
@@ -128,9 +128,12 @@ class StrategyScenario:
         self.initial_cash = float(initial_cash)
         self._mode = configuration.position_mode
         self._trading_symbol = configuration.trading_symbol
-        self._last_bars_ago = None
+        self._last_bars_ago = {}
         self._tmp = TemporaryDirectory(prefix="iaf-scenario-")
         _bound_strategies.add(id(strategy))
+        # Also releases the strategy if the scenario is never closed.
+        self._release = weakref.finalize(
+            self, _bound_strategies.discard, id(strategy))
         self._closed = False
 
         try:
@@ -178,7 +181,7 @@ class StrategyScenario:
         self._closed = True
         if hasattr(self, "_state"):
             self._state.close()
-        _bound_strategies.discard(id(self.strategy))
+        self._release()
         self._tmp.cleanup()
 
     @property
@@ -427,7 +430,18 @@ class StrategyScenario:
                 raise ScenarioSetupError(
                     f"{call}: no open trade for {symbol}. Call "
                     f"open_trade first.")
-            at = self._check_time(call, "at", at, trades)
+            history = []
+            for trade in trades:
+                history += [
+                    (f"trade {trade.id} opened", trade.opened_at),
+                    (f"the last mark of trade {trade.id}",
+                     trade.last_reported_price_datetime),
+                ] + [
+                    (f"a rule of trade {trade.id} was created",
+                     rule.created_at)
+                    for rule in trade.stop_losses + trade.take_profits
+                ]
+            at = self._check_time(call, "at", at, history)
 
             for trade in trades:
                 for kind, rules in (("stop-loss", trade.stop_losses),
@@ -484,11 +498,11 @@ class StrategyScenario:
             raise ScenarioSetupError(
                 f"{call}: bars_ago must be an int >= 1 (1 is the bar "
                 f"before the next evaluation).")
-        if self._last_bars_ago is not None \
-                and bars_ago > self._last_bars_ago:
+        last = self._last_bars_ago.get(symbol)
+        if last is not None and bars_ago > last:
             raise ScenarioSetupError(
-                f"{call}: an event {self._last_bars_ago} bars ago is "
-                f"already recorded. Record events oldest first.")
+                f"{call}: an event {last} bars ago is already recorded "
+                f"for {symbol}. Record events oldest first.")
         if strategy.get_scaling_rule(symbol) is None and not any(
             rule.applies_to_symbol(symbol) for rule in strategy.cooldowns
         ):
@@ -511,7 +525,7 @@ class StrategyScenario:
             strategy._cooldown_remaining[key] -= bars_ago - 1
             if strategy._cooldown_remaining[key] <= 0:
                 del strategy._cooldown_remaining[key]
-        self._last_bars_ago = bars_ago
+        self._last_bars_ago[symbol] = bars_ago
 
     # ----------------------------------------------------------------
     # Consistency
@@ -545,15 +559,20 @@ class StrategyScenario:
 
         # Cash follows from the order ledger: fills move it by
         # price * filled, fees reduce it, and pending BUY, SHORT and
-        # COVER orders reserve price * remaining.
+        # COVER orders reserve their reservation price * remaining.
+        # An order filled in chunks at different prices is booked at
+        # its last price, so such states are outside this check.
         sign = {"BUY": -1, "SELL": 1, "SHORT": 1, "COVER": -1}
         cash = self.initial_cash
         for order in orders:
             filled = order.filled or 0
-            cash += sign[order.order_side] * order.price * filled
+            if filled:
+                cash += sign[order.order_side] * order.price * filled
             cash -= order.order_fee or 0
             if order.status == "OPEN" and order.order_side != "SELL":
-                cash -= order.price * (order.amount - filled)
+                reservation = order.metadata.get("_reservation_price") \
+                    or order.reservation_price
+                cash -= reservation * (order.amount - filled)
             elif order.status == "OPEN":
                 reserved = sum(a.amount_pending for a in allocations
                                if a.order_id == order.id)
@@ -643,7 +662,8 @@ class StrategyScenario:
                 or strategy._cooldown_bar_index \
                 or strategy._cooldown_tracker._last_event \
                 or strategy._cooldown_remaining \
-                or strategy._scale_out_counts:
+                or strategy._scale_out_counts \
+                or strategy._last_system_exit_scan_at is not None:
             raise ScenarioSetupError(
                 f"{call}: this {type(strategy).__name__} instance has "
                 f"already run or holds cooldown state. Create a new "
@@ -655,6 +675,10 @@ class StrategyScenario:
         position_mode, configuration,
     ):
         if configuration is not None:
+            if not isinstance(configuration, PortfolioConfiguration):
+                raise ScenarioSetupError(
+                    f"{call}: portfolio_configuration must be a "
+                    f"PortfolioConfiguration.")
             if (trading_symbol, market, position_mode) != (None,) * 3:
                 raise ScenarioSetupError(
                     f"{call}: pass trading_symbol, market and "
@@ -668,9 +692,16 @@ class StrategyScenario:
                     f"Make them equal or leave initial_balance unset.")
             return configuration
 
-        if not trading_symbol:
+        if not trading_symbol or not isinstance(trading_symbol, str):
             raise ScenarioSetupError(
                 f"{call}: trading_symbol is required, e.g. 'EUR'.")
+        try:
+            position_mode = PositionMode(
+                position_mode or PositionMode.NETTING)
+        except ValueError:
+            raise ScenarioSetupError(
+                f"{call}: position_mode must be a PositionMode (got "
+                f"{position_mode!r}).")
         if market is None:
             markets = {
                 ds.market for ds in strategy.data_sources
@@ -685,12 +716,13 @@ class StrategyScenario:
             market=market,
             trading_symbol=trading_symbol,
             initial_balance=initial_cash,
-            position_mode=position_mode or PositionMode.NETTING,
+            position_mode=position_mode,
         )
 
     def _check_symbol(self, call, symbol):
-        if not isinstance(symbol, str) or not symbol:
-            raise ScenarioSetupError(f"{call}: symbol must be a string.")
+        if not isinstance(symbol, str) or not symbol or "/" in symbol:
+            raise ScenarioSetupError(
+                f"{call}: symbol must be a base symbol such as 'BTC'.")
         if symbol.upper() == self._trading_symbol:
             raise ScenarioSetupError(
                 f"{call}: {symbol} is the trading symbol; seed cash "
@@ -705,7 +737,7 @@ class StrategyScenario:
                     f"{call}: {name} must be a finite number > 0 "
                     f"(got {value!r}).")
 
-    def _check_time(self, call, name, at, trades=()):
+    def _check_time(self, call, name, at, after=()):
         if at is None:
             at = self._start
         if not isinstance(at, datetime) or at.tzinfo is None:
@@ -717,12 +749,11 @@ class StrategyScenario:
                 f"{call}: {name} {at.isoformat()} is after the scenario "
                 f"start {self._start.isoformat()}. Seeded history lies "
                 f"at or before the start.")
-        for trade in trades:
-            if at < trade.opened_at:
+        for event, when in after:
+            if when is not None and at < when:
                 raise ScenarioSetupError(
-                    f"{call}: {name} {at.isoformat()} is before trade "
-                    f"{trade.id} opened at {trade.opened_at.isoformat()}."
-                    f" Use a later time.")
+                    f"{call}: {name} {at.isoformat()} is before {event} "
+                    f"at {when.isoformat()}. Use a later time.")
         return at
 
     def _position(self, symbol):
@@ -834,7 +865,9 @@ class StrategyScenario:
                     f"{call}: the trade's {kind} already sell {used}%, "
                     f"so another {sell_percentage}% exceeds 100%. Lower "
                     f"sell_percentage.")
-            at = self._check_time(call, "created_at", created_at, [stored])
+            at = self._check_time(
+                call, "created_at", created_at,
+                [(f"trade {stored.id} opened", stored.opened_at)])
             with self._clock(at):
                 created = getattr(self._context, name)(
                     trade=stored, percentage=percentage,
@@ -846,17 +879,24 @@ class StrategyScenario:
 
 
 class _ScopedContext:
-    """Proxy that runs each :class:`Context` method call against its
-    scenario's state."""
+    """Proxy that runs each method call of the wrapped framework
+    object (the :class:`Context`, or a service reached through it)
+    against its scenario's state."""
 
-    def __init__(self, scenario):
+    def __init__(self, scenario, target=None):
         self._scenario = scenario
+        self._target = target
 
     def __getattr__(self, name):
         scenario = self._scenario
         scenario._ensure_open()
-        value = getattr(scenario._context, name)
+        target = scenario._context if self._target is None \
+            else self._target
+        value = getattr(target, name)
         if not callable(value):
+            if type(value).__module__.startswith(
+                    "investing_algorithm_framework"):
+                return _ScopedContext(scenario, value)
             return value
 
         @wraps(value)

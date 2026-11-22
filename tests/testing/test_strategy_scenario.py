@@ -196,6 +196,15 @@ class TestConsistency(TestCase):
                 self.assertEqual(results[0], results[1])
                 self.assertEqual(results[0][0], 4 - bars_ago)
 
+    def test_stop_order_reservation_is_checked(self):
+        with scenario() as s:
+            s.context.create_order(
+                target_symbol="BTC", price=None, order_type="STOP",
+                order_side="BUY", amount=1, stop_price=110)
+            self.assertEqual(s.context.get_unallocated(), 890)
+            s.check_consistency()
+            s.open_trade("ETH", amount=1, price=10)
+
     def test_corrupted_ledger_is_reported(self):
         with scenario() as s:
             s.open_trade("BTC", amount=2, price=100)
@@ -345,7 +354,14 @@ class TestValidation(TestCase):
         ran._cooldown_bar_index = 3
         cases = [
             (dict(start=naive), "timezone-aware"),
-            (dict(start=START + timedelta(minutes=5)), "on the hour"),
+            (dict(start=START + timedelta(minutes=5)), "on the UTC hour"),
+            (dict(start=datetime(2024, 1, 1, 5, tzinfo=timezone(
+                timedelta(hours=5, minutes=30)))), "on the UTC hour"),
+            (dict(position_mode="sideways"), "position_mode must be"),
+            (dict(trading_symbol=5), "trading_symbol is required"),
+            (dict(trading_symbol=None, market=None,
+                  portfolio_configuration={"market": "BITVAVO"}),
+             "must be a PortfolioConfiguration"),
             (dict(initial_cash=-1), "initial_cash must be"),
             (dict(initial_cash=float("inf")), "initial_cash must be"),
             (dict(trading_symbol=None), "trading_symbol is required"),
@@ -392,6 +408,7 @@ class TestValidation(TestCase):
             trade = s.open_trade("BTC", amount=2, price=100,
                                  opened_at=START - 2 * HOUR)
             s.place_order("BTC", side="BUY", amount=1, price=100)
+            s.mark_price("BTC", 101, at=START - HOUR / 2)
             unknown = SimpleNamespace(id=999)
             naive = datetime(2023, 12, 31)
             cases = [
@@ -403,6 +420,8 @@ class TestValidation(TestCase):
                  "fee must be"),
                 (lambda: s.open_trade("eur", amount=1, price=1),
                  "trading symbol"),
+                (lambda: s.open_trade("BTC/EUR", amount=1, price=1),
+                 "base symbol such as 'BTC'"),
                 (lambda: s.open_trade("BTC", amount=1, price=1,
                                       direction="up"),
                  "direction must be"),
@@ -447,6 +466,8 @@ class TestValidation(TestCase):
                  "no open trade for ETH"),
                 (lambda: s.mark_price("BTC", 110, at=START - 3 * HOUR),
                  "is before trade"),
+                (lambda: s.mark_price("BTC", 110, at=START - HOUR),
+                 "the last mark of trade"),
                 (lambda: s.mark_price("BTC", 90, at=START),
                  "triggers the active stop-loss"),
                 (lambda: s.record_cooldown("BTC", side="buy", bars_ago=1),
@@ -474,6 +495,21 @@ class TestValidation(TestCase):
             with self.assertRaisesRegex(ScenarioSetupError, "oldest first"):
                 s.record_cooldown(
                     "BTC", side=SignalSide.CLOSE_LONG, bars_ago=2)
+
+    def test_cooldown_order_is_per_symbol(self):
+        strategy = MyStrategy(cooldowns=[CooldownRule(bars=5)])
+        with scenario(strategy) as s:
+            s.record_cooldown("BTC", side=SignalSide.OPEN_LONG, bars_ago=1)
+            s.record_cooldown("ETH", side=SignalSide.OPEN_LONG, bars_ago=3)
+
+    def test_mark_cannot_predate_a_rule(self):
+        with scenario() as s:
+            trade = s.open_trade("BTC", amount=1, price=100,
+                                 opened_at=START - 2 * HOUR)
+            s.add_stop_loss(trade, percentage=5, trailing=True)
+            with self.assertRaisesRegex(
+                    ScenarioSetupError, "a rule of trade 1 was created"):
+                s.mark_price("BTC", 120, at=START - HOUR)
 
     def test_strategy_cannot_join_two_open_scenarios(self):
         strategy = MyStrategy()
@@ -545,6 +581,12 @@ class TestIndependence(TestCase):
                 self.assertEqual(app.context.get_unallocated(), 1_000)
             finally:
                 teardown_sqlalchemy()
+
+    def test_services_reached_through_context_stay_scoped(self):
+        with scenario() as s:
+            s.open_trade("BTC", amount=1, price=100)
+            orders = s.context.order_service.get_all()
+            self.assertEqual([o.order_side for o in orders], ["BUY"])
 
     def test_environment_does_not_change_the_portfolio(self):
         overrides = {
@@ -618,6 +660,18 @@ class TestCleanup(TestCase):
             with scenario(strategy) as s:
                 directory = s._tmp.name
                 raise ValueError("test body failed")
+        self.assertFalse(os.path.exists(directory))
+        scenario(strategy).close()
+
+    def test_unclosed_scenario_releases_the_strategy(self):
+        import gc
+
+        strategy = MyStrategy()
+        s = scenario(strategy)
+        directory = s._tmp.name
+        with self.assertWarns(ResourceWarning):
+            del s
+            gc.collect()
         self.assertFalse(os.path.exists(directory))
         scenario(strategy).close()
 
