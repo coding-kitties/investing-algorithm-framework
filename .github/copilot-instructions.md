@@ -30,6 +30,11 @@ Prefer the smallest relevant test selection. The
 [test workflow](workflows/test.yml) defines CI installation and full-suite
 commands; [.flake8](../.flake8) defines lint exclusions.
 
+Documentation-only changes do not require application tests unless a relevant
+documentation check exists. Validate changed links and commands as appropriate.
+Report the checks actually run, any checks not run, and pre-existing failures
+separately from failures introduced by the change.
+
 ## Architecture and behavior
 
 - Start with the [architecture index](../docs/architecture/README.md), then read
@@ -53,3 +58,12 @@ commands; [.flake8](../.flake8) defines lint exclusions.
 - Public docs live in `docusaurus/`; internal architecture and design references
   live in `docs/`. Follow the [release workflow](workflows/publish.yml) for tag
   and version rules.
+
+## Metric conventions
+
+- Return metrics and `win_rate` use decimal fractions: `0.10` means a 10% return
+  and `0.60` means a 60% win rate. Verify units in the metric producer before
+  converting for display; not every field named "percentage" uses fractions.
+- Weight trade gain/loss averages by actual positive/negative trade counts.
+  Breakeven trades are not losses. Ensure these counts are computed even when
+  callers request only the corresponding averages.
