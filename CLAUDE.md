@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`investing-algorithm-framework` (IAF) is a Python framework (Poetry, Python >=3.10) for building, backtesting and deploying trading bots. The v9 line is in alpha. An optional Rust/PyO3 extension lives in `native/confluence` and is published separately as `iaf-confluence-native`.
+`investing-algorithm-framework` (IAF) is a Python framework (Poetry, Python >=3.10) for building, backtesting and deploying trading bots. The current package version is defined in the root `pyproject.toml`. An optional Rust/PyO3 extension lives in `native/confluence` and is published separately as `iaf-confluence-native`.
 
 PRs target the `dev` branch upstream (`coding-kitties/investing-algorithm-framework`).
 
@@ -25,7 +25,7 @@ poetry run python -m unittest tests.services.test_order_backtest_service
 poetry run python -m unittest tests.app.test_eventloop.TestEventloopService.<test_method> -v
 ```
 
-Tests are `unittest.TestCase` classes and must be run from the repository root, because they import `tests.resources`. `pytest` is not a Poetry dependency; the native CI job installs it with pip and uses it for the parity selection, so both runners work on the suite, but `unittest` is the contract.
+Tests are primarily `unittest.TestCase` classes and must be run from the repository root, because they import `tests.resources`. `pytest` is included in Poetry's test dependency group; the native CI job also installs it with pip and uses it for the parity selection. Both runners work on the suite, but the main CI test job uses `unittest` through coverage.
 
 ### Native extension (optional)
 
