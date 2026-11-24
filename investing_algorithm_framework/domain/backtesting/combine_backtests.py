@@ -38,6 +38,21 @@ def safe_weighted_mean(values, weights):
     ) / total_weight if total_weight > 0 else None
 
 
+def _trade_population_count(metrics, name):
+    """Read a trade count, including legacy saved [count, percentage] pairs."""
+    count = getattr(metrics, name, None)
+    if isinstance(count, (list, tuple)) and len(count) == 2:
+        count = count[0]
+    if (
+        isinstance(count, (int, float))
+        and not isinstance(count, bool)
+        and math.isfinite(count)
+        and count >= 0
+    ):
+        return count
+    return None
+
+
 def _compound_percentage_returns(percentages):
     """
     Compound percentage returns across multiple periods.
@@ -702,14 +717,13 @@ def generate_backtest_summary_metrics(
     )
 
     # === AVERAGE TRADE LOSS (weighted by losing trades) ===
-    # We need to estimate losing trade count from win_rate if not available
-    losing_trade_weights = []
-    for b in valid_metrics:
-        if b.number_of_trades_closed is not None and b.win_rate is not None:
-            losing_trades = b.number_of_trades_closed * (1 - b.win_rate / 100)
-            losing_trade_weights.append(losing_trades)
-        else:
-            losing_trade_weights.append(b.number_of_trades_closed or 0)
+    # Per-run win_rate is a fraction, and closed trades also include
+    # breakevens. Use the producer's counts rather than estimating a
+    # population from the complement of the win rate.
+    losing_trade_weights = [
+        _trade_population_count(b, "number_of_negative_trades")
+        for b in valid_metrics
+    ]
 
     average_trade_loss = safe_weighted_mean(
         [b.average_trade_loss for b in valid_metrics],
@@ -721,13 +735,10 @@ def generate_backtest_summary_metrics(
     )
 
     # === AVERAGE TRADE GAIN (weighted by winning trades) ===
-    winning_trade_weights = []
-    for b in valid_metrics:
-        if b.number_of_trades_closed is not None and b.win_rate is not None:
-            winning_trades = b.number_of_trades_closed * (b.win_rate / 100)
-            winning_trade_weights.append(winning_trades)
-        else:
-            winning_trade_weights.append(b.number_of_trades_closed or 0)
+    winning_trade_weights = [
+        _trade_population_count(b, "number_of_positive_trades")
+        for b in valid_metrics
+    ]
 
     average_trade_gain = safe_weighted_mean(
         [b.average_trade_gain for b in valid_metrics],

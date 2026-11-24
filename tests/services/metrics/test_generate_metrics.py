@@ -4,13 +4,50 @@ from unittest import TestCase
 from investing_algorithm_framework import (
     BacktestMetrics,
     BacktestRun,
+    Trade,
     create_backtest_metrics,
 )
 from investing_algorithm_framework.services.metrics.trades import (
     get_directional_trade_statistics,
 )
+from investing_algorithm_framework.domain.backtesting.combine_backtests \
+    import generate_backtest_summary_metrics
+
 
 class TestGenerateMetrics(TestCase):
+    def test_selected_trade_averages_include_summary_population_counts(self):
+        run = BacktestRun.open(os.path.join(
+            self.backtest_run_directory, 'backtest_run_one'))
+        run.trades = [
+            Trade(
+                id=index, orders=[], target_symbol='BTC', trading_symbol='EUR',
+                opened_at=run.backtest_start_date,
+                closed_at=run.backtest_end_date,
+                open_price=100, amount=1, available_amount=0, cost=100,
+                remaining=0, filled_amount=1, status='CLOSED', net_gain=gain,
+            )
+            for index, gain in enumerate((10, -20, 0))
+        ]
+
+        for name, count_name, expected in (
+            ('average_trade_gain', 'number_of_positive_trades', 10),
+            ('average_trade_gain_percentage',
+             'number_of_positive_trades', 0.1),
+            ('average_trade_loss', 'number_of_negative_trades', -20),
+            ('average_trade_loss_percentage',
+             'number_of_negative_trades', -0.2),
+        ):
+            with self.subTest(metric=name):
+                requested = [name]
+                actual = create_backtest_metrics(
+                    run, risk_free_rate=0.024, metrics=requested)
+                self.assertEqual(requested, [name])
+                self.assertEqual(getattr(actual, count_name), 1)
+                restored = BacktestMetrics.from_dict(actual.to_dict())
+                summary = generate_backtest_summary_metrics([restored])
+                self.assertAlmostEqual(
+                    getattr(summary, name), expected)
+
     def test_resampling_is_shared_and_does_not_mutate_cached_frame(self):
         from investing_algorithm_framework.services.metrics.inputs import (
             prepare_metric_inputs,

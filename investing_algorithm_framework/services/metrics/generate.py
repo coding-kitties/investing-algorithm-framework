@@ -71,6 +71,8 @@ def create_backtest_metrics_for_backtest(
             metric calculations.
         metrics (List[str], optional): List of metric names to compute.
             If None, a default set of metrics will be computed.
+            Trade gain/loss averages also compute their population counts
+            for summary aggregation without modifying the supplied list.
         backtest_date_range (BacktestDateRange, optional): The date range
             for the backtest. If None, all backtest metrics will be computed
             for each backtest run.
@@ -700,6 +702,17 @@ def create_backtest_metrics(
             "gross_profit",
             "gross_loss",
         ]
+
+    metrics = list(metrics)
+    for average, count in (
+        ("average_trade_gain", "number_of_positive_trades"),
+        ("average_trade_loss", "number_of_negative_trades"),
+    ):
+        if (
+            (average in metrics or f"{average}_percentage" in metrics)
+            and count not in metrics
+        ):
+            metrics.append(count)
 
     backtest_metrics = BacktestMetrics(
         backtest_window=backtest_run.backtest_window,
