@@ -1,7 +1,9 @@
 """StrategyScenario: a seeded, isolated portfolio for strategy tests."""
 import math
 import weakref
+from collections.abc import Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from tempfile import TemporaryDirectory
@@ -13,12 +15,23 @@ from investing_algorithm_framework.dependency_container import \
 from investing_algorithm_framework.domain import BacktestDateRange, \
     INDEX_DATETIME, RESOURCE_DIRECTORY, Order, OrderSide, \
     PortfolioConfiguration, PositionMode, ScenarioSetupError, \
-    ScenarioStateError, Trade, TradeStopLoss, TradeTakeProfit
-from investing_algorithm_framework.domain.models.signal import SignalSide
+    ScenarioStateError, StopLossRule, TakeProfitRule, CooldownRule, \
+    Trade, TradeStopLoss, TradeTakeProfit
+from investing_algorithm_framework.domain.models.signal import (
+    Signal, SignalSide,
+)
 from investing_algorithm_framework.infrastructure.repositories \
     .event_memory import EventMemoryState, activate_event_memory
 from investing_algorithm_framework.services.strategy_phases \
     .record_cooldown import record_emission
+from investing_algorithm_framework.services.strategy_phases \
+    .resolve_conflicts import _TRACKER_SIDE
+from investing_algorithm_framework.services.data_providers \
+    .data_provider_service import DataProviderService
+from investing_algorithm_framework.services.strategy_phases import (
+    ApplyRiskBudgetPhase, PhaseState, ResolveConflictsPhase,
+    SizedIntent, SizePositionsPhase,
+)
 
 # ids of strategy instances bound to an open scenario
 _bound_strategies = set()
@@ -41,6 +54,61 @@ def _close(a, b):
 
 def _exceeds(a, b):
     return a > b and not _close(a, b)
+
+
+@dataclass(frozen=True)
+class ScenarioOrderPreview:
+    """Non-emitted order intents and production phase diagnostics.
+
+    ``orders`` is empty when blocked. A signal flip can produce both a
+    closing and an opening intent. Amounts are pre-executor quantities,
+    without fills, exchange rounding, fees or slippage.
+    """
+
+    orders: tuple[SizedIntent, ...]
+    traces: tuple[tuple[str, object], ...]
+
+    @property
+    def approved(self) -> bool:
+        return bool(self.orders)
+
+
+@dataclass(frozen=True)
+class ScenarioCooldownPreview:
+    """Cooldown state at the next evaluation, without consuming a bar.
+
+    ``rules`` contains active rules blocking the requested signal side.
+    ``remaining_bars`` includes the next bar and is the longest wait
+    across those rules and the policy-applicable scaling countdown.
+    Other eligibility gates are not part of this preview.
+    """
+
+    remaining_bars: int
+    rules: tuple[CooldownRule, ...]
+    scaling_remaining_bars: int
+
+    @property
+    def blocked(self) -> bool:
+        return self.remaining_bars > 0
+
+
+class _ScenarioPrices(DataProviderService):
+    def __init__(self, prices, trading_symbol, call):
+        super().__init__()
+        self.prices = prices
+        self.trading_symbol = trading_symbol
+        self.call = call
+
+    def get_ticker_data(self, symbol, market, date):
+        pair = symbol.upper()
+        if pair not in self.prices:
+            raise ScenarioSetupError(
+                f"{self.call}: no price supplied for {pair}. Pass its "
+                f"base symbol in prices, e.g. prices={{'ETH': 100}}; "
+                f"prices must be in {self.trading_symbol}."
+            )
+        price = self.prices[pair]
+        return {"bid": price, "ask": price}
 
 
 class StrategyScenario:
@@ -196,6 +264,295 @@ class StrategyScenario:
         self._ensure_open()
         return self._services.configuration_service() \
             .config[INDEX_DATETIME]
+
+    def get_position_size(
+        self, symbol: str, *, price: float,
+        prices: Optional[Mapping[str, float]] = None,
+    ) -> float:
+        """Return the strategy's raw allocation in quote currency.
+
+        Calls the overridable ``strategy.get_position_size(symbol)`` and
+        the returned rule's ``get_size`` with the scenario portfolio.
+        No eligibility, scaling, cash or exposure limits are applied.
+        ``price`` values the target asset; ``prices`` supplies current
+        quote-currency prices for other base symbols in the portfolio,
+        including positions created by pending orders.
+        """
+        call = _call("get_position_size", symbol, price=price)
+        with self._sizing_context(call, symbol, price, prices) as symbol:
+            rule = self.strategy.get_position_size(symbol)
+            if rule is None:
+                raise ScenarioSetupError(
+                    f"{call}: strategy.get_position_size({symbol!r}) "
+                    f"returned None. Return a PositionSize rule."
+                )
+            size = rule.get_size(self._context.get_portfolio(), price)
+            if not _number(size) or size < 0:
+                raise ScenarioSetupError(
+                    f"{call}: sizing rule must return a finite allocation "
+                    f">= 0 in {self._trading_symbol} (got {size!r})."
+                )
+            return float(size)
+
+    def get_stop_loss_rule(
+        self, symbol: str, *, side: str = "long",
+    ) -> Optional[StopLossRule]:
+        """Inspect the strategy's effective rule through its override.
+
+        ``side`` means position direction (long/short), not order side.
+        Side-specific lookup applies only in HEDGE, matching execution.
+        None means no configured rule. No trade or rule row is created.
+        """
+        with self._activate(), self._strategy_context():
+            return self._get_risk_rule(
+                "get_stop_loss_rule", symbol, side,
+            )
+
+    def get_take_profit_rule(
+        self, symbol: str, *, side: str = "long",
+    ) -> Optional[TakeProfitRule]:
+        """Inspect the effective take-profit rule; see get_stop_loss_rule."""
+        with self._activate(), self._strategy_context():
+            return self._get_risk_rule(
+                "get_take_profit_rule", symbol, side,
+            )
+
+    def get_cooldown_rules(self, symbol: str) -> tuple[CooldownRule, ...]:
+        """Return symbol and portfolio-scoped configuration, active or not."""
+        call = _call("get_cooldown_rules", symbol)
+        with self._activate():
+            symbol = self._check_symbol(call, symbol)
+            return tuple(
+                rule for rule in self.strategy.cooldowns
+                if rule.applies_to_symbol(symbol)
+            )
+
+    def preview_stop_loss(
+        self, symbol: str, *, price: float, amount: float = 1,
+        side: str = "long",
+        prices: Optional[Mapping[str, float]] = None,
+    ) -> Optional[TradeStopLoss]:
+        """Build a detached production risk model for a hypothetical fill.
+
+        The preview has trade_id=0 and is never persisted. Inspect its
+        stop_loss_price and sell_amount, or test trailing updates and
+        has_triggered on it without changing scenario state. It does not
+        check order eligibility. ``side`` is long/short; ``prices`` has
+        the same meaning as in get_position_size for contextual overrides.
+        None means no effective strategy rule.
+        """
+        call = _call("preview_stop_loss", symbol, price=price, amount=amount)
+        with self._sizing_context(call, symbol, price, prices) as symbol:
+            rule = self._get_risk_rule("get_stop_loss_rule", symbol, side)
+            return self._preview_risk(
+                call, rule, TradeStopLoss, price, amount, side,
+            )
+
+    def preview_take_profit(
+        self, symbol: str, *, price: float, amount: float = 1,
+        side: str = "long",
+        prices: Optional[Mapping[str, float]] = None,
+    ) -> Optional[TradeTakeProfit]:
+        """Build a detached take-profit model; see preview_stop_loss.
+
+        A trailing take-profit's take_profit_price is initially None:
+        the production model arms it only after a favorable price move.
+        """
+        call = _call("preview_take_profit", symbol, price=price, amount=amount)
+        with self._sizing_context(call, symbol, price, prices) as symbol:
+            rule = self._get_risk_rule("get_take_profit_rule", symbol, side)
+            return self._preview_risk(
+                call, rule, TradeTakeProfit, price, amount, side,
+            )
+
+    def preview_cooldown(
+        self, symbol: str, *, side: SignalSide = SignalSide.OPEN_LONG,
+    ) -> ScenarioCooldownPreview:
+        """Inspect blocking rules and remaining bars without ticking state.
+
+        Uses the production cooldown tracker at the next bar index,
+        including portfolio scope, HEDGE legs and scaling countdowns.
+        The conflict policy's cooldown_blocks controls scaling countdowns,
+        just as in the production eligibility phase.
+        """
+        call = _call("preview_cooldown", symbol, side=side)
+        rules = self.get_cooldown_rules(symbol)
+        with self._activate():
+            symbol = self._check_symbol(call, symbol)
+            if not isinstance(side, SignalSide):
+                raise ScenarioSetupError(
+                    f"{call}: side must be a SignalSide."
+                )
+            strategy = self.strategy
+            position_side = (
+                "long" if side.is_long else "short"
+            ) if self._mode == PositionMode.HEDGE else None
+            active = []
+            remaining = 0
+            for rule in rules:
+                if not rule.blocks_signal(_TRACKER_SIDE[side]):
+                    continue
+                bars = strategy._cooldown_tracker.remaining_bars(
+                    rule, symbol=symbol,
+                    bar_index=strategy._cooldown_bar_index + 1,
+                    position_side=position_side,
+                )
+                if bars > 0:
+                    active.append(rule)
+                    remaining = max(remaining, bars)
+            key = (
+                (symbol, position_side)
+                if self._mode == PositionMode.HEDGE else symbol
+            )
+            scaling = (
+                max(0, strategy._cooldown_remaining.get(key, 0) - 1)
+                if strategy.conflict_policy.is_blocked_by_cooldown(side)
+                else 0
+            )
+            return ScenarioCooldownPreview(
+                remaining_bars=max(remaining, scaling),
+                rules=tuple(active),
+                scaling_remaining_bars=scaling,
+            )
+
+    def _get_risk_rule(self, method, symbol, side):
+        call = _call(method, symbol, side=side)
+        symbol = self._check_symbol(call, symbol)
+        if side not in ("long", "short"):
+            raise ScenarioSetupError(
+                f"{call}: side must be 'long' or 'short'."
+            )
+        lookup = (
+            (symbol, side) if self._mode == PositionMode.HEDGE
+            else (symbol,)
+        )
+        return getattr(self.strategy, method)(*lookup)
+
+    def _preview_risk(self, call, rule, model, price, amount, side):
+        self._check_positive(call, amount=amount)
+        if rule is None:
+            return None
+        self._check_positive(call, percentage=rule.percentage_threshold)
+        if not _number(rule.sell_percentage) \
+                or not 0 < rule.sell_percentage <= 100:
+            raise ScenarioSetupError(
+                f"{call}: rule sell_percentage must be in (0, 100]."
+            )
+        return model(
+            trade_id=0, percentage=rule.percentage_threshold,
+            open_price=price, total_amount_trade=amount,
+            sell_percentage=rule.sell_percentage, trailing=rule.trailing,
+            is_short=side == "short",
+            mirror_on_exchange=rule.mirror_on_exchange,
+            created_at=self.now,
+        )
+
+    def preview_order(
+        self, symbol: str, *, price: float,
+        side: SignalSide = SignalSide.OPEN_LONG,
+        prices: Optional[Mapping[str, float]] = None,
+    ) -> ScenarioOrderPreview:
+        """Preview an explicit intent at the next evaluation's bar index.
+
+        Runs production conflict/eligibility, sizing and risk-budget
+        phases, honoring strategy sizing overrides. Does not generate
+        indicators/signals, submit/fill orders, attach risk rules, scan
+        protective exits, or advance the clock/cooldown history.
+
+        Prices have the same meaning as :meth:`get_position_size`.
+        Inspect ``orders`` for asset ``amount`` and ``quote_amount``, or
+        ``traces`` for gating and budget diagnostics. This is a single
+        intent preview, not a simultaneous multi-symbol allocation.
+        """
+        call = _call("preview_order", symbol, price=price, side=side)
+        self._ensure_open()
+        if not isinstance(side, SignalSide):
+            raise ScenarioSetupError(
+                f"{call}: side must be a SignalSide, e.g. "
+                f"SignalSide.OPEN_LONG."
+            )
+        with self._sizing_context(call, symbol, price, prices) as symbol:
+            strategy = self.strategy
+            remaining = strategy._cooldown_remaining
+            strategy._cooldown_remaining = {
+                key: bars - 1 for key, bars in remaining.items() if bars > 1
+            }
+            try:
+                state = PhaseState(
+                    strategy=strategy, context=self._context, data={},
+                    current_datetime=self.now,
+                    bar_index=strategy._cooldown_bar_index + 1,
+                    raw_signals=[Signal(symbol=symbol, side=side)],
+                )
+                for phase in (
+                    ResolveConflictsPhase(), SizePositionsPhase(),
+                    ApplyRiskBudgetPhase(),
+                ):
+                    phase.run(state)
+                orders = []
+                for intent in state.sized_intents:
+                    if any(
+                        not _number(value) or value < 0
+                        for value in (intent.amount, intent.quote_amount)
+                    ):
+                        raise ScenarioSetupError(
+                            f"{call}: sizing produced invalid amounts; "
+                            f"check the strategy's position/scaling rules."
+                        )
+                    if intent.amount == 0 or intent.quote_amount == 0:
+                        state.trace("preview_order.zero_size", intent)
+                        continue
+                    orders.append(intent)
+                return ScenarioOrderPreview(
+                    orders=tuple(orders),
+                    traces=tuple(state.traces),
+                )
+            finally:
+                strategy._cooldown_remaining = remaining
+
+    @contextmanager
+    def _strategy_context(self):
+        previous = self.strategy.context
+        self.strategy.context = self._context
+        try:
+            yield
+        finally:
+            self.strategy.context = previous
+
+    @contextmanager
+    def _sizing_context(self, call, symbol, price, prices):
+        with self._activate(), self._strategy_context():
+            symbol = self._check_symbol(call, symbol)
+            self._check_positive(call, price=price)
+            if prices is not None and not isinstance(prices, Mapping):
+                raise ScenarioSetupError(
+                    f"{call}: prices must map base symbols to prices."
+                )
+            quotes = {}
+            for target, value in (prices or {}).items():
+                target = self._check_symbol(call, target)
+                self._check_positive(call, **{f"price for {target}": value})
+                pair = f"{target}/{self._trading_symbol}"
+                if pair in quotes:
+                    raise ScenarioSetupError(
+                        f"{call}: prices contains duplicate symbol {target}."
+                    )
+                quotes[pair] = value
+            pair = f"{symbol}/{self._trading_symbol}"
+            if pair in quotes and quotes[pair] != price:
+                raise ScenarioSetupError(
+                    f"{call}: price conflicts with prices[{symbol!r}]. "
+                    f"Supply one consistent price."
+                )
+            quotes[pair] = price
+            previous_service = self._context.data_provider_service
+            self._context.data_provider_service = _ScenarioPrices(
+                quotes, self._trading_symbol, call,
+            )
+            try:
+                yield symbol
+            finally:
+                self._context.data_provider_service = previous_service
 
     # ----------------------------------------------------------------
     # Seeding

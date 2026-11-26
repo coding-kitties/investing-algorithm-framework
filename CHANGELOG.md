@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validated (`ScenarioSetupError`) and followed by a cash/position/lot
   consistency check (`ScenarioStateError`); every scenario keeps its state in
   its own in-memory store, with no database, network or files. (#625)
+- `StrategyScenario.get_position_size` calculates a concrete quote-currency
+  allocation through the strategy's overridable sizing method.
+  `preview_order` returns sized intents and diagnostics from the production
+  eligibility, sizing and risk-budget phases without submitting orders or
+  advancing cooldown history. Both use explicit offline asset prices.
+- Scenario rule inspection and detached stop-loss/take-profit previews honor
+  strategy overrides and position-mode rule selection. Cooldown inspection
+  reports matching configuration, blocking rules and remaining bars at the
+  next evaluation, including portfolio scope, HEDGE legs and scaling timers.
 
 ## [9.0.0] - 2026-11-17
 

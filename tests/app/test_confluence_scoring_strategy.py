@@ -25,6 +25,81 @@ from investing_algorithm_framework.services.strategy_phases import (
     SizePositionsPhase,
 )
 from scripts.bench_vector_snapshot_events import workload
+from tests.resources.strategies_for_testing.confluence_strategy import (
+    ConfluenceScoringStrategy as RSIEMAConfluenceStrategy,
+)
+
+
+@pytest.mark.parametrize(
+    "rsi_value, spread, entry, exit_",
+    [
+        (30, 1, True, False),
+        (31, 1, False, False),
+        (29, 0, False, False),
+        (29, -1, False, True),
+        (69, 1, False, False),
+        (70, 1, False, True),
+        (71, -1, False, True),
+        (50, 0, False, False),
+    ],
+)
+def test_rsi_ema_fixture_score_thresholds(rsi_value, spread, entry, exit_):
+    instance = RSIEMAConfluenceStrategy(indicator_configs=[
+        replace(config, calculate=lambda data: data, parameters={})
+        for config in RSIEMAConfluenceStrategy.indicator_configs
+    ])
+    data = frame([0.] * 51).assign(rsi=rsi_value, ema_spread=spread)
+    data.index = pd.date_range(
+        "2025-01-01", periods=len(data), freq="2h", tz="UTC",
+    )
+    masks = {
+        signal.source: signal.series
+        for signal in instance.generate_signal_series({"BTC_ohlcv": data})
+        if signal.source
+    }
+    assert bool(masks["long_entry"].iloc[-1]) is entry
+    assert bool(masks["long_exit"].iloc[-1]) is exit_
+
+
+@pytest.mark.parametrize("bars", [14, 49, 200])
+def test_rsi_ema_fixture_indicators_and_warmup(bars):
+    from pyindicators import rsi
+
+    data = frame([0.] * bars)
+    data.index = pd.date_range(
+        "2025-01-01", periods=bars, freq="2h", tz="UTC",
+    )
+    data["Close"] = (
+        [100 + i for i in range(100)]
+        + [199 - i * 0.5 for i in range(100)]
+    )[:bars]
+    masks = {
+        signal.source: signal.series
+        for signal in RSIEMAConfluenceStrategy().generate_signal_series(
+            {"BTC_ohlcv": data}
+        )
+        if signal.source
+    }
+    values = rsi(data.copy(), source_column="Close", period=14)["rsi"]
+    spread = (
+        data["Close"].ewm(span=20, adjust=False).mean()
+        - data["Close"].ewm(span=50, adjust=False).mean()
+    )
+    ready = pd.Series(
+        range(bars), index=data.index,
+    ) >= 49
+    expected_entry = (ready & (values <= 30) & (spread > 0)).shift(
+        1, fill_value=False,
+    )
+    expected_exit = (ready & ((values >= 70) | (spread < 0))).shift(
+        1, fill_value=False,
+    )
+    pd.testing.assert_series_equal(
+        masks["long_entry"], expected_entry, check_names=False,
+    )
+    pd.testing.assert_series_equal(
+        masks["long_exit"], expected_exit, check_names=False,
+    )
 
 
 def calculate(frame):

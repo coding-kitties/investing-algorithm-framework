@@ -266,8 +266,10 @@ from .services import (
     TradeTakeProfitService,
     TradeStopLossService,
 )
-from .testing import StrategyScenario, ScenarioSetupError, \
-    ScenarioStateError
+from .testing import (
+    StrategyScenario, ScenarioOrderPreview, ScenarioCooldownPreview,
+    ScenarioSetupError, ScenarioStateError,
+)
 try:
     from .notebook.magic import load_ipython_extension  # noqa: F401
 except ImportError:
@@ -598,6 +600,8 @@ __all__ = [
     "SyncResult",
     "PortfolioOutOfSyncError",
     "StrategyScenario",
+    "ScenarioOrderPreview",
+    "ScenarioCooldownPreview",
     "ScenarioSetupError",
     "ScenarioStateError",
 ]
