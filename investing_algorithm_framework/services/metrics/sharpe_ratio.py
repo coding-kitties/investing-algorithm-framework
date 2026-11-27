@@ -114,7 +114,8 @@ def get_rolling_sharpe_ratio(
     # Rolling Annualised Sharpe
     rolling = returns_s.rolling(window=365, min_periods=30)
     rolling_sharpe_s = np.sqrt(365) * (
-        rolling.mean() / rolling.std()
+        (rolling.mean() - risk_free_rate / 365)
+        / rolling.std().replace(0, np.nan)
     )
 
     # Ensure chronological order

@@ -410,6 +410,20 @@ class TestGetRollingSharpeRatio(TestCase):
         # Should return NaN values due to zero volatility
         self.assertIsInstance(result, list)
 
+    def test_rolling_sharpe_subtracts_risk_free_rate(self):
+        import random
+
+        random.seed(42)
+        values = [1000]
+        for _ in range(99):
+            values.append(values[-1] * (1 + random.gauss(0.001, 0.01)))
+        snapshots = self._create_snapshots(values)
+
+        without_rf = get_rolling_sharpe_ratio(snapshots, risk_free_rate=0.0)
+        with_rf = get_rolling_sharpe_ratio(snapshots, risk_free_rate=0.5)
+
+        self.assertLess(with_rf[-1][0], without_rf[-1][0])
+
     # ==========================================================
     # Timestamp Tests
     # ==========================================================
