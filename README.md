@@ -171,9 +171,8 @@ and routing. This replaces the default signal-processing pipeline: declaring
 strategy risk rules alone does not apply that pipeline to your custom orders.
 
 ```python
-from quantos import
-    DataSource, OrderSide, Schedule, TimeUnit, TradingStrategy,
-)
+from quantos import DataSource, OrderSide, Schedule, TimeUnit, TradingStrategy
+
 
 
 class DirectOrderStrategy(TradingStrategy):
@@ -210,10 +209,10 @@ Emit trading intent rather than orders. The framework applies its normal
 conflict resolution, sizing, risk, execution, and cooldown phases.
 
 ```python
-from quantos import (
-    DataSource, PositionSize, Schedule, SignalSide, TimeUnit, TradingStrategy,
-    signal_series_from_column, signals_from_column,
-)
+from quantos import DataSource, PositionSize, Schedule, \
+    SignalSide, TimeUnit, TradingStrategy, \
+    signal_series_from_column, signals_from_column
+
 
 
 class MovingAverageSignalStrategy(TradingStrategy):
