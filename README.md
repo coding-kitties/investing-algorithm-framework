@@ -1,79 +1,154 @@
-<h1 align="center">
-  Investing Algorithm Framework
-</h1>
+![QuantOS — modular trading framework. From research to execution.](static/branding/quantos-ceramic-banner.svg)
 
 <p align="center">
-  <i>Build strategies, backtest at scale, compare results, and deploy the winner without rewriting your strategy.</i>
+  <a href="https://pypi.org/project/investing-algorithm-framework/"><img src="https://img.shields.io/pypi/v/investing-algorithm-framework?style=flat-square&amp;labelColor=242D43&amp;color=634DCC&amp;label=pypi" alt="PyPI version"></a>
+  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&amp;label=build&amp;style=flat-square&amp;labelColor=242D43" alt="Build status on main"></a>
+  <a href="https://pypi.org/project/investing-algorithm-framework/"><img src="https://img.shields.io/badge/python-%3E%3D3.10%2C%3C4.0-634DCC?style=flat-square&amp;labelColor=242D43" alt="Python &gt;=3.10,&lt;4.0"></a>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache_2.0-634DCC?style=flat-square&amp;labelColor=242D43" alt="Apache 2.0 license"></a>
+  <a href="https://coding-kitties.github.io/investing-algorithm-framework/"><img src="https://img.shields.io/badge/docs-getting_started-634DCC?style=flat-square&amp;labelColor=242D43" alt="Documentation"></a>
+  <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers"><img src="https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework?style=flat-square&amp;labelColor=242D43&amp;color=634DCC&amp;label=stars" alt="GitHub stars"></a>
+  <a href="https://finterion.com"><img src="static/integrations/deploy-on-finterion-badge.svg" alt="Deploy on Finterion"></a>
+  <a href="https://finterion.com/community/forum"><img src="https://img.shields.io/badge/dynamic/xml?url=https%3A%2F%2Ffinterion.com%2Fapi%2Fforum-badge.svg&amp;query=%2F%2F%2A%5Blocal-name%28%29%3D%27text%27%20and%20contains%28.%2C%20%27%20members%27%29%5D&amp;label=forum&amp;style=flat-square&amp;labelColor=242D43&amp;color=634DCC" alt="Forum member count"></a>
 </p>
 
-<h4 align="center">
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=linux&style=flat-square&logo=linux&logoColor=white" alt="Linux build"></a>
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=macos&style=flat-square&logo=apple&logoColor=white" alt="macOS build"></a>
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=windows&style=flat-square&logo=windows&logoColor=white" alt="Windows build"></a>
-  <a href="https://pypi.org/project/investing-algorithm-framework/"><img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg?style=flat-square" alt="PyPI version"></a>
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/apache%202.0-blue.svg?style=flat-square&label=license" alt="Apache 2.0 license"></a>
-</h4>
+# QuantOS
 
-<a href="https://finterion.com/community/forum"><img src="https://finterion.com/api/forum-badge.svg" alt="Finterion forum" height="30"></a>
+> **Note:** QuantOS is the new name for the Investing Algorithm Framework and introduces several improvements and changes to the framework. Old references to the framework, such as package names and documentation URLs, still use the previous name but will be updated over time. You can install all the new versions of QuantOS using the existing package name:
+>
+> ```bash
+> pip install quantos
+> ```
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="static/features/hero-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="static/features/hero-light.svg">
-    <img src="static/features/hero-dark.svg" alt="Investing Algorithm Framework features overview" style="max-width: 100%;">
-  </picture>
-</p>
+**From research to execution.**
 
-<p align="center">
-  <sub>Proudly sponsored by</sub>
-  <br>
-  <a href="https://www.finterion.com/" target="_blank">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
-      <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
-      <img src="static/sponsors/finterion-light.png" alt="Finterion" width="180">
-    </picture>
-  </a>
-</p>
-
-Investing Algorithm Framework is a Python framework for the complete quantitative
+QuantOS (formerly Investing Algorithm Framework) is a Python framework for the complete quantitative
 trading workflow. Define a strategy once, explore it with vector backtests,
 validate it in an event-driven simulation, inspect the results in an interactive
 dashboard, and run the same strategy in paper or live trading.
 
-> **v9.1 is now available.**
+
+
+>**Note:** The current documentation website is not fully up-to-date with v9 of QuantOS. If you need guidance or have any questions please reach out on the [forum](https://finterion.com/community/forum).
+
+[Get started](#getting-started) · [Features](#feature-highlights) · [Platforms & hosting](#platforms-integrations--hosting) · [Guides & examples](#guides--examples) · [Dashboard](#dashboard) · [Deployment](#deployment) · [Forum](#join-the-quantos-forum-hosted-on-finterioncom)
+
+## Join the QuantOS forum hosted on Finterion.com
+
+Building a strategy, exploring backtest results, or getting started with QuantOS?
+Connect with the community on the Finterion forum to ask questions, share what
+you're building, discuss trading research, and help shape the framework.
+
+[![Join the Finterion forum — ask, share, and build together. Forum member count.](static/community/ceramic-invitation.svg)](https://finterion.com/community/forum)
+
+**[Join the forum](https://finterion.com/community/forum)** — bring a question,
+share a strategy, or start a discussion.
+
+## QuantOS Sponsors and Infrastructure Partners
+
+[![Sponsors / Infrastructure partners — Finterion supports QuantOS open-source development.](static/sponsors/finterion-console-credit.png)](https://finterion.com)
+
+## Getting started
+
+> **v9 is now available.**
 >
 > ```bash
-> pip install investing-algorithm-framework==9.1.0
+> pip install investing-algorithm-framework==9.0.0
 > ```
 >
-> See the [v9.1 changelog](CHANGELOG.md#910---2026-11-28)
-> and [v9.0 migration notes](docusaurus/blog/2026-08-02-v9.0-release.md).
-> This README targets **v9 and later**;
+> See the [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md)
+> and [changelog](CHANGELOG.md). This README targets **v9 and later**;
 > its APIs and examples may not work with earlier versions.
 
-### Feature Highlights
+> **Documentation update in progress.** Our current documentation is out of date,
+> and we're working hard to bring it up to date with **v9.0**. If you have
+> questions or need help, please [start a question on the QuantOS forum hosted on Finterion.com](https://finterion.com/community/forum).
+
+[Installation guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation) · [Tutorial notebooks](examples/tutorial/README.md) · [Strategy showcase](examples/algorithm_examples/strategies_showcase/README.md)
+
+## Feature highlights
+
+### Define strategies
 
 - 🧠 **[Advanced strategy definitions](#3-confluence-scoring-declare-indicators-and-decisions):** Combine declarative indicators and data streams, confluence-scored entry and exit decisions, and position sizing and risk rules.
-- 🔁 **[Long and short trading](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/orders):** Define entry and exit signals once and run the same strategy in vector backtests, event-driven backtests, paper trading, and live trading.
+- 🧮 **[Cross-sectional pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines):** Rank, filter, and score entire universes of symbols during each strategy iteration.
+- 🧠 **[Confluence scoring cards](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/confluence-cards):** Build explainable decisions from requirements, weighted evidence, vetoes, and score thresholds.
+
+### Backtest and validate
+
 - ⚡ **[Vector backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting):** Evaluate signals and sweep thousands of strategy variants quickly with Polars-powered execution.
 - 🏃 **[Event-driven backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting):** Validate candidates bar by bar with realistic orders, fills, costs, and portfolio management.
-- 🧪 **[A first-class, scenario-based strategy testing framework](docusaurus/docs/Getting%20Started/testing-framework.md):** Seed portfolio and market conditions, advance scheduled bars, and assert signals, orders, fills, sizing, risk rules, and cooldowns with Python testing frameworks. See the [runnable reference](examples/testing_framework/example.py).
 - 🪟 **[Studies, universes, and backtest windows](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/studies):** Define the assets, assumptions, and rolling, anchored, holdout, walk-forward, time-OOS, or universe-OOS periods for each experiment.
+- 🔀 **[Monte Carlo testing](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/permutation-testing):** Measure how often randomized market paths match or outperform a strategy's observed results.
+
+### Inspect, compare, and store
+
 - 🗂️ **[Open Backtest Format](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/open-backtest-format):** Keep complete vector and event results in portable, versioned `.obtf` bundles.
 - 🗄️ **[Tiered storage and indexing](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-storage):** Rank and filter 10,000+ backtests through SQLite without decoding full result bundles.
 - 📊 **[80+ performance metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics):** Analyze CAGR, Sharpe, Sortino, Calmar, VaR/CVaR, drawdown, recovery, and benchmark-relative returns.
 - 📈 **[Interactive dashboard](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports):** Compare strategies, inspect trades and charts, review window coverage, and save a self-contained HTML report.
-- 🔀 **[Monte Carlo testing](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/permutation-testing):** Measure how often randomized market paths match or outperform a strategy's observed results.
-- 🧮 **[Cross-sectional pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines):** Rank, filter, and score entire universes of symbols during each strategy iteration.
-- 🧠 **[Confluence scoring cards](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/confluence-cards):** Build explainable decisions from requirements, weighted evidence, vetoes, and score thresholds.
+
+### Trade and manage risk
+
+- 🔁 **[Long and short trading](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/orders):** Define entry and exit signals once and run the same strategy in vector backtests, event-driven backtests, paper trading, and live trading.
 - 🛡️ **[Declarative risk rules](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/overview):** Configure sizing, exposure limits, scaling, stop losses, take profits, and signal cooldowns.
 - 💸 **[Execution cost models](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/trading-cost):** Apply percentage, fixed, basis-point, or volume-aware commission and slippage assumptions.
 - 🔐 **[Portfolio and credentials management](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/portfolio-configuration):** Configure markets, balances, fees, paper trading, and environment-based credentials without hardcoding secrets.
+- ↔️ **[Position modes: NETTING vs. HEDGE](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/position-modes):** Choose one net direction per symbol or maintain independent long and short legs with separate risk controls and P&L.
+
+### Deploy and extend
+
 - 🚀 **[Flexible deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment):** Run locally, self-host, deploy to AWS Lambda or Azure Functions, or publish through Finterion.
 - 🌐 **[Extensible integrations](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-data-providers):** Add custom data providers, order executors, storage adapters, metrics, strategies, and optimizers.
 - 🤖 **[Built-in MCP server](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server):** Let compatible AI tools query backtests, compare strategies, inspect trades, and manage research notes.
-- ↔️ **[Position modes: NETTING vs. HEDGE](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/position-modes):** Choose one net direction per symbol or maintain independent long and short legs with separate risk controls and P&L.
+
+<a id="integrations--ecosystem"></a>
+## Platforms, integrations & hosting
+
+Run QuantOS independently on your own infrastructure, use serverless deployment
+options, or connect an optional hosted platform.
+
+| Platform or hosting option | How it fits |
+| --- | --- |
+| Local / self-hosted | Run research, backtests, dashboards, and paper or live strategies on your own machine or infrastructure, including Docker. |
+| AWS Lambda | Scaffold a serverless application with `investing-algorithm-framework init --type aws_lambda`. |
+| Azure Functions | Scaffold a serverless application with `investing-algorithm-framework init --type azure_function`. |
+| [Finterion](https://finterion.com) | Optional hosted analytics, strategy releases, paper or live deployment, monitoring, and distribution through the integration plugin. |
+
+See the [deployment examples](#deployment) and
+[deployment guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)
+for self-hosted and serverless setup.
+
+### Finterion — quantitative trading infrastructure
+
+[![Develop and backtest with QuantOS, exchange portable OBTF research, and connect Finterion for analytics, releases, deployment, monitoring, and distribution. QuantOS works independently.](static/integrations/finterion-workflow.svg)](https://finterion.com)
+
+[Finterion](https://finterion.com) connects your QuantOS strategies to hosted
+research and trading infrastructure. Organize backtest experiments, manage
+versioned releases, and deploy and monitor paper or live strategies.
+
+| Your workflow | What Finterion adds |
+| --- | --- |
+| Research & evaluation | Upload portable `.obtf` results, organize studies and research bundles, and compare experiments. |
+| Versioning & releases | Manage immutable source versions and named releases tied to deployments. |
+| Deployment & monitoring | Deploy paper or live strategies and monitor orders, trades, and execution activity. |
+| Publishing & distribution | Share research, publish algorithms, and distribute strategies through the marketplace. |
+
+[![Explore Finterion](static/integrations/explore-finterion.svg)](https://finterion.com)
+[![Integration plugin](static/integrations/integration-plugin.svg)](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin)
+
+**Optional by design.** QuantOS remains usable independently. Finterion extends
+your workflow; it is not required to develop, backtest, or run strategies.
+
+QuantOS's dashboard analyzes backtest results; Finterion's monitoring covers
+deployment execution activity.
+
+## Guides & examples
+
+Expand a guide for implementation details, code examples, and execution-mode
+limitations. Start with **Strategy Definition** for the recommended confluence
+scoring approach.
+
+[Strategy definition](#strategy-definition) · [Backtesting](#backtesting) · [Storage](#backtest-storage) · [Portfolio & credentials](#portfolio-and-credentials-management) · [Position modes](#position-modes) · [Pipelines](#pipelines) · [Monte Carlo](#monte-carlo-testing)
 
 <a id="strategy-definition"></a>
 <details>
@@ -112,9 +187,8 @@ and routing. This replaces the default signal-processing pipeline: declaring
 strategy risk rules alone does not apply that pipeline to your custom orders.
 
 ```python
-from investing_algorithm_framework import (
-    DataSource, OrderSide, Schedule, TimeUnit, TradingStrategy,
-)
+from quantos import DataSource, OrderSide, Schedule, TimeUnit, TradingStrategy
+
 
 
 class DirectOrderStrategy(TradingStrategy):
@@ -151,10 +225,10 @@ Emit trading intent rather than orders. The framework applies its normal
 conflict resolution, sizing, risk, execution, and cooldown phases.
 
 ```python
-from investing_algorithm_framework import (
-    DataSource, PositionSize, Schedule, SignalSide, TimeUnit, TradingStrategy,
-    signal_series_from_column, signals_from_column,
-)
+from quantos import DataSource, PositionSize, Schedule, \
+    SignalSide, TimeUnit, TradingStrategy, \
+    signal_series_from_column, signals_from_column
+
 
 
 class MovingAverageSignalStrategy(TradingStrategy):
@@ -211,7 +285,7 @@ Precomputation is appropriate here because RSI uses only present and past data.
 ```python
 from pyindicators import rsi
 
-from investing_algorithm_framework import (
+from quantos import (
     ConfluenceScoringStrategy, ConfluenceScoreConfig, CooldownRule,
     DataSource, IndicatorConfig, IndicatorRule, PositionSize, Schedule,
     SignalSide, StopLossRule, TakeProfitRule, TimeUnit,
@@ -316,7 +390,7 @@ Backtests use a `Study` to describe the experiment and a
 `BacktestRunConfiguration` to control execution and persistence.
 
 ```python
-from investing_algorithm_framework import BacktestRunConfiguration
+from quantos import BacktestRunConfiguration
 
 results = app.run_backtests(
     strategies=strategies,
@@ -442,24 +516,9 @@ investing-algorithm-framework init --type aws_lambda
 investing-algorithm-framework init --type azure_function
 ```
 
-### Finterion
-
-Publish validated strategies to the
-[Finterion marketplace](https://www.finterion.com/) so investors can subscribe
-to them. The Finterion plugin handles the framework integration.
-
-<p align="center">
-  <a href="https://www.finterion.com/" target="_blank">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="static/features/marketplace-dark.svg">
-      <source media="(prefers-color-scheme: light)" srcset="static/features/marketplace-light.svg">
-      <img src="static/features/marketplace-dark.svg" alt="Finterion marketplace integration" style="max-width: 100%;">
-    </picture>
-  </a>
-</p>
-
 See the [deployment guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)
-and [Finterion plugin](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin).
+for setup details, or [Platforms & hosting](#platforms-integrations--hosting)
+for optional hosted integrations.
 
 </details>
 
@@ -523,7 +582,7 @@ running a separate server.
 </p>
 
 ```python
-from investing_algorithm_framework import BacktestReport
+from quantos import BacktestReport
 
 # Materialize only the selected results when working with a large index.
 BacktestReport(
@@ -581,7 +640,7 @@ maintain independent long and short legs for the same symbol, each with its own
 entry, scaling, stop-loss, take-profit, cooldown, and P&L.
 
 ```python
-from investing_algorithm_framework import PositionMode
+from quantos import PositionMode
 
 app.add_market(
   market="BITVAVO",
@@ -615,7 +674,7 @@ universe, rank candidates, normalize factors, and construct multi-factor or
 risk-neutral signals without manually looping over symbols.
 
 ```python
-from investing_algorithm_framework import AverageDollarVolume, Pipeline, Returns
+from quantos import AverageDollarVolume, Pipeline, Returns
 
 
 class MomentumScreener(Pipeline):
@@ -700,6 +759,30 @@ and optimizers can be added without replacing the core workflow.
 
 ## Development & Contributing
 
+[![Build the next chapter of QuantOS. Explore the GitHub project boards and find a way to contribute.](static/community/quantos-contribute.svg)](https://github.com/coding-kitties/investing-algorithm-framework/projects)
+
+### What we're working on
+
+Follow the GitHub project boards for tracked work and its latest status.
+Open a card for context, then join the discussion before starting a larger change.
+
+**[Planned features](https://github.com/orgs/coding-kitties/projects/3)** · **[Bug tracking](https://github.com/orgs/coding-kitties/projects/5)** · [Source repository](https://github.com/coding-kitties/investing-algorithm-framework)
+
+### Find your way in
+
+| Contribution | Start here |
+| --- | --- |
+| **Fix a bug** | Check the [Bugs board](https://github.com/orgs/coding-kitties/projects/5), or [report a reproducible issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new). |
+| **Build a feature** | Explore [planned features](https://github.com/orgs/coding-kitties/projects/3) and discuss the approach on the linked issue. |
+| **Improve the docs** | Follow the [contributing guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing%20Guide/contributing) to help with explanations, examples, and tutorials. |
+| **Share an idea** | [Open an issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new) with your use case, or [talk it through on the forum](https://finterion.com/community/forum). |
+
+### From idea to pull request
+
+Fork the repository, agree on the scope in an issue, and make a focused change
+with relevant tests and documentation. Link the issue in your pull request and
+use the contributing guide for the full setup and review workflow.
+
 Contributions are welcome. Open an issue, choose an existing one, or submit a
 pull request against the `dev` branch.
 
@@ -734,18 +817,3 @@ project and its contributors assume no responsibility for investment results.
 
 Thank you to everyone who has contributed code, documentation, testing, ideas,
 and feedback. See [AUTHORS.md](AUTHORS.md) for the contributor list.
-
-## Sponsors
-
-<p align="center">
-  <a href="https://www.finterion.com/" target="_blank">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
-      <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
-      <img src="static/sponsors/finterion-light.png" alt="Finterion" width="180">
-    </picture>
-  </a>
-</p>
-
-[Finterion](https://www.finterion.com/) is a marketplace for trading bots where
-strategy creators can publish and monetize their work.

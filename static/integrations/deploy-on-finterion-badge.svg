@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="145" height="20" viewBox="0 0 145 20" role="img" aria-labelledby="title">
+  <title id="title">Deploy on Finterion</title>
+  <defs>
+    <linearGradient id="logo-blue" x1="421.6" y1="0" x2="486.19" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0052ff"/>
+      <stop offset="1" stop-color="#009eff"/>
+    </linearGradient>
+    <linearGradient id="logo-gold" x1="424.8" y1="0" x2="450.85" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#dba203"/>
+      <stop offset="1" stop-color="#ffc000"/>
+    </linearGradient>
+  </defs>
+  <path fill="#242d43" d="M0 0h61v20H0z"/>
+  <path fill="#634dcc" d="M61 0h84v20H61z"/>
+  <svg x="67" y="3" width="12" height="14" viewBox="421 403 66 94" aria-hidden="true">
+    <path fill="url(#logo-blue)" d="M486.19,403.14v22.74c0,2.29-1.51,4.32-3.72,4.96l-60.88,17.84v-22.74c0-2.29,1.51-4.32,3.72-4.96l60.88-17.84Z"/>
+    <path fill="url(#logo-blue)" d="M425.31,453.55c-2.2.65-3.72,2.67-3.72,4.96v24.15c0,3.13,1.67,5.96,4.27,7.51-2.35-5.51-1.37-9.98,8.4-12.64l16.58-4.86,19.39-5.67c2.2-.64,3.72-2.67,3.72-4.96v-22.74l-48.64,14.24Z"/>
+    <path fill="url(#logo-gold)" d="M434.27,477.53c-9.77,2.66-10.75,7.13-8.41,12.63l.02.02h0c1.33.58,2.7,1.07,4.09,1.48l17.38,5.09c1.75.51,3.49-.8,3.49-2.62v-21.46l-16.58,4.86Z"/>
+  </svg>
+  <g fill="#fff" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11" text-anchor="middle">
+    <text x="30.5" y="14">deploy on</text>
+    <text x="110" y="14">finterion</text>
+  </g>
+</svg>
