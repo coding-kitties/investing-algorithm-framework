@@ -720,7 +720,7 @@ python -m unittest discover -s tests
 - [Quick start](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation)
 - [Tutorial notebooks](examples/tutorial/README.md)
 - [Strategy showcase](examples/algorithm_examples/strategies_showcase/README.md)
-- [Discord](https://discord.gg/dQsRmGZP)
+- [Finterion forum](https://finterion.com/community/forum)
 - [Reddit](https://www.reddit.com/r/InvestingBots/)
 
 ## Risk Disclaimer

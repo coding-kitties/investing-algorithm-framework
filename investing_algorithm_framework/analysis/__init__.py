@@ -11,6 +11,7 @@ from .ranking import create_weights, rank_results
 from .bundle_inspection import print_bundle_summary
 from .top_selection import load_top_selection, TopSelection
 from .robustness import rank_by_cross_study_robustness
+from .charts import create_layered_equity_chart
 # Import from new location for backward compatibility
 from investing_algorithm_framework.services.data_providers.data import \
     fill_missing_timeseries_data, get_missing_timeseries_data_entries
@@ -39,4 +40,5 @@ __all__ = [
     "load_top_selection",
     "TopSelection",
     "rank_by_cross_study_robustness",
+    "create_layered_equity_chart",
 ]
