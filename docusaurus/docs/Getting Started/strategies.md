@@ -10,6 +10,10 @@ Learn how to create and implement trading strategies using the Investing Algorit
 
 Trading strategies are the core logic that determines when to buy, sell, or hold assets. The framework provides a flexible `TradingStrategy` class that allows you to implement various trading approaches using signal-based trading with built-in support for position sizing, stop losses, and take profits.
 
+Use the [scenario-based testing framework](./testing-framework.md) to seed
+portfolio state and assert signals, sizing, risk rules, orders, and fills in
+deterministic strategy regression tests.
+
 ## TradingStrategy Attributes
 
 The `TradingStrategy` class has the following key attributes:

@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `StrategyScenario` (`investing_algorithm_framework.testing`, also exported
+  at the top level) seeds a strategy test with cash, long/short trade lots,
+  pending orders, stop-loss/take-profit rules, trailing state and cooldown
+  history through the production order and trade services. Each seed is
+  validated (`ScenarioSetupError`) and followed by a cash/position/lot
+  consistency check (`ScenarioStateError`); every scenario keeps its state in
+  its own in-memory store, with no database, network or files. (#625)
+- `StrategyScenario.get_position_size` calculates a concrete quote-currency
+  allocation through the strategy's overridable sizing method.
+  `preview_order` returns sized intents and diagnostics from the production
+  eligibility, sizing and risk-budget phases without submitting orders or
+  advancing cooldown history. Both use explicit offline asset prices.
+- Scenario rule inspection and detached stop-loss/take-profit previews honor
+  strategy overrides and position-mode rule selection. Cooldown inspection
+  reports matching configuration, blocking rules and remaining bars at the
+  next evaluation, including portfolio scope, HEDGE legs and scaling timers.
+- Scenarios can register a datetime-based data generator and use `step` or
+  `advance_bars` to evaluate scheduled bars. Completed generated candles feed
+  the production backtest fill/risk evaluator before the strategy pipeline;
+  `ScenarioStepResult` captures raw signals, new orders, fills and traces.
+  New orders remain pending until a later eligible candle is supplied.
+- Scenario construction also accepts `start_date` as an alias for `start`
+  and an optional inclusive `end_date`. `None` leaves stepping unbounded;
+  out-of-range advancement is rejected before evaluating any requested bar.
+- `register_position` seeds a filled trade with generated order IDs and
+  returns its `Position`. `get_trades(position=...)` and
+  `get_orders(position=...)` inspect all associated lots/orders, including
+  closed trades, pending exits and both HEDGE legs; omitting the position
+  returns all scenario trades/orders. `open_trade` still returns a `Trade`.
+  Both query helpers accept the corresponding Context filters in addition to
+  `position`: trades support target/trading symbol, market, portfolio object
+  or ID, status and inclusive `opened_since`; orders support target symbol,
+  status, type, side and market. Filters intersect and preserve Context
+  ordering without advancing the scenario or mutating its state.
+  Per-symbol/source data generators accept datetime-based callbacks returning
+  OHLCV frames or candle records, alongside the existing whole-strategy
+  generator form. The showcase includes a warmed-up extreme-crash scenario
+  verifying trailing-stop triggers, later fills and no long-entry signals.
+- The [strategy testing guide](docusaurus/docs/Getting%20Started/testing-framework.md)
+  documents public setup, preview/query utilities, generated stepping, failure
+  handling, and cleanup, alongside an expanded runnable reference example.
+
 ## [9.0.0] - 2026-11-17
 
 The first stable v9 release brings together the v9 prereleases documented
