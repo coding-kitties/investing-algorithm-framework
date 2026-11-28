@@ -15,9 +15,9 @@ triggers protection without new long entries." Use a
 Passing scenario tests does not demonstrate profitability.
 
 :::note Availability
-These APIs are being introduced in the next release. Until it is published,
-use a source checkout containing `StrategyScenario`; the released 9.0.0 package
-does not include this guide's new scenario APIs.
+These APIs are available in **v9.1.0 and later**. Upgrade to that release or use
+a source checkout containing `StrategyScenario`; version 9.0.0 does not include
+this guide's scenario APIs.
 :::
 
 ## Quick start: seed an existing trade

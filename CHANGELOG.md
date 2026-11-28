@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.1.0] - 2026-11-28
+
 ### Added
 
 - `StrategyScenario` (`investing_algorithm_framework.testing`, also exported
@@ -50,6 +52,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The [strategy testing guide](docusaurus/docs/Getting%20Started/testing-framework.md)
   documents public setup, preview/query utilities, generated stepping, failure
   handling, and cleanup, alongside an expanded runnable reference example.
+
+### Fixed
+
+- Rolling Sharpe ratios subtract the annual risk-free rate consistently with
+  static Sharpe ratios and retain `NaN` for zero-volatility windows. (#651)
+- Value at Risk and Conditional Value at Risk include the first month's
+  return by reusing the shared monthly-return calculation. (#648)
+- Multi-window winning/losing trade averages use actual population counts,
+  including legacy saved count/percentage pairs, rather than misinterpreting
+  fractional win rates or counting breakeven trades as losses. (#646)
 
 ## [9.0.0] - 2026-11-17
 
