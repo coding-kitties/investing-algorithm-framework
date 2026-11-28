@@ -30,7 +30,7 @@ dashboard, and run the same strategy in paper or live trading.
 
 >**Note:** The current documentation website is not fully up-to-date with v9 of QuantOS. If you need guidance or have any questions please reach out on the [forum](https://finterion.com/community/forum).
 
-[Get started](#getting-started) · [Features](#feature-highlights) · [Integrations](#integrations--ecosystem) · [Guides & examples](#guides--examples) · [Dashboard](#dashboard) · [Deployment](#deployment) · [Forum](#join-the-quantos-forum-hosted-on-finterioncom)
+[Get started](#getting-started) · [Features](#feature-highlights) · [Platforms & hosting](#platforms-integrations--hosting) · [Guides & examples](#guides--examples) · [Dashboard](#dashboard) · [Deployment](#deployment) · [Forum](#join-the-quantos-forum-hosted-on-finterioncom)
 
 ## Join the QuantOS forum hosted on Finterion.com
 
@@ -101,10 +101,22 @@ share a strategy, or start a discussion.
 - 🌐 **[Extensible integrations](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-data-providers):** Add custom data providers, order executors, storage adapters, metrics, strategies, and optimizers.
 - 🤖 **[Built-in MCP server](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server):** Let compatible AI tools query backtests, compare strategies, inspect trades, and manage research notes.
 
-## Integrations & ecosystem
+<a id="integrations--ecosystem"></a>
+## Platforms, integrations & hosting
 
-Build with QuantOS. Extend your workflow with optional integrations for
-research, deployment, monitoring, and distribution.
+Run QuantOS independently on your own infrastructure, use serverless deployment
+options, or connect an optional hosted platform.
+
+| Platform or hosting option | How it fits |
+| --- | --- |
+| Local / self-hosted | Run research, backtests, dashboards, and paper or live strategies on your own machine or infrastructure, including Docker. |
+| AWS Lambda | Scaffold a serverless application with `investing-algorithm-framework init --type aws_lambda`. |
+| Azure Functions | Scaffold a serverless application with `investing-algorithm-framework init --type azure_function`. |
+| [Finterion](https://finterion.com) | Optional hosted analytics, strategy releases, paper or live deployment, monitoring, and distribution through the integration plugin. |
+
+See the [deployment examples](#deployment) and
+[deployment guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)
+for self-hosted and serverless setup.
 
 ### Finterion — quantitative trading infrastructure
 
@@ -126,6 +138,9 @@ versioned releases, and deploy and monitor paper or live strategies.
 
 **Optional by design.** QuantOS remains usable independently. Finterion extends
 your workflow; it is not required to develop, backtest, or run strategies.
+
+QuantOS's dashboard analyzes backtest results; Finterion's monitoring covers
+deployment execution activity.
 
 ## Guides & examples
 
@@ -366,11 +381,6 @@ and the [strategy showcase](examples/algorithm_examples/strategies_showcase/READ
 
 </details>
 
-[![Give your strategy a release history. Optional Finterion integration.](static/integrations/finterion-strategy-definition.svg)](https://finterion.com)
-
-[![Integration plugin](static/integrations/integration-plugin.svg)](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin)
-
-
 <a id="backtesting"></a>
 <details>
 <summary><strong>Backtesting</strong></summary>
@@ -441,11 +451,6 @@ and the [tutorial notebooks](examples/tutorial/README.md).
 
 </details>
 
-[![Organize and compare backtest experiments. Optional Finterion integration.](static/integrations/finterion-backtesting.svg)](https://finterion.com)
-
-[![Integration plugin](static/integrations/integration-plugin.svg)](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin)
-
-
 <a id="backtest-storage"></a>
 <details>
 <summary><strong>Backtest Storage</strong></summary>
@@ -477,11 +482,6 @@ iaf migrate-store --from local-dir --src ./my-backtests/ \
 See the [storage layer example](examples/storage_layer_demo/README.md).
 
 </details>
-
-[![Connect portable OBTF results to hosted research. Optional Finterion integration.](static/integrations/finterion-backtest-storage.svg)](https://finterion.com)
-
-[![Integration plugin](static/integrations/integration-plugin.svg)](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin)
-
 
 <a id="deployment"></a>
 <details>
@@ -516,31 +516,11 @@ investing-algorithm-framework init --type aws_lambda
 investing-algorithm-framework init --type azure_function
 ```
 
-### Finterion
-
-Publish validated strategies to the
-[Finterion marketplace](https://www.finterion.com/) so investors can subscribe
-to them. The Finterion plugin handles the framework integration.
-
-<p align="center">
-  <a href="https://www.finterion.com/" target="_blank">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="static/features/marketplace-dark.svg">
-      <source media="(prefers-color-scheme: light)" srcset="static/features/marketplace-light.svg">
-      <img src="static/features/marketplace-dark.svg" alt="Finterion marketplace integration" style="max-width: 100%;">
-    </picture>
-  </a>
-</p>
-
 See the [deployment guide](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)
-and [Finterion plugin](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin).
+for setup details, or [Platforms & hosting](#platforms-integrations--hosting)
+for optional hosted integrations.
 
 </details>
-
-[![Deploy paper or live strategies and monitor execution. Optional Finterion integration.](static/integrations/finterion-deployment.svg)](https://finterion.com)
-
-[![Integration plugin](static/integrations/integration-plugin.svg)](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin)
-
 
 <a id="portfolio-and-credentials-management"></a>
 <details>
@@ -625,13 +605,6 @@ See the [report guide](https://coding-kitties.github.io/investing-algorithm-fram
 and [MCP server guide](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server).
 
 </details>
-
-[![Extend backtest analysis with deployment monitoring. Optional Finterion integration.](static/integrations/finterion-dashboard.svg)](https://finterion.com)
-
-[![Integration plugin](static/integrations/integration-plugin.svg)](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin)
-
-QuantOS's dashboard analyzes backtest results; Finterion's monitoring covers deployment execution activity.
-
 
 <a id="advanced-features"></a>
 <details>
@@ -783,11 +756,6 @@ Custom data providers, order executors, storage adapters, strategies, metrics,
 and optimizers can be added without replacing the core workflow.
 
 </details>
-
-[![Publish research and distribute algorithms. Optional Finterion integration.](static/integrations/finterion-plugins-and-supported-libraries.svg)](https://finterion.com)
-
-[![Integration plugin](static/integrations/integration-plugin.svg)](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin)
-
 
 ## Development & Contributing
 
