@@ -7,7 +7,7 @@
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache_2.0-634DCC?style=flat-square&amp;labelColor=242D43" alt="Apache 2.0 license"></a>
   <a href="https://coding-kitties.github.io/investing-algorithm-framework/"><img src="https://img.shields.io/badge/docs-getting_started-634DCC?style=flat-square&amp;labelColor=242D43" alt="Documentation"></a>
   <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers"><img src="https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework?style=flat-square&amp;labelColor=242D43&amp;color=634DCC&amp;label=stars" alt="GitHub stars"></a>
-  <a href="https://finterion.com"><img src="https://img.shields.io/badge/deploy%20on-finterion-634DCC?style=flat-square&amp;labelColor=242D43" alt="Deploy on Finterion"></a>
+  <a href="https://finterion.com"><img src="static/integrations/deploy-on-finterion-badge.svg" alt="Deploy on Finterion"></a>
   <a href="https://finterion.com/community/forum"><img src="https://img.shields.io/badge/dynamic/xml?url=https%3A%2F%2Ffinterion.com%2Fapi%2Fforum-badge.svg&amp;query=%2F%2F%2A%5Blocal-name%28%29%3D%27text%27%20and%20contains%28.%2C%20%27%20members%27%29%5D&amp;label=forum&amp;style=flat-square&amp;labelColor=242D43&amp;color=634DCC" alt="Forum member count"></a>
 </p>
 
