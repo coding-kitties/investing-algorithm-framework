@@ -1,9 +1,5 @@
-<h1 align="center">
-  Investing Algorithm Framework
-</h1>
-
 <p align="center">
-  <i>Build strategies, backtest at scale, compare results, and deploy the winner without rewriting your strategy.</i>
+  <img src="static/branding/foundry-ceramic-banner.svg" alt="Investing Algorithm Framework" width="100%">
 </p>
 
 <h4 align="center">
