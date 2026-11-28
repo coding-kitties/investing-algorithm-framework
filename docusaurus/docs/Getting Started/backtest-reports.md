@@ -26,6 +26,82 @@ report.show()  # Opens a browser, or renders inline in Jupyter.
 
 ## Creating Reports
 
+### Standalone layered equity chart
+
+Use `create_layered_equity_chart(backtests, daterange)` to compare equity
+without constructing a full report or reshaping metrics manually:
+
+```python
+from investing_algorithm_framework import (
+    BacktestDateRange, create_layered_equity_chart,
+)
+
+chart = create_layered_equity_chart(
+    backtests=results,  # BacktestIndex, a Backtest, or an iterable of Backtests
+    daterange=BacktestDateRange("2024-01-01", "2024-12-31"),
+)
+chart.display_in_jupyter()  # Offline notebook display; requires notebook extras.
+# In a Python script: chart.show() opens the hosted Finterion chart renderer.
+```
+
+Every overlapping run across all studies and both engines gets a labeled line
+in the same panel. The inclusive date range clips observations, and each line
+is normalized to 1 at its first selected point. Missing observations remain
+gaps; curves are not interpolated, combined, or extended past their history.
+This is normalized portfolio equity, not cash-flow-adjusted return.
+Normalization uses a linear axis, not a logarithmic scale. To display original
+portfolio balances instead, pass `normalize=False`:
+
+```python
+chart = create_layered_equity_chart(results, daterange, normalize=False)
+chart.display_in_jupyter()
+```
+
+Absolute values retain each run's quote currency, so compare runs using the
+same currency. Zero or negative starting values are allowed in absolute mode;
+normalization requires a positive first selected value.
+
+Add a benchmark curve by supplying a pandas Series with a DatetimeIndex of
+quote-availability timestamps:
+
+```python
+chart = create_layered_equity_chart(
+    results, daterange, normalize=True,
+    benchmark=benchmark_prices, benchmark_label="S&P 500 (^GSPC)",
+)
+chart.display_in_jupyter()
+```
+
+The benchmark is normalized to its first available sampled quote. A supplied
+quote before the date range can establish its starting reference. The most
+recent available quote is carried forward at each chart timestamp, including
+weekends and holidays; future quotes are never filled backward. If no starting
+quote is available, the benchmark starts later with a gap. Benchmark overlays
+require normalized mode, avoiding mixing index points with currency balances.
+The chart helper itself does not fetch data.
+
+The runnable example downloads the S&P 500 **price index** (`^GSPC`) using
+`download_v2` with the optional Yahoo integration:
+
+```bash
+poetry install --extras yahoo
+python -m examples.charts.layered_equity_chart --sp500
+```
+
+In the Interactive Window, use `main(inline=True, sp500=True)`. Downloading needs
+internet access, but the HTML chart remains self-contained. This price-index
+comparison excludes dividends and does not convert USD returns to EUR.
+
+An index loads its referenced bundles one at a time; filter it first to limit
+the algorithms loaded. All overlapping runs within each loaded bundle are
+included. Runs use stored equity metrics, or portfolio snapshots if those
+metrics are absent. Missing selected data and invalid normalization baselines
+raise explicit errors rather than silently dropping a curve.
+Identical repeated observations (such as opening snapshots) are collapsed;
+conflicting equity values at the same timestamp are rejected.
+The shared vertical range includes all selected curves, so comparison lines
+are not clipped to the primary curve's values.
+
 ### Dedicated dashboard demo
 
 The [dashboard demo](https://github.com/coding-kitties/investing-algorithm-framework/tree/main/examples/dashboard_demo)

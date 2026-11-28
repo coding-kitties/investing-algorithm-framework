@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `create_layered_equity_chart(backtests, daterange)` returns a standalone
+  Finterion chart with normalized, labeled equity overlays for overlapping
+  runs across studies and engines. It accepts BacktestIndex/Backtest inputs
+  directly, clips inclusively, retains missing-data gaps, and supports
+  portfolio-snapshot fallback when equity metrics are absent.
+
 ## [9.1.0] - 2026-11-28
 
 ### Added

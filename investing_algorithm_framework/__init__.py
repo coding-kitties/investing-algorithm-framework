@@ -21,7 +21,7 @@ from .analysis import generate_rolling_backtest_windows, \
     plot_backtest_windows, plot_window_correlation_matrix, \
     load_top_selection, TopSelection, \
     create_cross_study_metrics_table, \
-    rank_by_cross_study_robustness  # noqa: F401
+    rank_by_cross_study_robustness, create_layered_equity_chart  # noqa: F401
 from .app import App, Algorithm, \
     TradingStrategy, ConfluenceScoringStrategy, StatelessAction, Task, \
     AppHook, Context, \
@@ -543,6 +543,7 @@ __all__ = [
     "TopSelection",
     "create_cross_study_metrics_table",
     "rank_by_cross_study_robustness",
+    "create_layered_equity_chart",
     "build_index",
     "rank_index",
     "format_table",
