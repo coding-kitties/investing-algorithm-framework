@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="208" viewBox="0 0 960 208" role="img" aria-labelledby="title description">
+<title id="title">Build the next chapter of QuantOS</title>
+<desc id="description">Explore the GitHub project boards. Pick an issue, share an idea, or improve the docs. Every contribution moves the framework forward.</desc>
+<rect x=".5" y=".5" width="959" height="207" rx="12" fill="#f0efeb" stroke="#cec6e7"/>
+<rect x=".5" y="24" width="5" height="160" rx="2.5" fill="#634dcc"/>
+<g font-family="Arial,Helvetica,sans-serif">
+<text x="32" y="37" fill="#634dcc" font-size="12" font-weight="700" letter-spacing="2">QUANTOS / BUILT TOGETHER</text>
+<text x="31" y="80" fill="#242d43" font-size="32" font-weight="700">Build the next chapter.</text>
+<text x="32" y="111" fill="#697184" font-size="16">Code. Documentation. Ideas. There is more than one way to contribute.</text>
+<rect x="32" y="140" width="258" height="40" rx="6" fill="#634dcc"/>
+<text x="49" y="165" fill="#fff" font-size="14" font-weight="700">Explore the project boards</text>
+<path d="M266 160h10m-4-4 4 4-4 4" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="309" y="165" fill="#697184" font-size="14">Find a starting point. Make it better.</text>
+</g>
+<g transform="translate(804 43)" fill="none" stroke="#634dcc" stroke-width="2">
+<rect x="0" y="0" width="112" height="122" rx="10" stroke="#c5badf"/>
+<path d="M37 1v120M75 1v120" stroke="#d3cddd"/>
+<rect x="10" y="13" width="17" height="32" rx="4" fill="#ddd7ef" stroke="none"/>
+<rect x="47" y="13" width="18" height="51" rx="4" fill="#b5a7e1" stroke="none"/>
+<rect x="85" y="13" width="17" height="25" rx="4" fill="#634dcc" stroke="none"/>
+<path d="m88 25 3 3 7-8" stroke="#fff" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="10" y="53" width="17" height="24" rx="4" fill="#ddd7ef" stroke="none"/>
+<rect x="47" y="72" width="18" height="24" rx="4" fill="#ddd7ef" stroke="none"/>
+</g>
+</svg>
