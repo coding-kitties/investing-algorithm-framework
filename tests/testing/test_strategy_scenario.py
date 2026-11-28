@@ -1,14 +1,15 @@
 """Tests for the StrategyScenario setup harness (#625).
 
-One test case per acceptance criterion of the issue. Every scenario
-runs in memory: no CSV data, no network and nothing written to the
-repository tree.
+One test case per acceptance criterion of the issue. Valid strategies use
+the shared RSI/EMA confluence baseline. Every scenario runs in memory:
+no CSV data, no network and nothing written to the repository tree.
 """
 import inspect
 import os
 import re
 import socket
 import tempfile
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest import TestCase
@@ -16,18 +17,20 @@ from unittest.mock import patch
 
 from investing_algorithm_framework import BacktestDateRange, \
     CooldownRule, DataSource, PortfolioConfiguration, PositionMode, \
-    RESOURCE_DIRECTORY, ScalingRule, Schedule, SignalSide, StopLossRule, \
-    TakeProfitRule, TimeUnit, TradingStrategy
+    RESOURCE_DIRECTORY, ScalingRule, SignalSide, StopLossRule, \
+    TakeProfitRule
 from investing_algorithm_framework import StrategyScenario, \
     ScenarioSetupError, ScenarioStateError
 from investing_algorithm_framework.domain import OperationalException
+from tests.resources.strategies_for_testing.confluence_strategy import \
+    ConfluenceScoringStrategy
 
 START = datetime(2024, 1, 1, tzinfo=timezone.utc)
 HOUR = timedelta(hours=1)
 
 
-class MyStrategy(TradingStrategy):
-    schedule = Schedule.every(1, TimeUnit.HOUR)
+class MyStrategy(ConfluenceScoringStrategy):
+    """Use the same real RSI/EMA baseline as the capability scenarios."""
 
 
 def minimal_example():
@@ -345,10 +348,9 @@ class TestValidation(TestCase):
     def test_constructor_errors(self):
         naive = datetime(2024, 1, 1)
         strategy_with_sources = MyStrategy(data_sources=[
-            DataSource(symbol="BTC/EUR", data_type="OHLCV",
-                       time_frame="1h", market="BITVAVO"),
-            DataSource(symbol="BTC/USDT", data_type="OHLCV",
-                       time_frame="1h", market="BINANCE"),
+            *MyStrategy.data_sources,
+            DataSource(symbol="ETH/USDT", data_type="OHLCV",
+                       time_frame="2h", market="BINANCE"),
         ])
         ran = MyStrategy()
         ran._cooldown_bar_index = 3
@@ -365,7 +367,10 @@ class TestValidation(TestCase):
             (dict(initial_cash=-1), "initial_cash must be"),
             (dict(initial_cash=float("inf")), "initial_cash must be"),
             (dict(trading_symbol=None), "trading_symbol is required"),
-            (dict(market=None), "no market"),
+            (dict(market=None, strategy=MyStrategy(data_sources=[
+                replace(MyStrategy.data_sources[0], market=None),
+            ])),
+             "no market"),
             (dict(market=None, strategy=strategy_with_sources),
              "['BINANCE', 'BITVAVO']"),
             (dict(trading_symbol=None, market=None,
@@ -392,9 +397,7 @@ class TestValidation(TestCase):
                 "StrategyScenario(...): "))
 
     def test_market_comes_from_the_single_data_source_market(self):
-        strategy = MyStrategy(data_sources=[DataSource(
-            symbol="BTC/EUR", data_type="OHLCV", time_frame="1h",
-            market="BITVAVO")])
+        strategy = MyStrategy()
         with StrategyScenario(strategy, initial_cash=1, start=START,
                               trading_symbol="EUR") as s:
             self.assertEqual(
