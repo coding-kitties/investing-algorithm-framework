@@ -171,7 +171,7 @@ and routing. This replaces the default signal-processing pipeline: declaring
 strategy risk rules alone does not apply that pipeline to your custom orders.
 
 ```python
-from investing_algorithm_framework import (
+from quantos import
     DataSource, OrderSide, Schedule, TimeUnit, TradingStrategy,
 )
 
@@ -210,7 +210,7 @@ Emit trading intent rather than orders. The framework applies its normal
 conflict resolution, sizing, risk, execution, and cooldown phases.
 
 ```python
-from investing_algorithm_framework import (
+from quantos import (
     DataSource, PositionSize, Schedule, SignalSide, TimeUnit, TradingStrategy,
     signal_series_from_column, signals_from_column,
 )
@@ -270,7 +270,7 @@ Precomputation is appropriate here because RSI uses only present and past data.
 ```python
 from pyindicators import rsi
 
-from investing_algorithm_framework import (
+from quantos import (
     ConfluenceScoringStrategy, ConfluenceScoreConfig, CooldownRule,
     DataSource, IndicatorConfig, IndicatorRule, PositionSize, Schedule,
     SignalSide, StopLossRule, TakeProfitRule, TimeUnit,
@@ -380,7 +380,7 @@ Backtests use a `Study` to describe the experiment and a
 `BacktestRunConfiguration` to control execution and persistence.
 
 ```python
-from investing_algorithm_framework import BacktestRunConfiguration
+from quantos import BacktestRunConfiguration
 
 results = app.run_backtests(
     strategies=strategies,
@@ -602,7 +602,7 @@ running a separate server.
 </p>
 
 ```python
-from investing_algorithm_framework import BacktestReport
+from quantos import BacktestReport
 
 # Materialize only the selected results when working with a large index.
 BacktestReport(
@@ -667,7 +667,7 @@ maintain independent long and short legs for the same symbol, each with its own
 entry, scaling, stop-loss, take-profit, cooldown, and P&L.
 
 ```python
-from investing_algorithm_framework import PositionMode
+from quantos import PositionMode
 
 app.add_market(
   market="BITVAVO",
@@ -701,7 +701,7 @@ universe, rank candidates, normalize factors, and construct multi-factor or
 risk-neutral signals without manually looping over symbols.
 
 ```python
-from investing_algorithm_framework import AverageDollarVolume, Pipeline, Returns
+from quantos import AverageDollarVolume, Pipeline, Returns
 
 
 class MomentumScreener(Pipeline):
