@@ -249,3 +249,119 @@ Official methodology references:
 
 This report records research observations and their limitations. It is not
 legal advice, a trademark registration, or an assurance that use is lawful.
+
+## Alternative name candidates
+
+User-provided brainstorming list. Repeated names, including case-only variants,
+are listed once. These alternatives have not been screened by this report;
+inclusion does not establish trademark, domain, or package-name availability.
+
+### Tier 1 - Strong contenders
+
+- TradeForge
+- QuantCraft
+- TradeCraft
+- apexquant
+- vectortrade
+- stratforge
+- quantengine
+- tradeengine
+- forgequant
+- tradehub
+- tradenest
+- quantmew
+- kittyquant
+
+### Additional candidates
+
+- AlgoForge
+- QuantFlow
+- Stratify
+- AlphaWorks
+- AlphaTrader
+- PyTrader
+- TradeX
+- TradeCore
+- QuantCore
+- PyTradeBotLab
+- QuantLab
+- TradeAlchemy
+- PyTrade
+- FluxTrade
+- TradeLib
+- Quantify
+- AlphaTrade
+- CoreTrade
+- PyQuant
+- TradeLab
+- TraderLib
+- FluxQuant
+- TradeWorks
+- QuantLib
+- TradeBotLab
+- QuantBotLab
+- StrataTrade
+- QLynk
+- Toro
+- Prysm
+- Vyn
+- Arvo
+- Delta
+- Fluxis
+- Sivo
+- Corex
+- Numa
+- Aerith
+- Drift
+- Orium
+- Kaltra
+- Spire
+- Vetra
+- Nebula
+- Orionis
+- Xylo
+- Lunara
+- Alchemy
+- Craft
+- Axion
+- Nexora
+- Omnitrade
+- Lumora
+- Veltrix
+- Equinox
+- Zenith
+- Orbis
+- Cypherion
+- Novatrade
+- Optivest
+- Athenium
+- Vertex
+- Arbitrix
+- Quantis
+- Finetix
+- Modulus
+- AlgoSphere
+- Kintara
+- CodeTrade
+- NeuraTrade
+- AlphaTrail
+- TradeVibe
+- SignalWave
+- FlowAlgo
+- MarketForge
+- ProfitSense
+- ChronoTrade
+- Quantix
+- backbase
+- brovo
+- catquant
+- core-quant
+- norix
+- nuvix
+- nuvo
+- quantara
+- quantcore-py
+- vexa
+- qyrix
+- xelva
+- zylar
