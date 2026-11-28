@@ -41,14 +41,15 @@ trading workflow. Define a strategy once, explore it with vector backtests,
 validate it in an event-driven simulation, inspect the results in an interactive
 dashboard, and run the same strategy in paper or live trading.
 
-> **v9 is now available.**
+> **v9.1 is now available.**
 >
 > ```bash
-> pip install investing-algorithm-framework==9.0.0
+> pip install investing-algorithm-framework==9.1.0
 > ```
 >
-> See the [v9.0 release notes](docusaurus/blog/2026-08-02-v9.0-release.md)
-> and [changelog](CHANGELOG.md). This README targets **v9 and later**;
+> See the [v9.1 changelog](CHANGELOG.md#910---2026-11-28)
+> and [v9.0 migration notes](docusaurus/blog/2026-08-02-v9.0-release.md).
+> This README targets **v9 and later**;
 > its APIs and examples may not work with earlier versions.
 
 ### Feature Highlights
@@ -57,6 +58,7 @@ dashboard, and run the same strategy in paper or live trading.
 - 🔁 **[Long and short trading](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/orders):** Define entry and exit signals once and run the same strategy in vector backtests, event-driven backtests, paper trading, and live trading.
 - ⚡ **[Vector backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting):** Evaluate signals and sweep thousands of strategy variants quickly with Polars-powered execution.
 - 🏃 **[Event-driven backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting):** Validate candidates bar by bar with realistic orders, fills, costs, and portfolio management.
+- 🧪 **[A first-class, scenario-based strategy testing framework](docusaurus/docs/Getting%20Started/testing-framework.md):** Seed portfolio and market conditions, advance scheduled bars, and assert signals, orders, fills, sizing, risk rules, and cooldowns with Python testing frameworks. See the [runnable reference](examples/testing_framework/example.py).
 - 🪟 **[Studies, universes, and backtest windows](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/studies):** Define the assets, assumptions, and rolling, anchored, holdout, walk-forward, time-OOS, or universe-OOS periods for each experiment.
 - 🗂️ **[Open Backtest Format](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/open-backtest-format):** Keep complete vector and event results in portable, versioned `.obtf` bundles.
 - 🗄️ **[Tiered storage and indexing](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-storage):** Rank and filter 10,000+ backtests through SQLite without decoding full result bundles.

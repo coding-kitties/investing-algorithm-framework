@@ -463,11 +463,12 @@ class EventMemoryState:
 
 
 @contextmanager
-def event_memory_scope(accounting_backend='python'):
+def activate_event_memory(state, accounting_backend='python'):
+    """Route repository calls into an existing ``state`` for the
+    duration of the block, without creating or closing it."""
     if _active_state.get() is not None:
         raise OperationalException(
             'Nested event memory scopes are unsupported')
-    state = EventMemoryState()
     token = _active_state.set(state)
     try:
         from investing_algorithm_framework.domain.native_event import \
@@ -476,4 +477,13 @@ def event_memory_scope(accounting_backend='python'):
             yield state
     finally:
         _active_state.reset(token)
+
+
+@contextmanager
+def event_memory_scope(accounting_backend='python'):
+    state = EventMemoryState()
+    try:
+        with activate_event_memory(state, accounting_backend):
+            yield state
+    finally:
         state.close()

@@ -140,3 +140,27 @@ class PortfolioOutOfSyncError(OperationalException):
         self.local_unallocated = local_unallocated
         self.broker_available = broker_available
         self.delta = delta
+
+
+class ScenarioSetupError(OperationalException):
+    """
+    Raised when a :class:`StrategyScenario` is given a fixture that
+    cannot exist, such as a lot the cash cannot pay for. The
+    scenario state is left unchanged.
+    """
+
+
+class ScenarioStateError(OperationalException):
+    """
+    Raised when a :class:`StrategyScenario`'s cash, positions, trade
+    lots and reservations no longer agree.
+
+    Attributes:
+        violations (list[str]): Every invariant that does not hold.
+    """
+
+    def __init__(self, violations) -> None:
+        super().__init__(
+            "Scenario state is inconsistent:\n- " + "\n- ".join(violations)
+        )
+        self.violations = list(violations)

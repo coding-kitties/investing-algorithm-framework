@@ -56,6 +56,59 @@ _ORDER_SIDE_TO_TRACKER = {
 _SYSTEM_EXIT_REASONS = ("take_profit", "stop_loss")
 
 
+def record_emission(strategy, symbol, side, bar_index, position_mode):
+    """Record one emitted order on the strategy's cooldown state.
+
+    Updates the :class:`CooldownTracker`, the scale-out counter and
+    the ``ScalingRule.cooldown_in_bars`` countdown exactly as
+    :class:`RecordCooldownPhase` does for each emitted order.
+
+    Args:
+        strategy: The :class:`TradingStrategy` that owns the state.
+        symbol (str): Target symbol of the order.
+        side (SignalSide): Side of the signal that emitted the order.
+        bar_index (int): Bar index the emission is recorded at.
+        position_mode (PositionMode): Mode of the portfolio; HEDGE
+            keys the state per position side.
+    """
+    tracker_side = _TRACKER_SIDE.get(side)
+    if tracker_side is None:
+        return  # pragma: no cover - exhaustive map
+
+    # Record into the CooldownTracker for CooldownRule
+    # evaluation on the *next* bar.
+    strategy._cooldown_tracker.record(
+        symbol=symbol,
+        order_side=tracker_side,
+        bar_index=bar_index,
+        position_side=(
+            ("long" if side.is_long else "short")
+            if position_mode == PositionMode.HEDGE
+            else None
+        ),
+    )
+
+    # Per-side bookkeeping.
+    scaling_rule = strategy.get_scaling_rule(symbol)
+    if side is SignalSide.SCALE_OUT:
+        so_index = strategy._scale_out_counts.get(symbol, 0)
+        strategy._scale_out_counts[symbol] = so_index + 1
+    elif side is SignalSide.CLOSE_LONG:
+        # Full exit resets the scale-out ladder.
+        strategy._scale_out_counts.pop(symbol, None)
+
+    # Start per-symbol cooldown if the scaling rule asks for it.
+    if scaling_rule and scaling_rule.cooldown_in_bars > 0:
+        cooldown_key = symbol
+        if position_mode == PositionMode.HEDGE:
+            cooldown_key = (
+                symbol, "long" if side.is_long else "short"
+            )
+        strategy._cooldown_remaining[cooldown_key] = (
+            scaling_rule.cooldown_in_bars
+        )
+
+
 class RecordCooldownPhase(StrategyPhase):
     """Phase 7 — update cooldown tracker + scale-out counters."""
 
@@ -67,50 +120,13 @@ class RecordCooldownPhase(StrategyPhase):
         if not state.emitted_orders:
             return
 
-        strategy = state.strategy
-        bar_index = state.bar_index
-
         for emitted in state.emitted_orders:
-            symbol = emitted.symbol
-            side = emitted.side
             if emitted.intent.signal.metadata.get("synthetic_flip_close"):
                 continue
-            tracker_side = _TRACKER_SIDE.get(side)
-            if tracker_side is None:
-                continue  # pragma: no cover - exhaustive map
-
-            # Record into the CooldownTracker for CooldownRule
-            # evaluation on the *next* bar.
-            strategy._cooldown_tracker.record(
-                symbol=symbol,
-                order_side=tracker_side,
-                bar_index=bar_index,
-                position_side=(
-                    ("long" if side.is_long else "short")
-                    if state.position_mode == PositionMode.HEDGE
-                    else None
-                ),
+            record_emission(
+                state.strategy, emitted.symbol, emitted.side,
+                state.bar_index, state.position_mode,
             )
-
-            # Per-side bookkeeping.
-            scaling_rule = strategy.get_scaling_rule(symbol)
-            if side is SignalSide.SCALE_OUT:
-                so_index = strategy._scale_out_counts.get(symbol, 0)
-                strategy._scale_out_counts[symbol] = so_index + 1
-            elif side is SignalSide.CLOSE_LONG:
-                # Full exit resets the scale-out ladder.
-                strategy._scale_out_counts.pop(symbol, None)
-
-            # Start per-symbol cooldown if the scaling rule asks for it.
-            if scaling_rule and scaling_rule.cooldown_in_bars > 0:
-                cooldown_key = symbol
-                if state.position_mode == PositionMode.HEDGE:
-                    cooldown_key = (
-                        symbol, "long" if side.is_long else "short"
-                    )
-                strategy._cooldown_remaining[cooldown_key] = (
-                    scaling_rule.cooldown_in_bars
-                )
 
     def _record_system_exits(self, state: PhaseState) -> None:
         """Record TP / SL fills onto the strategy's
