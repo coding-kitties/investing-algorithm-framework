@@ -1,8 +1,8 @@
 """Shared setup and real RSI/EMA signals for capability scenarios.
 
-StrategyScenario currently provides state setup, not evaluation steps or
-result objects. Eligibility checks below use existing production phases,
-without executing orders or filling pending ones.
+Eligibility-only checks below use production phases without executing
+orders or filling pending ones. Scheduled execution/fill tests instead
+use the public StrategyScenario.step API.
 """
 
 from datetime import datetime, timedelta, timezone

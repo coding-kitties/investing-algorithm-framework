@@ -1,22 +1,27 @@
 """StrategyScenario: a seeded, isolated portfolio for strategy tests."""
 import math
 import weakref
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from tempfile import TemporaryDirectory
-from typing import Optional
+from typing import Any, Callable, Optional
+
+import pandas as pd
+import polars as pl
 
 from investing_algorithm_framework.app import App, TradingStrategy
 from investing_algorithm_framework.dependency_container import \
     DependencyContainer
 from investing_algorithm_framework.domain import BacktestDateRange, \
-    INDEX_DATETIME, RESOURCE_DIRECTORY, Order, OrderSide, \
-    PortfolioConfiguration, PositionMode, ScenarioSetupError, \
+    DataType, INDEX_DATETIME, RESOURCE_DIRECTORY, OperationalException, \
+    Order, OrderSide, OrderStatus, OrderType, Portfolio, \
+    PortfolioConfiguration, Position, PositionMode, ScenarioSetupError, \
     ScenarioStateError, StopLossRule, TakeProfitRule, CooldownRule, \
-    Trade, TradeStopLoss, TradeTakeProfit
+    TimeFrame, Trade, TradeStatus, TradeStopLoss, TradeTakeProfit
 from investing_algorithm_framework.domain.models.signal import (
     Signal, SignalSide,
 )
@@ -32,6 +37,11 @@ from investing_algorithm_framework.services.strategy_phases import (
     ApplyRiskBudgetPhase, PhaseState, ResolveConflictsPhase,
     SizedIntent, SizePositionsPhase,
 )
+from investing_algorithm_framework.services.indicator_engine import (
+    _completion, _normalize,
+)
+from investing_algorithm_framework.services.trade_order_evaluator \
+    .backtest_trade_oder_evaluator import BacktestTradeOrderEvaluator
 
 # ids of strategy instances bound to an open scenario
 _bound_strategies = set()
@@ -92,6 +102,24 @@ class ScenarioCooldownPreview:
         return self.remaining_bars > 0
 
 
+@dataclass(frozen=True)
+class ScenarioStepResult:
+    """Detached snapshots from one scheduled evaluation.
+
+    ``signals`` are raw strategy signals, not necessarily approved.
+    ``orders`` were created this step, including protective exits.
+    ``filled_orders`` gained a fill this step, including partial fills.
+    New orders normally fill on a later step, not retroactively against
+    the candles that produced their signals.
+    """
+
+    datetime: datetime
+    signals: tuple[Signal, ...]
+    orders: tuple[Order, ...]
+    filled_orders: tuple[Order, ...]
+    traces: tuple[tuple[str, object], ...]
+
+
 class _ScenarioPrices(DataProviderService):
     def __init__(self, prices, trading_symbol, call):
         super().__init__()
@@ -127,6 +155,10 @@ class StrategyScenario:
     scenarios never share state. Process-wide caches that hold no
     portfolio state (timeframe parsing, blotter registry) are shared.
 
+    Register a data generator to drive scheduled :meth:`step` evaluations
+    or :meth:`advance_bars`, including production order/fill processing.
+    Existing preview methods remain non-mutating and do not advance time.
+
     Example::
 
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -143,8 +175,12 @@ class StrategyScenario:
         strategy (TradingStrategy): A fresh strategy instance; it is
             bound to this scenario until :meth:`close`.
         initial_cash (float): Quote-currency cash at the start.
-        start (datetime): Timezone-aware scenario time, on the hour.
-            Seeded history lies at or before it.
+        start (datetime): Timezone-aware initial scenario time, on the hour.
+            Required unless start_date is supplied.
+        start_date (datetime, optional): Alias for start. If both are given,
+            they must identify the same instant.
+        end_date (datetime, optional): Inclusive stepping limit, at or after
+            the initial time. None (default) leaves stepping unbounded.
         trading_symbol (str): Quote currency, e.g. ``"EUR"``.
         market (str, optional): Market name. Defaults to the single
             market named by the strategy's data sources.
@@ -153,6 +189,8 @@ class StrategyScenario:
         portfolio_configuration (PortfolioConfiguration, optional):
             Use instead of ``trading_symbol``, ``market`` and
             ``position_mode``.
+        data_generator (callable, optional): Datetime-based market-data
+            callback; alternatively use :meth:`register_data_generator`.
 
     Raises:
         ScenarioSetupError: If the arguments describe no valid
@@ -164,15 +202,24 @@ class StrategyScenario:
         strategy: TradingStrategy,
         *,
         initial_cash: float,
-        start: datetime,
+        start: Optional[datetime] = None,
         trading_symbol: Optional[str] = None,
         market: Optional[str] = None,
         position_mode: Optional[PositionMode] = None,
         portfolio_configuration: Optional[PortfolioConfiguration] = None,
+        data_generator: Optional[
+            Callable[[datetime], Mapping[str, Any]]
+        ] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
     ):
         self._closed = True
         call = "StrategyScenario(...)"
         self._check_strategy(call, strategy)
+        if data_generator is not None and not callable(data_generator):
+            raise ScenarioSetupError(
+                f"{call}: data generator must be callable."
+            )
 
         if not _number(initial_cash) or initial_cash < 0:
             raise ScenarioSetupError(
@@ -180,6 +227,13 @@ class StrategyScenario:
                 f"(got {initial_cash!r})."
             )
 
+        if start is not None and start_date is not None \
+                and start != start_date:
+            raise ScenarioSetupError(
+                f"{call}: start and start_date must identify the same time."
+            )
+        if start is None:
+            start = start_date
         if not isinstance(start, datetime) or start.tzinfo is None \
                 or start.timestamp() % 3600:
             raise ScenarioSetupError(
@@ -187,6 +241,17 @@ class StrategyScenario:
                 f"UTC hour (got {start!r}). Pass e.g. "
                 f"datetime(2024, 1, 1, tzinfo=timezone.utc)."
             )
+        if end_date is not None:
+            if not isinstance(end_date, datetime) or end_date.tzinfo is None \
+                    or end_date.utcoffset() is None:
+                raise ScenarioSetupError(
+                    f"{call}: end_date must be a timezone-aware datetime "
+                    f"or None (got {end_date!r})."
+                )
+            if end_date < start:
+                raise ScenarioSetupError(
+                    f"{call}: end_date must be at or after start."
+                )
 
         configuration = self._portfolio_configuration(
             call, strategy, initial_cash, trading_symbol, market,
@@ -197,6 +262,13 @@ class StrategyScenario:
         self._mode = configuration.position_mode
         self._trading_symbol = configuration.trading_symbol
         self._last_bars_ago = {}
+        self._data_generator = data_generator
+        self._source_generators: dict[
+            str, Callable[[datetime], Any]
+        ] = {}
+        self._end_date = end_date
+        self._stepping = False
+        self._step_failed = False
         self._tmp = TemporaryDirectory(prefix="iaf-scenario-")
         _bound_strategies.add(id(strategy))
         # Also releases the strategy if the scenario is never closed.
@@ -220,6 +292,18 @@ class StrategyScenario:
             self._context._current_strategy_id = strategy.strategy_id
             self._start = date_range.start_date
             self._state = EventMemoryState()
+            self._evaluator = BacktestTradeOrderEvaluator(
+                trade_service=self._services.trade_service(),
+                order_service=self._services.order_service(),
+                trade_stop_loss_service=self._services
+                .trade_stop_loss_service(),
+                trade_take_profit_service=self._services
+                .trade_take_profit_service(),
+                configuration_service=self._services.configuration_service(),
+                context=self._context,
+                trading_costs=configuration.trading_costs,
+                portfolio_configuration=configuration,
+            )
 
             with self._activate():
                 self._services.portfolio_service() \
@@ -264,6 +348,350 @@ class StrategyScenario:
         self._ensure_open()
         return self._services.configuration_service() \
             .config[INDEX_DATETIME]
+
+    def register_data_generator(
+        self,
+        generator: Callable[[datetime], Mapping[str, Any]] | str,
+        symbol_generator: Optional[Callable[[datetime], Any]] = None,
+    ) -> None:
+        """Register an offline market-data callback for scheduled steps.
+
+        Called with each evaluation datetime. Return pandas/Polars frames
+        keyed by every declared data-source ID. Include sufficient history
+        for indicators and fills since the preceding step. OHLCV frames
+        need Open/High/Low/Close/Volume and a datetime index or column;
+        timestamps are candle opening times. Only completed candles are
+        passed to the strategy and fill evaluator.
+
+        The callback generates input data, not a replacement Context.
+        It must not mutate the scenario itself.
+        Portfolio state remains owned by the scenario. All held/ordered
+        assets must have a declared OHLCV source in the quote currency;
+        for multiple timeframes, the finest source supplies fill prices.
+
+        Alternatively register_data_generator("BTC", callback) registers
+        one OHLCV source. The callback receives the same datetime and returns
+        a frame or an iterable of candle records (timestamp and
+        open/high/low/close/volume). A base symbol must resolve to one source;
+        use its exact data-source ID when ambiguous. Register every declared
+        source, and do not mix this mode with a whole-strategy callback.
+        """
+        self._ensure_open()
+        if self._stepping or self._step_failed:
+            raise ScenarioSetupError(
+                "Cannot replace the data generator during a step or after "
+                "a failed evaluation. Create a fresh scenario after failure."
+            )
+        if isinstance(generator, str):
+            if not callable(symbol_generator):
+                raise ScenarioSetupError(
+                    "A symbol/source generator must be callable."
+                )
+            if self._data_generator is not None:
+                raise ScenarioSetupError(
+                    "Cannot mix symbol generators with a whole-strategy "
+                    "data generator."
+                )
+            sources = [
+                source for source in self.strategy.data_sources or []
+                if source.get_identifier() == generator
+            ]
+            if not sources:
+                symbol = self._check_symbol(
+                    _call("register_data_generator", generator), generator,
+                )
+                sources = [
+                    source for source in self.strategy.data_sources or []
+                    if source.symbol == f"{symbol}/{self._trading_symbol}"
+                    and DataType.OHLCV.equals(source.data_type)
+                ]
+            if len(sources) != 1 or not DataType.OHLCV.equals(
+                sources[0].data_type,
+            ):
+                raise ScenarioSetupError(
+                    f"{generator!r} must resolve to one declared OHLCV "
+                    "source. Use an exact data-source ID when ambiguous."
+                )
+            self._source_generators[sources[0].get_identifier()] = (
+                symbol_generator
+            )
+            return
+        if not callable(generator) or symbol_generator is not None:
+            raise ScenarioSetupError("data generator must be callable.")
+        if self._source_generators:
+            raise ScenarioSetupError(
+                "Cannot mix a whole-strategy data generator with "
+                "symbol generators."
+            )
+        self._data_generator = generator
+
+    def step(self) -> ScenarioStepResult:
+        """Advance to the next scheduled time, evaluate fills, then strategy.
+
+        Reuses the production backtest evaluator and run_strategy pipeline,
+        including overridden phases/executors, trading costs, risk rules,
+        hooks and cooldown bookkeeping. New orders are pending until a later
+        eligible completed candle. No exchange or data-provider fetch runs.
+
+        Generator/data validation errors leave time and trading state
+        unchanged. Evaluation failures can leave partial effects: inspect
+        them, but use a fresh scenario rather than retrying the failed tick.
+        Earlier successful steps in advance_bars are not rolled back.
+        """
+        self._ensure_open()
+        if self._stepping or self._step_failed:
+            raise ScenarioSetupError(
+                "Cannot step recursively or after a failed evaluation. "
+                "Create a fresh scenario after failure."
+            )
+        if self._data_generator is None and not self._source_generators:
+            raise ScenarioSetupError(
+                "Register a market-data callback with "
+                "register_data_generator before stepping."
+            )
+        at = self._next_step_time(self.now)
+        self._stepping = True
+        try:
+            generated = (
+                self._data_generator(at)
+                if self._data_generator is not None else {
+                    identifier: self._source_frame(callback(at), identifier)
+                    for identifier, callback in self._source_generators.items()
+                }
+            )
+            data, quotes, candles = self._generated_data(generated, at)
+            with self._activate(), self._strategy_context():
+                services = self._services
+                positions = services.position_service().get_all()
+                required = {
+                    f"{position.symbol}/{self._trading_symbol}"
+                    for position in positions
+                    if position.symbol != self._trading_symbol
+                }
+                required.update(
+                    order.symbol for order in services.order_service()
+                    .get_all({"status": "OPEN"})
+                )
+                required.update(
+                    trade.symbol for trade in services.trade_service()
+                    .get_all({"status": "OPEN"})
+                )
+                missing = required - quotes.keys()
+                if missing:
+                    raise ScenarioSetupError(
+                        f"step({at!r}): no completed OHLCV prices for "
+                        f"{sorted(missing)}. Declare and generate their "
+                        f"data sources."
+                    )
+                before = {
+                    order.id: order.filled or 0
+                    for order in services.order_service().get_all()
+                }
+                previous_provider = self._context.data_provider_service
+                self._context.data_provider_service = _ScenarioPrices(
+                    quotes, self._trading_symbol, _call("step", at),
+                )
+                self._step_failed = True
+                services.configuration_service().add_value(INDEX_DATETIME, at)
+                try:
+                    dispatcher = services.trade_service().trade_hook_dispatcher
+                    dispatcher.configure([self.strategy], self._context)
+                    self._evaluator.evaluate(
+                        open_trades=services.trade_service().get_all(
+                            {"status": "OPEN"},
+                        ),
+                        open_orders=services.order_service().get_all(
+                            {"status": "OPEN"},
+                        ),
+                        ohlcv_data=candles,
+                    )
+                    self.strategy.run_strategy(self._context, data)
+                    emission_errors = [
+                        detail for name, detail in self.strategy.traces
+                        if name == "emit_orders.error"
+                    ]
+                    if emission_errors:
+                        raise OperationalException(
+                            f"step({at!r}): order emission failed: "
+                            f"{emission_errors!r}"
+                        )
+                    self.strategy._last_run = at
+                    self._check()
+                    orders = services.order_service().get_all()
+                    result = ScenarioStepResult(
+                        datetime=at,
+                        signals=tuple(deepcopy(self.strategy.last_signals)),
+                        orders=tuple(deepcopy([
+                            order for order in orders if order.id not in before
+                        ])),
+                        filled_orders=tuple(deepcopy([
+                            order for order in orders
+                            if (order.filled or 0) > before.get(order.id, 0)
+                        ])),
+                        traces=tuple(deepcopy(self.strategy.traces)),
+                    )
+                    self._last_bars_ago.clear()
+                    self._step_failed = False
+                    return result
+                finally:
+                    if self._step_failed:
+                        self._context.data_provider_service = previous_provider
+        finally:
+            self._stepping = False
+
+    def advance_bars(self, count: int = 1) -> tuple[ScenarioStepResult, ...]:
+        """Run count scheduled evaluations; a bar is one strategy tick.
+
+        Check the whole requested schedule before evaluating any bar.
+        Exceeding end_date raises without advancing time or trading state.
+        """
+        self._ensure_open()
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            raise ScenarioSetupError("advance_bars count must be an int >= 1.")
+        at = self.now
+        for _ in range(count):
+            at = self._next_step_time(at)
+        return tuple(self.step() for _ in range(count))
+
+    def _next_step_time(self, after: datetime) -> datetime:
+        at = self.strategy.schedule.next_run_after(after)
+        if at is None:
+            raise ScenarioSetupError("The strategy has no next scheduled run.")
+        if self._end_date is not None and at > self._end_date:
+            raise ScenarioSetupError(
+                f"Scheduled evaluation {at.isoformat()} exceeds end_date "
+                f"{self._end_date.isoformat()}."
+            )
+        return at
+
+    @staticmethod
+    def _source_frame(raw, identifier):
+        if not isinstance(raw, (pd.DataFrame, pl.DataFrame)):
+            if not isinstance(raw, Iterable) \
+                    or isinstance(raw, (str, bytes, Mapping)):
+                raise ScenarioSetupError(
+                    f"Source {identifier}: return a frame or iterable "
+                    "of OHLCV records."
+                )
+            records = list(raw)
+            if any(not isinstance(row, Mapping) for row in records):
+                raise ScenarioSetupError(
+                    f"Source {identifier}: each candle record must be a "
+                    "mapping."
+                )
+            if not records:
+                return pd.DataFrame(
+                    columns=["Open", "High", "Low", "Close", "Volume"],
+                    index=pd.DatetimeIndex([], tz="UTC"),
+                )
+            raw = pd.DataFrame.from_records(records)
+        names = {
+            "timestamp": "Datetime", "datetime": "Datetime",
+            "open": "Open", "high": "High", "low": "Low",
+            "close": "Close", "volume": "Volume",
+        }
+        renames = {
+            column: names[str(column).lower()] for column in raw.columns
+            if str(column).lower() in names
+        }
+        return (
+            raw.rename(columns=renames) if isinstance(raw, pd.DataFrame)
+            else raw.rename(renames)
+        )
+
+    def _generated_data(self, generated, at):
+        call = _call("step", at)
+        if not isinstance(generated, Mapping):
+            raise ScenarioSetupError(
+                f"{call}: data generator must return a mapping of "
+                "data-source IDs to frames."
+            )
+        sources = {
+            source.get_identifier(): source
+            for source in self.strategy.data_sources or []
+        }
+        if generated.keys() != sources.keys():
+            raise ScenarioSetupError(
+                f"{call}: generated data-source IDs must match the strategy; "
+                f"missing={sorted(sources.keys() - generated.keys())}, "
+                f"unexpected={list(generated.keys() - sources.keys())}."
+            )
+        data, quotes, candles, resolutions = {}, {}, {}, {}
+        for identifier, source in sources.items():
+            raw = generated[identifier]
+            try:
+                frame = _normalize(raw, identifier, preserve=True)
+            except (TypeError, ValueError) as error:
+                raise ScenarioSetupError(f"{call}: {error}") from error
+            is_ohlcv = DataType.OHLCV.equals(source.data_type)
+            if is_ohlcv and (
+                source.time_frame is None
+                or source.time_frame == TimeFrame.CURRENT
+            ):
+                raise ScenarioSetupError(
+                    f"{call}: {identifier} needs a candle timeframe."
+                )
+            available = (
+                _completion(frame.index, source.time_frame.value)
+                if is_ohlcv else frame.index
+            )
+            completed = available <= at
+            frame = frame.loc[completed]
+            if source.pandas:
+                data[identifier] = frame
+            elif isinstance(raw, pl.DataFrame):
+                data[identifier] = raw.filter(pl.Series(completed))
+            else:
+                normalized = frame.drop(columns=["Datetime"], errors="ignore")
+                data[identifier] = pl.from_pandas(
+                    normalized.rename_axis("Datetime").reset_index(),
+                )
+            if not is_ohlcv:
+                continue
+            columns = ["Open", "High", "Low", "Close", "Volume"]
+            if any(column not in frame for column in columns):
+                raise ScenarioSetupError(
+                    f"{call}: {identifier} requires OHLCV columns {columns}."
+                )
+            if frame.empty:
+                continue
+            values = frame[columns]
+            if any(
+                not pd.api.types.is_numeric_dtype(values[column])
+                or pd.api.types.is_bool_dtype(values[column])
+                or pd.api.types.is_complex_dtype(values[column])
+                for column in columns
+            ):
+                raise ScenarioSetupError(
+                    f"{call}: {identifier} OHLCV values must be numeric."
+                )
+            if not (
+                values.notna().all().all()
+                and values.abs().lt(float("inf")).all().all()
+                and values[columns[:4]].gt(0).all().all()
+                and values["Volume"].ge(0).all()
+                and values["Low"].le(values[["Open", "Close"]].min(axis=1))
+                .all()
+                and values["High"].ge(values[["Open", "Close"]].max(axis=1))
+                .all()
+            ):
+                raise ScenarioSetupError(
+                    f"{call}: {identifier} contains invalid OHLCV candles."
+                )
+            pair = source.symbol
+            if pair is None or not pair.endswith(f"/{self._trading_symbol}"):
+                raise ScenarioSetupError(
+                    f"{call}: {identifier} needs an OHLCV pair in "
+                    f"{self._trading_symbol}."
+                )
+            resolution = source.time_frame.amount_of_minutes
+            if pair not in resolutions or resolution < resolutions[pair]:
+                resolutions[pair] = resolution
+                quotes[pair] = float(frame["Close"].iloc[-1])
+                execution = values.copy()
+                execution.index.name = "Datetime"
+                candles[pair] = pl.from_pandas(execution.reset_index())
+        return data, quotes, candles
 
     def get_position_size(
         self, symbol: str, *, price: float,
@@ -619,6 +1047,111 @@ class StrategyScenario:
             return self._services.trade_service() \
                 .get_all({"order_id": order.id})[0]
 
+    def register_position(
+        self,
+        symbol: str,
+        *,
+        amount: float,
+        price: float,
+        direction: str = "long",
+        opened_at: Optional[datetime] = None,
+        fee: float = 0.0,
+        apply_strategy_rules: bool = True,
+    ) -> Position:
+        """Seed a filled lot through open_trade and return its Position.
+
+        Repeated registrations add lots to the same position. Inspect all
+        its lots/orders with get_trades(position=...) and get_orders(
+        position=...), including both legs in HEDGE mode. This does not
+        replace holdings or link an existing/custom order ID.
+        """
+        trade = self.open_trade(
+            symbol, amount=amount, price=price, direction=direction,
+            opened_at=opened_at, fee=fee,
+            apply_strategy_rules=apply_strategy_rules,
+        )
+        with self._activate():
+            return self._services.position_service().find({
+                "order_id": trade.orders[0].id,
+            })
+
+    def get_trades(
+        self,
+        target_symbol: Optional[str] = None,
+        trading_symbol: Optional[str] = None,
+        market: Optional[str] = None,
+        portfolio: Optional[Portfolio | int] = None,
+        status: Optional[TradeStatus | str] = None,
+        opened_since: Optional[datetime] = None,
+        *,
+        position: Optional[Position] = None,
+    ) -> list[Trade]:
+        """Get trade lots using Context filters and an optional position.
+
+        Filters are combined with AND. Portfolio accepts a Portfolio or ID;
+        opened_since is inclusive. With no status, include open/closed lots
+        and both HEDGE legs. Omitted filters leave that field unrestricted.
+        """
+        with self._activate():
+            position_id = None if position is None else \
+                self._check_position("get_trades", position)
+            trades = self._context.get_trades(
+                target_symbol=target_symbol, trading_symbol=trading_symbol,
+                market=market, portfolio=portfolio, status=status,
+                opened_since=opened_since,
+            )
+            if position is None:
+                return trades
+            return [
+                trade for trade in trades
+                if any(order.position_id == position_id
+                       for order in trade.orders)
+            ]
+
+    def get_orders(
+        self,
+        target_symbol: Optional[str] = None,
+        status: Optional[OrderStatus | str] = None,
+        order_type: Optional[OrderType | str] = None,
+        order_side: Optional[OrderSide | str] = None,
+        market: Optional[str] = None,
+        *,
+        position: Optional[Position] = None,
+    ) -> list[Order]:
+        """Get orders using Context filters and an optional position.
+
+        Filters are combined with AND. With no status, include filled
+        entries and pending exits. Preserve Context's result ordering.
+        """
+        with self._activate():
+            position_id = None if position is None else \
+                self._check_position("get_orders", position)
+            orders = self._context.get_orders(
+                target_symbol=target_symbol, status=status,
+                order_type=order_type, order_side=order_side, market=market,
+            )
+            if position is None:
+                return orders
+            return [
+                order for order in orders if order.position_id == position_id
+            ]
+
+    def _check_position(self, method: str, position: Position) -> int:
+        if not isinstance(position, Position):
+            raise ScenarioSetupError(
+                f"{method}: position must be a Position from this scenario."
+            )
+        matches = self._services.position_service().get_all({
+            "id": position.id,
+            "portfolio": position.portfolio_id,
+            "symbol": position.symbol,
+        })
+        if position.id is None or not matches:
+            raise ScenarioSetupError(
+                f"{method}: position does not exist in this scenario."
+            )
+        return position.id
+
     def place_order(
         self,
         symbol: str,
@@ -932,7 +1465,8 @@ class StrategyScenario:
                 cash -= reservation * (order.amount - filled)
             elif order.status == "OPEN":
                 reserved = sum(a.amount_pending for a in allocations
-                               if a.order_id == order.id)
+                               if a.order_id == order.id
+                               and a.trade_id is not None)
                 if not _close(reserved, order.amount - filled):
                     violations.append(
                         f"pending SELL {order.id} reserves {reserved} "
@@ -999,11 +1533,12 @@ class StrategyScenario:
     @contextmanager
     def _clock(self, at):
         configuration = self._services.configuration_service()
+        previous = self.now
         configuration.add_value(INDEX_DATETIME, at)
         try:
             yield
         finally:
-            configuration.add_value(INDEX_DATETIME, self._start)
+            configuration.add_value(INDEX_DATETIME, previous)
 
     @staticmethod
     def _check_strategy(call, strategy):
@@ -1096,16 +1631,17 @@ class StrategyScenario:
 
     def _check_time(self, call, name, at, after=()):
         if at is None:
-            at = self._start
+            at = self.now
         if not isinstance(at, datetime) or at.tzinfo is None:
             raise ScenarioSetupError(
                 f"{call}: {name} must be a timezone-aware datetime "
                 f"(got {at!r}).")
-        if at > self._start:
+        if at > self.now:
+            boundary = "start" if self.now == self._start else "time"
             raise ScenarioSetupError(
                 f"{call}: {name} {at.isoformat()} is after the scenario "
-                f"start {self._start.isoformat()}. Seeded history lies "
-                f"at or before the start.")
+                f"{boundary} {self.now.isoformat()}. Seeded history lies "
+                f"at or before the current time.")
         for event, when in after:
             if when is not None and at < when:
                 raise ScenarioSetupError(

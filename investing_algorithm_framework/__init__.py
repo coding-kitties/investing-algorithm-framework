@@ -268,7 +268,7 @@ from .services import (
 )
 from .testing import (
     StrategyScenario, ScenarioOrderPreview, ScenarioCooldownPreview,
-    ScenarioSetupError, ScenarioStateError,
+    ScenarioSetupError, ScenarioStateError, ScenarioStepResult,
 )
 try:
     from .notebook.magic import load_ipython_extension  # noqa: F401
@@ -602,6 +602,7 @@ __all__ = [
     "StrategyScenario",
     "ScenarioOrderPreview",
     "ScenarioCooldownPreview",
+    "ScenarioStepResult",
     "ScenarioSetupError",
     "ScenarioStateError",
 ]

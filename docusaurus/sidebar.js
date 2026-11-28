@@ -23,6 +23,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/testing-framework',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/credentials',
                 },
                 {
